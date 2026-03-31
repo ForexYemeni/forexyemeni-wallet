@@ -1,5 +1,5 @@
 // Firebase Cloud Messaging Service Worker
-// This file handles background push notifications
+// This file handles background push notifications (FCM + Web Push)
 
 importScripts('https://www.gstatic.com/firebasejs/10.8.1/firebase-app-compat.js');
 importScripts('https://www.gstatic.com/firebasejs/10.8.1/firebase-messaging-compat.js');
@@ -15,6 +15,7 @@ firebase.initializeApp({
 
 const messaging = firebase.messaging();
 
+// ==================== FCM BACKGROUND MESSAGES ====================
 messaging.onBackgroundMessage(function(payload) {
     console.log('[Firebase SW] Background message received:', payload);
 
@@ -38,9 +39,45 @@ messaging.onBackgroundMessage(function(payload) {
     self.registration.showNotification(notificationTitle, notificationOptions);
 });
 
-// Handle notification click - open app
+// ==================== WEB PUSH MESSAGES ====================
+self.addEventListener('push', function(event) {
+    console.log('[SW] Push event received');
+
+    var data = { title: 'ForexYemeni Wallet', body: 'لديك إشعار جديد' };
+
+    try {
+        if (event.data) {
+            try {
+                data = event.data.json();
+            } catch(e) {
+                data.body = event.data.text();
+            }
+        }
+    } catch(e) {
+        console.warn('[SW] Push data parse error:', e);
+    }
+
+    var notificationOptions = {
+        body: data.body || 'لديك إشعار جديد',
+        icon: 'icon.png',
+        badge: 'icon.png',
+        dir: 'rtl',
+        lang: 'ar',
+        tag: data.tag || 'fy-push-' + Date.now(),
+        renotify: true,
+        requireInteraction: true,
+        vibrate: [200, 100, 200, 100, 200, 100, 200],
+        data: { clickAction: data.clickAction || '' }
+    };
+
+    event.waitUntil(
+        self.registration.showNotification(data.title || 'ForexYemeni Wallet', notificationOptions)
+    );
+});
+
+// ==================== NOTIFICATION CLICK ====================
 self.addEventListener('notificationclick', function(event) {
-    console.log('[Firebase SW] Notification clicked:', event);
+    console.log('[SW] Notification clicked:', event);
     event.notification.close();
 
     var clickAction = '/forexyemeni-wallet.html';
