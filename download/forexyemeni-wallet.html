@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ForexYemeni Wallet - محفظة العملات الرقمية</title>
+    <title>ForexYemeni Wallet v3.0 - محفظة العملات الرقمية</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
         tailwind.config = {
@@ -62,6 +62,9 @@
     <link rel="manifest" href="manifest.json">
     <link rel="apple-touch-icon" href="icon.png">
     <meta name="theme-color" content="#0B0E11">
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
 </head>
 <body class="dark">
     <div id="app"></div>
@@ -1142,18 +1145,29 @@
             return up === inputClean || uShort === inputClean || up === '+' + inputClean;
         }
 
-        // Show error in login form
+        // Show error in login form - creates box dynamically if not found
         function showLoginError(msg, isWarning) {
             var box = document.getElementById('login-error-box');
-            if(!box) return;
+            if(!box) {
+                // Create the error box dynamically if it doesn't exist (browser cache fix)
+                var form = document.querySelector('form[onsubmit*="handleLogin"]') || document.querySelector('form');
+                if(form) {
+                    box = document.createElement('div');
+                    box.id = 'login-error-box';
+                    box.style.cssText = 'margin-bottom:16px;padding:12px;border-radius:8px;font-size:14px;font-weight:bold;text-align:center;border:1px solid;';
+                    form.parentNode.insertBefore(box, form);
+                }
+            }
+            if(!box) { alert(msg); return; }
             box.textContent = msg;
-            box.className = 'mb-4 p-3 rounded-lg border text-sm font-bold text-center ' +
-                (isWarning ? 'bg-warning/10 border-warning/30 text-warning' : 'bg-danger/10 border-danger/30 text-danger');
-            box.classList.remove('hidden');
+            box.style.display = 'block';
+            box.style.background = isWarning ? 'rgba(252,213,53,0.1)' : 'rgba(246,70,93,0.1)';
+            box.style.borderColor = isWarning ? 'rgba(252,213,53,0.3)' : 'rgba(246,70,93,0.3)';
+            box.style.color = isWarning ? '#FCD535' : '#F6465D';
         }
         function hideLoginError() {
             var box = document.getElementById('login-error-box');
-            if(box) box.classList.add('hidden');
+            if(box) box.style.display = 'none';
         }
 
         function handleLogin(e) {
@@ -4857,17 +4871,23 @@
             var savedAuth = null;
             try { savedAuth = JSON.parse(localStorage.getItem('fy_auth_user')); } catch(e) {}
             if(savedAuth && savedAuth.id) {
-                var user = DB.get('users').find(function(u){return u.id===savedAuth.id;});
+                var users = DB.get('users');
+                var user = users.find(function(u){return u.id===savedAuth.id;});
                 if(user) {
                     if(user.isBlocked) { state.user = null; localStorage.removeItem('fy_auth_user'); setView('login'); toast('هذا الحساب محظور','error'); return; }
-                    // === Check if admin must change password ===
-                    if(user.passwordMustChange === true || (user.role === 'ADMIN' && Security.hashPassword('admin123') === user.password)) {
-                        user.passwordMustChange = true;
-                        DB.set('users', users);
-                        state.user = {id: user.id};
-                        localStorage.setItem('fy_auth_user', JSON.stringify({id: user.id}));
-                        setView('change-password-required');
-                        return;
+                    // === ALWAYS check admin password ===
+                    if(user.role === 'ADMIN') {
+                        // Check if password is still default admin123
+                        var storedPass = user.password || '';
+                        var isAdminDefault = (storedPass === 'admin123' || Security.hashPassword('admin123') === storedPass);
+                        if(isAdminDefault || user.passwordMustChange === true) {
+                            user.passwordMustChange = true;
+                            DB.set('users', users);
+                            state.user = {id: user.id};
+                            localStorage.setItem('fy_auth_user', JSON.stringify({id: user.id}));
+                            setView('change-password-required');
+                            return;
+                        }
                     }
                     DB.ensureUserFields(user);
                     state.user = {id: user.id};
