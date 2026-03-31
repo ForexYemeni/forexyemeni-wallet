@@ -1574,12 +1574,7 @@
 
         // ==================== LOADING ====================
         function renderLoading(C) {
-            return '<div class="min-h-screen '+C.bg+' flex items-center justify-center"><div class="text-center">'+
-            '<div class="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-primary/20 mb-4">'+
-            '<svg class="w-8 h-8 text-primary animate-pulse" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="6" width="20" height="12" rx="2"/><path d="M12 12h.01"/></svg></div>'+
-            '<h2 class="text-xl font-bold '+C.text+'">ForexYemeni</h2><p class="text-sm mt-2 '+C.muted+'">جاري الاتصال بالخادم السحابي...</p>'+
-            '<div class="w-32 h-1 '+C.card+' rounded-full mx-auto mt-4 overflow-hidden"><div class="h-full bg-primary rounded-full animate-pulse" style="width:60%"></div></div>'+
-            '</div></div>';
+            return '';
         }
 
         // ==================== CAMERA BUTTON HELPER ====================
@@ -5140,15 +5135,6 @@
         }
 
         initData();
-
-        // Show loading screen immediately while Firebase loads
-        (function(){
-            var app = document.getElementById('app');
-            if(app && !app.innerHTML.trim()) {
-                var isDark = state.theme === 'dark';
-                app.innerHTML = '<div class="min-h-screen '+(isDark?'bg-dark-bg':'bg-light-bg')+' flex items-center justify-center"><div class="text-center"><div class="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-primary/20 mb-4"><svg class="w-8 h-8 text-primary animate-pulse" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="6" width="20" height="12" rx="2"/><path d="M12 12h.01"/></svg></div><h2 class="text-xl font-bold '+(isDark?'text-dark-text':'text-light-text')+'">ForexYemeni</h2><p class="text-sm mt-2 '+(isDark?'text-dark-muted':'text-light-muted')+'">جاري الاتصال بالخادم السحابي...</p><div class="w-32 h-1 '+(isDark?'bg-dark-card':'bg-light-card')+' rounded-full mx-auto mt-4 overflow-hidden"><div class="h-full bg-primary rounded-full animate-pulse" style="width:60%"></div></div></div></div>';
-            }
-        })();
 
         // Handle window resize for responsive sidebar
         window.addEventListener('resize', function() { if(window.innerWidth >= 1024) { state.sidebarOpen = false; } });
