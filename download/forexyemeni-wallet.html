@@ -893,6 +893,7 @@
             '<div class="text-center mb-8"><div class="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-primary/10 mb-4">'+
             '<svg class="w-8 h-8 text-primary" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="6" width="20" height="12" rx="2"/><path d="M12 12h.01M6 12h.01M18 12h.01"/></svg></div>'+
             '<h1 class="text-2xl font-bold '+C.text+'">ForexYemeni Wallet</h1><p class="'+C.muted+' mt-1">تسجيل الدخول إلى محفظتك</p></div>'+
+            '<div id="login-error-box" class="hidden mb-4 p-3 rounded-lg bg-danger/10 border border-danger/30 text-danger text-sm font-bold text-center"></div>'+
             '<form onsubmit="handleLogin(event)" class="space-y-4">'+
             '<div><label class="block text-sm font-medium '+C.text+' mb-1">رقم الهاتف</label>'+
             '<input type="tel" id="login-phone" required class="w-full px-4 py-3 rounded-lg border '+C.input+' focus:ring-2 focus:ring-primary/50 outline-none" placeholder="أدخل رقم الهاتف"></div>'+
@@ -1141,23 +1142,38 @@
             return up === inputClean || uShort === inputClean || up === '+' + inputClean;
         }
 
+        // Show error in login form
+        function showLoginError(msg, isWarning) {
+            var box = document.getElementById('login-error-box');
+            if(!box) return;
+            box.textContent = msg;
+            box.className = 'mb-4 p-3 rounded-lg border text-sm font-bold text-center ' +
+                (isWarning ? 'bg-warning/10 border-warning/30 text-warning' : 'bg-danger/10 border-danger/30 text-danger');
+            box.classList.remove('hidden');
+        }
+        function hideLoginError() {
+            var box = document.getElementById('login-error-box');
+            if(box) box.classList.add('hidden');
+        }
+
         function handleLogin(e) {
             e.preventDefault();
             var phoneVal = document.getElementById('login-phone').value.trim();
             var pass = document.getElementById('login-pass').value;
-            if(!phoneVal || !pass) { toast('أدخل رقم الهاتف وكلمة المرور','error'); return; }
+            hideLoginError();
+            if(!phoneVal || !pass) { showLoginError('أدخل رقم الهاتف وكلمة المرور'); return; }
 
             // === Brute Force Protection ===
             var bfCheck = Security.checkBruteForce(phoneVal);
             if (!bfCheck.allowed) {
                 if (bfCheck.locked) {
-                    toast('🔒 الحساب مقفل. حاول بعد ' + bfCheck.waitMinutes + ' دقيقة','error',false);
+                    showLoginError('🔒 الحساب مقفل. حاول بعد ' + bfCheck.waitMinutes + ' دقيقة');
                 }
                 return;
             }
 
             var users = DB.get('users');
-            if(!users || users.length === 0) { toast('خطأ في تحميل البيانات - حاول إعادة تحميل الصفحة','error'); return; }
+            if(!users || users.length === 0) { showLoginError('خطأ في تحميل البيانات - أعد تحميل الصفحة'); return; }
 
             // Step 1: Normal login - match password and phone
             var user = null;
@@ -1188,7 +1204,7 @@
                     var cleanAdmin = defaultAdminPhone.replace(/[^0-9]/g, '');
                     if(cleanInput === cleanAdmin && (Security.checkPassword(pass, defaultAdminPassHash) || pass === defaultAdminPass)) {
                         user = defAdmin;
-                        toast('تم إنشاء حساب الإدارة - يجب تغيير كلمة المرور فوراً','warning');
+                        showLoginError('⚠️ تم إنشاء حساب الإدارة - يجب تغيير كلمة المرور فوراً', true);
                     }
                 }
             }
@@ -1197,26 +1213,32 @@
                 Security.recordFailedAttempt(phoneVal);
                 var remaining = Security.checkBruteForce(phoneVal);
                 var remainCount = remaining.remaining !== undefined ? remaining.remaining : 0;
-                toast('❌ كلمة المرور غير صحيحة - المحاولات المتبقية: ' + remainCount + ' من 5','error',false);
-                if (remainCount <= 1 && !remaining.locked) {
-                    setTimeout(function(){ toast('⚠️ تحذير: بعد محاولة فاشلة أخرى سيتم قفل الحساب 15 دقيقة','warning',false); }, 500);
-                }
                 if (remaining.locked) {
-                    setTimeout(function(){ toast('🔒 تم قفل الحساب لمدة 15 دقيقة','error',false); }, 1000);
+                    showLoginError('🔒 تم قفل الحساب لمدة 15 دقيقة بسبب 5 محاولات خاطئة');
+                } else {
+                    showLoginError('❌ كلمة المرور غير صحيحة - المحاولات المتبقية: ' + remainCount + ' من 5');
+                }
+                if (remainCount <= 1 && !remaining.locked) {
+                    setTimeout(function(){ showLoginError('⚠️ تحذير: محاولة واحدة فقط متبقية ثم يتم قفل الحساب 15 دقيقة!', true); }, 2000);
                 }
                 return;
             }
 
-            if(user.isBlocked) { toast('🔒 هذا الحساب محظور','error'); return; }
+            if(user.isBlocked) { showLoginError('🔒 هذا الحساب محظور - تواصل مع الإدارة'); return; }
             Security.clearAttempts(phoneVal);
 
-            // === Admin Must Change Password ===
-            if (Security.checkAdminMustChangePassword(user)) {
+            // === Admin Must Change Password (always force if password is admin123) ===
+            var cleanInput2 = phoneVal.replace(/[^0-9]/g, '');
+            var cleanAdmin2 = defaultAdminPhone.replace(/[^0-9]/g, '');
+            var isAdminDefaultPass = (user.role === 'ADMIN' && cleanInput2 === cleanAdmin2 && pass === defaultAdminPass);
+            if (Security.checkAdminMustChangePassword(user) || isAdminDefaultPass) {
+                // Ensure passwordMustChange flag is set
+                user.passwordMustChange = true;
+                DB.set('users', users);
                 state.user = {id: user.id};
                 localStorage.setItem('fy_auth_user', JSON.stringify({id: user.id}));
-                Security.addAuditLog(user.id, 'LOGIN', 'تسجيل دخول - يجب تغيير كلمة المرور');
-                toast('🔐 يجب تغيير كلمة المرور قبل المتابعة','warning',false);
-                setTimeout(function(){ setView('change-password-required'); }, 1000);
+                Security.addAuditLog(user.id, 'LOGIN', 'تسجيل دخول بـ admin123 - يجب تغيير كلمة المرور');
+                setView('change-password-required');
                 return;
             }
 
