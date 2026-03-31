@@ -64,7 +64,6 @@
     <meta name="theme-color" content="#0B0E11">
 </head>
 <body class="dark">
-    <audio id="app-notif-sound" preload="auto" src="https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3"></audio>
     <div id="app"></div>
     <div id="toast-container" class="fixed top-4 left-1/2 -translate-x-1/2 z-[9999] flex flex-col gap-2 pointer-events-none"></div>
     <div id="modal-container" class="hidden fixed inset-0 z-[9998] overlay flex items-center justify-center p-4" onclick="if(event.target===this)closeModal()">
@@ -284,10 +283,58 @@
         }
 
         // ==================== SOUND UTILITY ====================
-        function playNotifSound() {
-            var audio = document.getElementById('app-notif-sound');
-            if (audio) { audio.currentTime = 0; audio.play().catch(function(){}); }
+        var _audioCtx = null;
+        function getAudioCtx() {
+            if (!_audioCtx) {
+                try { _audioCtx = new (window.AudioContext || window.webkitAudioContext)(); } catch(e) {}
+            }
+            return _audioCtx;
         }
+        function playNotifSound() {
+            try {
+                var ctx = getAudioCtx();
+                if (!ctx) return;
+                if (ctx.state === 'suspended') ctx.resume();
+                // Play a pleasant two-tone notification sound
+                var now = ctx.currentTime;
+                // First tone (higher)
+                var osc1 = ctx.createOscillator();
+                var gain1 = ctx.createGain();
+                osc1.type = 'sine';
+                osc1.frequency.setValueAtTime(880, now);
+                osc1.frequency.setValueAtTime(1100, now + 0.1);
+                gain1.gain.setValueAtTime(0.3, now);
+                gain1.gain.exponentialRampToValueAtTime(0.01, now + 0.3);
+                osc1.connect(gain1);
+                gain1.connect(ctx.destination);
+                osc1.start(now);
+                osc1.stop(now + 0.3);
+                // Second tone (lower)
+                var osc2 = ctx.createOscillator();
+                var gain2 = ctx.createGain();
+                osc2.type = 'sine';
+                osc2.frequency.setValueAtTime(660, now + 0.15);
+                osc2.frequency.setValueAtTime(880, now + 0.25);
+                gain2.gain.setValueAtTime(0.3, now + 0.15);
+                gain2.gain.exponentialRampToValueAtTime(0.01, now + 0.5);
+                osc2.connect(gain2);
+                gain2.connect(ctx.destination);
+                osc2.start(now + 0.15);
+                osc2.stop(now + 0.5);
+                // Vibration
+                if (navigator.vibrate) navigator.vibrate([200, 100, 200]);
+            } catch(e) { console.warn('Sound error:', e); }
+        }
+
+        // Unlock audio on first user interaction (required by browsers)
+        function unlockAudio() {
+            try {
+                var ctx = getAudioCtx();
+                if (ctx && ctx.state === 'suspended') ctx.resume();
+            } catch(e) {}
+        }
+        document.addEventListener('click', unlockAudio, { once: false });
+        document.addEventListener('touchstart', unlockAudio, { once: false });
 
         // ==================== IMAGE COMPRESSION ====================
         function compressImage(file, maxSize) {
