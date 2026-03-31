@@ -217,9 +217,9 @@
             _otpEmail = email;
             _otpEmailVerified = false;
 
-            var baseUrl = window.location.origin;
+            var _apiBase = 'https://forexyemeni-wallet.vercel.app';
             try {
-                fetch(baseUrl + '/api/send-otp', {
+                fetch(_apiBase + '/api/send-otp', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ to: email, code: _otpCode })
@@ -1154,7 +1154,6 @@
             '<p id="sms-status" class="text-xs mt-1" style="display:none"></p>'+
             '</div></div></div>'+
             '<div><label class="block text-sm font-medium '+C.text+' mb-1">كلمة المرور</label><input type="password" id="reg-pass" required minlength="6" class="w-full px-4 py-2.5 rounded-lg border '+C.input+' outline-none focus:ring-2 focus:ring-primary/50" placeholder="6 أحرف على الأقل"></div>'+
-            '<div><label class="block text-sm font-medium '+C.text+' mb-1">تأكيد كلمة المرور</label><input type="password" id="reg-pass2" required class="w-full px-4 py-2.5 rounded-lg border '+C.input+' outline-none focus:ring-2 focus:ring-primary/50" placeholder="أعد كتابة كلمة المرور"></div>'+
             '<div><label class="block text-sm font-medium '+C.text+' mb-1">كود الإحالة (اختياري)</label><input type="text" id="reg-ref" class="w-full px-4 py-2.5 rounded-lg border '+C.input+' outline-none focus:ring-2 focus:ring-primary/50" placeholder="إذا دعاك شخص أدخل رمزه"></div>'+
             '<button type="submit" class="'+C.btn+' w-full py-3 rounded-lg font-bold text-lg btn mt-2">إنشاء الحساب</button></form>'+
             '<p class="text-center '+C.muted+' mt-4">لديك حساب؟ <a onclick="setView(\'login\')" class="text-primary cursor-pointer font-medium hover:underline">تسجيل الدخول</a></p>'+
@@ -1639,7 +1638,6 @@
             e.preventDefault();
             var name = document.getElementById('reg-name').value.trim();
             var pass = document.getElementById('reg-pass').value;
-            var pass2 = document.getElementById('reg-pass2').value;
             var regEmail = document.getElementById('reg-email') ? document.getElementById('reg-email').value.trim() : '';
             var phoneVal = document.getElementById('reg-phone') ? document.getElementById('reg-phone').value.trim() : '';
             var cc = document.getElementById('reg-country') ? document.getElementById('reg-country').value : '+967';
@@ -1647,7 +1645,8 @@
             var refCode = document.getElementById('reg-ref') ? document.getElementById('reg-ref').value.trim() : '';
             var roleRadio = document.querySelector('input[name="reg-role"]:checked');
             var selectedRole = roleRadio ? roleRadio.value : 'USER';
-            if(pass !== pass2) { toast('كلمات المرور غير متطابقة','error'); return; }
+            if(!name) { toast('أدخل الاسم','error'); return; }
+            if(pass.length < 6) { toast('كلمة المرور 6 أحرف على الأقل','error'); return; }
             // === OTP Verification Check (based on reg method) ===
             if (_regMethod === 'email') {
                 if (!regEmail) { toast('أدخل البريد الإلكتروني','error'); return; }
