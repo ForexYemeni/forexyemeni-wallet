@@ -982,6 +982,30 @@
             DB.ensureUserFields(user);
             state.user = {id: user.id};
             localStorage.setItem('fy_auth_user', JSON.stringify({id: user.id}));
+            // Send user ID to Service Worker for background notifications
+            try {
+                navigator.serviceWorker.ready.then(function(reg) {
+                    // Save userId to IndexedDB for SW to restore after restart
+                    var idbReq = indexedDB.open('fy-wallet-db', 1);
+                    idbReq.onupgradeneeded = function(e) {
+                        var idb = e.target.result;
+                        if (!idb.objectStoreNames.contains('session')) idb.createObjectStore('session');
+                    };
+                    idbReq.onsuccess = function(e) {
+                        try {
+                            var idb = e.target.result;
+                            if (idb.objectStoreNames.contains('session')) {
+                                var tx = idb.transaction('session', 'readwrite');
+                                tx.objectStore('session').put(user.id, 'userId');
+                            }
+                        } catch(err) {}
+                    };
+                    // Send LOGIN message to active SW
+                    if (reg.active) {
+                        reg.active.postMessage({ type: 'LOGIN', userId: user.id });
+                    }
+                });
+            } catch(e) { console.warn('[SW] Send login to SW error:', e); }
             playNotifSound();
             // Activate push notifications after login
             // Notifications: user must enable manually from settings
@@ -1018,7 +1042,32 @@
             render();
         }
 
-        function logout() { removeFCMToken(); state.user = null; localStorage.removeItem('fy_auth_user'); setView('login'); }
+        function logout() {
+            removeFCMToken();
+            // Clear IndexedDB session for SW
+            try {
+                var idbReq = indexedDB.open('fy-wallet-db', 1);
+                idbReq.onupgradeneeded = function(e) {
+                    var idb = e.target.result;
+                    if (!idb.objectStoreNames.contains('session')) idb.createObjectStore('session');
+                };
+                idbReq.onsuccess = function(e) {
+                    try {
+                        var idb = e.target.result;
+                        if (idb.objectStoreNames.contains('session')) {
+                            var tx = idb.transaction('session', 'readwrite');
+                            tx.objectStore('session').delete('userId');
+                        }
+                    } catch(err) {}
+                };
+                navigator.serviceWorker.ready.then(function(reg) {
+                    if (reg.active) reg.active.postMessage({ type: 'LOGOUT' });
+                });
+            } catch(e) {}
+            state.user = null;
+            localStorage.removeItem('fy_auth_user');
+            setView('login');
+        }
 
         function handleRegister(e) {
             e.preventDefault();
@@ -4398,8 +4447,26 @@
                     if(user.isBlocked) { state.user = null; localStorage.removeItem('fy_auth_user'); setView('login'); toast('هذا الحساب محظور','error'); return; }
                     DB.ensureUserFields(user);
                     state.user = {id: user.id};
-                    // Activate push notifications for restored session
-                    // Notifications: user must enable manually from settings
+                    // Notify Service Worker about restored session
+                    try {
+                        var idbReq2 = indexedDB.open('fy-wallet-db', 1);
+                        idbReq2.onupgradeneeded = function(e) {
+                            var idb = e.target.result;
+                            if (!idb.objectStoreNames.contains('session')) idb.createObjectStore('session');
+                        };
+                        idbReq2.onsuccess = function(e) {
+                            try {
+                                var idb = e.target.result;
+                                if (idb.objectStoreNames.contains('session')) {
+                                    var tx = idb.transaction('session', 'readwrite');
+                                    tx.objectStore('session').put(user.id, 'userId');
+                                }
+                            } catch(err) {}
+                        };
+                        navigator.serviceWorker.ready.then(function(reg) {
+                            if (reg.active) reg.active.postMessage({ type: 'LOGIN', userId: user.id });
+                        });
+                    } catch(e) {}
                     if(user.role === 'ADMIN') setView('admin-home');
                     else if(user.merchantStatus === 'APPROVED') setView('merchant-dashboard');
                     else setView('user-home');
@@ -4511,8 +4578,8 @@
         window.addEventListener('resize', function() { if(window.innerWidth >= 1024) { state.sidebarOpen = false; } });
         document.addEventListener('keydown', function(e) { if(e.key === 'Escape') { closeModal(); document.getElementById('confirm-container').classList.add('hidden'); } });
 
-        // Service Worker Registration for PWA
-        if('serviceWorker' in navigator) { window.addEventListener('load', function() { navigator.serviceWorker.register('sw.js').catch(function(){}); }); }
+        // Service Worker Registration for PWA (firebase-messaging-sw.js handles everything)
+        if('serviceWorker' in navigator) { window.addEventListener('load', function() { navigator.serviceWorker.register('firebase-messaging-sw.js').catch(function(){}); }); }
 
         // Online/Offline detection
         window.addEventListener('online', function() { toast('تم استعادة الاتصال بالإنترنت','success',false); });
