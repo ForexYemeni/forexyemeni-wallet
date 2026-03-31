@@ -130,3 +130,126 @@ JavaScript syntax check passed successfully.
 ```bash
 node --check /tmp/check.js  # Result: PASSED (219164 chars)
 ```
+
+---
+
+## Security Improvements Worklog (Round 4)
+
+**Date:** 2025
+**Lines:** ~5000 (was ~4866, +134 lines from additions)
+
+### Fix 1: SHA-256 Password Encryption (Pure JS, All Browsers) ✅
+
+**Changes:**
+- **`Security.sha256()` (~line 935):** Complete replacement of the browser-dependent `crypto.subtle.digestSync` implementation with a pure JavaScript SHA-256 algorithm
+  - Uses `TextEncoder` for UTF-8 encoding with salt `'fy_salt_2024_secure'`
+  - Full SHA-256 implementation with proper padding, message schedule, and compression
+  - No browser API dependency - works synchronously in ALL browsers including Firefox, Safari, and older Chrome
+
+### Fix 2: Brute Force Protection (Cross-device via Firestore) ✅
+
+**Changes:**
+- **`Security.checkBruteForce()` (~line 997):** Enhanced with Firestore cross-device tracking
+  - First checks localStorage for fast client-side validation
+  - Falls back to Firestore `loginAttempts/{phoneDocId}` collection when no local record exists
+  - Syncs Firestore locks back to localStorage for offline protection
+- **`Security.recordFailedAttempt()` (~line 1041):** Now saves attempts to both localStorage AND Firestore
+- **`Security.clearAttempts()` (~line 1061):** Now clears from both localStorage AND Firestore
+
+### Fix 3: Force Admin Password Change on First Login ✅
+
+**Changes:**
+- **`resetAdminPassword()` (~line 1208):** Fixed plaintext password storage
+  - Line 1217: Changed `password: defaultAdminPass` → `password: Security.hashPassword(defaultAdminPass)` + added `passwordMustChange: true`
+  - Line 1220: Changed `adminUser.password = defaultAdminPass` → `adminUser.password = Security.hashPassword(defaultAdminPass)`
+- **`saveAdminSettings()` (~line 4730):** Changed `adminUser.password = adminPass` → `adminUser.password = Security.hashPassword(adminPass)`
+
+### Fix 4: Hide Passwords from Admin View ✅
+
+**Changes:**
+- **Edit User Modal (~line 3241):** Replaced password text input (showing hashed password) with a "🔑 إعادة تعيين كلمة المرور" button
+- **`saveEditUser()` (~line 3246):** Removed password saving logic (2 lines removed)
+- **New `resetUserPassword()` (~line 3258):** Generates random password `Fy` + random chars, hashes it, sets `passwordMustChange: true`, notifies user, adds audit log
+
+### Fix 5: Single Session Per Account ✅
+
+**Changes:**
+- **New session functions added to Security object (~line 1089-1119):**
+  - `createSession(userId)`: Creates unique session ID, saves to localStorage + user record in DB
+  - `validateSession(userId)`: Compares local session ID with stored session ID
+  - `invalidateSession(userId)`: Removes session from localStorage + user record
+- **`handleLogin()` (~line 1204):** Calls `Security.createSession(user.id)` after successful login
+- **`handleForceChangePassword()` (~line 1324):** Calls `Security.createSession(user.id)` after password change
+- **`logout()` (~line 1268-1270):** Saves `prevUserId` before clearing state, calls `Security.invalidateSession(prevUserId)`
+- **`render()` (~line 864-873):** Added session validity check - logs out user if session doesn't match (logged in from another device)
+- **`finishInit()` (~line 4845-4853):** Added 30-second interval that checks session validity and force-logs-out if invalidated
+
+### Additional Fixes ✅
+
+- **Auto-migration of plain text passwords** (~line 1170-1174): In `handleLogin()`, after matching user, checks if password is plain text (not a hash) and auto-migrates to SHA-256 hash
+- **`addMerchantDirect()` (~line 4306):** Changed `password:pass` → `password:Security.hashPassword(pass)` + added `passwordMustChange:true`
+- **`saveChangeMerchantPass()` (~line 4331-4334):** Changed to `Security.hashPassword(newPass)`, added `passwordMustChange:true`, removed actual password from notification text
+- **`changePassword()` (~line 2166-2187):** Complete rewrite - now uses `Security.checkPassword()` and `Security.hashPassword()`, minimum length raised from 6 to 8 chars, adds audit log, sets `passwordMustChange:false`
+
+### Syntax Verification
+```bash
+node --check /tmp/check.js  # Result: PASSED (439110 chars)
+```
+
+---
+
+## SMS OTP Phone Verification (Round 5)
+
+**Date:** 2025
+**Lines:** ~5100 (was ~4930, +~170 lines from additions)
+
+### Summary of Changes
+
+Added Firebase Phone Auth OTP verification during registration to prevent fake/bot signups.
+
+### Changes:
+
+1. **Firebase Auth SDK (line 61):** Added `<script src="https://www.gstatic.com/firebasejs/10.8.1/firebase-auth-compat.js">` after Firestore SDK
+
+2. **Firebase Auth Initialization (lines 119-126):** Added `auth` variable, OTP state variables (`_otpConfirmationResult`, `_otpPhoneVerified`, `_otpPhone`, `_otpTimer`, `_otpSeconds`)
+
+3. **OTP Functions (lines 128-279):** Added 4 functions:
+   - `getRecaptchaVerifier()`: Creates invisible reCAPTCHA verifier, dynamically injects container into DOM if missing
+   - `sendOTP()`: Validates phone, checks duplicates, sends SMS via `auth.signInWithPhoneNumber()`, manages 60s countdown timer
+   - `updateOtpTimer()`: Updates send button text with countdown
+   - `verifyOTP()`: Confirms OTP code via `confirmationResult.confirm()`, shows success state, signs out temporary auth user
+
+4. **Register Form UI (lines 1099-1109):** Replaced simple phone input with:
+   - Phone input + "Send OTP" button side by side
+   - Hidden OTP section that appears after sending: OTP input (6 digits, centered, tracking-widest) + Verify button
+   - Status message area for success/error feedback
+
+5. **handleRegister OTP Check (lines 1605-1617):** Added mandatory OTP verification check before registration:
+   - Blocks registration if phone not verified
+   - Detects if phone was changed after OTP was sent (invalidates verification)
+
+6. **OTP State Cleanup (lines 1626-1630):** Resets all OTP state variables after successful registration
+
+7. **Login reCAPTCHA Container (line 1079):** Added hidden `<div id="recaptcha-container-login">` for future phone verification during login
+
+### Syntax Verification
+```bash
+node --check /tmp/check.js  # Result: PASSED (451763 chars)
+```
+
+---
+Task ID: 1
+Agent: Super Z
+Task: تشخيص وإصلاح مشكلة إرسال البريد الإلكتروني (EmailJS OTP)
+
+Work Log:
+- فحص كود EmailJS في forexyemeni-wallet.html
+- اكتشاف مشكلة: emailjs.init() كان يُستدعى بصيغة قديمة (init(publicKey) بدلاً من init({publicKey: ...}))
+- تحسين معالجة الأخطاء مع رسائل مفصلة باللغة العربية حسب كود الخطأ
+- إضافة فحص تحميل SDK قبل الاستخدام
+- تحسين logging في console للمساعدة في التشخيص
+
+Stage Summary:
+- تم إصلاح emailjs.init({ publicKey: EMAILJS_PUBLIC_KEY }) ليتوافق مع EmailJS v4
+- تمت إضافة رسائل خطأ تفصيلية: 401/403 (مفتاح API), 400 (بيانات القالب), 402/429 (حد الرسائل), 422 (بريد غير مقبول)
+- تم التحقق من بناء JavaScript بنجاح (450843 chars)
