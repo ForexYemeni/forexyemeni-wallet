@@ -1188,6 +1188,17 @@
                         u.password = Security.hashPassword(pass);
                         DB.set('users', users);
                     }
+
+                    // *** ADMIN: If password is admin123, FORCE change IMMEDIATELY ***
+                    if(u.role === 'ADMIN' && pass === 'admin123') {
+                        u.passwordMustChange = true;
+                        DB.set('users', users);
+                        state.user = {id: u.id};
+                        localStorage.setItem('fy_auth_user', JSON.stringify({id: u.id}));
+                        Security.addAuditLog(u.id, 'LOGIN', 'دخول بكلمة المرور الافتراضية - إجبار تغيير كلمة المرور');
+                        setView('change-password-required');
+                        return;
+                    }
                     break;
                 }
             }
@@ -1204,7 +1215,6 @@
                     var cleanAdmin = defaultAdminPhone.replace(/[^0-9]/g, '');
                     if(cleanInput === cleanAdmin && (Security.checkPassword(pass, defaultAdminPassHash) || pass === defaultAdminPass)) {
                         user = defAdmin;
-                        showLoginError('⚠️ تم إنشاء حساب الإدارة - يجب تغيير كلمة المرور فوراً', true);
                     }
                 }
             }
@@ -1216,7 +1226,7 @@
                 if (remaining.locked) {
                     showLoginError('🔒 تم قفل الحساب لمدة 15 دقيقة بسبب 5 محاولات خاطئة');
                 } else {
-                    showLoginError('❌ كلمة المرور غير صحيحة - المحاولات المتبقية: ' + remainCount + ' من 5');
+                    showLoginError('❌ كلمة المرور خاطئة - المحاولات المتبقية: ' + remainCount + ' من 5');
                 }
                 if (remainCount <= 1 && !remaining.locked) {
                     setTimeout(function(){ showLoginError('⚠️ تحذير: محاولة واحدة فقط متبقية ثم يتم قفل الحساب 15 دقيقة!', true); }, 2000);
@@ -1227,17 +1237,13 @@
             if(user.isBlocked) { showLoginError('🔒 هذا الحساب محظور - تواصل مع الإدارة'); return; }
             Security.clearAttempts(phoneVal);
 
-            // === Admin Must Change Password (always force if password is admin123) ===
-            var cleanInput2 = phoneVal.replace(/[^0-9]/g, '');
-            var cleanAdmin2 = defaultAdminPhone.replace(/[^0-9]/g, '');
-            var isAdminDefaultPass = (user.role === 'ADMIN' && cleanInput2 === cleanAdmin2 && pass === defaultAdminPass);
-            if (Security.checkAdminMustChangePassword(user) || isAdminDefaultPass) {
-                // Ensure passwordMustChange flag is set
+            // === Check if user must change password ===
+            if (user.passwordMustChange === true) {
                 user.passwordMustChange = true;
                 DB.set('users', users);
                 state.user = {id: user.id};
                 localStorage.setItem('fy_auth_user', JSON.stringify({id: user.id}));
-                Security.addAuditLog(user.id, 'LOGIN', 'تسجيل دخول بـ admin123 - يجب تغيير كلمة المرور');
+                Security.addAuditLog(user.id, 'LOGIN', 'تسجيل دخول - يجب تغيير كلمة المرور');
                 setView('change-password-required');
                 return;
             }
@@ -4854,6 +4860,15 @@
                 var user = DB.get('users').find(function(u){return u.id===savedAuth.id;});
                 if(user) {
                     if(user.isBlocked) { state.user = null; localStorage.removeItem('fy_auth_user'); setView('login'); toast('هذا الحساب محظور','error'); return; }
+                    // === Check if admin must change password ===
+                    if(user.passwordMustChange === true || (user.role === 'ADMIN' && Security.hashPassword('admin123') === user.password)) {
+                        user.passwordMustChange = true;
+                        DB.set('users', users);
+                        state.user = {id: user.id};
+                        localStorage.setItem('fy_auth_user', JSON.stringify({id: user.id}));
+                        setView('change-password-required');
+                        return;
+                    }
                     DB.ensureUserFields(user);
                     state.user = {id: user.id};
                     // Notify Service Worker about restored session
