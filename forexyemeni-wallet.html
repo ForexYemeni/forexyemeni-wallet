@@ -116,16 +116,12 @@
         firebase.initializeApp(firebaseConfig);
         var db = firebase.firestore();
 
-        // ==================== EMAIL OTP (EmailJS - FREE) ====================
+        // ==================== EMAIL OTP (Vercel Serverless Function - FREE) ====================
         var _otpEmailVerified = false;
         var _otpEmail = '';
         var _otpCode = '';
         var _otpTimer = null;
         var _otpSeconds = 0;
-        // EmailJS Config - UPDATE WITH YOUR CREDENTIALS
-        var EMAILJS_PUBLIC_KEY = 'DF-W1nW3EwIetBPGe';
-        var EMAILJS_SERVICE_ID = 'service_g9eees1';
-        var EMAILJS_TEMPLATE_ID = 'template_lren914';
 
         function sendOTP() {
             var emailInput = document.getElementById('reg-email');
@@ -139,44 +135,51 @@
                 toast('البريد الإلكتروني مسجل مسبقاً', 'error', false);
                 return;
             }
-            if (EMAILJS_PUBLIC_KEY === 'YOUR_PUBLIC_KEY') {
-                toast('خدمة التحقق غير مهيأة - تواصل مع الإدارة', 'error', false);
-                return;
-            }
             var sendBtn = document.getElementById('send-otp-btn');
             if (sendBtn) { sendBtn.disabled = true; sendBtn.textContent = 'جاري الإرسال...'; }
             _otpCode = '';
             for (var i = 0; i < 6; i++) _otpCode += Math.floor(Math.random() * 10);
             _otpEmail = email;
             _otpEmailVerified = false;
-            try { if (typeof emailjs !== 'undefined' && emailjs.init) emailjs.init(EMAILJS_PUBLIC_KEY); } catch(e) {}
+
+            var baseUrl = window.location.origin;
             try {
-                emailjs.send(EMAILJS_SERVICE_ID, EMAILJS_TEMPLATE_ID, {
-                    to_email: email, otp_code: _otpCode, app_name: 'ForexYemeni Wallet'
-                }).then(function() {
-                    var otpSection = document.getElementById('otp-section');
-                    if (otpSection) otpSection.style.display = 'block';
-                    var otpSentMsg = document.getElementById('otp-sent-msg');
-                    if (otpSentMsg) otpSentMsg.textContent = 'تم إرسال رمز التحقق إلى ' + email;
-                    _otpSeconds = 60;
-                    if (sendBtn) { sendBtn.disabled = true; }
-                    _otpTimer = setInterval(function() {
-                        _otpSeconds--;
-                        var btn2 = document.getElementById('send-otp-btn');
-                        if (btn2 && _otpSeconds > 0) btn2.textContent = 'أعد المحاولة بعد ' + _otpSeconds + ' ثانية';
-                        if (_otpSeconds <= 0) {
-                            clearInterval(_otpTimer);
-                            if (btn2) { btn2.disabled = false; btn2.textContent = 'إعادة إرسال الرمز'; }
-                        }
-                    }, 1000);
-                    toast('تم إرسال رمز التحقق عبر البريد الإلكتروني', 'success', false);
+                fetch(baseUrl + '/api/send-otp', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ to: email, code: _otpCode })
+                }).then(function(response) { return response.json(); })
+                .then(function(data) {
+                    if (data.success) {
+                        console.log('[OTP] Email sent via Vercel Function');
+                        var otpSection = document.getElementById('otp-section');
+                        if (otpSection) otpSection.style.display = 'block';
+                        var otpSentMsg = document.getElementById('otp-sent-msg');
+                        if (otpSentMsg) otpSentMsg.textContent = 'تم إرسال رمز التحقق إلى ' + email;
+                        _otpSeconds = 60;
+                        if (sendBtn) { sendBtn.disabled = true; }
+                        _otpTimer = setInterval(function() {
+                            _otpSeconds--;
+                            var btn2 = document.getElementById('send-otp-btn');
+                            if (btn2 && _otpSeconds > 0) btn2.textContent = 'أعد المحاولة بعد ' + _otpSeconds + ' ثانية';
+                            if (_otpSeconds <= 0) {
+                                clearInterval(_otpTimer);
+                                if (btn2) { btn2.disabled = false; btn2.textContent = 'إعادة إرسال الرمز'; }
+                            }
+                        }, 1000);
+                        toast('تم إرسال رمز التحقق عبر البريد الإلكتروني', 'success', false);
+                    } else {
+                        console.error('[OTP] Error:', data.error);
+                        toast('فشل إرسال البريد: ' + (data.error || 'غير معروف'), 'error', 8000);
+                        if (sendBtn) { sendBtn.disabled = false; sendBtn.textContent = 'إرسال رمز التحقق'; }
+                    }
                 }).catch(function(error) {
                     console.error('[OTP] Error:', error);
-                    toast('فشل إرسال البريد - تأكد من صحة الإعدادات', 'error', false);
+                    toast('فشل إرسال البريد: ' + (error.message || 'تأكد من الاتصال بالإنترنت'), 'error', 8000);
                     if (sendBtn) { sendBtn.disabled = false; sendBtn.textContent = 'إرسال رمز التحقق'; }
                 });
             } catch(e) {
-                toast('خطأ في خدمة البريد', 'error', false);
+                toast('خطأ: ' + (e.message || 'غير معروف'), 'error', false);
                 if (sendBtn) { sendBtn.disabled = false; sendBtn.textContent = 'إرسال رمز التحقق'; }
             }
         }
