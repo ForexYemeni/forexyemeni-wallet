@@ -544,6 +544,61 @@
 
         // ==================== STATE ====================
         var state = { view: 'loading', user: null, theme: 'dark', sidebarOpen: false, confirmCb: null, editId: null, settingsEditMode: false, activeChatUserId: null, affTab: 'requests', dbConfigEditMode: false, depPmId: '', wdMethodType: '', chatWithMerchantId: null };
+
+        // ==================== NOTIFICATION SETTINGS ====================
+        function getUserNotifSettings(userId) {
+            var allSettings = {};
+            try { allSettings = JSON.parse(localStorage.getItem('fy_notif_settings') || '{}'); } catch(e) {}
+            if (!allSettings[userId]) {
+                allSettings[userId] = { messages: true, deposits: true, withdrawals: true, adminActions: true, sound: true, vibrate: true };
+                localStorage.setItem('fy_notif_settings', JSON.stringify(allSettings));
+            }
+            return allSettings[userId];
+        }
+        function saveUserNotifSettings(userId, settings) {
+            var allSettings = {};
+            try { allSettings = JSON.parse(localStorage.getItem('fy_notif_settings') || '{}'); } catch(e) {}
+            allSettings[userId] = settings;
+            localStorage.setItem('fy_notif_settings', JSON.stringify(allSettings));
+        }
+        function toggleNotifSetting(key) {
+            var user = getUser();
+            if (!user) return;
+            var settings = getUserNotifSettings(user.id);
+            settings[key] = !settings[key];
+            saveUserNotifSettings(user.id, settings);
+            render();
+            var labels = {messages:'الرسائل', deposits:'الإيداعات', withdrawals:'السحوبات', adminActions:'إجراءات الإدارة', sound:'الصوت', vibrate:'الاهتزاز'};
+            toast('إشعارات ' + (labels[key]||key) + ': ' + (settings[key] ? 'مفعّلة ✓' : 'معطّلة'), 'info', false);
+        }
+        function shouldNotify(type) {
+            var user = getUser();
+            if (!user) return false;
+            var settings = getUserNotifSettings(user.id);
+            if (type === 'CHAT') return settings.messages;
+            if (type === 'DEPOSIT') return settings.deposits;
+            if (type === 'WITHDRAW') return settings.withdrawals;
+            return true;
+        }
+        function renderNotifSettingsSection(C, userId) {
+            var settings = getUserNotifSettings(userId);
+            function tog(key, label, icon) {
+                var on = settings[key];
+                return '<div class="flex items-center justify-between py-2 border-b '+C.border+' last:border-0">'+
+                    '<div class="flex items-center gap-2"><span>'+icon+'</span><span class="text-sm '+C.text+'">'+label+'</span></div>'+
+                    '<button onclick="toggleNotifSetting(\''+key+'\')" class="w-12 h-7 rounded-full transition-colors relative btn '+(on?'bg-success':'bg-gray-500')+'">'+
+                    '<span class="absolute top-1 '+(on?'left-1':'left-6')+' w-5 h-5 bg-white rounded-full shadow transition-all"></span></button></div>';
+            }
+            return '<div class="'+C.card+' rounded-lg p-4 border '+C.border+'"><h3 class="font-bold '+C.text+' mb-3">🔔 إعدادات الإشعارات</h3>'+
+                '<p class="'+C.muted+' text-xs mb-3">اختر الإشعارات التي تريد استلامها</p>'+
+                tog('messages', 'الرسائل', '💬')+
+                tog('deposits', 'طلبات الإيداع', '💰')+
+                tog('withdrawals', 'طلبات السحب', '🏧')+
+                tog('adminActions', 'إجراءات الإدارة', '⚙️')+
+                tog('sound', 'الصوت', '🔊')+
+                tog('vibrate', 'الاهتزاز', '📳')+
+                '<button onclick="requestNotifPermission()" class="'+C.btn+' w-full py-2.5 rounded-lg font-bold btn mt-3 text-sm">🔔 تفعيل إشعارات الهاتف</button></div>';
+        }
         function setView(v) { state.view = v; state.sidebarOpen = false; render(); }
         function setTheme(t) { state.theme = t; document.body.className = t; localStorage.setItem('fy_theme', t); render(); }
         function getUser() { return DB.ensureUserFields(DB.get('users').find(function(u) { return u.id === (state.user && state.user.id); })); }
@@ -581,10 +636,20 @@
             var ns = DB.get('notifications') || [];
             ns.unshift({ id: DB.uid(), userId: userId, title: title, message: msg, type: type, isRead: false, createdAt: new Date().toISOString() });
             DB.set('notifications', ns);
+            // Check notification settings for target user
+            var notifSettings = getUserNotifSettings(userId);
             var currentUser = getUser();
-            if(currentUser && currentUser.id === userId) toast(title, type.toLowerCase(), true);
-            // Send push notification (works even when app is closed)
-            queuePushNotification(userId, title, msg, type);
+            if (currentUser && currentUser.id === userId) {
+                // Show in-app toast
+                toast(title, type.toLowerCase(), true);
+                // Play sound if enabled
+                if (notifSettings.sound) playNotifSound();
+                // Vibrate if enabled
+                if (notifSettings.vibrate) { try { if (navigator.vibrate) navigator.vibrate([200, 100, 200, 100, 200]); } catch(e) {} }
+            } else {
+                // For other users - send push notification
+                queuePushNotification(userId, title, msg, type);
+            }
         }
         function addLog(userId, type, amount, currency, desc) {
             var logs = DB.get('transactionLog') || [];
@@ -1622,6 +1687,7 @@
             return '<div class="'+C.card+' rounded-xl p-6 max-w-lg mx-auto border '+C.border+'">'+
                 '<h2 class="text-xl font-bold '+C.text+' mb-6 text-center">⚙️ الإعدادات</h2>'+
                 '<div class="space-y-4">'+
+                renderNotifSettingsSection(C, user.id)+
                 '<div class="'+C.card+' rounded-lg p-4 border '+C.border+'"><h3 class="font-bold '+C.text+' mb-3">معلومات الحساب</h3>'+
                 '<div class="space-y-2 text-sm"><p class="'+C.muted+'">الاسم: <span class="'+C.text+'">'+escHtml(user.name)+'</span></p>'+
                 '<p class="'+C.muted+'">الهاتف: <span class="'+C.text+'">'+escHtml(user.phone)+'</span></p>'+
@@ -2477,6 +2543,7 @@
                 '<h2 class="text-xl font-bold '+C.text+' mb-2 text-center">⚙️ إعدادات التاجر</h2>'+
                 '<p class="text-xs '+C.muted+' text-center mb-6">هذه البيانات ستظهر للمستخدمين عند اختيارك كتاجر</p>'+
                 '<div class="space-y-4">'+
+                renderNotifSettingsSection(C, user.id)+
                 '<div class="'+C.card+' rounded-lg p-4 border '+C.border+'">'+
                 '<h3 class="font-bold '+C.text+' mb-3">💱 التسعير والعمولة</h3>'+
                 '<div class="space-y-3">'+
@@ -4156,6 +4223,7 @@
             return '<div class="'+C.card+' rounded-xl p-6 max-w-2xl mx-auto border '+C.border+'">'+
                 '<h2 class="text-xl font-bold '+C.text+' mb-6 text-center">⚙️ الإعدادات العامة</h2>'+
                 '<div class="space-y-6">'+
+                (adminUser ? renderNotifSettingsSection(C, adminUser.id) : '')+
                 '<div class="'+C.card+' rounded-lg p-4 border '+C.border+'"><h3 class="font-bold '+C.text+' mb-3">💱 العملات والرسوم</h3><div class="space-y-3">'+
                 '<div class="grid grid-cols-2 gap-3">'+
                 '<div><label class="block text-sm '+C.muted+' mb-1">🇾🇪 سعر الصرف (1 USDT = ? YER)</label><input type="number" id="set-rate" value="'+rate+'" class="w-full px-4 py-2.5 rounded-lg border '+C.input+' outline-none"></div>'+
