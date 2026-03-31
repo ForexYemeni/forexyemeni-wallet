@@ -1771,6 +1771,8 @@
             var msgs = DB.get('messages');
             msgs.push({id:DB.uid(),fromId:user.id,toId:adminUser.id,text:text,isRead:false,createdAt:new Date().toISOString()});
             DB.set('messages', msgs);
+            addNotif(adminUser.id, '💬 رسالة جديدة', 'رسالة من ' + user.name + ': ' + text.substring(0, 50), 'CHAT');
+            playNotifSound();
             input.value = '';
             render();
         }
@@ -1976,6 +1978,7 @@
             var msgs = DB.get('messages');
             msgs.push({id:DB.uid(),fromId:user.id,toId:merchantId,text:text,isRead:false,createdAt:new Date().toISOString()});
             DB.set('messages', msgs);
+            addNotif(merchantId, '💬 رسالة جديدة', 'رسالة من ' + user.name + ': ' + text.substring(0, 50), 'CHAT');
             input.value = '';
             render();
         }
@@ -2576,6 +2579,7 @@
             var msgs = DB.get('messages');
             msgs.push({id:DB.uid(),fromId:user.id,toId:adminId,text:text,isRead:false,createdAt:new Date().toISOString()});
             DB.set('messages', msgs);
+            addNotif(adminId, '💬 رسالة من تاجر', 'رسالة من ' + user.name + ': ' + text.substring(0, 50), 'CHAT');
             input.value = '';
             render();
         }
@@ -3445,9 +3449,12 @@
             if(!text) return;
             var adminUser = DB.get('users').find(function(u){return u.role==='ADMIN';});
             var adminId = adminUser ? adminUser.id : 'admin1';
+            var targetUser = DB.get('users').find(function(u){return u.id === state.activeChatUserId;});
             var msgs = DB.get('messages');
             msgs.push({id:DB.uid(),fromId:adminId,toId:state.activeChatUserId,text:text,isRead:false,createdAt:new Date().toISOString()});
             DB.set('messages', msgs);
+            addNotif(state.activeChatUserId, '💬 رسالة من الإدارة', text.substring(0, 80), 'CHAT');
+            playNotifSound();
             input.value = '';
             render();
         }
