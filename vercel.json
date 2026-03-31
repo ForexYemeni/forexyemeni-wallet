@@ -1,35 +1,9 @@
 {
-  "rewrites": [
-    { "source": "/(.*)", "destination": "/forexyemeni-wallet.html" }
+  "version": 2,
+  "builds": [
+    { "src": "api/send-otp.js", "use": "@vercel/node" }
   ],
-  "headers": [
-    {
-      "source": "/(.*)",
-      "headers": [
-        { "key": "Cache-Control", "value": "no-cache, no-store, must-revalidate" },
-        { "key": "Pragma", "value": "no-cache" },
-        { "key": "Expires", "value": "0" }
-      ]
-    },
-    {
-      "source": "/forexyemeni-wallet.html",
-      "headers": [
-        { "key": "Cache-Control", "value": "no-cache, no-store, must-revalidate" },
-        { "key": "Pragma", "value": "no-cache" },
-        { "key": "Expires", "value": "0" }
-      ]
-    },
-    {
-      "source": "/firebase-messaging-sw.js",
-      "headers": [
-        { "key": "Cache-Control", "value": "no-cache, no-store" }
-      ]
-    },
-    {
-      "source": "/manifest.json",
-      "headers": [
-        { "key": "Cache-Control", "value": "no-cache, no-store" }
-      ]
-    }
+  "routes": [
+    { "src": "/api/send-otp", "dest": "/api/send-otp.js" }
   ]
 }

@@ -59,7 +59,7 @@
     <script src="https://www.gstatic.com/firebasejs/10.8.1/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore-compat.js"></script>
     <script>try { document.write('<script src="https://www.gstatic.com/firebasejs/10.8.1/firebase-messaging-compat.js"><\/script>'); } catch(e) { console.warn('FCM SDK load skipped'); }</script>
-    <script src="https://www.gstatic.com/firebasejs/10.8.1/firebase-functions-compat.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
     <link rel="manifest" href="manifest.json">
     <link rel="apple-touch-icon" href="icon.png">
     <meta name="theme-color" content="#0B0E11">
@@ -116,13 +116,12 @@
         firebase.initializeApp(firebaseConfig);
         var db = firebase.firestore();
 
-        // ==================== EMAIL OTP (Google Apps Script - FREE, No Limits) ====================
+        // ==================== EMAIL OTP (Vercel Serverless Function - FREE) ====================
         var _otpEmailVerified = false;
         var _otpEmail = '';
         var _otpCode = '';
         var _otpTimer = null;
         var _otpSeconds = 0;
-        var OTP_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwUEgB0FveGPVlevmzIkrnjGhIPdLOzcz4n4eSlAQcQs80ZkjSX1cJrX5-2v4PGHAJUqQ/exec';
 
         function sendOTP() {
             var emailInput = document.getElementById('reg-email');
@@ -143,16 +142,16 @@
             _otpEmail = email;
             _otpEmailVerified = false;
 
+            var baseUrl = window.location.origin;
             try {
-                fetch(OTP_SCRIPT_URL, {
+                fetch(baseUrl + '/api/send-otp', {
                     method: 'POST',
-                    redirect: 'follow',
-                    headers: { 'Content-Type': 'text/plain' },
+                    headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ to: email, code: _otpCode })
                 }).then(function(response) { return response.json(); })
                 .then(function(data) {
                     if (data.success) {
-                        console.log('[OTP] Email sent via Google Apps Script');
+                        console.log('[OTP] Email sent via Vercel Function');
                         var otpSection = document.getElementById('otp-section');
                         if (otpSection) otpSection.style.display = 'block';
                         var otpSentMsg = document.getElementById('otp-sent-msg');
@@ -170,6 +169,7 @@
                         }, 1000);
                         toast('تم إرسال رمز التحقق عبر البريد الإلكتروني', 'success', false);
                     } else {
+                        console.error('[OTP] Error:', data.error);
                         toast('فشل إرسال البريد: ' + (data.error || 'غير معروف'), 'error', 8000);
                         if (sendBtn) { sendBtn.disabled = false; sendBtn.textContent = 'إرسال رمز التحقق'; }
                     }
