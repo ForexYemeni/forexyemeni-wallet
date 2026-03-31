@@ -123,6 +123,7 @@
         var _smsConfirmationResult = null;
         var _smsTimer = null;
         var _smsSeconds = 0;
+        var _currentRecaptchaVerifier = null;
 
         function sendSMSOTP() {
             var phoneInput = document.getElementById('reg-phone');
@@ -137,30 +138,54 @@
             var btn = document.getElementById('send-sms-btn');
             if (btn) { btn.disabled = true; btn.textContent = 'جاري الإرسال...'; }
             try {
-                var appVerifier = new firebase.auth.RecaptchaVerifier('recaptcha-container', {size:'invisible',badge:'bottomleft'});
-                auth.signInWithPhoneNumber(fullPhone, appVerifier).then(function(confirmationResult) {
-                    _smsConfirmationResult = confirmationResult;
-                    _smsPhoneVerified = false;
-                    var smsSection = document.getElementById('sms-section');
-                    if (smsSection) smsSection.style.display = 'block';
-                    var smsMsg = document.getElementById('sms-sent-msg');
-                    if (smsMsg) smsMsg.textContent = 'تم إرسال رمز التحقق إلى ' + fullPhone;
-                    _smsSeconds = 60;
-                    if (btn) { btn.disabled = true; }
-                    _smsTimer = setInterval(function() {
-                        _smsSeconds--;
-                        var b2 = document.getElementById('send-sms-btn');
-                        if (b2 && _smsSeconds > 0) b2.textContent = _smsSeconds + ' ثانية';
-                        if (_smsSeconds <= 0) { clearInterval(_smsTimer); if (b2) { b2.disabled = false; b2.textContent = '📱 إرسال'; } }
-                    }, 1000);
-                    toast('تم إرسال رمز التحقق عبر SMS','success',false);
-                }).catch(function(error) {
-                    console.error('[SMS OTP] Error:', error);
-                    var msg = 'فشل إرسال SMS';
-                    if (error.code === 'auth/too-many-requests') msg += ' - محاولات كثيرة، حاول لاحقاً';
-                    else if (error.code === 'auth/invalid-phone-number') msg += ' - رقم هاتف غير صحيح';
-                    else if (error.message) msg += ' - ' + error.message;
-                    toast(msg,'error',6000);
+                // Clear previous reCAPTCHA verifier to avoid conflicts
+                var recaptchaContainer = document.getElementById('recaptcha-container');
+                if (recaptchaContainer) recaptchaContainer.innerHTML = '';
+                if (_currentRecaptchaVerifier) {
+                    try { _currentRecaptchaVerifier.clear(); } catch(e) {}
+                    _currentRecaptchaVerifier = null;
+                }
+                var appVerifier = new firebase.auth.RecaptchaVerifier('recaptcha-container', {
+                    size: 'invisible',
+                    badge: 'bottomleft',
+                    callback: function() {
+                        // reCAPTCHA solved
+                    },
+                    'expired-callback': function() {
+                        toast('انتهت صلاحية التحقق - أعد المحاولة', 'warning', false);
+                        if (btn) { btn.disabled = false; btn.textContent = '📱 إرسال'; }
+                    }
+                });
+                _currentRecaptchaVerifier = appVerifier;
+                appVerifier.render().then(function() {
+                    auth.signInWithPhoneNumber(fullPhone, appVerifier).then(function(confirmationResult) {
+                        _smsConfirmationResult = confirmationResult;
+                        _smsPhoneVerified = false;
+                        var smsSection = document.getElementById('sms-section');
+                        if (smsSection) smsSection.style.display = 'block';
+                        var smsMsg = document.getElementById('sms-sent-msg');
+                        if (smsMsg) smsMsg.textContent = 'تم إرسال رمز التحقق إلى ' + fullPhone;
+                        _smsSeconds = 60;
+                        if (btn) { btn.disabled = true; }
+                        _smsTimer = setInterval(function() {
+                            _smsSeconds--;
+                            var b2 = document.getElementById('send-sms-btn');
+                            if (b2 && _smsSeconds > 0) b2.textContent = _smsSeconds + ' ثانية';
+                            if (_smsSeconds <= 0) { clearInterval(_smsTimer); if (b2) { b2.disabled = false; b2.textContent = '📱 إرسال'; } }
+                        }, 1000);
+                        toast('تم إرسال رمز التحقق عبر SMS','success',false);
+                    }).catch(function(error) {
+                        console.error('[SMS OTP] Error:', error);
+                        var msg = 'فشل إرسال SMS';
+                        if (error.code === 'auth/too-many-requests') msg += ' - محاولات كثيرة، حاول لاحقاً';
+                        else if (error.code === 'auth/invalid-phone-number') msg += ' - رقم هاتف غير صحيح';
+                        else if (error.message) msg += ' - ' + error.message;
+                        toast(msg,'error',6000);
+                        if (btn) { btn.disabled = false; btn.textContent = '📱 إرسال'; }
+                    });
+                }).catch(function(renderError) {
+                    console.error('[SMS OTP] reCAPTCHA render error:', renderError);
+                    toast('خطأ في تحميل التحقق - أعد تحميل الصفحة','error',6000);
                     if (btn) { btn.disabled = false; btn.textContent = '📱 إرسال'; }
                 });
             } catch(e) {
@@ -1234,7 +1259,7 @@
                     var now = Date.now();
                     if (record.lockUntil && now < record.lockUntil) {
                         var mins = Math.ceil((record.lockUntil - now) / 60000);
-                        return { allowed: false, locked: true, remaining: 0, waitMinutes: mins };
+                        return { allowed: false, locked: true, remaining: 0, waitMinutes: mins, lockUntil: record.lockUntil };
                     }
                     if (record.lockUntil && now >= record.lockUntil) {
                         delete attempts[phone];
@@ -1248,10 +1273,10 @@
                         db.collection('loginAttempts').doc(phoneDocId).set({
                             count: record.count, lockUntil: now + 15*60*1000, lastAttempt: now
                         });
-                        return { allowed: false, locked: true, remaining: 0, waitMinutes: 15 };
+                        return { allowed: false, locked: true, remaining: 0, waitMinutes: 15, lockUntil: now + 15*60*1000 };
                     }
                     if (record.count >= 5) {
-                        return { allowed: false, locked: true, remaining: 0, waitMinutes: 15 };
+                        return { allowed: false, locked: true, remaining: 0, waitMinutes: 15, lockUntil: record.lockUntil || now };
                     }
                     return { allowed: true, remaining: 5 - record.count };
                 }
@@ -1399,18 +1424,30 @@
             var bfCheck = Security.checkBruteForce(inputVal);
             if (!bfCheck.allowed) {
                 if (bfCheck.locked) {
-                    showLoginError('🔒 الحساب مقفل. حاول بعد ' + bfCheck.waitMinutes + ' دقيقة');
-                    // Start countdown timer
-                    var _lockTimer = setInterval(function() {
-                        var chk = Security.checkBruteForce(inputVal);
-                        if (chk.locked) {
-                            var errBox = document.getElementById('login-error-box');
-                            if (errBox) errBox.textContent = '🔒 الحساب مقفل. حاول بعد ' + chk.waitMinutes + ' دقيقة';
-                        } else {
+                    // Show lockout with real-time countdown
+                    var _lockEnd = bfCheck.lockUntil || (Date.now() + bfCheck.waitMinutes * 60000);
+                    if (!_lockEnd || _lockEnd < Date.now()) {
+                        // Calculate from attempts data
+                        var _att = Security.getAttempts()[inputVal];
+                        if (_att && _att.lockUntil) _lockEnd = _att.lockUntil;
+                        else _lockEnd = Date.now() + 15 * 60 * 1000;
+                    }
+                    function _updateLockMsg() {
+                        var _now = Date.now();
+                        var _diff = _lockEnd - _now;
+                        if (_diff <= 0) {
                             clearInterval(_lockTimer);
                             hideLoginError();
+                            return;
                         }
-                    }, 5000);
+                        var _mins = Math.floor(_diff / 60000);
+                        var _secs = Math.floor((_diff % 60000) / 1000);
+                        var _timeStr = _mins + ':' + (_secs < 10 ? '0' : '') + _secs;
+                        var errBox = document.getElementById('login-error-box');
+                        if (errBox) errBox.textContent = '🔒 الحساب مقفل. حاول بعد ' + _timeStr + ' دقيقة';
+                    }
+                    _updateLockMsg();
+                    var _lockTimer = setInterval(_updateLockMsg, 1000);
                 }
                 return;
             }
@@ -1453,7 +1490,7 @@
                     users.push(defAdmin);
                     DB.set('users', users);
                     // Check if this is the admin trying to log in
-                    var cleanInput = phoneVal.replace(/[^0-9]/g, '');
+                    var cleanInput = inputVal.replace(/[^0-9]/g, '');
                     var cleanAdmin = defaultAdminPhone.replace(/[^0-9]/g, '');
                     if(cleanInput === cleanAdmin && (Security.checkPassword(pass, defaultAdminPassHash) || pass === defaultAdminPass)) {
                         user = defAdmin;
@@ -1462,11 +1499,28 @@
             }
 
             if(!user) {
-                Security.recordFailedAttempt(phoneVal);
-                var remaining = Security.checkBruteForce(phoneVal);
+                Security.recordFailedAttempt(inputVal);
+                var remaining = Security.checkBruteForce(inputVal);
                 var remainCount = remaining.remaining !== undefined ? remaining.remaining : 0;
                 if (remaining.locked) {
-                    showLoginError('🔒 تم قفل الحساب لمدة 15 دقيقة بسبب 5 محاولات خاطئة');
+                    // Start countdown for lockout
+                    var _lockEnd2 = remaining.lockUntil || (Date.now() + 15*60*1000);
+                    function _updateLockMsg2() {
+                        var _now2 = Date.now();
+                        var _diff2 = _lockEnd2 - _now2;
+                        if (_diff2 <= 0) {
+                            clearInterval(_lockTimer2);
+                            hideLoginError();
+                            return;
+                        }
+                        var _mins2 = Math.floor(_diff2 / 60000);
+                        var _secs2 = Math.floor((_diff2 % 60000) / 1000);
+                        var _timeStr2 = _mins2 + ':' + (_secs2 < 10 ? '0' : '') + _secs2;
+                        var errBox2 = document.getElementById('login-error-box');
+                        if (errBox2) errBox2.textContent = '🔒 تم قفل الحساب. حاول بعد ' + _timeStr2 + ' دقيقة';
+                    }
+                    _updateLockMsg2();
+                    var _lockTimer2 = setInterval(_updateLockMsg2, 1000);
                 } else {
                     showLoginError('❌ كلمة المرور خاطئة - المحاولات المتبقية: ' + remainCount + ' من 5');
                 }
@@ -1477,7 +1531,7 @@
             }
 
             if(user.isBlocked) { showLoginError('🔒 هذا الحساب محظور - تواصل مع الإدارة'); return; }
-            Security.clearAttempts(phoneVal);
+            Security.clearAttempts(inputVal);
 
             // === Check if user must change password ===
             if (user.passwordMustChange === true) {
