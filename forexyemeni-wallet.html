@@ -125,6 +125,12 @@
         var _smsSeconds = 0;
         var _currentRecaptchaVerifier = null;
 
+        // ==================== SMS OTP (Vercel Serverless Function - NO reCAPTCHA) ====================
+        var _smsPhoneVerified = false;
+        var _smsCode = '';
+        var _smsTimer = null;
+        var _smsSeconds = 0;
+
         function sendSMSOTP() {
             var phoneInput = document.getElementById('reg-phone');
             var countrySelect = document.getElementById('reg-country');
@@ -137,74 +143,48 @@
             if(users.find(function(u){ return u.phone === fullPhone; })) { toast('رقم الهاتف مسجل مسبقاً','error',false); return; }
             var btn = document.getElementById('send-sms-btn');
             if (btn) { btn.disabled = true; btn.textContent = 'جاري الإرسال...'; }
+
+            // Generate 6-digit code
+            _smsCode = '';
+            for (var i = 0; i < 6; i++) _smsCode += Math.floor(Math.random() * 10);
+            _smsPhoneVerified = false;
+
+            var _apiBase = 'https://forexyemeni-wallet.vercel.app';
             try {
-                // Clear previous reCAPTCHA verifier to avoid conflicts
-                var recaptchaContainer = document.getElementById('recaptcha-container');
-                if (recaptchaContainer) recaptchaContainer.innerHTML = '';
-                if (_currentRecaptchaVerifier) {
-                    try { _currentRecaptchaVerifier.clear(); } catch(e) {}
-                    _currentRecaptchaVerifier = null;
-                }
-                if (_setSmsRecaptchaVerifier) {
-                    try { _setSmsRecaptchaVerifier.clear(); } catch(e) {}
-                    _setSmsRecaptchaVerifier = null;
-                }
-                // Show reCAPTCHA inline inside the form
-                var recapParent = document.getElementById('reg-phone-block');
-                var recapDiv = document.getElementById('reg-recaptcha');
-                if (!recapDiv) {
-                    recapDiv = document.createElement('div');
-                    recapDiv.id = 'reg-recaptcha';
-                    recapDiv.style.cssText = 'display:flex;justify-content:center;margin:8px 0;';
-                    if (recapParent) recapParent.appendChild(recapDiv);
-                    else document.body.appendChild(recapDiv);
-                }
-                recapDiv.innerHTML = '';
-                var appVerifier = new firebase.auth.RecaptchaVerifier('reg-recaptcha', {
-                    size: 'normal',
-                    callback: function(response) {
-                        // reCAPTCHA solved - proceed with SMS
-                    },
-                    'expired-callback': function() {
-                        toast('انتهت صلاحية التحقق - أعد المحاولة', 'warning', false);
-                        if (btn) { btn.disabled = false; btn.textContent = '📱 إرسال'; }
-                    }
-                });
-                _currentRecaptchaVerifier = appVerifier;
-                appVerifier.render().then(function() {
-                    // After reCAPTCHA renders, signInWithPhoneNumber will auto-trigger the reCAPTCHA check
-                    auth.signInWithPhoneNumber(fullPhone, appVerifier).then(function(confirmationResult) {
-                        _smsConfirmationResult = confirmationResult;
-                        _smsPhoneVerified = false;
+                fetch(_apiBase + '/api/send-sms-otp', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ to: fullPhone, code: _smsCode })
+                }).then(function(r){ return r.json(); })
+                .then(function(data) {
+                    if (data.success) {
                         var smsSection = document.getElementById('sms-section');
                         if (smsSection) smsSection.style.display = 'block';
                         var smsMsg = document.getElementById('sms-sent-msg');
-                        if (smsMsg) smsMsg.textContent = 'تم إرسال رمز التحقق إلى ' + fullPhone;
+                        if (smsMsg) {
+                            if (data.provider === 'gmail-fallback') {
+                                smsMsg.textContent = 'تم إرسال رمز التحقق - تحقق من بريد الإدارة';
+                            } else {
+                                smsMsg.textContent = 'تم إرسال رمز التحقق إلى ' + fullPhone;
+                            }
+                        }
                         _smsSeconds = 60;
-                        if (btn) { btn.disabled = true; }
+                        if (btn) btn.disabled = true;
                         _smsTimer = setInterval(function() {
                             _smsSeconds--;
                             var b2 = document.getElementById('send-sms-btn');
                             if (b2 && _smsSeconds > 0) b2.textContent = _smsSeconds + ' ثانية';
-                            if (_smsSeconds <= 0) { clearInterval(_smsTimer); if (b2) { b2.disabled = false; b2.textContent = '📱 إرسال'; } }
+                            if (_smsSeconds <= 0) { clearInterval(_smsTimer); if (b2) { b2.disabled = false; b2.textContent = '📱 إعادة إرسال'; } }
                         }, 1000);
-                        // Hide reCAPTCHA after successful SMS
-                        if (recapDiv) recapDiv.style.display = 'none';
-                        toast('تم إرسال رمز التحقق عبر SMS','success',false);
-                    }).catch(function(error) {
-                        console.error('[SMS OTP] Error:', error);
-                        var msg = 'فشل إرسال SMS';
-                        if (error.code === 'auth/too-many-requests') msg += ' - محاولات كثيرة، حاول لاحقاً';
-                        else if (error.code === 'auth/invalid-phone-number') msg += ' - رقم هاتف غير صحيح';
-                        else if (error.code === 'auth/unverified-email') msg += ' - يجب التحقق من البريد أولاً في Firebase';
-                        else if (error.code === 'auth/quota-exceeded') msg += ' - تم تجاوز حصة الرسائل';
-                        else if (error.message) msg += ' - ' + error.message;
-                        toast(msg,'error',8000);
+                        toast('تم إرسال رمز التحقق بنجاح','success',false);
+                    } else {
+                        console.error('[SMS OTP] Error:', data.error);
+                        toast('فشل إرسال SMS: ' + (data.error || 'غير معروف'),'error',8000);
                         if (btn) { btn.disabled = false; btn.textContent = '📱 إرسال'; }
-                    });
-                }).catch(function(renderError) {
-                    console.error('[SMS OTP] reCAPTCHA render error:', renderError);
-                    toast('خطأ في تحميل التحقق الآمن (reCAPTCHA) - تأكد من اتصال الإنترنت وأعد تحميل الصفحة','error',8000);
+                    }
+                }).catch(function(err) {
+                    console.error('[SMS OTP] Error:', err);
+                    toast('فشل الإرسال: ' + (err.message || 'تأكد من الاتصال'),'error',8000);
                     if (btn) { btn.disabled = false; btn.textContent = '📱 إرسال'; }
                 });
             } catch(e) {
@@ -218,21 +198,19 @@
             if (!codeInput) return;
             var code = codeInput.value.trim();
             if (!code || code.length < 6) { toast('أدخل رمز الـ 6 أرقام','error',false); return; }
-            if (!_smsConfirmationResult) { toast('أرسل رمز التحقق أولاً','error',false); return; }
+            if (!_smsCode) { toast('أرسل رمز التحقق أولاً','error',false); return; }
             var btn = document.getElementById('verify-sms-btn');
-            _smsConfirmationResult.confirm(code).then(function(result) {
+            if (code === _smsCode) {
                 _smsPhoneVerified = true;
-                auth.signOut();
                 var status = document.getElementById('sms-status');
                 if (status) { status.textContent = '✅ تم التحقق من رقم الهاتف'; status.style.display = 'block'; status.style.color = '#0ECB81'; }
                 if (btn) { btn.disabled = true; btn.textContent = '✅ تم'; }
                 codeInput.disabled = true;
                 codeInput.style.borderColor = '#0ECB81';
                 toast('تم التحقق من رقم الهاتف بنجاح','success',false);
-            }).catch(function(error) {
-                console.error('[SMS Verify] Error:', error);
+            } else {
                 toast('رمز التحقق غير صحيح','error',false);
-            });
+            }
         }
 
         // ==================== EMAIL OTP (Vercel Serverless Function - FREE) ====================
@@ -405,12 +383,11 @@
             }
         }
 
-        // ==================== SETTINGS SMS OTP (for adding phone in settings) ====================
+        // ==================== SETTINGS SMS OTP (Vercel Serverless Function - NO reCAPTCHA) ====================
         var _setSmsVerified = false;
-        var _setSmsResult = null;
+        var _setSmsCode = '';
         var _setSmsTimer = null;
         var _setSmsSeconds = 0;
-        var _setSmsRecaptchaVerifier = null;
 
         function sendSettingsPhoneSMS() {
             var phoneInput = document.getElementById('set-new-phone');
@@ -428,57 +405,46 @@
 
             var btn = document.getElementById('set-send-sms-btn');
             if (btn) { btn.disabled = true; btn.textContent = 'جاري الإرسال...'; }
+
+            // Generate 6-digit code
+            _setSmsCode = '';
+            for (var i = 0; i < 6; i++) _setSmsCode += Math.floor(Math.random() * 10);
+            _setSmsVerified = false;
+
+            var _apiBase = 'https://forexyemeni-wallet.vercel.app';
             try {
-                // Clear all previous verifiers
-                if (_setSmsRecaptchaVerifier) { try { _setSmsRecaptchaVerifier.clear(); } catch(e) {} _setSmsRecaptchaVerifier = null; }
-                if (_currentRecaptchaVerifier) { try { _currentRecaptchaVerifier.clear(); } catch(e) {} _currentRecaptchaVerifier = null; }
-                // Create visible reCAPTCHA inside phone section
-                var smsBlock = document.getElementById('set-sms-section');
-                var recapId = 'set-recaptcha';
-                var recapEl = document.getElementById(recapId);
-                if (!recapEl) {
-                    recapEl = document.createElement('div');
-                    recapEl.id = recapId;
-                    recapEl.style.cssText = 'display:flex;justify-content:center;margin:8px 0;';
-                    if (smsBlock && smsBlock.parentNode) smsBlock.parentNode.insertBefore(recapEl, smsBlock);
-                    else document.body.appendChild(recapEl);
-                }
-                recapEl.innerHTML = '';
-                recapEl.style.display = 'flex';
-                var appVerifier = new firebase.auth.RecaptchaVerifier(recapId, {
-                    size: 'normal',
-                    'expired-callback': function() { toast('انتهت صلاحية التحقق - أعد المحاولة', 'warning', false); if (btn) { btn.disabled = false; btn.textContent = '📱 إرسال'; } }
-                });
-                _setSmsRecaptchaVerifier = appVerifier;
-                appVerifier.render().then(function() {
-                    auth.signInWithPhoneNumber(fullPhone, appVerifier).then(function(confirmationResult) {
-                        _setSmsResult = confirmationResult;
-                        _setSmsVerified = false;
+                fetch(_apiBase + '/api/send-sms-otp', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ to: fullPhone, code: _setSmsCode })
+                }).then(function(r){ return r.json(); })
+                .then(function(data) {
+                    if (data.success) {
                         var sec = document.getElementById('set-sms-section');
                         if (sec) sec.style.display = 'block';
                         var msg = document.getElementById('set-sms-sent-msg');
-                        if (msg) msg.textContent = 'تم إرسال رمز التحقق إلى ' + fullPhone;
+                        if (msg) {
+                            if (data.provider === 'gmail-fallback') {
+                                msg.textContent = 'تم إرسال رمز التحقق - تحقق من بريد الإدارة';
+                            } else {
+                                msg.textContent = 'تم إرسال رمز التحقق إلى ' + fullPhone;
+                            }
+                        }
                         _setSmsSeconds = 60;
                         if (btn) btn.disabled = true;
-                        if (recapEl) recapEl.style.display = 'none';
                         _setSmsTimer = setInterval(function() {
                             _setSmsSeconds--;
                             var b = document.getElementById('set-send-sms-btn');
                             if (b && _setSmsSeconds > 0) b.textContent = _setSmsSeconds + ' ثانية';
                             if (_setSmsSeconds <= 0) { clearInterval(_setSmsTimer); if (b) { b.disabled = false; b.textContent = '📱 إرسال'; } }
                         }, 1000);
-                        toast('تم إرسال رمز التحقق عبر SMS', 'success', false);
-                    }).catch(function(error) {
-                        var msg = 'فشل إرسال SMS';
-                        if (error.code === 'auth/too-many-requests') msg += ' - محاولات كثيرة';
-                        else if (error.code === 'auth/invalid-phone-number') msg += ' - رقم غير صحيح';
-                        else if (error.code === 'auth/quota-exceeded') msg += ' - تم تجاوز حصة الرسائل';
-                        else if (error.message) msg += ' - ' + error.message;
-                        toast(msg, 'error', 6000);
+                        toast('تم إرسال رمز التحقق بنجاح', 'success', false);
+                    } else {
+                        toast('فشل إرسال SMS: ' + (data.error || 'غير معروف'), 'error', 6000);
                         if (btn) { btn.disabled = false; btn.textContent = '📱 إرسال'; }
-                    });
+                    }
                 }).catch(function(err) {
-                    toast('خطأ في تحميل التحقق الآمن - تأكد من اتصال الإنترنت وأعد تحميل الصفحة', 'error', 6000);
+                    toast('فشل الإرسال: ' + (err.message || 'تأكد من الاتصال'), 'error', 6000);
                     if (btn) { btn.disabled = false; btn.textContent = '📱 إرسال'; }
                 });
             } catch(e) {
@@ -492,19 +458,18 @@
             if (!codeInput) return;
             var code = codeInput.value.trim();
             if (!code || code.length < 6) { toast('أدخل رمز الـ 6 أرقام', 'error', false); return; }
-            if (!_setSmsResult) { toast('أرسل رمز التحقق أولاً', 'error', false); return; }
+            if (!_setSmsCode) { toast('أرسل رمز التحقق أولاً', 'error', false); return; }
             var btn = document.getElementById('set-verify-sms-btn');
-            _setSmsResult.confirm(code).then(function(result) {
+            if (code === _setSmsCode) {
                 _setSmsVerified = true;
-                auth.signOut();
                 var status = document.getElementById('set-sms-status');
                 if (status) { status.textContent = '✅ تم التحقق من رقم الهاتف'; status.style.display = 'block'; status.style.color = '#0ECB81'; }
                 if (btn) { btn.disabled = true; btn.textContent = '✅ تم'; }
                 codeInput.disabled = true; codeInput.style.borderColor = '#0ECB81';
                 toast('تم التحقق من رقم الهاتف بنجاح', 'success', false);
-            }).catch(function(error) {
+            } else {
                 toast('رمز التحقق غير صحيح', 'error', false);
-            });
+            }
         }
 
         // ==================== SETTINGS: ADD EMAIL (with OTP) ====================
