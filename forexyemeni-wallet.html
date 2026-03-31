@@ -145,11 +145,25 @@
                     try { _currentRecaptchaVerifier.clear(); } catch(e) {}
                     _currentRecaptchaVerifier = null;
                 }
-                var appVerifier = new firebase.auth.RecaptchaVerifier('recaptcha-container', {
-                    size: 'invisible',
-                    badge: 'bottomleft',
-                    callback: function() {
-                        // reCAPTCHA solved
+                if (_setSmsRecaptchaVerifier) {
+                    try { _setSmsRecaptchaVerifier.clear(); } catch(e) {}
+                    _setSmsRecaptchaVerifier = null;
+                }
+                // Show reCAPTCHA inline inside the form
+                var recapParent = document.getElementById('reg-phone-block');
+                var recapDiv = document.getElementById('reg-recaptcha');
+                if (!recapDiv) {
+                    recapDiv = document.createElement('div');
+                    recapDiv.id = 'reg-recaptcha';
+                    recapDiv.style.cssText = 'display:flex;justify-content:center;margin:8px 0;';
+                    if (recapParent) recapParent.appendChild(recapDiv);
+                    else document.body.appendChild(recapDiv);
+                }
+                recapDiv.innerHTML = '';
+                var appVerifier = new firebase.auth.RecaptchaVerifier('reg-recaptcha', {
+                    size: 'normal',
+                    callback: function(response) {
+                        // reCAPTCHA solved - proceed with SMS
                     },
                     'expired-callback': function() {
                         toast('انتهت صلاحية التحقق - أعد المحاولة', 'warning', false);
@@ -158,6 +172,7 @@
                 });
                 _currentRecaptchaVerifier = appVerifier;
                 appVerifier.render().then(function() {
+                    // After reCAPTCHA renders, signInWithPhoneNumber will auto-trigger the reCAPTCHA check
                     auth.signInWithPhoneNumber(fullPhone, appVerifier).then(function(confirmationResult) {
                         _smsConfirmationResult = confirmationResult;
                         _smsPhoneVerified = false;
@@ -173,19 +188,23 @@
                             if (b2 && _smsSeconds > 0) b2.textContent = _smsSeconds + ' ثانية';
                             if (_smsSeconds <= 0) { clearInterval(_smsTimer); if (b2) { b2.disabled = false; b2.textContent = '📱 إرسال'; } }
                         }, 1000);
+                        // Hide reCAPTCHA after successful SMS
+                        if (recapDiv) recapDiv.style.display = 'none';
                         toast('تم إرسال رمز التحقق عبر SMS','success',false);
                     }).catch(function(error) {
                         console.error('[SMS OTP] Error:', error);
                         var msg = 'فشل إرسال SMS';
                         if (error.code === 'auth/too-many-requests') msg += ' - محاولات كثيرة، حاول لاحقاً';
                         else if (error.code === 'auth/invalid-phone-number') msg += ' - رقم هاتف غير صحيح';
+                        else if (error.code === 'auth/unverified-email') msg += ' - يجب التحقق من البريد أولاً في Firebase';
+                        else if (error.code === 'auth/quota-exceeded') msg += ' - تم تجاوز حصة الرسائل';
                         else if (error.message) msg += ' - ' + error.message;
-                        toast(msg,'error',6000);
+                        toast(msg,'error',8000);
                         if (btn) { btn.disabled = false; btn.textContent = '📱 إرسال'; }
                     });
                 }).catch(function(renderError) {
                     console.error('[SMS OTP] reCAPTCHA render error:', renderError);
-                    toast('خطأ في تحميل التحقق - أعد تحميل الصفحة','error',6000);
+                    toast('خطأ في تحميل التحقق الآمن (reCAPTCHA) - تأكد من اتصال الإنترنت وأعد تحميل الصفحة','error',8000);
                     if (btn) { btn.disabled = false; btn.textContent = '📱 إرسال'; }
                 });
             } catch(e) {
@@ -410,11 +429,24 @@
             var btn = document.getElementById('set-send-sms-btn');
             if (btn) { btn.disabled = true; btn.textContent = 'جاري الإرسال...'; }
             try {
-                var recaptchaContainer = document.getElementById('recaptcha-container');
-                if (recaptchaContainer) recaptchaContainer.innerHTML = '';
+                // Clear all previous verifiers
                 if (_setSmsRecaptchaVerifier) { try { _setSmsRecaptchaVerifier.clear(); } catch(e) {} _setSmsRecaptchaVerifier = null; }
-                var appVerifier = new firebase.auth.RecaptchaVerifier('recaptcha-container', {
-                    size: 'invisible', badge: 'bottomleft',
+                if (_currentRecaptchaVerifier) { try { _currentRecaptchaVerifier.clear(); } catch(e) {} _currentRecaptchaVerifier = null; }
+                // Create visible reCAPTCHA inside phone section
+                var smsBlock = document.getElementById('set-sms-section');
+                var recapId = 'set-recaptcha';
+                var recapEl = document.getElementById(recapId);
+                if (!recapEl) {
+                    recapEl = document.createElement('div');
+                    recapEl.id = recapId;
+                    recapEl.style.cssText = 'display:flex;justify-content:center;margin:8px 0;';
+                    if (smsBlock && smsBlock.parentNode) smsBlock.parentNode.insertBefore(recapEl, smsBlock);
+                    else document.body.appendChild(recapEl);
+                }
+                recapEl.innerHTML = '';
+                recapEl.style.display = 'flex';
+                var appVerifier = new firebase.auth.RecaptchaVerifier(recapId, {
+                    size: 'normal',
                     'expired-callback': function() { toast('انتهت صلاحية التحقق - أعد المحاولة', 'warning', false); if (btn) { btn.disabled = false; btn.textContent = '📱 إرسال'; } }
                 });
                 _setSmsRecaptchaVerifier = appVerifier;
@@ -428,6 +460,7 @@
                         if (msg) msg.textContent = 'تم إرسال رمز التحقق إلى ' + fullPhone;
                         _setSmsSeconds = 60;
                         if (btn) btn.disabled = true;
+                        if (recapEl) recapEl.style.display = 'none';
                         _setSmsTimer = setInterval(function() {
                             _setSmsSeconds--;
                             var b = document.getElementById('set-send-sms-btn');
@@ -439,12 +472,13 @@
                         var msg = 'فشل إرسال SMS';
                         if (error.code === 'auth/too-many-requests') msg += ' - محاولات كثيرة';
                         else if (error.code === 'auth/invalid-phone-number') msg += ' - رقم غير صحيح';
+                        else if (error.code === 'auth/quota-exceeded') msg += ' - تم تجاوز حصة الرسائل';
                         else if (error.message) msg += ' - ' + error.message;
                         toast(msg, 'error', 6000);
                         if (btn) { btn.disabled = false; btn.textContent = '📱 إرسال'; }
                     });
                 }).catch(function(err) {
-                    toast('خطأ في تحميل التحقق - أعد تحميل الصفحة', 'error', 6000);
+                    toast('خطأ في تحميل التحقق الآمن - تأكد من اتصال الإنترنت وأعد تحميل الصفحة', 'error', 6000);
                     if (btn) { btn.disabled = false; btn.textContent = '📱 إرسال'; }
                 });
             } catch(e) {
