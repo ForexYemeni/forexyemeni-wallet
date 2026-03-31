@@ -1196,9 +1196,13 @@
             if(!user) {
                 Security.recordFailedAttempt(phoneVal);
                 var remaining = Security.checkBruteForce(phoneVal);
-                toast('البيانات غير صحيحة - المحاولات المتبقية: ' + remaining.remaining,'error');
-                if (remaining.remaining <= 1 && !remaining.locked) {
-                    toast('⚠️ تحذير: بعد محاولة فاشلة أخرى سيتم قفل الحساب 15 دقيقة','warning',false);
+                var remainCount = remaining.remaining !== undefined ? remaining.remaining : 0;
+                toast('❌ كلمة المرور غير صحيحة - المحاولات المتبقية: ' + remainCount + ' من 5','error',false);
+                if (remainCount <= 1 && !remaining.locked) {
+                    setTimeout(function(){ toast('⚠️ تحذير: بعد محاولة فاشلة أخرى سيتم قفل الحساب 15 دقيقة','warning',false); }, 500);
+                }
+                if (remaining.locked) {
+                    setTimeout(function(){ toast('🔒 تم قفل الحساب لمدة 15 دقيقة','error',false); }, 1000);
                 }
                 return;
             }
@@ -1211,7 +1215,8 @@
                 state.user = {id: user.id};
                 localStorage.setItem('fy_auth_user', JSON.stringify({id: user.id}));
                 Security.addAuditLog(user.id, 'LOGIN', 'تسجيل دخول - يجب تغيير كلمة المرور');
-                setView('change-password-required');
+                toast('🔐 يجب تغيير كلمة المرور قبل المتابعة','warning',false);
+                setTimeout(function(){ setView('change-password-required'); }, 1000);
                 return;
             }
 
