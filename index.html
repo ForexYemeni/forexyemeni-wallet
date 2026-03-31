@@ -4293,10 +4293,57 @@
                 snapshot.docChanges().forEach(function(change) {
                     if(change.type === 'modified' && change.doc.data()) {
                         var k = change.doc.id;
+                        var oldData = window.appData[k];
+                        var newData = change.doc.data().data;
                         if(window.appData.hasOwnProperty(k)) {
-                            window.appData[k] = change.doc.data().data;
-                            if(_initDone) render();
+                            window.appData[k] = newData;
                         }
+                        // Check for new messages → play sound for recipient
+                        if(k === 'messages' && oldData && newData) {
+                            var currentUser = state.user;
+                            if (currentUser && currentUser.id) {
+                                var notifSettings = getUserNotifSettings(currentUser.id);
+                                var oldLen = Array.isArray(oldData) ? oldData.length : 0;
+                                var newLen = Array.isArray(newData) ? newData.length : 0;
+                                if (newLen > oldLen) {
+                                    // New message(s) added
+                                    for (var mi = oldLen; mi < newLen; mi++) {
+                                        var msg = newData[mi];
+                                        if (msg && msg.toId === currentUser.id && !msg.isRead) {
+                                            // Message is for current user
+                                            var senderName = 'مستخدم';
+                                            var users = window.appData.users;
+                                            if (users) {
+                                                var sender = users.find(function(u){return u.id === msg.fromId;});
+                                                if (sender) senderName = sender.name;
+                                            }
+                                            toast('💬 رسالة جديدة من ' + senderName, 'info', true);
+                                            if (notifSettings.sound) playNotifSound();
+                                            if (notifSettings.vibrate) { try { if (navigator.vibrate) navigator.vibrate([200, 100, 200]); } catch(e) {} }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                        // Check for new notifications → play sound
+                        if(k === 'notifications' && oldData && newData) {
+                            var currentUser = state.user;
+                            if (currentUser && currentUser.id) {
+                                var notifSettings = getUserNotifSettings(currentUser.id);
+                                var oldLenN = Array.isArray(oldData) ? oldData.length : 0;
+                                var newLenN = Array.isArray(newData) ? newData.length : 0;
+                                if (newLenN > oldLenN) {
+                                    for (var ni = oldLenN; ni < newLenN; ni++) {
+                                        var notif = newData[ni];
+                                        if (notif && notif.userId === currentUser.id && !notif.isRead) {
+                                            if (notifSettings.sound) playNotifSound();
+                                            if (notifSettings.vibrate) { try { if (navigator.vibrate) navigator.vibrate([200, 100, 200]); } catch(e) {} }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                        if(_initDone) render();
                     }
                 });
             });
