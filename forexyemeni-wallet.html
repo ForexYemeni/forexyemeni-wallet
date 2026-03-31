@@ -1400,6 +1400,17 @@
             if (!bfCheck.allowed) {
                 if (bfCheck.locked) {
                     showLoginError('🔒 الحساب مقفل. حاول بعد ' + bfCheck.waitMinutes + ' دقيقة');
+                    // Start countdown timer
+                    var _lockTimer = setInterval(function() {
+                        var chk = Security.checkBruteForce(inputVal);
+                        if (chk.locked) {
+                            var errBox = document.getElementById('login-error-box');
+                            if (errBox) errBox.textContent = '🔒 الحساب مقفل. حاول بعد ' + chk.waitMinutes + ' دقيقة';
+                        } else {
+                            clearInterval(_lockTimer);
+                            hideLoginError();
+                        }
+                    }, 5000);
                 }
                 return;
             }
