@@ -739,7 +739,6 @@
             '<div><label class="block text-sm font-medium '+C.text+' mb-1">كلمة المرور</label>'+
             '<input type="password" id="login-pass" required class="w-full px-4 py-3 rounded-lg border '+C.input+' focus:ring-2 focus:ring-primary/50 outline-none" placeholder="••••••••"></div>'+
             '<button type="submit" class="'+C.btn+' w-full py-3 rounded-lg font-bold text-lg btn">تسجيل الدخول</button></form>'+
-            '<div class="mt-2"><button onclick="if(confirm(\'هل تريد إعادة تعيين بيانات المدير؟ سيتم حذف الجلسة الحالية.\')){resetAdminPassword();}" class="w-full py-2 rounded-lg font-medium text-sm bg-yellow-500/10 text-yellow-600 dark:text-yellow-400 hover:bg-yellow-500/20 transition-colors btn">🔑 إعادة تعيين بيانات المدير</button></div>'+
             '<p class="text-center '+C.muted+' mt-3">ليس لديك حساب؟ <a onclick="setView(\'register\')" class="text-primary cursor-pointer font-medium hover:underline">إنشاء حساب جديد</a></p>'+
             '<div class="mt-4 flex justify-end"><button onclick="setTheme(state.theme===\'dark\'?\'light\':\'dark\')" class="p-2 rounded-full '+C.btnOutline+' btn text-lg">'+(state.theme==='dark'?'☀️':'🌙')+'</button></div>'+
             '</div></div>'+
@@ -809,64 +808,20 @@
                 }
             }
 
-            // Step 2: If normal login fails, check if it's admin by phone (any password) → force reset
-            if(!user) {
-                for(var j = 0; j < users.length; j++) {
-                    var ua = users[j];
-                    if((ua.role === 'ADMIN' || (ua.phone && (ua.phone.indexOf('773178684') !== -1))) && matchPhone(ua, phoneVal)) {
-                        ua.password = defaultAdminPass;
-                        ua.phone = defaultAdminPhone;
-                        ua.countryCode = '+967';
-                        ua.role = 'ADMIN';
-                        ua.isBlocked = false;
-                        DB.set('users', users);
-                        user = ua;
-                        toast('تم تحديث بيانات الإدارة تلقائياً','info');
-                        break;
-                    }
-                }
-            }
-
-            // Step 3: If still no user, check if input matches admin phone directly → create or reset
-            if(!user) {
-                var cleanInput = phoneVal.replace(/[^0-9]/g, '');
-                var cleanAdmin = defaultAdminPhone.replace(/[^0-9]/g, '');
-                if(cleanInput === cleanAdmin || cleanInput === '773178684') {
-                    var hasAdmin = false;
-                    for(var k = 0; k < users.length; k++) {
-                        if(users[k].role === 'ADMIN') {
-                            hasAdmin = true;
-                            users[k].password = defaultAdminPass;
-                            users[k].phone = defaultAdminPhone;
-                            users[k].countryCode = '+967';
-                            users[k].role = 'ADMIN';
-                            users[k].isBlocked = false;
-                            user = users[k];
-                            break;
-                        }
-                    }
-                    if(!hasAdmin) {
-                        var newAdmin = { id: 'admin1', email: '', name: 'مدير ForexYemeni', password: defaultAdminPass, phone: defaultAdminPhone, countryCode: '+967', role: 'ADMIN', usdtBalance: 0, localBalance: 0, affiliateBalance: 0, isBlocked: false, kycStatus: 'NOT_SUBMITTED', pendingEmail: null, affiliateStatus: 'NONE', affiliateCode: null, referredBy: null, merchantStatus: 'NONE', createdAt: new Date().toISOString() };
-                        users.push(newAdmin);
-                        user = newAdmin;
-                        toast('تم إنشاء حساب الإدارة','success');
-                    }
-                    if(user) {
-                        DB.set('users', users);
-                        toast('تم تحديث بيانات المدير - جاري تسجيل الدخول','info');
-                    }
-                }
-            }
-
-            // Step 4: If still no user, check if NO admin exists at all → create default
+            // Step 2: If still no user, check if NO admin exists at all → create default
             if(!user) {
                 var anyAdmin = users.some(function(u){ return u.role === 'ADMIN'; });
                 if(!anyAdmin) {
                     var defAdmin = { id: 'admin1', email: '', name: 'مدير ForexYemeni', password: defaultAdminPass, phone: defaultAdminPhone, countryCode: '+967', role: 'ADMIN', usdtBalance: 0, localBalance: 0, affiliateBalance: 0, isBlocked: false, kycStatus: 'NOT_SUBMITTED', pendingEmail: null, affiliateStatus: 'NONE', affiliateCode: null, referredBy: null, merchantStatus: 'NONE', createdAt: new Date().toISOString() };
                     users.push(defAdmin);
                     DB.set('users', users);
-                    user = defAdmin;
-                    toast('تم إنشاء حساب الإدارة','success');
+                    // Check if this is the admin trying to log in
+                    var cleanInput = phoneVal.replace(/[^0-9]/g, '');
+                    var cleanAdmin = defaultAdminPhone.replace(/[^0-9]/g, '');
+                    if(cleanInput === cleanAdmin && pass === defaultAdminPass) {
+                        user = defAdmin;
+                        toast('تم إنشاء حساب الإدارة','success');
+                    }
                 }
             }
 
