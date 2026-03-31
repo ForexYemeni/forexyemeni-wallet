@@ -1744,33 +1744,45 @@
             }
 
             if(!user) {
-                Security.recordFailedAttempt(inputVal);
-                var remaining = Security.checkBruteForce(inputVal);
-                var remainCount = remaining.remaining !== undefined ? remaining.remaining : 0;
-                if (remaining.locked) {
-                    // Start countdown for lockout
-                    var _lockEnd2 = remaining.lockUntil || (Date.now() + 15*60*1000);
-                    function _updateLockMsg2() {
-                        var _now2 = Date.now();
-                        var _diff2 = _lockEnd2 - _now2;
-                        if (_diff2 <= 0) {
-                            clearInterval(_lockTimer2);
-                            hideLoginError();
-                            return;
-                        }
-                        var _mins2 = Math.floor(_diff2 / 60000);
-                        var _secs2 = Math.floor((_diff2 % 60000) / 1000);
-                        var _timeStr2 = _mins2 + ':' + (_secs2 < 10 ? '0' : '') + _secs2;
-                        var errBox2 = document.getElementById('login-error-box');
-                        if (errBox2) errBox2.textContent = '🔒 تم قفل الحساب. حاول بعد ' + _timeStr2 + ' دقيقة';
+                // Check if account actually exists before recording failed attempt
+                var accountExists = false;
+                for(var j = 0; j < users.length; j++) {
+                    if(isEmail) {
+                        if((users[j].email||'').toLowerCase() === inputVal.toLowerCase()) { accountExists = true; break; }
+                    } else {
+                        if(matchPhone(users[j], inputVal)) { accountExists = true; break; }
                     }
-                    _updateLockMsg2();
-                    var _lockTimer2 = setInterval(_updateLockMsg2, 1000);
-                } else {
-                    showLoginError('❌ كلمة المرور خاطئة - المحاولات المتبقية: ' + remainCount + ' من 5');
                 }
-                if (remainCount <= 1 && !remaining.locked) {
-                    setTimeout(function(){ showLoginError('⚠️ تحذير: محاولة واحدة فقط متبقية ثم يتم قفل الحساب 15 دقيقة!', true); }, 2000);
+                if(accountExists) {
+                    Security.recordFailedAttempt(inputVal);
+                    var remaining = Security.checkBruteForce(inputVal);
+                    var remainCount = remaining.remaining !== undefined ? remaining.remaining : 0;
+                    if (remaining.locked) {
+                        var _lockEnd2 = remaining.lockUntil || (Date.now() + 15*60*1000);
+                        function _updateLockMsg2() {
+                            var _now2 = Date.now();
+                            var _diff2 = _lockEnd2 - _now2;
+                            if (_diff2 <= 0) {
+                                clearInterval(_lockTimer2);
+                                hideLoginError();
+                                return;
+                            }
+                            var _mins2 = Math.floor(_diff2 / 60000);
+                            var _secs2 = Math.floor((_diff2 % 60000) / 1000);
+                            var _timeStr2 = _mins2 + ':' + (_secs2 < 10 ? '0' : '') + _secs2;
+                            var errBox2 = document.getElementById('login-error-box');
+                            if (errBox2) errBox2.textContent = '🔒 تم قفل الحساب. حاول بعد ' + _timeStr2 + ' دقيقة';
+                        }
+                        _updateLockMsg2();
+                        var _lockTimer2 = setInterval(_updateLockMsg2, 1000);
+                    } else {
+                        showLoginError('❌ كلمة المرور خاطئة - المحاولات المتبقية: ' + remainCount + ' من 5');
+                    }
+                    if (remainCount <= 1 && !remaining.locked) {
+                        setTimeout(function(){ showLoginError('⚠️ تحذير: محاولة واحدة فقط متبقية ثم يتم قفل الحساب 15 دقيقة!', true); }, 2000);
+                    }
+                } else {
+                    showLoginError('❌ الحساب غير موجود - تأكد من رقم الهاتف أو البريد الإلكتروني');
                 }
                 return;
             }
