@@ -636,20 +636,12 @@
             var ns = DB.get('notifications') || [];
             ns.unshift({ id: DB.uid(), userId: userId, title: title, message: msg, type: type, isRead: false, createdAt: new Date().toISOString() });
             DB.set('notifications', ns);
-            // Check notification settings for target user
-            var notifSettings = getUserNotifSettings(userId);
+            // For other users - send push notification only (sound will play via onSnapshot on their device)
             var currentUser = getUser();
-            if (currentUser && currentUser.id === userId) {
-                // Show in-app toast
-                toast(title, type.toLowerCase(), true);
-                // Play sound if enabled
-                if (notifSettings.sound) playNotifSound();
-                // Vibrate if enabled
-                if (notifSettings.vibrate) { try { if (navigator.vibrate) navigator.vibrate([200, 100, 200, 100, 200]); } catch(e) {} }
-            } else {
-                // For other users - send push notification
+            if (!currentUser || currentUser.id !== userId) {
                 queuePushNotification(userId, title, msg, type);
             }
+            // Do NOT play sound here - onSnapshot handles sound on the recipient's device
         }
         function addLog(userId, type, amount, currency, desc) {
             var logs = DB.get('transactionLog') || [];
@@ -1864,7 +1856,6 @@
             msgs.push({id:DB.uid(),fromId:user.id,toId:adminUser.id,text:text,isRead:false,createdAt:new Date().toISOString()});
             DB.set('messages', msgs);
             addNotif(adminUser.id, '💬 رسالة جديدة', 'رسالة من ' + user.name + ': ' + text.substring(0, 50), 'CHAT');
-            playNotifSound();
             input.value = '';
             render();
         }
@@ -3547,7 +3538,6 @@
             msgs.push({id:DB.uid(),fromId:adminId,toId:state.activeChatUserId,text:text,isRead:false,createdAt:new Date().toISOString()});
             DB.set('messages', msgs);
             addNotif(state.activeChatUserId, '💬 رسالة من الإدارة', text.substring(0, 80), 'CHAT');
-            playNotifSound();
             input.value = '';
             render();
         }
