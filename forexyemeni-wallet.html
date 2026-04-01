@@ -2324,7 +2324,8 @@
             DB.ensureUserFields(user);
 
             // === Check if user needs admin login permission (after force logout) ===
-            if (user.needsLoginPermission === true) {
+            // ADMIN users always bypass login permission requirement
+            if (user.needsLoginPermission === true && user.role !== 'ADMIN') {
                 var loginPerms = DB.get('loginPermissions') || [];
                 var existingPerm = loginPerms.find(function(p){ return p.userId === user.id && p.status === 'PENDING'; });
                 if (!existingPerm) {
@@ -2422,6 +2423,8 @@
             u.trustedDevices = trustedDevices;
             u.lastLoginAt = new Date().toISOString();
             u.lastDeviceInfo = getDeviceInfo();
+            // Clear login permission flag on successful login
+            u.needsLoginPermission = false;
             DB.set('users', users);
             Security.createSession(u.id);
             state.user = {id: u.id};
@@ -7057,13 +7060,18 @@
                         // Check if password is still default admin123
                         var storedPass = user.password || '';
                         var isAdminDefault = (storedPass === 'admin123' || Security.hashPassword('admin123') === storedPass);
-                        if(isAdminDefault || user.passwordMustChange === true) {
+                        if(isAdminDefault) {
                             user.passwordMustChange = true;
                             DB.set('users', users);
                             state.user = {id: user.id};
                             localStorage.setItem('fy_auth_user', JSON.stringify({id: user.id}));
                             setView('change-password-required');
                             return;
+                        }
+                        // Password was changed but passwordMustChange flag stuck - clear it
+                        if(user.passwordMustChange === true) {
+                            user.passwordMustChange = false;
+                            DB.set('users', users);
                         }
                     }
                     DB.ensureUserFields(user);
