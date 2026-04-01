@@ -203,7 +203,7 @@
             </div>
         </div>
     </div>
-    <div id="camera-modal" class="camera-modal hidden">
+    <div id="camera-modal" class="camera-modal" style="display:none;">
         <div class="w-full max-w-lg">
             <div class="flex justify-between items-center mb-4">
                 <h3 class="text-lg font-bold text-white">📸 التقاط صورة</h3>
@@ -1154,20 +1154,30 @@
 
         // ==================== CAMERA UTILITY ====================
         var cameraStream = null, cameraCallback = null, cameraFacing = 'environment';
-        function openCameraModal(callback) { cameraCallback = callback; document.getElementById('camera-modal').classList.remove('hidden'); startCamera(); }
-        function closeCameraModal() { stopCamera(); document.getElementById('camera-modal').classList.add('hidden'); cameraCallback = null; }
+        function openCameraModal(callback) { cameraCallback = callback; var modal = document.getElementById('camera-modal'); modal.classList.remove('hidden'); modal.style.display = 'flex'; startCamera(); }
+        function closeCameraModal() { stopCamera(); var modal = document.getElementById('camera-modal'); modal.classList.add('hidden'); modal.style.display = 'none'; cameraCallback = null; }
         async function startCamera() {
             stopCamera();
             var video = document.getElementById('camera-video');
             var fallbackNote = document.getElementById('camera-fallback-note');
             var flipBtn = document.getElementById('camera-flip-btn');
+            var captureBtn = document.querySelector('#camera-modal button[onclick="capturePhoto()"]');
             fallbackNote.textContent = '';
             try {
-                var stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: cameraFacing, width: { ideal: 1280 }, height: { ideal: 720 } } });
+                var constraints = { video: { facingMode: cameraFacing, width: { ideal: 1280 }, height: { ideal: 720 } } };
+                var stream = await navigator.mediaDevices.getUserMedia(constraints);
                 cameraStream = stream; video.srcObject = stream; video.style.display = 'block'; flipBtn.style.display = 'block';
+                if(captureBtn) captureBtn.style.display = '';
             } catch(e) {
-                fallbackNote.textContent = '⚠️ لا يمكن الوصول للكاميرا.';
+                console.error('Camera error:', e);
+                var msg = '⚠️ لا يمكن الوصول للكاميرا';
+                if(e.name === 'NotAllowedError') msg = '⚠️ تم رفض إذن الكاميرا - اسمح بالوصول من إعدادات المتصفح';
+                else if(e.name === 'NotFoundError') msg = '⚠️ لا توجد كاميرا في هذا الجهاز';
+                else if(e.name === 'NotReadableError') msg = '⚠️ الكاميرا مستخدمة بواسطة تطبيق آخر';
+                else if(e.name === 'SecurityError') msg = '⚠️ يجب استخدام HTTPS للوصول للكاميرا';
+                fallbackNote.textContent = msg;
                 flipBtn.style.display = 'none'; video.style.display = 'none';
+                if(captureBtn) captureBtn.style.display = 'none';
             }
         }
         function stopCamera() { if(cameraStream) { cameraStream.getTracks().forEach(function(t){t.stop();}); cameraStream = null; } }
@@ -4802,7 +4812,7 @@
                 '<div class="flex gap-2 mt-2">'+camBtn('merch-kyc-back',C)+fileBtn('merch-kyc-back',C)+'</div></div>'+
                 '<div><label class="block text-sm font-medium '+C.text+' mb-1">🤳 سيلفي مع الهوية <span class="text-danger">*</span><span class="text-xs text-primary mr-1">(صورة مباشرة)</span></label>'+
                 previewDiv('merch-kyc-selfie')+
-                '<div class="flex gap-2 mt-2">'+camBtn('merch-kyc-selfie',C)+'</div></div>'+
+                '<div class="flex gap-2 mt-2">'+camBtn('merch-kyc-selfie',C)+fileBtn('merch-kyc-selfie',C)+'</div></div>'+
                 '<div><label class="block text-sm font-medium '+C.text+' mb-1">🏠 إثبات عنوان السكن <span class="text-danger">*</span></label>'+
                 previewDiv('merch-kyc-address')+
                 '<div class="flex gap-2 mt-2">'+camBtn('merch-kyc-address',C)+fileBtn('merch-kyc-address',C)+'</div></div>'+
