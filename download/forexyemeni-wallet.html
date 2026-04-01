@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ForexYemeni Wallet v3.1 - محفظة العملات الرقمية</title>
+    <title>ForexYemeni Wallet v4.0 - محفظة العملات الرقمية</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
         tailwind.config = {
@@ -55,6 +55,25 @@
         .camera-modal canvas { display: none; }
         .copy-btn { display: inline-flex; align-items: center; gap: 2px; padding: 2px 8px; border-radius: 4px; font-size: 0.7rem; background: rgba(240,185,11,0.15); color: #F0B90B; cursor: pointer; border: none; transition: all 0.2s; }
         .copy-btn:hover { background: rgba(240,185,11,0.3); }
+        /* Mobile improvements */
+        @media (max-width: 640px) {
+            .toast { font-size: 0.8rem; padding: 8px 12px; max-width: 90vw; }
+            #modal-content, #confirm-container > div { margin: 8px; max-width: calc(100vw - 16px); max-height: 85vh; border-radius: 16px; }
+            .sidebar-mobile-overlay { display: block !important; }
+        }
+        /* Smooth touch scrolling */
+        * { -webkit-tap-highlight-color: transparent; }
+        input, textarea, select { font-size: 16px !important; /* Prevent iOS zoom */ }
+        /* Pull to refresh indicator */
+        .pull-indicator { position: fixed; top: -50px; left: 50%; transform: translateX(-50%); z-index: 9999; transition: top 0.3s; }
+        .pull-indicator.active { top: 10px; }
+        /* Ripple effect for buttons */
+        .btn { position: relative; overflow: hidden; }
+        .btn:active { transform: scale(0.97); }
+        /* Bottom safe area for iPhone X+ */
+        @supports (padding-bottom: env(safe-area-inset-bottom)) {
+            .sidebar-safe { padding-bottom: env(safe-area-inset-bottom); }
+        }
     </style>
     <script src="https://www.gstatic.com/firebasejs/10.8.1/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore-compat.js"></script>
@@ -1241,8 +1260,49 @@
             var currentUser = getUser();
             if (!currentUser || currentUser.id !== userId) {
                 queuePushNotification(userId, title, msg, type);
+            } else {
+                // Play notification sound for current user
+                _playNotifSound(type);
+                // Show browser notification if permission granted
+                if ('Notification' in window && Notification.permission === 'granted') {
+                    try {
+                        new Notification(title, { body: msg, icon: 'icon.png', badge: 'icon.png', tag: 'fy-notif-' + Date.now() });
+                    } catch(e) {}
+                }
             }
-            // Do NOT play sound here - onSnapshot handles sound on the recipient's device
+        }
+
+        // Play notification sound using Web Audio API
+        var _audioCtx = null;
+        function _playNotifSound(type) {
+            try {
+                if (!_audioCtx) _audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+                var osc = _audioCtx.createOscillator();
+                var gain = _audioCtx.createGain();
+                osc.connect(gain);
+                gain.connect(_audioCtx.destination);
+                var freq = type === 'WARNING' || type === 'DANGER' ? 440 : type === 'SUCCESS' ? 660 : 520;
+                osc.frequency.value = freq;
+                osc.type = 'sine';
+                gain.gain.value = 0.1;
+                gain.gain.exponentialRampToValueAtTime(0.001, _audioCtx.currentTime + 0.3);
+                osc.start(_audioCtx.currentTime);
+                osc.stop(_audioCtx.currentTime + 0.3);
+                // Second beep for important notifications
+                if (type === 'WARNING' || type === 'DANGER') {
+                    setTimeout(function(){
+                        try {
+                            var osc2 = _audioCtx.createOscillator();
+                            var gain2 = _audioCtx.createGain();
+                            osc2.connect(gain2); gain2.connect(_audioCtx.destination);
+                            osc2.frequency.value = freq + 100;
+                            osc2.type = 'sine'; gain2.gain.value = 0.1;
+                            gain2.gain.exponentialRampToValueAtTime(0.001, _audioCtx.currentTime + 0.3);
+                            osc2.start(_audioCtx.currentTime); osc2.stop(_audioCtx.currentTime + 0.3);
+                        } catch(e){}
+                    }, 200);
+                }
+            } catch(e) { /* Audio not supported */ }
         }
         function addLog(userId, type, amount, currency, desc) {
             var logs = DB.get('transactionLog') || [];
@@ -1347,6 +1407,10 @@
         }
         function getDeviceInfo() {
             return navigator.userAgent.substring(0, 80);
+        }
+
+        function _getUrlRef() {
+            try { var p = new URLSearchParams(window.location.search); return p.get('ref') || ''; } catch(e) { return ''; }
         }
 
         function renderLogin(C) {
@@ -1499,7 +1563,7 @@
             '<p id="sms-status" class="text-xs mt-1" style="display:none"></p>'+
             '</div></div></div></div>'+
             '<div><label class="block text-sm font-medium '+C.text+' mb-1">كلمة المرور</label><input type="password" id="reg-pass" required minlength="6" oninput="updatePasswordStrength()" class="w-full px-4 py-2.5 rounded-lg border '+C.input+' outline-none focus:ring-2 focus:ring-primary/50" placeholder="8 أحرف على الأقل">'+renderPasswordStrength(C)+'</div>'+
-            '<div><label class="block text-sm font-medium '+C.text+' mb-1">كود الإحالة (اختياري)</label><input type="text" id="reg-ref" class="w-full px-4 py-2.5 rounded-lg border '+C.input+' outline-none focus:ring-2 focus:ring-primary/50" placeholder="إذا دعاك شخص أدخل رمزه"></div>'+
+            '<div><label class="block text-sm font-medium '+C.text+' mb-1">كود الإحالة (اختياري)</label><input type="text" id="reg-ref" value="'+escHtml(_getUrlRef()||'')+'" class="w-full px-4 py-2.5 rounded-lg border '+C.input+' outline-none focus:ring-2 focus:ring-primary/50" placeholder="إذا دعاك شخص أدخل رمزه"></div>'+
             '<button type="submit" class="'+C.btn+' w-full py-3 rounded-lg font-bold text-lg btn mt-2">إنشاء الحساب</button></form>'+
             '<p class="text-center '+C.muted+' mt-4">لديك حساب؟ <a onclick="setView(\'login\')" class="text-primary cursor-pointer font-medium hover:underline">تسجيل الدخول</a></p>'+
             '<div class="mt-4 flex justify-end"><button onclick="setTheme(state.theme===\'dark\'?\'light\':\'dark\')" class="p-2 rounded-full '+C.btnOutline+' btn text-lg">'+(state.theme==='dark'?'☀️':'🌙')+'</button></div>'+
@@ -1997,6 +2061,10 @@
             else if(u.role === 'MERCHANT' || u.merchantStatus === 'APPROVED') setView('merchant-dashboard');
             else setView('user-home');
             toast('مرحباً '+u.name,'success');
+            // Auto-request notification permission on first login
+            if('Notification' in window && Notification.permission === 'default') {
+                setTimeout(function(){ requestNotifPermission(); }, 3000);
+            }
             // Show welcome tutorial for first-time users
             setTimeout(function(){ _showWelcomeTutorial(u); }, 1500);
         }
@@ -2722,8 +2790,34 @@
                 '<div class="flex items-center gap-3">'+
                 '<button onclick="setTheme(state.theme===\'dark\'?\'light\':\'dark\')" class="p-2 rounded-lg '+C.btnOutline+' btn text-sm">'+(state.theme==='dark'?'☀️':'🌙')+'</button>'+
                 '</div></div>'+
-                '<div class="fade-in">'+contentHtml+'</div></main></div>'+
+                '<div class="fade-in">'+contentHtml+'</div></main>'+
+                // Mobile bottom navigation bar
+                '<nav class="fixed bottom-0 left-0 right-0 lg:hidden z-40 '+C.card+' border-t '+C.border+' sidebar-safe">'+_renderMobileNavBar(C,role)+'</nav>'+
                 floatingContactHtml;
+        }
+
+        function _renderMobileNavBar(C, role) {
+            var items = [];
+            if(role === 'admin') {
+                items = [{id:'admin-home',icon:'🏠',label:'الرئيسية'},{id:'admin-users',icon:'👥',label:'المستخدمين'},{id:'admin-deposits',icon:'💰',label:'الإيداعات'},{id:'admin-chat',icon:'💬',label:'الدعم'},{id:'admin-settings',icon:'⚙️',label:'الإعدادات'}];
+            } else if(role === 'merchant') {
+                items = [{id:'merchant-dashboard',icon:'🏠',label:'الرئيسية'},{id:'merchant-deposit',icon:'💰',label:'إيداع'},{id:'merchant-withdraw',icon:'🏧',label:'سحب'},{id:'merchant-transactions',icon:'📊',label:'المعاملات'},{id:'merchant-chat',icon:'💬',label:'الدعم'}];
+            } else {
+                items = [{id:'user-home',icon:'🏠',label:'الرئيسية'},{id:'user-deposit',icon:'💰',label:'إيداع'},{id:'user-withdraw',icon:'🏧',label:'سحب'},{id:'user-merchants',icon:'🏪',label:'التجار'},{id:'user-chat',icon:'💬',label:'الدعم'}];
+            }
+            var active = state.view;
+            // Check notifications badge for chat
+            var currentUser = getUser();
+            var unreadChat = 0;
+            if(currentUser) unreadChat = DB.get('messages').filter(function(m){return m.toId===currentUser.id && !m.isRead;}).length;
+            return '<div class="flex items-center justify-around py-1.5 px-1">'+items.map(function(item){
+                var isActive = active === item.id;
+                var badge = '';
+                if((item.id.indexOf('chat') >= 0) && unreadChat > 0) badge = '<span class="absolute -top-1 -right-1 w-4 h-4 bg-danger rounded-full text-white text-[10px] flex items-center justify-center font-bold">'+unreadChat+'</span>';
+                return '<button onclick="setView(\''+item.id+'\')" class="flex flex-col items-center gap-0.5 py-1 px-3 rounded-lg relative '+(isActive?'text-primary':'text-dark-muted')+'">'+
+                    '<span class="text-xl">'+item.icon+'</span>'+
+                    '<span class="text-[10px] font-medium">'+item.label+'</span>'+badge+'</button>';
+            }).join('')+'</div>';
         }
         // ==================== USER: HOME ====================
         function renderUserHome(C) {
@@ -3645,32 +3739,61 @@
             if(status === 'NONE') {
                 return '<div class="'+C.card+' rounded-xl p-6 max-w-lg mx-auto border '+C.border+' text-center">'+
                     '<h2 class="text-xl font-bold '+C.text+' mb-4">🔗 نظام العمولة</h2>'+
-                    '<div class="py-8"><p class="text-4xl mb-4">🔗</p><p class="'+C.muted+' mb-6">يمكنك كسب عمولة من خلال دعوة أصدقائك</p>'+
-                    '<button onclick="requestAffiliate()" class="'+C.btn+' px-8 py-3 rounded-lg font-bold btn text-lg">طلب الانضمام</button></div></div>';
+                    '<div class="py-4 space-y-4">'+
+                    '<div class="p-4 rounded-xl bg-primary/5 border border-primary/20"><p class="text-3xl mb-2">🎁</p><p class="'+C.text+' font-bold mb-1">اكسب عمولة من كل صديق تدعوه!</p><p class="'+C.muted+' text-sm">احصل على كود إحالة خاص بك وشاركه مع أصدقائك. عندما يسجلون ويقومون بمعاملات، تحصل على نسبة من العمولة تلقائياً.</p></div>'+
+                    '<div class="grid grid-cols-3 gap-2">'+
+                    '<div class="'+C.card+' rounded-lg p-3 border '+C.border+' text-center"><p class="text-2xl mb-1">👥</p><p class="text-xs '+C.muted+'">ادعُ أصدقائك</p></div>'+
+                    '<div class="'+C.card+' rounded-lg p-3 border '+C.border+' text-center"><p class="text-2xl mb-1">💰</p><p class="text-xs '+C.muted+'">احصل على عمولة</p></div>'+
+                    '<div class="'+C.card+' rounded-lg p-3 border '+C.border+' text-center"><p class="text-2xl mb-1">🏧</p><p class="text-xs '+C.muted+'">اسحب أرباحك</p></div></div>'+
+                    '<button onclick="requestAffiliate()" class="'+C.btn+' px-8 py-3 rounded-lg font-bold btn text-lg">🚀 ابدأ الآن - طلب الانضمام</button></div></div>';
             }
             if(status === 'PENDING') {
                 return '<div class="'+C.card+' rounded-xl p-6 max-w-lg mx-auto border '+C.border+' text-center">'+
                     '<h2 class="text-xl font-bold '+C.text+' mb-4">🔗 نظام العمولة</h2>'+
-                    '<div class="py-8"><p class="text-4xl mb-4">⏳</p><p class="'+C.muted+'">طلب الانضمام قيد المراجعة</p></div></div>';
+                    '<div class="py-8"><p class="text-4xl mb-4">⏳</p><p class="'+C.muted+'">طلب الانضمام قيد المراجعة من الإدارة</p><p class="'+C.muted+' text-xs mt-2">سيتم إشعارك فور الموافقة</p></div></div>';
             }
             var users = DB.get('users');
             var referrals = users.filter(function(u){return u.referredBy===user.id;});
             var code = user.affiliateCode || '';
             var balance = user.affiliateBalance || 0;
-            var refHtml = referrals.length===0 ? '<p class="'+C.muted+' text-sm text-center py-4">لا يوجد مدعوين بعد</p>' :
+            var affL1 = parseFloat(DB.getSetting('aff_l1')) || 5;
+            var affL2 = parseFloat(DB.getSetting('aff_l2')) || 3;
+            var affL3 = parseFloat(DB.getSetting('aff_l3')) || 1;
+            // Build referral link
+            var refLink = window.location.origin + window.location.pathname + '?ref=' + code;
+            // Stats
+            var activeReferrals = referrals.filter(function(r){return r.kycStatus === 'APPROVED';}).length;
+            var totalRefDeposits = referrals.reduce(function(s,r){ return s + (DB.get('deposits').filter(function(d){return d.userId===r.id && d.status==='APPROVED';}).reduce(function(ss,d){return ss+(d.usdtAmount||0);},0)); },0);
+            var earnedFromDeposits = totalRefDeposits * (affL1/100);
+            var refHtml = referrals.length===0 ? '<div class="text-center py-6"><p class="text-3xl mb-2">👥</p><p class="'+C.muted+' text-sm">لم يدعُ أحد بعد - شارك رابط الدعوة!</p></div>' :
                 referrals.map(function(r) {
-                    return '<div class="flex items-center justify-between py-2 border-b '+C.border+' last:border-0">'+
-                        '<div><p class="text-sm '+C.text+'">'+escHtml(r.name)+'</p><p class="text-xs '+C.muted+'">'+escHtml(r.phone)+'</p></div>'+
-                        '<span class="text-xs '+C.muted+'">'+fmtDate(r.createdAt)+'</span></div>';
+                    var rDeposits = DB.get('deposits').filter(function(d){return d.userId===r.id && d.status==='APPROVED';}).reduce(function(s,d){return s+(d.usdtAmount||0);},0);
+                    return '<div class="flex items-center justify-between py-2.5 border-b '+C.border+' last:border-0">'+
+                        '<div class="flex items-center gap-2"><div class="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center text-xs">👤</div>'+
+                        '<div><p class="text-sm '+C.text+'">'+escHtml(r.name)+'</p><p class="text-xs '+C.muted+'">'+escHtml(r.phone)+'</p></div></div>'+
+                        '<div class="text-left"><p class="text-xs text-success font-bold">'+fmtNum(rDeposits)+' USDT</p>'+
+                        '<p class="text-xs '+C.muted+'">'+fmtDate(r.createdAt)+'</p></div></div>';
                 }).join('');
             return '<div class="'+C.card+' rounded-xl p-6 max-w-lg mx-auto border '+C.border+'">'+
                 '<h2 class="text-xl font-bold '+C.text+' mb-4 text-center">🔗 نظام العمولة</h2>'+
+                // Invite link section
+                '<div class="p-4 rounded-xl bg-primary/5 border-2 border-primary/30 mb-4">'+
+                '<p class="text-sm font-bold '+C.text+' mb-2">🔗 رابط الدعوة</p>'+
+                '<div class="flex gap-2 mb-2"><input type="text" value="'+escHtml(refLink)+'" readonly class="flex-1 px-3 py-2 rounded-lg border '+C.input+' outline-none text-xs font-mono '+C.text+'" id="ref-link-input">'+
+                '<button onclick="navigator.clipboard.writeText(\''+escHtml(refLink)+'\');toast(\'تم نسخ الرابط ✓\',\'success\')" class="px-4 py-2 rounded-lg bg-primary text-dark-bg font-bold btn text-sm shrink-0">📋 نسخ</button></div>'+
+                '<div class="flex items-center gap-2"><span class="text-xs '+C.muted+'">أو شارك الكود:</span>'+
+                '<div class="flex items-center gap-1 px-3 py-1 rounded-lg bg-primary/20 border border-primary/30 cursor-pointer" onclick="copyText(\''+escHtml(code)+'\')">'+
+                '<span class="font-mono font-bold text-primary">'+escHtml(code)+'</span>'+
+                '<span class="text-xs text-primary">📋</span></div></div></div>'+
+                // Stats cards
                 '<div class="grid grid-cols-2 gap-3 mb-4">'+
-                '<div class="'+C.card+' rounded-lg p-3 text-center border '+C.border+'"><p class="'+C.muted+' text-xs">كود الإحالة</p><p class="font-bold text-primary text-lg font-mono">'+escHtml(code)+'</p><button onclick="copyText(\''+escHtml(code)+'\')" class="text-xs text-primary btn mt-1">نسخ</button></div>'+
-                '<div class="'+C.card+' rounded-lg p-3 text-center border '+C.border+'"><p class="'+C.muted+' text-xs">رصيد العمولات</p><p class="font-bold text-success text-lg">'+fmtNum(balance)+' USDT</p></div></div>'+
-                '<div class="'+C.card+' rounded-lg p-3 border '+C.border+' mb-4"><p class="'+C.muted+' text-xs">عدد المدعوين: <span class="'+C.text+' font-bold">'+referrals.length+'</span></p></div>'+
-                '<button onclick="withdrawAffiliateBalance()" class="w-full py-2.5 rounded-lg font-bold btn bg-info text-white mb-4">سحب أرباح العمولات إلى رصيدي</button>'+
-                '<h3 class="font-bold '+C.text+' mb-3">قائمة المدعوين</h3>'+
+                '<div class="'+C.card+' rounded-lg p-3 text-center border '+C.border+'"><p class="'+C.muted+' text-xs">💰 رصيد العمولات</p><p class="font-bold text-success text-lg">'+fmtNum(balance)+' USDT</p></div>'+
+                '<div class="'+C.card+' rounded-lg p-3 text-center border '+C.border+'"><p class="'+C.muted+' text-xs">👥 المدعوين</p><p class="font-bold text-primary text-lg">'+referrals.length+' <span class="text-xs text-success">('+activeReferrals+' نشط)</span></p></div>'+
+                '<div class="'+C.card+' rounded-lg p-3 text-center border '+C.border+'"><p class="'+C.muted+' text-xs">📈 إيداعات المدعوين</p><p class="font-bold text-info text-lg">'+fmtNum(totalRefDeposits)+' USDT</p></div>'+
+                '<div class="'+C.card+' rounded-lg p-3 text-center border '+C.border+'"><p class="'+C.muted+' text-xs">🏆 نسب العمولة</p><p class="font-bold text-warning text-xs">L1: '+affL1+'% • L2: '+affL2+'% • L3: '+affL3+'%</p></div></div>'+
+                '<button onclick="withdrawAffiliateBalance()" class="w-full py-2.5 rounded-lg font-bold btn bg-info text-white mb-4">💰 سحب أرباح العمولات ('+fmtNum(balance)+' USDT)</button>'+
+                // Referrals list
+                '<h3 class="font-bold '+C.text+' mb-3">📋 قائمة المدعوين ('+referrals.length+')</h3>'+
                 '<div class="max-h-64 overflow-y-auto">'+refHtml+'</div></div>';
         }
 
@@ -3740,6 +3863,14 @@
                         starsHtml += '<span class="cursor-pointer text-lg '+(filled?'text-warning':'text-gray-500')+'" onclick="rateMerchant(\''+m.id+'\','+si+')">'+(filled?'★':'☆')+'</span>';
                     }
                     var ratingText = mRatings.length > 0 ? avgRating+' ('+mRatings.length+')' : 'لا توجد تقييمات';
+                    // Reviews with text
+                    var reviewsWithText = mRatings.filter(function(r){return r.review && r.review.trim();});
+                    var reviewsHtml = '';
+                    if(reviewsWithText.length > 0) {
+                        reviewsHtml = '<div class="mt-2 space-y-1">'+reviewsWithText.slice(0,2).map(function(rv){
+                            return '<div class="p-2 rounded-lg bg-dark-bg/30 border '+C.border+'"><div class="flex items-center justify-between mb-1"><span class="text-[10px] '+C.text+' font-medium">'+escHtml(rv.userName||'مستخدم')+'</span><span class="text-[10px] text-warning">'+rv.score+'★</span></div><p class="text-xs '+C.muted+'">'+escHtml(rv.review)+'</p></div>';
+                        }).join('')+'</div>';
+                    }
                     html += '<div class="p-4 rounded-lg border '+C.border+' overflow-hidden">'+
                         '<div class="flex items-center gap-3 mb-3">'+
                         '<div class="w-12 h-12 rounded-full bg-primary/20 flex items-center justify-center text-xl shrink-0">🏪</div>'+
@@ -3756,6 +3887,7 @@
                         (mCommission>0?'<span class="px-2 py-1 rounded bg-warning/10 text-warning font-medium">عمولة: '+mCommission+'%</span>':'')+
                         (!hasCrypto&&!hasBank?'<span class="px-2 py-1 rounded bg-gray-500/10 text-gray-400 font-medium">لم يعيّن بيانات</span>':'')+
                         '</div>'+
+                        reviewsHtml+
                         '<button onclick="openMerchantChat(\''+m.id+'\')" class="w-full py-2 rounded-lg text-xs font-medium btn border '+C.border+' '+C.text+' hover:border-primary hover:text-primary">💬 مراسلة التاجر</button>'+
                         '</div>';
                 });
@@ -3768,18 +3900,47 @@
         function rateMerchant(merchantId, score) {
             var user = getUser();
             if(!user) return;
+            // Show review modal
+            var C = getThemeColors();
+            showModal('<h3 class="text-lg font-bold '+C.text+' mb-4 text-center">⭐ تقييم التاجر</h3>'+
+                '<div class="flex justify-center gap-2 mb-4" id="rating-stars-modal">'+
+                [1,2,3,4,5].map(function(s){return '<span class="text-4xl cursor-pointer btn '+(s<=score?'text-warning':'text-gray-500')+'" onclick="_selectRating('+s+')">'+(s<=score?'★':'☆')+'</span>';}).join('')+
+                '</div>'+
+                '<input type="hidden" id="rating-score-val" value="'+score+'">'+
+                '<textarea id="rating-review-text" class="w-full px-3 py-2.5 rounded-lg border '+C.input+' outline-none text-sm mb-4" rows="2" placeholder="اترك تعليقاً (اختياري)..."></textarea>'+
+                '<button onclick="_submitRating(\''+merchantId+'\')" class="'+C.btn+' w-full py-2.5 rounded-lg font-bold btn">✅ إرسال التقييم</button>'+
+                '<button onclick="closeModal()" class="w-full py-2 mt-2 rounded-lg border '+C.border+' '+C.text+' btn">إلغاء</button>');
+        }
+        var _selectedRatingScore = 0;
+        window._selectRating = function(score) {
+            _selectedRatingScore = score;
+            var el = document.getElementById('rating-score-val');
+            if(el) el.value = score;
+            var stars = document.getElementById('rating-stars-modal');
+            if(stars) {
+                stars.innerHTML = [1,2,3,4,5].map(function(s){return '<span class="text-4xl cursor-pointer btn '+(s<=score?'text-warning':'text-gray-500')+'" onclick="_selectRating('+s+')">'+(s<=score?'★':'☆')+'</span>';}).join('');
+            }
+        };
+        window._submitRating = function(merchantId) {
+            var score = parseInt(document.getElementById('rating-score-val').value) || _selectedRatingScore;
+            if(!score) { toast('اختر عدد النجوم','error'); return; }
+            var review = (document.getElementById('rating-review-text').value || '').trim();
+            var user = getUser();
+            if(!user) return;
             var ratings = DB.get('merchantRatings');
             var existing = ratings.find(function(r){return r.merchantId===merchantId && r.userId===user.id;});
             if(existing) {
                 existing.score = score;
+                existing.review = review;
                 existing.updatedAt = new Date().toISOString();
             } else {
-                ratings.unshift({id:DB.uid(),merchantId:merchantId,userId:user.id,score:score,createdAt:new Date().toISOString()});
+                ratings.unshift({id:DB.uid(),merchantId:merchantId,userId:user.id,userName:user.name,score:score,review:review,createdAt:new Date().toISOString()});
             }
             DB.set('merchantRatings', ratings);
-            toast('تم تقييم التاجر: '+score+' نجوم','success',false);
+            closeModal();
+            toast('تم تقييم التاجر: '+score+' نجوم ✓','success',false);
             render();
-        }
+        };
 
         function openMerchantChat(merchantId) {
             state.chatWithMerchantId = merchantId;
@@ -4592,11 +4753,29 @@
             var users = DB.get('users');
             var u = users.find(function(x){return x.id===userId;});
             if(!u) return;
-            u.name = document.getElementById('edit-user-name').value.trim();
-            u.phone = document.getElementById('edit-user-phone').value.trim();
+            var newName = document.getElementById('edit-user-name').value.trim();
+            var newPhone = document.getElementById('edit-user-phone').value.trim();
+            var phoneChanged = (newPhone !== u.phone);
+            if(phoneChanged && newPhone) {
+                // Auto-detect and set country code
+                var detectedCC = '';
+                var countries2 = [{code:'+967',len:12},{code:'+966',len:12},{code:'+971',len:12},{code:'+968',len:11},{code:'+974',len:11},{code:'+965',len:11},{code:'+973',len:11},{code:'+20',len:13},{code:'+962',len:12},{code:'+961',len:11},{code:'+964',len:13}];
+                for(var ci = 0; ci < countries2.length; ci++) {
+                    if(newPhone.indexOf(countries2[ci].code) === 0) { detectedCC = countries2[ci].code; break; }
+                }
+                if(detectedCC) u.countryCode = detectedCC;
+                // Check duplicate phone
+                var dupPhone = users.find(function(x){ return x.id !== userId && x.phone === newPhone; });
+                if(dupPhone) { toast('رقم الهاتف مسجل مسبقاً لحساب آخر','error'); return; }
+                // Reset needsLoginPermission so user can login with new phone immediately
+                delete u.needsLoginPermission;
+                delete u.forceLogout;
+            }
+            u.name = newName;
+            u.phone = newPhone;
             DB.set('users', users);
             closeModal();
-            toast('تم تحديث بيانات المستخدم','success');
+            toast('تم تحديث بيانات المستخدم'+(phoneChanged?' - يمكنه الدخول بالرقم الجديد فوراً ✓':''),'success');
             render();
         }
 
@@ -6627,7 +6806,21 @@
             var banner = DB.getSetting('admin_banner') || '';
             var bannerType = DB.getSetting('admin_banner_type') || 'INFO';
             var bannerActive = DB.getSetting('admin_banner_active') === 'true';
+            var bannerCountries = DB.getSetting('admin_banner_countries') || ''; // comma-separated country codes
             if (!bannerActive || !banner.trim()) return '';
+            // Check if current user's country should see this banner
+            var currentUser = getUser();
+            var userCC = (currentUser && currentUser.countryCode) || '+967';
+            var showBanner = false;
+            if (!bannerCountries.trim()) {
+                showBanner = true; // No country filter = show to all
+            } else {
+                var allowedCountries = bannerCountries.split(',').map(function(c){return c.trim();});
+                if (allowedCountries.indexOf('ALL') >= 0 || allowedCountries.indexOf(userCC) >= 0) {
+                    showBanner = true;
+                }
+            }
+            if (!showBanner) return '';
             var colors = {
                 'INFO': {bg:'bg-info/10', border:'border-info/30', text:'text-info', icon:'ℹ️'},
                 'WARNING': {bg:'bg-warning/10', border:'border-warning/30', text:'text-warning', icon:'⚠️'},
@@ -6635,17 +6828,43 @@
                 'SUCCESS': {bg:'bg-success/10', border:'border-success/30', text:'text-success', icon:'✅'}
             };
             var c = colors[bannerType] || colors['INFO'];
+            var countryFlags = bannerCountries.trim() ? ' ' + bannerCountries.split(',').map(function(cc){
+                var co = countries.find(function(x){return x.code===cc.trim();});
+                return co ? co.flag : '';
+            }).join('') : ' 🌍';
             return '<div class="p-3 rounded-lg border '+c.border+' '+c.bg+' flex items-center gap-3">'+
                 '<span class="text-xl shrink-0">'+c.icon+'</span>'+
-                '<p class="text-sm '+c.text+' flex-1">'+escHtml(banner)+'</p></div>';
+                '<p class="text-sm '+c.text+' flex-1">'+escHtml(banner)+'</p>'+
+                '<span class="text-sm shrink-0">'+countryFlags+'</span></div>';
         }
 
         function renderAdminBannerSettings(C) {
             var banner = DB.getSetting('admin_banner') || '';
             var bannerType = DB.getSetting('admin_banner_type') || 'INFO';
             var bannerActive = DB.getSetting('admin_banner_active') === 'true';
+            var bannerCountries = DB.getSetting('admin_banner_countries') || '';
+            var selectedCountries = bannerCountries ? bannerCountries.split(',').map(function(c){return c.trim();}) : [];
+            // Build country flags HTML
+            var flagsHtml = '<div class="flex flex-wrap gap-2 mb-3" id="banner-country-flags">';
+            // "All" button
+            flagsHtml += '<button onclick="setBannerCountry(\'ALL\')" class="w-10 h-10 rounded-lg flex items-center justify-center text-lg btn border-2 '+(selectedCountries.indexOf('ALL')>=0 ? 'border-primary bg-primary/20' : C.border+' '+C.card)+'" title="جميع الدول">🌍</button>';
+            countries.forEach(function(co) {
+                var isSelected = selectedCountries.indexOf(co.code) >= 0;
+                flagsHtml += '<button onclick="setBannerCountry(\''+co.code+'\')" class="w-10 h-10 rounded-lg flex items-center justify-center text-lg btn border-2 '+(isSelected ? 'border-primary bg-primary/20' : C.border+' '+C.card)+'" title="'+escHtml(co.name)+'">'+co.flag+'</button>';
+            });
+            flagsHtml += '</div>';
+            // Show selected countries
+            var selectedLabel = '🌍 الجميع';
+            if (selectedCountries.length > 0 && selectedCountries[0] !== 'ALL') {
+                selectedLabel = selectedCountries.map(function(cc){
+                    var co = countries.find(function(x){return x.code===cc;});
+                    return co ? co.flag+' '+co.name : cc;
+                }).join(' • ');
+            }
             return '<div class="'+C.card+' rounded-lg p-4 border '+C.border+'"><h3 class="font-bold '+C.text+' mb-3">📢 شعار تنبيه للمستخدمين</h3>'+
-                '<p class="text-xs '+C.muted+' mb-3">يظهر هذا التنبيه لجميع المستخدمين في أعلى الصفحة الرئيسية</p>'+
+                '<p class="text-xs '+C.muted+' mb-3">يظهر هذا التنبيه للمستخدمين في أعلى الصفحة الرئيسية</p>'+
+                '<div class="'+C.card+' rounded-lg p-3 border '+C.border+' mb-3"><p class="text-xs '+C.muted+' mb-2">🎯 استهداف الدول (اختر أعلام الدول):</p>'+
+                '<p class="text-xs font-medium '+C.text+' mb-2">'+selectedLabel+'</p>'+flagsHtml+'</div>'+
                 '<div class="flex gap-2 mb-3">'+
                 '<button onclick="DB.setSetting(\'admin_banner_type\',\'INFO\');render()" class="flex-1 py-2 rounded-lg text-xs font-bold btn '+(bannerType==='INFO'?'bg-info text-white':'border border-info/30 '+C.text)+'">ℹ️ معلومة</button>'+
                 '<button onclick="DB.setSetting(\'admin_banner_type\',\'WARNING\');render()" class="flex-1 py-2 rounded-lg text-xs font-bold btn '+(bannerType==='WARNING'?'bg-warning text-dark-bg':'border border-warning/30 '+C.text)+'">⚠️ تحذير</button>'+
@@ -6653,6 +6872,26 @@
                 '<button onclick="DB.setSetting(\'admin_banner_type\',\'SUCCESS\');render()" class="flex-1 py-2 rounded-lg text-xs font-bold btn '+(bannerType==='SUCCESS'?'bg-success text-dark-bg':'border border-success/30 '+C.text)+'">✅ نجاح</button></div>'+
                 '<textarea id="set-banner-text" class="w-full px-3 py-2.5 rounded-lg border '+C.input+' outline-none text-sm mb-3" rows="2" placeholder="اكتب نص التنبيه هنا...">'+escHtml(banner)+'</textarea>'+
                 '<button onclick="saveBanner()" class="w-full py-2.5 rounded-lg font-bold btn '+(bannerActive?'bg-danger text-white':'bg-success text-dark-bg')+' text-sm">'+(bannerActive?'🔒 إخفاء التنبيه':'📢 تفعيل وحفظ التنبيه')+'</button></div>';
+        }
+
+        function setBannerCountry(code) {
+            var current = DB.getSetting('admin_banner_countries') || '';
+            var selected = current ? current.split(',').map(function(c){return c.trim();}) : [];
+            var idx = selected.indexOf(code);
+            if (code === 'ALL') {
+                selected = ['ALL']; // "All" clears everything else
+            } else {
+                // Remove 'ALL' if selecting specific country
+                selected = selected.filter(function(c){return c !== 'ALL';});
+                if (idx >= 0) {
+                    selected.splice(idx, 1);
+                } else {
+                    selected.push(code);
+                }
+            }
+            if (selected.length === 0) selected = ['ALL'];
+            DB.setSetting('admin_banner_countries', selected.join(','));
+            render();
         }
 
         function saveBanner() {
@@ -6682,40 +6921,49 @@
         function _fetchLiveRates() {
             if (Date.now() - _liveRatesLastFetch < 300000) return; // Cache 5 min
             _liveRatesLastFetch = Date.now();
-            // Use multiple free APIs for better accuracy
+            // Admin rate is the PRIMARY source (accurate for Yemen)
+            var adminRateYER = parseFloat(DB.getSetting('exchange_rate')) || 0;
+            var adminRateSAR = parseFloat(DB.getSetting('exchange_rate_sar')) || 0;
+            // If admin has set rates, use them immediately (no API needed)
+            if (adminRateYER > 0) {
+                _liveRates = {
+                    USD_YER: adminRateYER,
+                    USD_SAR: 3.75,
+                    YER_SAR: adminRateSAR > 0 ? adminRateSAR : adminRateYER / 3.75,
+                    YER_USD: 1 / adminRateYER,
+                    SAR_YER: adminRateSAR > 0 ? adminRateSAR : adminRateYER / 3.75,
+                    timestamp: new Date().toISOString(),
+                    source: 'admin'
+                };
+                return;
+            }
+            // Fallback: try API only if admin hasn't set rates
             var controller = new AbortController();
             var timeout = setTimeout(function(){ controller.abort(); }, 10000);
             fetch('https://api.exchangerate-api.com/v4/latest/USD', {signal: controller.signal})
             .then(function(r){ clearTimeout(timeout); return r.json(); })
             .then(function(data) {
                 if (data && data.rates) {
-                    // Use manual accurate rates for YER since APIs often have stale data
-                    // Admin can override these in settings
-                    var adminRate = parseFloat(DB.getSetting('exchange_rate')) || 0;
                     var apiYER = data.rates.YER || 0;
-                    // If admin has set a rate manually, use that; otherwise use API
-                    var finalYER = adminRate > 0 ? adminRate : (apiYER > 0 ? apiYER : 533);
+                    var finalYER = apiYER > 100 ? apiYER : 533; // Sanity check
                     var finalSAR = data.rates.SAR || 3.75;
                     _liveRates = {
                         USD_YER: finalYER,
                         USD_SAR: finalSAR,
                         YER_SAR: finalYER / finalSAR,
+                        YER_USD: 1 / finalYER,
+                        SAR_YER: finalYER / finalSAR,
                         timestamp: new Date().toISOString(),
-                        source: adminRate > 0 ? 'admin' : 'api'
+                        source: 'api'
                     };
-                    console.log('[Live Rates] Updated: 1 USD = ' + finalYER + ' YER, 1 SAR = ' + (finalYER / finalSAR).toFixed(2) + ' YER (source: ' + _liveRates.source + ')');
                 }
             }).catch(function(err) {
                 clearTimeout(timeout);
-                console.warn('[Live Rates] Fetch error:', err);
-                // Fallback: keep existing rates or use last known
                 if (!_liveRates) {
                     _liveRates = {
-                        USD_YER: parseFloat(DB.getSetting('exchange_rate')) || 533,
-                        USD_SAR: 3.75,
-                        YER_SAR: (parseFloat(DB.getSetting('exchange_rate')) || 533) / 3.75,
-                        timestamp: new Date().toISOString(),
-                        source: 'fallback'
+                        USD_YER: 533, USD_SAR: 3.75, YER_SAR: 142.13,
+                        YER_USD: 1/533, SAR_YER: 142.13,
+                        timestamp: new Date().toISOString(), source: 'fallback'
                     };
                 }
             });
@@ -6729,16 +6977,17 @@
 
         function renderLiveRateBadge(C) {
             if (!_liveRates || !_liveRates.USD_YER) return '';
-            var sarCross = _liveRates.YER_SAR ? _liveRates.YER_SAR.toFixed(2) : (parseFloat(DB.getSetting('exchange_rate_sar')) || '137.50');
+            var sarToYER = _liveRates.SAR_YER ? _liveRates.SAR_YER.toFixed(2) : (_liveRates.USD_YER / 3.75).toFixed(2);
+            var sourceLabel = _liveRates.source === 'admin' ? '⚙️ إدارة' : '📡 API';
             return '<div class="flex flex-col gap-1 p-3 rounded-lg bg-success/10 border border-success/30">' +
                 '<div class="flex items-center justify-between"><span class="text-xs text-success font-bold">📈 أسعار الصرف</span>' +
-                '<span class="text-xs ' + C.muted + '">' + getTimeAgo(_liveRates.timestamp) + '</span></div>' +
+                '<span class="text-xs ' + C.muted + '">' + sourceLabel + ' • ' + getTimeAgo(_liveRates.timestamp) + '</span></div>' +
                 '<div class="flex gap-3">' +
                 '<span class="text-xs ' + C.text + '">🇺🇸 1 USD = <b>' + Math.round(_liveRates.USD_YER) + '</b> YER</span>' +
-                '<span class="text-xs ' + C.text + '">🇸🇦 1 SAR = <b>' + sarCross + '</b> YER</span></div></div>';
+                '<span class="text-xs ' + C.text + '">🇸🇦 1 SAR = <b>' + sarToYER + '</b> YER</span></div></div>';
         }
 
-        console.log('%c ForexYemeni Wallet v3.0 (Session Timeout + PIN + Live Rates) ', 'background: #F0B90B; color: #0B0E11; font-size: 16px; font-weight: bold; padding: 8px 16px; border-radius: 4px;');
+        console.log('%c ForexYemeni Wallet v4.0 (Rates + Flags + Affiliate + Push + Mobile + Ratings) ', 'background: #F0B90B; color: #0B0E11; font-size: 16px; font-weight: bold; padding: 8px 16px; border-radius: 4px;');
     </script>
 </body>
 </html>
