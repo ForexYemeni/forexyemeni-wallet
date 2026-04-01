@@ -1364,6 +1364,25 @@
         }
         function setView(v) { state.view = v; state.sidebarOpen = false; render(); }
         function setTheme(t) { state.theme = t; document.body.className = t; localStorage.setItem('fy_theme', t); render(); }
+        function getDisplayCurrency() { return localStorage.getItem('fy_display_currency') || 'USDT'; }
+        function saveDisplayCurrency() { var sel = document.getElementById('set-display-currency'); if(sel) { localStorage.setItem('fy_display_currency', sel.value); toast('تم تغيير عملة العرض ✓','success'); render(); } }
+        // Convert USDT amount to display currency
+        function convertToDisplay(usdtAmount) {
+            var cur = getDisplayCurrency();
+            if(cur === 'USDT') return { amount: usdtAmount, label: 'USDT', symbol: '💵' };
+            var rate = parseFloat(DB.getSetting('exchange_rate')) || 535;
+            var rateSar = parseFloat(DB.getSetting('exchange_rate_sar')) || 137.50;
+            if(cur === 'YER') return { amount: usdtAmount * rate, label: 'YER', symbol: '🇾🇪' };
+            if(cur === 'SAR') return { amount: usdtAmount * rate / rateSar, label: 'SAR', symbol: '🇸🇦' };
+            return { amount: usdtAmount, label: 'USDT', symbol: '💵' };
+        }
+        // Format amount with display currency
+        function fmtDisplay(usdtAmount) {
+            var c = convertToDisplay(usdtAmount);
+            if(c.label === 'YER') return c.symbol + ' ' + fmtInt(Math.round(c.amount));
+            if(c.label === 'SAR') return c.symbol + ' ' + fmtNum(c.amount, 2);
+            return fmtNum(c.amount);
+        }
         function getUser() { return DB.ensureUserFields(DB.get('users').find(function(u) { return u.id === (state.user && state.user.id); })); }
 
         // ==================== TOAST ====================
@@ -1545,8 +1564,8 @@
             };
             switch(state.view) {
                 case 'login': app.innerHTML = renderLogin(C); break;
+                case 'register': app.innerHTML = renderRegister(C); setTimeout(function(){ if(typeof updateRegPhoneLength === 'function') updateRegPhoneLength(); },50); break;
                 case 'change-password-required': app.innerHTML = renderChangePasswordRequired(C); break;
-                case 'register': app.innerHTML = renderRegister(C); setTimeout(updateRegPhoneLength,50); break;
                 case 'loading': app.innerHTML = renderLoading(C); break;
                 default:
                     var currentUser = getUser();
@@ -3045,8 +3064,9 @@
             var sarEquiv = usdtBal * sarRate;
             var deposits = DB.get('deposits').filter(function(d){return d.userId===user.id;});
             var withdrawals = DB.get('withdrawals').filter(function(w){return w.userId===user.id;});
-            var totalDep = deposits.filter(function(d){return d.status==='APPROVED';}).reduce(function(s,d){return s+(d.amount||0);},0);
-            var totalWd = withdrawals.filter(function(w){return w.status==='APPROVED';}).reduce(function(s,w){return s+(w.localAmount||w.net||0);},0);
+            var totalDepUsdt = deposits.filter(function(d){return d.status==='APPROVED';}).reduce(function(s,d){return s+(d.usdtAmount||0);},0);
+            var totalWdUsdt = withdrawals.filter(function(w){return w.status==='APPROVED';}).reduce(function(s,w){return s+(w.net||0);},0);
+            var displayCur = getDisplayCurrency();
             var pendingDep = deposits.filter(function(d){return d.status==='PENDING';}).length;
             var pendingWd = withdrawals.filter(function(w){return w.status==='PENDING';}).length;
             var recentLogs = (DB.get('transactionLog')||[]).filter(function(l){return l.userId===user.id;}).slice(0,5);
@@ -3073,12 +3093,12 @@
                 '<div class="'+C.card+' rounded-2xl p-6 border '+C.border+' card-hover shadow-card bg-gradient-to-br from-blue-500/10 to-indigo-500/5"><div class="flex items-center justify-between mb-2"><p class="'+C.muted+' text-sm">المعادل بالريال السعودي</p><div class="w-10 h-10 rounded-xl bg-info/10 flex items-center justify-center text-info text-xl">🇸🇦</div></div><h2 class="text-3xl font-extrabold text-info">'+fmtNum(sarEquiv,2)+' <span class="text-lg font-bold">SAR</span></h2>'+
                 '<p class="'+C.muted+' text-xs mt-2 opacity-70">1 SAR = '+fmtNum(sarCrossRate,2)+' YER</p></div></div>'+
                 '<div class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">'+
-                '<div class="'+C.card+' rounded-2xl p-4 text-center border '+C.border+' card-hover"><p class="text-xs '+C.muted+' mb-1">إجمالي الإيداعات</p><p class="font-extrabold text-success text-lg">'+fmtInt(totalDep)+'</p><p class="text-xs '+C.muted+' opacity-60">مجموع العملات</p></div>'+
-                '<div class="'+C.card+' rounded-2xl p-4 text-center border '+C.border+' card-hover"><p class="text-xs '+C.muted+' mb-1">إجمالي السحوبات</p><p class="font-extrabold text-danger text-lg">'+fmtInt(totalWd)+'</p><p class="text-xs '+C.muted+' opacity-60">مجموع العملات</p></div>'+
+                '<div class="'+C.card+' rounded-2xl p-4 text-center border '+C.border+' card-hover"><p class="text-xs '+C.muted+' mb-1">إجمالي الإيداعات</p><p class="font-extrabold text-success text-lg">'+fmtDisplay(totalDepUsdt)+'</p><p class="text-xs '+C.muted+' opacity-60">'+displayCur+'</p></div>'+
+                '<div class="'+C.card+' rounded-2xl p-4 text-center border '+C.border+' card-hover"><p class="text-xs '+C.muted+' mb-1">إجمالي السحوبات</p><p class="font-extrabold text-danger text-lg">'+fmtDisplay(totalWdUsdt)+'</p><p class="text-xs '+C.muted+' opacity-60">'+displayCur+'</p></div>'+
                 '<div class="'+C.card+' rounded-2xl p-4 text-center border '+C.border+' card-hover"><p class="text-xs '+C.muted+' mb-1">إيداعات معلقة</p><p class="font-extrabold text-warning text-lg">'+pendingDep+'</p></div>'+
                 '<div class="'+C.card+' rounded-2xl p-4 text-center border '+C.border+' card-hover"><p class="text-xs '+C.muted+' mb-1">سحوبات معلقة</p><p class="font-extrabold text-warning text-lg">'+pendingWd+'</p></div></div>'+
                 '<div class="grid grid-cols-2 gap-3 mb-4">'+
-                '<div class="'+C.card+' rounded-2xl p-4 border '+C.border+' flex items-center justify-between card-hover"><span class="'+C.muted+' text-xs">🏆 المستوى</span><span class="text-xs font-bold text-primary">'+(totalDep>1000?'ذهبي 💎':totalDep>500?'فضي ⭐':totalDep>100?'برونزي 🥉':'جديد 🌱')+'</span></div></div>'+
+                '<div class="'+C.card+' rounded-2xl p-4 border '+C.border+' flex items-center justify-between card-hover"><span class="'+C.muted+' text-xs">🏆 المستوى</span><span class="text-xs font-bold text-primary">'+(totalDepUsdt>1000?'ذهبي 💎':totalDepUsdt>500?'فضي ⭐':totalDepUsdt>100?'برونزي 🥉':'جديد 🌱')+'</span></div></div>'+
                 '<div class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">'+
                 '<button onclick="setView(\'user-deposit\')" class="'+C.card+' rounded-2xl p-5 text-center border '+C.border+' hover:border-primary/50 btn card-hover shadow-card"><div class="w-12 h-12 rounded-2xl bg-success/10 flex items-center justify-center text-2xl mx-auto mb-2">💰</div><p class="text-sm mt-1 font-bold '+C.text+'">إيداع</p></button>'+
                 '<button onclick="setView(\'user-withdraw\')" class="'+C.card+' rounded-2xl p-5 text-center border '+C.border+' hover:border-primary/50 btn card-hover shadow-card"><div class="w-12 h-12 rounded-2xl bg-danger/10 flex items-center justify-center text-2xl mx-auto mb-2">🏧</div><p class="text-sm mt-1 font-bold '+C.text+'">سحب</p></button>'+
@@ -3826,6 +3846,13 @@
                 '<p class="'+C.muted+'">الدولة: <span class="'+C.text+'">'+escHtml(user.countryCode||'')+'</span></p></div></div>'+
                 renderContactManagement(C, user, user.role)+
                 renderTrustedDevicesSection(C, user)+
+                '<div class="'+C.card+' rounded-xl p-4 border '+C.border+'"><h3 class="font-bold '+C.text+' mb-3">💱 عملة العرض</h3>'+
+                '<p class="text-sm '+C.muted+' mb-3">اختر العملة الافتراضية لعرض الإجماليات والأرصدة</p>'+
+                '<select id="set-display-currency" onchange="saveDisplayCurrency()" class="w-full px-4 py-2.5 rounded-xl border '+C.input+' outline-none">'+
+                '<option value="USDT"'+(getDisplayCurrency()==='USDT'?' selected':'')+'>💵 USDT - دولار أمريكي</option>'+
+                '<option value="YER"'+(getDisplayCurrency()==='YER'?' selected':'')+'>🇾🇪 YER - ريال يمني</option>'+
+                '<option value="SAR"'+(getDisplayCurrency()==='SAR'?' selected':'')+'>🇸🇦 SAR - ريال سعودي</option>'+
+                '</select></div>'+
                 '<div class="'+C.card+' rounded-xl p-4 border '+C.border+'"><h3 class="font-bold '+C.text+' mb-3">🔐 رمز PIN للمعاملات</h3>'+
                 '<p class="text-sm '+C.muted+' mb-3">رمز PIN يحمي معاملاتك حتى لو سُرق الجهاز</p>'+
                 '<button onclick="_showPinModal(function(){toast(\'رمز PIN مفعل ✓\',\'success\')})" class="w-full py-2.5 rounded-lg border '+C.border+' '+C.text+' font-bold text-sm btn hover:border-primary">' +
@@ -4955,15 +4982,16 @@
             var currentUser = getUser();
             var unreadMsgs = DB.get('messages').filter(function(m){return m.toId===(currentUser && currentUser.id) && !m.isRead;}).length;
             var totalUsers = users.length;
-            var totalDep = deposits.reduce(function(s,d){return s+(d.amount||0);},0);
-            var totalWd = withdrawals.reduce(function(s,w){return s+(w.localAmount||w.net||0);},0);
+            var totalDep = deposits.reduce(function(s,d){return s+(d.usdtAmount||0);},0);
+            var totalWd = withdrawals.reduce(function(s,w){return s+(w.net||0);},0);
+            var merchantCur = getDisplayCurrency();
             var pendingDep = deposits.filter(function(d){return d.status==='PENDING';}).length;
             var pendingWd = withdrawals.filter(function(w){return w.status==='PENDING';}).length;
             var pendingPerms = DB.get('loginPermissions').filter(function(p){return p.status==='PENDING';}).length;
             return renderAdminBanner(C) + renderDeviceApprovalPendingSection(C) + '<div class="grid grid-cols-2 md:grid-cols-3 gap-4 mb-6">'+
                 '<div class="'+C.card+' rounded-2xl p-5 border '+C.border+' text-center cursor-pointer btn card-hover shadow-card hover:border-info/50 bg-gradient-to-br from-blue-500/10 to-cyan-500/5" onclick="setView(\'admin-users\')"><div class="w-14 h-14 rounded-2xl bg-blue-500/10 flex items-center justify-center text-3xl mx-auto mb-2">👥</div><p class="text-2xl font-extrabold text-info">'+totalUsers+'</p><p class="'+C.muted+' text-sm">المستخدمين</p></div>'+
-                '<div class="'+C.card+' rounded-2xl p-5 border '+C.border+' text-center cursor-pointer btn card-hover shadow-card hover:border-success/50 bg-gradient-to-br from-emerald-500/10 to-green-500/5" onclick="setView(\'admin-deposits\')"><div class="w-14 h-14 rounded-2xl bg-success/10 flex items-center justify-center text-3xl mx-auto mb-2">💰</div><p class="text-2xl font-extrabold text-success">'+fmtInt(totalDep)+'</p><p class="'+C.muted+' text-sm">إجمالي الإيداعات</p><p class="'+C.muted+' text-xs opacity-60">مجموع العملات</p></div>'+
-                '<div class="'+C.card+' rounded-2xl p-5 border '+C.border+' text-center cursor-pointer btn card-hover shadow-card hover:border-danger/50 bg-gradient-to-br from-red-500/10 to-rose-500/5" onclick="setView(\'admin-withdrawals\')"><div class="w-14 h-14 rounded-2xl bg-danger/10 flex items-center justify-center text-3xl mx-auto mb-2">🏧</div><p class="text-2xl font-extrabold text-danger">'+fmtInt(totalWd)+'</p><p class="'+C.muted+' text-sm">إجمالي السحوبات</p><p class="'+C.muted+' text-xs opacity-60">مجموع العملات</p></div>'+
+                '<div class="'+C.card+' rounded-2xl p-5 border '+C.border+' text-center cursor-pointer btn card-hover shadow-card hover:border-success/50 bg-gradient-to-br from-emerald-500/10 to-green-500/5" onclick="setView(\'admin-deposits\')"><div class="w-14 h-14 rounded-2xl bg-success/10 flex items-center justify-center text-3xl mx-auto mb-2">💰</div><p class="text-2xl font-extrabold text-success">'+fmtDisplay(totalDep)+'</p><p class="'+C.muted+' text-sm">إجمالي الإيداعات</p><p class="'+C.muted+' text-xs opacity-60">'+merchantCur+'</p></div>'+
+                '<div class="'+C.card+' rounded-2xl p-5 border '+C.border+' text-center cursor-pointer btn card-hover shadow-card hover:border-danger/50 bg-gradient-to-br from-red-500/10 to-rose-500/5" onclick="setView(\'admin-withdrawals\')"><div class="w-14 h-14 rounded-2xl bg-danger/10 flex items-center justify-center text-3xl mx-auto mb-2">🏧</div><p class="text-2xl font-extrabold text-danger">'+fmtDisplay(totalWd)+'</p><p class="'+C.muted+' text-sm">إجمالي السحوبات</p><p class="'+C.muted+' text-xs opacity-60">'+merchantCur+'</p></div>'+
                 '<div class="'+C.card+' rounded-2xl p-5 border '+C.border+' text-center cursor-pointer btn card-hover shadow-card hover:border-warning/50 bg-gradient-to-br from-amber-500/10 to-yellow-500/5" onclick="setView(\'admin-deposits\')"><div class="w-14 h-14 rounded-2xl bg-warning/10 flex items-center justify-center text-3xl mx-auto mb-2 pulse-glow">⏳</div><p class="text-2xl font-extrabold text-warning">'+pendingDep+'</p><p class="'+C.muted+' text-sm">إيداعات معلقة</p></div>'+
                 '<div class="'+C.card+' rounded-2xl p-5 border '+C.border+' text-center cursor-pointer btn card-hover shadow-card hover:border-warning/50 bg-gradient-to-br from-amber-500/10 to-yellow-500/5" onclick="setView(\'admin-withdrawals\')"><div class="w-14 h-14 rounded-2xl bg-warning/10 flex items-center justify-center text-3xl mx-auto mb-2 pulse-glow">⏳</div><p class="text-2xl font-extrabold text-warning">'+pendingWd+'</p><p class="'+C.muted+' text-sm">سحوبات معلقة</p></div>'+
                 '<div class="'+C.card+' rounded-2xl p-5 border '+C.border+' text-center cursor-pointer btn card-hover shadow-card hover:border-warning/50 bg-gradient-to-br from-violet-500/10 to-purple-500/5" onclick="setView(\'admin-kyc\')"><div class="w-14 h-14 rounded-2xl bg-violet-500/10 flex items-center justify-center text-3xl mx-auto mb-2">🪪</div><p class="text-2xl font-extrabold text-accent-violet">'+pendingKyc+'</p><p class="'+C.muted+' text-sm">توثيق معلق</p></div>'+
@@ -6308,10 +6336,11 @@
             var users = DB.get('users').filter(function(u){return u.role!=='ADMIN';});
             var deposits = DB.get('deposits');
             var withdrawals = DB.get('withdrawals');
-            var totalDep = deposits.filter(function(d){return d.status==='APPROVED';}).reduce(function(s,d){return s+(d.amount||0);},0);
-            var totalWd = withdrawals.filter(function(w){return w.status==='APPROVED';}).reduce(function(s,w){return s+(w.localAmount||w.net||0);},0);
-            var pendingDep = deposits.filter(function(d){return d.status==='PENDING';}).reduce(function(s,d){return s+(d.amount||0);},0);
-            var pendingWd = withdrawals.filter(function(w){return w.status==='PENDING';}).reduce(function(s,w){return s+(w.localAmount||w.net||0);},0);
+            var totalDep = deposits.filter(function(d){return d.status==='APPROVED';}).reduce(function(s,d){return s+(d.usdtAmount||0);},0);
+            var totalWd = withdrawals.filter(function(w){return w.status==='APPROVED';}).reduce(function(s,w){return s+(w.net||0);},0);
+            var pendingDep = deposits.filter(function(d){return d.status==='PENDING';}).reduce(function(s,d){return s+(d.usdtAmount||0);},0);
+            var pendingWd = withdrawals.filter(function(w){return w.status==='PENDING';}).reduce(function(s,w){return s+(w.net||0);},0);
+            var reportsCur = getDisplayCurrency();
             var totalBalance = users.reduce(function(s,u){return s+(u.usdtBalance||0);},0);
             var rate = parseFloat(DB.getSetting('exchange_rate')) || 535;
             var totalFees = withdrawals.filter(function(w){return w.status==='APPROVED';}).reduce(function(s,w){return s+(w.fee||0);},0);
@@ -6319,14 +6348,14 @@
                 '<h2 class="text-xl font-bold '+C.text+' mb-4">📈 التقارير المالية</h2>'+
                 '<div class="grid grid-cols-2 md:grid-cols-3 gap-4 mb-6">'+
                 '<div class="'+C.card+' rounded-xl p-4 border '+C.border+' text-center"><p class="'+C.muted+' text-xs mb-1">إجمالي المستخدمين</p><p class="text-2xl font-bold text-primary">'+users.length+'</p></div>'+
-                '<div class="'+C.card+' rounded-xl p-4 border '+C.border+' text-center"><p class="'+C.muted+' text-xs mb-1">إجمالي أرصدة المستخدمين</p><p class="text-2xl font-bold text-success">'+fmtNum(totalBalance)+'</p><p class="'+C.muted+' text-xs opacity-60">USDT</p></div>'+
-                '<div class="'+C.card+' rounded-xl p-4 border '+C.border+' text-center"><p class="'+C.muted+' text-xs mb-1">المعادل YER</p><p class="text-2xl font-bold text-primary">'+fmtInt(Math.round(totalBalance*rate))+'</p></div>'+
-                '<div class="'+C.card+' rounded-xl p-4 border '+C.border+' text-center"><p class="'+C.muted+' text-xs mb-1">إجمالي الإيداعات (مقبولة)</p><p class="text-2xl font-bold text-success">'+fmtInt(totalDep)+'</p><p class="'+C.muted+' text-xs opacity-60">مجموع العملات</p></div>'+
-                '<div class="'+C.card+' rounded-xl p-4 border '+C.border+' text-center"><p class="'+C.muted+' text-xs mb-1">إجمالي السحوبات (مقبولة)</p><p class="text-2xl font-bold text-danger">'+fmtInt(totalWd)+'</p><p class="'+C.muted+' text-xs opacity-60">مجموع العملات</p></div>'+
-                '<div class="'+C.card+' rounded-xl p-4 border '+C.border+' text-center"><p class="'+C.muted+' text-xs mb-1">إجمالي الرسوم المحصلة</p><p class="text-2xl font-bold text-warning">'+fmtNum(totalFees)+' <span class="text-sm">USDT</span></p></div>'+
-                '<div class="'+C.card+' rounded-xl p-4 border '+C.border+' text-center"><p class="'+C.muted+' text-xs mb-1">إيداعات معلقة</p><p class="text-2xl font-bold text-warning">'+fmtInt(pendingDep)+'</p><p class="'+C.muted+' text-xs opacity-60">مجموع العملات</p></div>'+
-                '<div class="'+C.card+' rounded-xl p-4 border '+C.border+' text-center"><p class="'+C.muted+' text-xs mb-1">سحوبات معلقة</p><p class="text-2xl font-bold text-warning">'+fmtInt(pendingWd)+'</p><p class="'+C.muted+' text-xs opacity-60">مجموع العملات</p></div>'+
-                '<div class="'+C.card+' rounded-xl p-4 border '+C.border+' text-center"><p class="'+C.muted+' text-xs mb-1">صافي التدفق</p><p class="text-2xl font-bold '+(totalDep-totalWd>=0?'text-success':'text-danger')+'">'+fmtInt(totalDep-totalWd)+'</p><p class="'+C.muted+' text-xs opacity-60">مجموع العملات</p></div></div></div>';
+                '<div class="'+C.card+' rounded-xl p-4 border '+C.border+' text-center"><p class="'+C.muted+' text-xs mb-1">إجمالي أرصدة المستخدمين</p><p class="text-2xl font-bold text-success">'+fmtDisplay(totalBalance)+'</p><p class="'+C.muted+' text-xs opacity-60">'+reportsCur+'</p></div>'+
+                '<div class="'+C.card+' rounded-xl p-4 border '+C.border+' text-center"><p class="'+C.muted+' text-xs mb-1">المعادل YER</p><p class="text-2xl font-bold text-primary">'+fmtInt(Math.round(totalBalance*rate))+' YER</p></div>'+
+                '<div class="'+C.card+' rounded-xl p-4 border '+C.border+' text-center"><p class="'+C.muted+' text-xs mb-1">إجمالي الإيداعات (مقبولة)</p><p class="text-2xl font-bold text-success">'+fmtDisplay(totalDep)+'</p><p class="'+C.muted+' text-xs opacity-60">'+reportsCur+'</p></div>'+
+                '<div class="'+C.card+' rounded-xl p-4 border '+C.border+' text-center"><p class="'+C.muted+' text-xs mb-1">إجمالي السحوبات (مقبولة)</p><p class="text-2xl font-bold text-danger">'+fmtDisplay(totalWd)+'</p><p class="'+C.muted+' text-xs opacity-60">'+reportsCur+'</p></div>'+
+                '<div class="'+C.card+' rounded-xl p-4 border '+C.border+' text-center"><p class="'+C.muted+' text-xs mb-1">إجمالي الرسوم المحصلة</p><p class="text-2xl font-bold text-warning">'+fmtNum(totalFees)+' USDT</p></div>'+
+                '<div class="'+C.card+' rounded-xl p-4 border '+C.border+' text-center"><p class="'+C.muted+' text-xs mb-1">إيداعات معلقة</p><p class="text-2xl font-bold text-warning">'+fmtDisplay(pendingDep)+'</p><p class="'+C.muted+' text-xs opacity-60">'+reportsCur+'</p></div>'+
+                '<div class="'+C.card+' rounded-xl p-4 border '+C.border+' text-center"><p class="'+C.muted+' text-xs mb-1">سحوبات معلقة</p><p class="text-2xl font-bold text-warning">'+fmtDisplay(pendingWd)+'</p><p class="'+C.muted+' text-xs opacity-60">'+reportsCur+'</p></div>'+
+                '<div class="'+C.card+' rounded-xl p-4 border '+C.border+' text-center"><p class="'+C.muted+' text-xs mb-1">صافي التدفق</p><p class="text-2xl font-bold '+(totalDep-totalWd>=0?'text-success':'text-danger')+'">'+fmtDisplay(totalDep-totalWd)+'</p><p class="'+C.muted+' text-xs opacity-60">'+reportsCur+'</p></div></div></div>';
         }
 
         // ==================== ADMIN: DB CONFIG (IMPROVED) ====================
@@ -6803,7 +6832,11 @@
                             var updatedUser = newData.find(function(u){return u.id === state.user.id;});
                             if(updatedUser && updatedUser.kycStatus !== (window.appData._lastKycStatus)) {
                                 window.appData._lastKycStatus = updatedUser.kycStatus;
-                                setTimeout(function(){ render(); }, 300);
+                                // Only re-render if not on login/register pages to avoid interference
+                                var v = state.view;
+                                if(v !== 'login' && v !== 'register' && v !== 'loading' && v !== 'change-password-required') {
+                                    setTimeout(function(){ render(); }, 300);
+                                }
                             }
                         }
                         // Check for new messages → play sound for recipient
