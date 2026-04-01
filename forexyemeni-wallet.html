@@ -1250,6 +1250,7 @@
 
         // ==================== UTILITIES ====================
         function fmtDate(d) { if(!d) return ''; var dt = new Date(d); return dt.toLocaleDateString('ar-YE',{year:'numeric',month:'short',day:'numeric'}) + ' ' + dt.toLocaleTimeString('ar-YE',{hour:'2-digit',minute:'2-digit'}); }
+        function getTimeAgo(d) { if(!d) return ''; var now = Date.now(); var diff = now - new Date(d).getTime(); var mins = Math.floor(diff/60000); if(mins < 1) return 'الآن'; if(mins < 60) return 'منذ '+mins+' دقيقة'; var hrs = Math.floor(mins/60); if(hrs < 24) return 'منذ '+hrs+' ساعة'; var days = Math.floor(hrs/24); if(days < 7) return 'منذ '+days+' يوم'; if(days < 30) return 'منذ '+Math.floor(days/7)+' أسبوع'; if(days < 365) return 'منذ '+Math.floor(days/30)+' شهر'; return 'منذ '+Math.floor(days/365)+' سنة'; }
         function fmtNum(n) { return Number(n||0).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2}); }
         function fmtInt(n) { return Number(n||0).toLocaleString('en-US'); }
         function statusBadge(s) {
@@ -5281,31 +5282,74 @@
 
         function renderAdminAuditLog(C) {
             var logs = DB.get('auditLog') || [];
+            var users = DB.get('users');
             var header = '<h2 class="text-lg font-bold '+C.text+' mb-4">📋 سجل العمليات الأمنية</h2>';
-            if (logs.length === 0) return header + '<p class="'+C.muted+'">لا توجد عمليات مسجلة بعد</p>';
+            if (logs.length === 0) return header + '<div class="text-center py-12"><p class="text-4xl mb-3">📋</p><p class="'+C.muted+'">لا توجد عمليات مسجلة بعد</p></div>';
+
+            var actionConfig = {
+                'LOGIN':         {icon:'🔐', label:'تسجيل دخول', color:'text-success'},
+                'LOGOUT':        {icon:'🚪', label:'تسجيل خروج', color:'text-dark-muted'},
+                'REGISTER':      {icon:'📝', label:'تسجيل حساب جديد', color:'text-info'},
+                'PASSWORD_CHANGE':{icon:'🔑', label:'تغيير كلمة المرور', color:'text-warning'},
+                'PASSWORD_RESET': {icon:'🔑', label:'إعادة تعيين كلمة مرور', color:'text-warning'},
+                'FORCE_LOGOUT':  {icon:'🚪', label:'تسجيل خروج قسري', color:'text-danger'},
+                'DEPOSIT_APPROVE':{icon:'✅', label:'قبول إيداع', color:'text-success'},
+                'DEPOSIT_REJECT': {icon:'❌', label:'رفض إيداع', color:'text-danger'},
+                'WITHDRAW_APPROVE':{icon:'💰', label:'قبول سحب', color:'text-success'},
+                'WITHDRAW_REJECT': {icon:'🚫', label:'رفض سحب', color:'text-danger'},
+                'BLOCK_USER':    {icon:'🚫', label:'حظر مستخدم', color:'text-danger'},
+                'UNBLOCK_USER':  {icon:'✅', label:'إلغاء حظر', color:'text-success'},
+                'CHANGE_BALANCE':{icon:'💎', label:'تعديل رصيد', color:'text-warning'},
+                'SET_COMMISSION':{icon:'⚙️', label:'تحديد عمولة', color:'text-dark-muted'},
+                'CREATE_MERCHANT':{icon:'🏪', label:'إنشاء تاجر', color:'text-info'},
+                'DELETE_USER':   {icon:'🗑️', label:'حذف حساب', color:'text-danger'},
+                'EXPORT':        {icon:'📥', label:'تصدير بيانات', color:'text-dark-muted'},
+                'CLEAR_LOG':     {icon:'🗑️', label:'مسح السجل', color:'text-danger'},
+                'PROFILE_UPDATE':{icon:'👤', label:'تحديث بيانات', color:'text-info'}
+            };
+
             var rows = '';
             for (var i = 0; i < Math.min(logs.length, 100); i++) {
                 var log = logs[i];
                 if (!log) continue;
-                var actionIcons = {'LOGIN':'🔐','LOGOUT':'🚪','REGISTER':'📝','PASSWORD_CHANGE':'🔑','DEPOSIT_APPROVE':'✅','DEPOSIT_REJECT':'❌','WITHDRAW_APPROVE':'💰','WITHDRAW_REJECT':'🚫','BLOCK_USER':'🚫','UNBLOCK_USER':'✅','CHANGE_BALANCE':'💎','SET_COMMISSION':'⚙️','CREATE_MERCHANT':'🏪','DELETE_USER':'🗑️','EXPORT':'📥','CLEAR_LOG':'🗑️'};
-                var icon = actionIcons[log.action] || '📌';
-                var actionLabels = {'LOGIN':'تسجيل دخول','LOGOUT':'تسجيل خروج','REGISTER':'تسجيل حساب','PASSWORD_CHANGE':'تغيير كلمة مرور','DEPOSIT_APPROVE':'قبول إيداع','DEPOSIT_REJECT':'رفض إيداع','WITHDRAW_APPROVE':'قبول سحب','WITHDRAW_REJECT':'رفض سحب','BLOCK_USER':'حظر مستخدم','UNBLOCK_USER':'إلغاء حظر','CHANGE_BALANCE':'تعديل رصيد','SET_COMMISSION':'تحديد عمولة','CREATE_MERCHANT':'إنشاء تاجر','DELETE_USER':'حذف حساب','EXPORT':'تصدير','CLEAR_LOG':'مسح السجل'};
-                var actionLabel = actionLabels[log.action] || log.action;
-                rows += '<tr class="border-b '+C.border+' hover:'+C.card+' transition">'+
-                    '<td class="px-3 py-2 text-sm">'+icon+'</td>'+
-                    '<td class="px-3 py-2 text-sm '+C.text+' font-medium">'+escHtml(actionLabel)+'</td>'+
-                    '<td class="px-3 py-2 text-sm '+C.muted+'">'+escHtml(log.details || '-')+'</td>'+
-                    '<td class="px-3 py-2 text-xs '+C.muted+'">'+escHtml(log.userId || '-')+'</td>'+
-                    '<td class="px-3 py-2 text-xs '+C.muted+'">'+fmtDate(log.timestamp)+'</td>'+
-                '</tr>';
+                var cfg = actionConfig[log.action] || {icon:'📌', label:log.action, color:'text-dark-muted'};
+                // Find user info
+                var userInfo = null;
+                if (log.userId && log.userId !== 'SYSTEM') {
+                    userInfo = users.find(function(u){return u.id === log.userId;});
+                }
+                var userDisplay = '';
+                if (!log.userId || log.userId === 'SYSTEM') {
+                    userDisplay = '<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-dark-bg text-dark-muted text-[10px] font-bold">⚙️ النظام</span>';
+                } else if (userInfo) {
+                    var roleIcon = userInfo.role === 'ADMIN' ? '🛡️' : (userInfo.role === 'MERCHANT' ? '🏪' : '👤');
+                    var roleBadge = '<span class="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[9px] font-bold '+(userInfo.role==='ADMIN'?'bg-primary/20 text-primary':(userInfo.role==='MERCHANT'?'bg-info/20 text-info':'bg-success/20 text-success'))+'">'+roleIcon+' '+userInfo.role+'</span>';
+                    var contactInfo = '';
+                    if (userInfo.phone) contactInfo += '<span class="text-[10px] text-dark-muted">📱 '+escHtml(userInfo.phone)+'</span>';
+                    if (userInfo.email) contactInfo += '<span class="text-[10px] text-dark-muted">📧 '+escHtml(userInfo.email)+'</span>';
+                    userDisplay = '<div class="flex flex-col gap-0.5"><div class="flex items-center gap-1.5"><span class="text-xs font-medium '+C.text+'">'+escHtml(userInfo.name)+'</span>'+roleBadge+'</div>'+(contactInfo?'<div class="flex flex-col gap-px">'+contactInfo+'</div>':'')+'</div>';
+                } else {
+                    userDisplay = '<span class="text-xs '+C.muted+'">'+escHtml(log.userId)+'</span>';
+                }
+
+                var timeAgo = getTimeAgo(log.timestamp);
+                rows += '<div class="p-3 rounded-lg border '+C.border+' hover:'+C.card+' transition">'+
+                    '<div class="flex items-start gap-3">'+
+                    '<div class="text-xl mt-0.5 shrink-0">'+cfg.icon+'</div>'+
+                    '<div class="flex-1 min-w-0">'+
+                    '<div class="flex items-center justify-between gap-2 mb-1">'+
+                    '<span class="text-sm font-bold '+C.text+'">'+cfg.label+'</span>'+
+                    '<span class="text-[10px] '+C.muted+' whitespace-nowrap">'+timeAgo+'</span></div>'+
+                    (log.details ? '<p class="text-xs '+C.muted+' mb-1.5">'+escHtml(log.details)+'</p>' : '')+
+                    '<div class="pt-1 border-t '+C.border+'">'+userDisplay+'</div>'+
+                    '</div></div></div>';
             }
             return header +
-            '<div class="mb-4 flex flex-wrap gap-2">'+
-            '<button onclick="exportAuditCSV()" class="px-3 py-1.5 rounded-lg border '+C.border+' text-sm '+C.text+' btn">📥 تصدير CSV</button>'+
-            '<button onclick="clearAuditLogConfirm()" class="px-3 py-1.5 rounded-lg bg-danger/10 text-danger text-sm btn">🗑️ مسح السجل</button></div>'+
-            '<div class="overflow-x-auto rounded-lg border '+C.border+'"><table class="w-full text-right"><thead><tr class="'+C.card+'">'+
-            '<th class="px-3 py-2 text-xs '+C.muted+'">العملية</th><th class="px-3 py-2 text-xs '+C.muted+'">التفاصيل</th><th class="px-3 py-2 text-xs '+C.muted+'">المستخدم</th><th class="px-3 py-2 text-xs '+C.muted+'">الوقت</th>'+
-            '</tr></thead><tbody>'+rows+'</tbody></table></div>';
+            '<div class="flex flex-wrap gap-2 mb-4">'+
+            '<span class="px-3 py-1 rounded-lg '+C.card+' text-xs '+C.muted+' border '+C.border+'">📊 '+logs.length+' عملية مسجلة</span>'+
+            '<button onclick="exportAuditCSV()" class="px-3 py-1.5 rounded-lg border '+C.border+' text-xs '+C.text+' btn">📥 تصدير CSV</button>'+
+            '<button onclick="clearAuditLogConfirm()" class="px-3 py-1.5 rounded-lg bg-danger/10 text-danger text-xs btn">🗑️ مسح السجل</button></div>'+
+            '<div class="space-y-2 max-h-[70vh] overflow-y-auto pr-1">'+rows+'</div>';
         }
 
         function clearAuditLogConfirm() {
