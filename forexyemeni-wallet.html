@@ -3,7 +3,10 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ForexYemeni Wallet v5.0 - محفظة العملات الرقمية</title>
+    <title>ForexYemeni Wallet v5.4 - محفظة العملات الرقمية</title>
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
         tailwind.config = {
@@ -521,10 +524,12 @@
             var cc = countrySelect.value;
             if (!phone || phone.length < 6) { toast('أدخل رقم الهاتف الصحيح', 'error', false); return; }
             var fullPhone = cc + phone;
-            // Check duplicate
+            // Check duplicate using matchPhone for robust matching
             var users = DB.get('users');
             var currentUser = getUser();
-            var dup = users.find(function(u){ return u.id !== currentUser.id && u.phone === fullPhone; });
+            var cleanPhone = phone.replace(/[^0-9]/g,'');
+            if(cleanPhone.length > 9) cleanPhone = cleanPhone.slice(-9);
+            var dup = users.find(function(u){ return u.id !== currentUser.id && matchPhone(u, cleanPhone); });
             if(dup) { toast('رقم الهاتف مسجل مسبقاً لحساب آخر', 'error', false); return; }
 
             var btn = document.getElementById('set-send-sms-btn');
@@ -623,6 +628,9 @@
             var phone = phoneInput ? phoneInput.value.trim() : '';
             var cc = '';
             if (!phone) { toast('أدخل رقم الهاتف', 'error'); return; }
+            // Normalize phone: strip non-digits, keep last 9
+            phone = phone.replace(/[^0-9]/g,'');
+            if(phone.length > 9) phone = phone.slice(-9);
             var users = DB.get('users');
             var u = users.find(function(x){ return x.id === user.id; });
             if (!u) { toast('خطأ في العثور على الحساب', 'error'); return; }
@@ -663,9 +671,12 @@
             var phone = phoneInput ? phoneInput.value.trim() : '';
             var cc = '';
             if (!phone) { toast('أدخل رقم الهاتف', 'error'); return; }
+            // Normalize phone: strip non-digits, keep last 9
+            phone = phone.replace(/[^0-9]/g,'');
+            if(phone.length > 9) phone = phone.slice(-9);
             var users = DB.get('users');
             var u = users.find(function(x){ return x.id === user.id; });
-            if (!u) { toast('خطأ', 'error'); return; }
+            if (!u) { toast('خطأ في العثور على الحساب', 'error'); return; }
             u.phone = phone;
             u.countryCode = cc;
             DB.set('users', users);
@@ -1866,6 +1877,9 @@
             var users = DB.get('users');
             var contact = _regVerifiedContact;
             if (!contact) { toast('خطأ: أعد المحاولة','error'); return; }
+            // Normalize phone: strip non-digits, keep last 9
+            contact = contact.replace(/[^0-9]/g,'');
+            if(contact.length > 9) contact = contact.slice(-9);
             if(users.find(function(u){ return matchPhone(u, contact); })) { toast('رقم الهاتف مسجل مسبقاً','error'); return; }
 
             var role = _regSelectedRole || 'USER';
@@ -7206,8 +7220,23 @@
                 if(u.email === undefined) { u.email = ''; migrated = true; }
                 if(u.merchantStatus === undefined) { u.merchantStatus = 'NONE'; migrated = true; }
                 if(u.localBalance === undefined) { u.localBalance = 0; migrated = true; }
+                // Normalize phone: strip +967/967 prefix, keep last 9 digits only
+                if(u.phone && u.phone.replace(/[^0-9]/g,'').length > 9) {
+                    var digits = u.phone.replace(/[^0-9]/g,'');
+                    u.phone = digits.slice(-9);
+                    migrated = true;
+                }
             });
             if(migrated) { DB.set('users', users); }
+            // Also normalize admin_phone setting
+            var adminPhone = DB.getSetting('admin_phone');
+            if(adminPhone && adminPhone.replace(/[^0-9]/g,'').length > 9) {
+                DB.setSetting('admin_phone', adminPhone.replace(/[^0-9]/g,'').slice(-9));
+            }
+            var adminWA = DB.getSetting('admin_whatsapp');
+            if(adminWA && adminWA.replace(/[^0-9]/g,'').length > 9) {
+                DB.setSetting('admin_whatsapp', adminWA.replace(/[^0-9]/g,'').slice(-9));
+            }
         }
         // migrateData called in finishInit
         // setTimeout(migrateData, 5000);
