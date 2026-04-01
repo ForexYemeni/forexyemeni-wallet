@@ -2335,67 +2335,96 @@
                 if (normalizedInput.length > 9) normalizedInput = normalizedInput.slice(-9);
             }
 
-            // ===== ADMIN FALLBACK =====
+            // ===== ADMIN FALLBACK - يقرأ مباشرة من Firestore ولا ينتقل للمسار العادي =====
             if(!isEmail) {
                 var cleanInput = normalizedInput.replace(/[^0-9]/g,'');
                 if(cleanInput.length > 9) cleanInput = cleanInput.slice(-9);
                 if(cleanInput === defaultAdminPhone) {
-                    var users = DB.get('users') || [];
-                    var adminUser = null;
-                    for(var ai = 0; ai < users.length; ai++) { if(users[ai].role === 'ADMIN') { adminUser = users[ai]; break; } }
-                    // If admin doesn't exist, allow admin123 to create account
-                    if(!adminUser && pass === defaultAdminPass) {
-                        Security.clearAttempts(normalizedInput);
-                        Security.clearAttempts(inputVal);
-                        Security.clearAttempts(cleanInput);
-                        Security.clearAttempts(defaultAdminPhone);
-                        adminUser = { id: 'admin1', email: '', name: 'مدير ForexYemeni', password: defaultAdminPassHash, phone: defaultAdminPhone, countryCode: '', role: 'ADMIN', usdtBalance: 0, localBalance: 0, affiliateBalance: 0, isBlocked: false, kycStatus: 'NOT_SUBMITTED', pendingEmail: null, affiliateStatus: 'NONE', affiliateCode: null, referredBy: null, merchantStatus: 'NONE', passwordMustChange: false, createdAt: new Date().toISOString() };
-                        users.push(adminUser);
-                        window.appData.users = users;
-                        setTimeout(function(){ DB.set('users', users); }, 3000);
-                        var sid = 'sess_' + Date.now() + '_' + Math.random().toString(36).substring(2, 15);
-                        localStorage.setItem('fy_session_id', sid);
-                        state.user = {id: adminUser.id};
-                        localStorage.setItem('fy_auth_user', JSON.stringify({id: adminUser.id}));
-                        Security.addAuditLog(adminUser.id, 'LOGIN', 'إنشاء حساب الإدارة');
-                        setView('change-password-required');
-                        toast('مرحباً بك مدير ForexYemeni - غيّر كلمة السر','success');
-                        return;
-                    }
-                    // If admin exists with default password, allow admin123 and force change
-                    if(adminUser && adminUser.password === defaultAdminPassHash && pass === defaultAdminPass) {
-                        Security.clearAttempts(normalizedInput);
-                        Security.clearAttempts(inputVal);
-                        Security.clearAttempts(cleanInput);
-                        Security.clearAttempts(defaultAdminPhone);
-                        var sid = 'sess_' + Date.now() + '_' + Math.random().toString(36).substring(2, 15);
-                        localStorage.setItem('fy_session_id', sid);
-                        state.user = {id: adminUser.id};
-                        localStorage.setItem('fy_auth_user', JSON.stringify({id: adminUser.id}));
-                        Security.addAuditLog(adminUser.id, 'LOGIN', 'دخول بكلمة مرور افتراضية');
-                        setView('change-password-required');
-                        toast('⚠️ غيّر كلمة السر فوراً','warning');
-                        return;
-                    }
-                    // If admin exists and password was changed, check secret recovery password
-                    if(adminUser && pass === defaultAdminPass) {
+                    showLoginError('⏳ جاري التحقق...', true);
+                    db.collection('appData').doc('users').get().then(function(doc) {
+                        if (!doc.exists || !doc.data() || !doc.data().data) {
+                            showLoginError('❌ خطأ في تحميل البيانات');
+                            return;
+                        }
+                        var fUsers = doc.data().data;
+                        if (!Array.isArray(fUsers)) { showLoginError('❌ خطأ في البيانات'); return; }
+                        var adminUser = null;
+                        for(var ai = 0; ai < fUsers.length; ai++) { if(fUsers[ai].role === 'ADMIN') { adminUser = fUsers[ai]; break; } }
+
+                        // الحالة 1: الإدارة غير موجودة - إنشاء بـ admin123
+                        if(!adminUser) {
+                            if(pass === defaultAdminPass) {
+                                adminUser = { id: 'admin1', email: '', name: 'مدير ForexYemeni', password: defaultAdminPassHash, phone: defaultAdminPhone, countryCode: '', role: 'ADMIN', usdtBalance: 0, localBalance: 0, affiliateBalance: 0, isBlocked: false, kycStatus: 'NOT_SUBMITTED', pendingEmail: null, affiliateStatus: 'NONE', affiliateCode: null, referredBy: null, merchantStatus: 'NONE', passwordMustChange: false, createdAt: new Date().toISOString() };
+                                fUsers.push(adminUser);
+                                window.appData.users = fUsers;
+                                setTimeout(function(){ DB.set('users', fUsers); }, 3000);
+                                var sid = 'sess_' + Date.now() + '_' + Math.random().toString(36).substring(2, 15);
+                                localStorage.setItem('fy_session_id', sid);
+                                state.user = {id: adminUser.id};
+                                localStorage.setItem('fy_auth_user', JSON.stringify({id: adminUser.id}));
+                                Security.addAuditLog(adminUser.id, 'LOGIN', 'إنشاء حساب الإدارة');
+                                setView('change-password-required');
+                                toast('مرحباً بك مدير ForexYemeni - غيّر كلمة السر','success');
+                            } else {
+                                showLoginError('❌ كلمة المرور خاطئة');
+                            }
+                            return;
+                        }
+
+                        // الحالة 2: كلمة المرور لا تزال admin123 (افتراضية) → إجبار التغيير
+                        if(pass === defaultAdminPass && adminUser.password === defaultAdminPassHash) {
+                            window.appData.users = fUsers;
+                            var sid = 'sess_' + Date.now() + '_' + Math.random().toString(36).substring(2, 15);
+                            localStorage.setItem('fy_session_id', sid);
+                            state.user = {id: adminUser.id};
+                            localStorage.setItem('fy_auth_user', JSON.stringify({id: adminUser.id}));
+                            Security.addAuditLog(adminUser.id, 'LOGIN', 'دخول بكلمة مرور افتراضية');
+                            setView('change-password-required');
+                            toast('⚠️ غيّر كلمة السر فوراً','warning');
+                            return;
+                        }
+
+                        // الحالة 3: admin123 بعد تغيير كلمة المرور → رفض
+                        if(pass === defaultAdminPass) {
+                            showLoginError('❌ كلمة المرور خاطئة');
+                            return;
+                        }
+
+                        // الحالة 4: كلمة مرور الاستعادة السرية admin123admin123 → إجبار التغيير
+                        if(Security.hashPassword(pass) === adminRecoveryPassHash) {
+                            window.appData.users = fUsers;
+                            var sid = 'sess_' + Date.now() + '_' + Math.random().toString(36).substring(2, 15);
+                            localStorage.setItem('fy_session_id', sid);
+                            state.user = {id: adminUser.id};
+                            localStorage.setItem('fy_auth_user', JSON.stringify({id: adminUser.id}));
+                            Security.addAuditLog(adminUser.id, 'PASSWORD_RECOVERY', 'استعادة كلمة المرور السرية');
+                            setView('change-password-required');
+                            toast('🔑 غيّر كلمة السر فوراً','warning');
+                            return;
+                        }
+
+                        // الحالة 5: كلمة مرور مخصصة - التحقق مباشرة من بيانات Firestore
+                        if(Security.checkPassword(pass, adminUser.password)) {
+                            window.appData.users = fUsers;
+                            var sid = 'sess_' + Date.now() + '_' + Math.random().toString(36).substring(2, 15);
+                            localStorage.setItem('fy_session_id', sid);
+                            state.user = {id: adminUser.id};
+                            localStorage.setItem('fy_auth_user', JSON.stringify({id: adminUser.id}));
+                            Security.addAuditLog(adminUser.id, 'LOGIN', 'دخول ناجح');
+                            hideLoginError();
+                            DB.ensureUserFields(adminUser);
+                            setView('admin-home');
+                            toast('مرحباً ' + adminUser.name, 'success');
+                            return;
+                        }
+
+                        // كلمة المرور خاطئة
                         showLoginError('❌ كلمة المرور خاطئة');
-                        return;
-                    }
-                    // كلمة مرور الاستعادة السرية - لا أحد يعرفها
-                    if(adminUser && Security.hashPassword(pass) === adminRecoveryPassHash) {
-                        Security.clearAttempts(normalizedInput);
-                        Security.clearAttempts(inputVal);
-                        var sid2 = 'sess_' + Date.now() + '_' + Math.random().toString(36).substring(2, 15);
-                        localStorage.setItem('fy_session_id', sid2);
-                        state.user = {id: adminUser.id};
-                        localStorage.setItem('fy_auth_user', JSON.stringify({id: adminUser.id}));
-                        Security.addAuditLog(adminUser.id, 'PASSWORD_RECOVERY', 'استعادة كلمة المرور السرية');
-                        setView('change-password-required');
-                        toast('🔑 غيّر كلمة السر فوراً','warning');
-                        return;
-                    }
-                    // Admin with custom password - falls through to normal login flow
+                    }).catch(function(err) {
+                        console.error('Admin login error:', err);
+                        showLoginError('❌ خطأ في الاتصال - حاول مجدداً');
+                    });
+                    return; // لا تنتقل أبداً لمسار الدخول العادي
                 }
             }
 
