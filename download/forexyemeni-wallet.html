@@ -3001,7 +3001,8 @@
                 '<div class="flex items-center justify-between mb-6">'+
                 '<button onclick="state.sidebarOpen=true;render()" class="lg:hidden p-2.5 rounded-xl glass border '+C.border+' '+C.text+' btn hover:border-primary/30 transition-all">☰</button>'+
                 '<div class="flex items-center gap-3">'+
-                '<button onclick="setTheme(state.theme===\'dark\'?\'light\':\'dark\')" class="p-2.5 rounded-xl glass border '+C.border+' '+C.text+' btn btn-premium hover:border-primary/30 transition-all">'+(state.theme==='dark'?'☀️':'🌙')+'</button>'+
+                '<button onclick="logout()" class="p-2.5 rounded-xl glass border border-red-500/20 text-danger btn btn-premium hover:border-red-500/50 hover:bg-red-500/5 transition-all" title="تسجيل الخروج">🚪</button>'+
+                '<button onclick="setTheme(state.theme===\'dark\'?\'light\':\'dark\')" class="p-2.5 rounded-xl glass border '+C.border+' '+C.text+' btn btn-premium hover:border-primary/30 transition-all" title="تغيير الوضع">'+(state.theme==='dark'?'☀️':'🌙')+'</button>'+
                 '</div></div>'+
                 '<div class="page-enter">'+contentHtml+'</div></main>'+
                 // Mobile bottom navigation bar
