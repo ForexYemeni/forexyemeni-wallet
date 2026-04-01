@@ -701,54 +701,34 @@
             });
         }
 
-        // Save FCM token to Firestore (under fcmTokens collection)
+        // Save FCM token to Firestore appData (accessible by serverless functions)
         function saveFCMToken(token) {
             var currentUser = state.user;
             if (!currentUser || !currentUser.id) return;
-            
-            db.collection('fcmTokens').doc(currentUser.id).get().then(function(doc) {
-                var existingTokens = [];
-                if (doc.exists && doc.data() && doc.data().tokens) {
-                    existingTokens = doc.data().tokens;
-                }
-                // Add token if not already exists
-                if (existingTokens.indexOf(token) === -1) {
-                    existingTokens.push(token);
-                    // Keep max 5 tokens per user (different devices)
-                    if (existingTokens.length > 5) {
-                        existingTokens = existingTokens.slice(-5);
-                    }
-                    db.collection('fcmTokens').doc(currentUser.id).set({
-                        tokens: existingTokens,
-                        userId: currentUser.id,
-                        updatedAt: new Date().toISOString()
-                    });
-                    console.log('[FCM] Token saved for user:', currentUser.id);
-                }
-            }).catch(function(err) {
-                console.warn('[FCM] Save token error:', err);
-            });
+            // Save to appData so the serverless function can read it
+            var fcmTokens = DB.get('fcmTokens') || {};
+            var userTokens = fcmTokens[currentUser.id] || [];
+            if (userTokens.indexOf(token) === -1) {
+                userTokens.push(token);
+                if (userTokens.length > 5) userTokens = userTokens.slice(-5);
+                fcmTokens[currentUser.id] = userTokens;
+                DB.set('fcmTokens', fcmTokens);
+                console.log('[FCM] Token saved to appData for user:', currentUser.id);
+            }
         }
 
         // Remove FCM token on logout
         function removeFCMToken() {
             var currentUser = state.user;
             if (!currentUser || !_fcmToken) return;
-            
-            db.collection('fcmTokens').doc(currentUser.id).get().then(function(doc) {
-                if (doc.exists && doc.data() && doc.data().tokens) {
-                    var tokens = doc.data().tokens;
-                    var idx = tokens.indexOf(_fcmToken);
-                    if (idx !== -1) {
-                        tokens.splice(idx, 1);
-                        db.collection('fcmTokens').doc(currentUser.id).set({
-                            tokens: tokens,
-                            userId: currentUser.id,
-                            updatedAt: new Date().toISOString()
-                        });
-                    }
-                }
-            }).catch(function(){});
+            var fcmTokens = DB.get('fcmTokens') || {};
+            var userTokens = fcmTokens[currentUser.id] || [];
+            var idx = userTokens.indexOf(_fcmToken);
+            if (idx !== -1) {
+                userTokens.splice(idx, 1);
+                fcmTokens[currentUser.id] = userTokens;
+                DB.set('fcmTokens', fcmTokens);
+            }
             _fcmToken = null;
             _fcmInitialized = false;
         }
@@ -1186,7 +1166,7 @@
             kycDocuments: null, notifications: null, userWithdrawalMethods: null,
             transactionLog: null, messages: null, settings: null, merchantRequests: null,
             merchantTransactions: null, profileChangeRequests: null, merchants: null, deviceApprovals: null,
-            loginPermissions: null,
+            loginPermissions: null, fcmTokens: null,
             merchantPaymentData: null,
             merchantPaymentMethods: null, merchantRatings: null, auditLog: null
         };
@@ -1339,20 +1319,42 @@
             var ns = DB.get('notifications') || [];
             ns.unshift({ id: DB.uid(), userId: userId, title: title, message: msg, type: type, isRead: false, createdAt: new Date().toISOString() });
             DB.set('notifications', ns);
-            // For other users - send push notification only (sound will play via onSnapshot on their device)
             var currentUser = getUser();
             if (!currentUser || currentUser.id !== userId) {
-                queuePushNotification(userId, title, msg, type);
+                // Send SERVER-SIDE push notification (works even when app is closed!)
+                _sendServerPush(userId, title, msg, type);
             } else {
                 // Play notification sound for current user
                 _playNotifSound(type);
-                // Show browser notification if permission granted
                 if ('Notification' in window && Notification.permission === 'granted') {
                     try {
                         new Notification(title, { body: msg, icon: 'icon.png', badge: 'icon.png', tag: 'fy-notif-' + Date.now() });
                     } catch(e) {}
                 }
             }
+        }
+
+        // Send push notification from SERVER (works when app is closed/swiped)
+        function _sendServerPush(userId, title, body, type) {
+            try {
+                var fcmTokens = DB.get('fcmTokens') || {};
+                var userTokens = fcmTokens[userId] || [];
+                if (userTokens.length === 0) return;
+                var apiBase = 'https://forexyemeni-wallet.vercel.app';
+                fetch(apiBase + '/api/send-push', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        userId: userId,
+                        tokens: userTokens,
+                        title: title,
+                        body: body,
+                        type: type || 'INFO'
+                    })
+                }).catch(function(err) {
+                    console.warn('[Push] Server push error:', err);
+                });
+            } catch(e) {}
         }
 
         // Play notification sound using Web Audio API
