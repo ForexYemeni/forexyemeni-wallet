@@ -276,7 +276,7 @@
             for (var i = 0; i < 6; i++) _smsCode += Math.floor(Math.random() * 10);
             _smsPhoneVerified = false;
 
-            var _apiBase = 'https://forexyemeni-wallet.vercel.app';
+            var _apiBase = window.location.origin;
             try {
                 fetch(_apiBase + '/api/send-sms-otp', {
                     method: 'POST',
@@ -366,7 +366,7 @@
             _otpEmail = email;
             _otpEmailVerified = false;
 
-            var _apiBase = 'https://forexyemeni-wallet.vercel.app';
+            var _apiBase = window.location.origin;
             try {
                 fetch(_apiBase + '/api/send-otp', {
                     method: 'POST',
@@ -460,7 +460,7 @@
             for (var i = 0; i < 6; i++) _setOtpCode += Math.floor(Math.random() * 10);
             _setOtpEmail = email;
             _setOtpVerified = false;
-            var _apiBase = 'https://forexyemeni-wallet.vercel.app';
+            var _apiBase = window.location.origin;
             fetch(_apiBase + '/api/send-otp', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -538,7 +538,7 @@
             for (var i = 0; i < 6; i++) _setSmsCode += Math.floor(Math.random() * 10);
             _setSmsVerified = false;
 
-            var _apiBase = 'https://forexyemeni-wallet.vercel.app';
+            var _apiBase = window.location.origin;
             try {
                 fetch(_apiBase + '/api/send-sms-otp', {
                     method: 'POST',
@@ -1488,7 +1488,7 @@
                 var fcmTokens = DB.get('fcmTokens') || {};
                 var userTokens = fcmTokens[userId] || [];
                 if (userTokens.length === 0) return;
-                var apiBase = 'https://forexyemeni-wallet.vercel.app';
+                var apiBase = window.location.origin;
                 fetch(apiBase + '/api/send-push', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -5438,7 +5438,7 @@
                 // Send password via email if user has email
                 var sendPromise = null;
                 if(u.email && u.email.trim()) {
-                    var _apiBase = 'https://forexyemeni-wallet.vercel.app';
+                    var _apiBase = window.location.origin;
                     sendPromise = fetch(_apiBase + '/api/send-otp', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
