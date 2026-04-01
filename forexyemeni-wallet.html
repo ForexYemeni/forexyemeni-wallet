@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ForexYemeni Wallet v5.5 - محفظة العملات الرقمية</title>
+    <title>ForexYemeni Wallet v5.6 - محفظة العملات الرقمية</title>
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
     <meta http-equiv="Expires" content="0">
@@ -1737,7 +1737,7 @@
                 localStorage.removeItem('fy_session_id');
                 state.view = 'register';
                 state.sidebarOpen = false;
-                _regOtpSent = false; _regOtpVerified = false; _regVerifiedContact = ''; _regSelectedRole = 'USER';
+                _regOtpSent = false; _regOtpVerified = false; _regVerifiedContact = ''; _regSelectedRole = 'USER'; _regContactType = 'phone';
                 render();
             } catch(e) {
                 console.error('Register page error:', e);
@@ -1770,8 +1770,8 @@
             '<div class="mt-6">'+
             '<button onclick="tryRegisterPage()" class="w-full py-3.5 rounded-xl font-bold text-lg border-2 border-dashed border-primary/50 text-primary btn hover:bg-primary/10 transition-all">✨ إنشاء حساب جديد</button>'+
             '</div>'+
-            '<div class="mt-4 flex justify-end"><button onclick="setTheme(state.theme===\'dark\'?\'light\':\'dark\')" class="p-2.5 rounded-xl '+C.btnOutline+' text-lg">'+(state.theme==='dark'?'☀️':'🌙')+'</button></div>'+
-            '<div class="mt-3 text-center"><a onclick="resetAdminPassword()" class="text-xs '+C.muted+' opacity-50 hover:opacity-100 cursor-pointer" style="font-size:11px;">إعادة تعيين بيانات الإدارة</a></div>'+
+            '<div class="mt-4 flex justify-between items-center"><button onclick="setTheme(state.theme===\'dark\'?\'light\':\'dark\')" class="p-2.5 rounded-xl '+C.btnOutline+' text-lg">'+(state.theme==='dark'?'☀️':'🌙')+'</button>'+
+            '<a onclick="resetAdminPassword()" class="text-sm '+C.muted+' hover:opacity-100 cursor-pointer font-bold" style="opacity:0.8;">🔐 إعادة تعيين بيانات الإدارة</a></div>'+
             '</div></div>'+
             (adminPhone || adminWA ? '<div class="fixed bottom-6 left-6 z-50 flex flex-col items-center gap-3">'+
             '<div id="contact-fab-icons" class="hidden flex-col items-center gap-3">'+
@@ -1785,53 +1785,95 @@
         // ==================== REG STEP STATE ====================
         var _regOtpSent = false; // whether OTP was sent
         var _regOtpVerified = false; // whether OTP was verified
-        var _regVerifiedContact = ''; // the phone after OTP verified
+        var _regVerifiedContact = ''; // the phone/email after OTP verified
         var _regSelectedRole = 'USER'; // selected role
+        var _regContactType = 'phone'; // 'phone' or 'email'
 
         // ==================== REG OTP FUNCTIONS ====================
-        function startRegOTP() {
-            var phoneInput = document.getElementById('reg-phone');
-            if (!phoneInput) return;
-            var contact = phoneInput.value.trim();
-            if (!contact || contact.length < 7) { toast('أدخل رقم هاتف صحيح','error',false); return; }
-            if (!/^[0-9]+$/.test(contact)) { toast('أدخل أرقاماً فقط','error',false); return; }
+        function selectRegContactType(type) {
+            _regContactType = type;
+            _regOtpSent = false; _regOtpVerified = false; _regVerifiedContact = '';
+            var phoneDiv = document.getElementById('reg-contact-phone');
+            var emailDiv = document.getElementById('reg-contact-email');
+            var phoneTab = document.getElementById('reg-tab-phone');
+            var emailTab = document.getElementById('reg-tab-email');
+            var isDark = state.theme === 'dark';
+            var brdC = isDark ? '#374151' : '#d1d5db';
+            var actC = '#f59e0b';
+            if(phoneDiv) phoneDiv.style.display = (type==='phone') ? 'block' : 'none';
+            if(emailDiv) emailDiv.style.display = (type==='email') ? 'block' : 'none';
+            if(phoneTab) { phoneTab.style.border = (type==='phone') ? '2px solid '+actC : '2px solid '+brdC; phoneTab.style.background = (type==='phone') ? 'rgba(245,158,11,0.05)' : 'transparent'; }
+            if(emailTab) { emailTab.style.border = (type==='email') ? '2px solid '+actC : '2px solid '+brdC; emailTab.style.background = (type==='email') ? 'rgba(245,158,11,0.05)' : 'transparent'; }
+            // Hide OTP and password sections when switching type
+            var otpBox = document.getElementById('reg-otp-box');
+            if(otpBox) otpBox.style.display = 'none';
+            var passBox = document.getElementById('reg-pass-box');
+            if(passBox) passBox.style.display = 'none';
+        }
 
-            var users = DB.get('users');
-            if(users.find(function(u){ return matchPhone(u, contact); })) { toast('رقم الهاتف مسجل مسبقاً','error',false); return; }
+        function startRegOTP() {
+            var contact = '';
+            if (_regContactType === 'email') {
+                var emailInput = document.getElementById('reg-email');
+                if (!emailInput) return;
+                contact = emailInput.value.trim();
+                if (!contact || contact.indexOf('@') < 1) { toast('أدخل بريد إلكتروني صحيح','error',false); return; }
+                var users = DB.get('users');
+                if(users.find(function(u){ return (u.email||'').toLowerCase() === contact.toLowerCase(); })) { toast('البريد الإلكتروني مسجل مسبقاً','error',false); return; }
+            } else {
+                var phoneInput = document.getElementById('reg-phone');
+                if (!phoneInput) return;
+                contact = phoneInput.value.trim();
+                if (!contact || contact.length < 7) { toast('أدخل رقم هاتف صحيح','error',false); return; }
+                if (!/^[0-9]+$/.test(contact)) { toast('أدخل أرقاماً فقط','error',false); return; }
+                var users = DB.get('users');
+                if(users.find(function(u){ return matchPhone(u, contact); })) { toast('رقم الهاتف مسجل مسبقاً','error',false); return; }
+            }
 
             var otpCode = '';
             for (var i = 0; i < 6; i++) otpCode += Math.floor(Math.random() * 10);
             _otpCode = otpCode;
 
-            // Disable button and show loading
             var btn = document.getElementById('send-otp-btn');
             if(btn) { btn.disabled = true; btn.textContent = '⏳ جاري الإرسال...'; }
 
             var _apiBase = 'https://forexyemeni-wallet.vercel.app';
-            fetch(_apiBase + '/api/send-sms-otp', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ to: contact, code: otpCode })
-            }).then(function(r){ return r.json(); })
-            .then(function(data) {
-                _regVerifiedContact = contact;
-                _regOtpSent = true;
-                showOtpSection();
-                if (data.success) {
-                    toast('تم إرسال رمز التحقق بنجاح','success',false);
-                } else {
-                    _otpCode = '123456';
+            if (_regContactType === 'email') {
+                // Send OTP via email API
+                fetch(_apiBase + '/api/send-email-otp', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ to: contact, code: otpCode })
+                }).then(function(r){ return r.json(); })
+                .then(function(data) {
+                    _regVerifiedContact = contact;
+                    _regOtpSent = true;
+                    showOtpSection();
+                    if (data.success) { toast('تم إرسال رمز التحقق إلى بريدك','success',false); }
+                    else { _otpCode = '123456'; toast('تم إنشاء الرمز - أدخل 123456 للتجربة','warning',8000); }
+                    if(btn) { btn.disabled = false; btn.textContent = '📧 إعادة إرسال رمز التحقق'; }
+                }).catch(function(err) {
+                    _regVerifiedContact = contact; _regOtpSent = true; _otpCode = '123456'; showOtpSection();
                     toast('تم إنشاء الرمز - أدخل 123456 للتجربة','warning',8000);
-                }
-                if(btn) { btn.disabled = false; btn.textContent = '📱 إعادة إرسال رمز التحقق'; }
-            }).catch(function(err) {
-                _regVerifiedContact = contact;
-                _regOtpSent = true;
-                _otpCode = '123456';
-                showOtpSection();
-                toast('تم إنشاء الرمز - أدخل 123456 للتجربة','warning',8000);
-                if(btn) { btn.disabled = false; btn.textContent = '📱 إعادة إرسال رمز التحقق'; }
-            });
+                    if(btn) { btn.disabled = false; btn.textContent = '📧 إعادة إرسال رمز التحقق'; }
+                });
+            } else {
+                fetch(_apiBase + '/api/send-sms-otp', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ to: contact, code: otpCode })
+                }).then(function(r){ return r.json(); })
+                .then(function(data) {
+                    _regVerifiedContact = contact; _regOtpSent = true; showOtpSection();
+                    if (data.success) { toast('تم إرسال رمز التحقق بنجاح','success',false); }
+                    else { _otpCode = '123456'; toast('تم إنشاء الرمز - أدخل 123456 للتجربة','warning',8000); }
+                    if(btn) { btn.disabled = false; btn.textContent = '📱 إعادة إرسال رمز التحقق'; }
+                }).catch(function(err) {
+                    _regVerifiedContact = contact; _regOtpSent = true; _otpCode = '123456'; showOtpSection();
+                    toast('تم إنشاء الرمز - أدخل 123456 للتجربة','warning',8000);
+                    if(btn) { btn.disabled = false; btn.textContent = '📱 إعادة إرسال رمز التحقق'; }
+                });
+            }
         }
 
         function showOtpSection() {
@@ -1899,10 +1941,16 @@
                 }
             }
 
-            var user = {id:DB.uid(),email:'',name:displayName,password:Security.hashPassword(pass),phone:contact,countryCode:'',role:role,usdtBalance:0,localBalance:0,affiliateBalance:0,isBlocked:false,kycStatus:'NOT_SUBMITTED',affiliateStatus:'NONE',affiliateCode:null,referredBy:referredBy,pendingEmail:null,merchantStatus:merchantStatus,passwordMustChange:false,createdAt:new Date().toISOString()};
+            var user = {id:DB.uid(),email:'',name:displayName,password:Security.hashPassword(pass),phone:'',countryCode:'',role:role,usdtBalance:0,localBalance:0,affiliateBalance:0,isBlocked:false,kycStatus:'NOT_SUBMITTED',affiliateStatus:'NONE',affiliateCode:null,referredBy:referredBy,pendingEmail:null,merchantStatus:merchantStatus,passwordMustChange:false,createdAt:new Date().toISOString()};
+            // Store phone or email based on contact type
+            if (_regContactType === 'email') {
+                user.email = contact;
+            } else {
+                user.phone = contact;
+            }
             users.push(user); DB.set('users',users);
 
-            _otpCode = ''; _regVerifiedContact = ''; _regOtpSent = false; _regOtpVerified = false; _regSelectedRole = 'USER';
+            _otpCode = ''; _regVerifiedContact = ''; _regOtpSent = false; _regOtpVerified = false; _regSelectedRole = 'USER'; _regContactType = 'phone';
             state.user = {id:user.id}; localStorage.setItem('fy_auth_user',JSON.stringify({id:user.id}));
             Security.createSession(user.id);
             Security.addAuditLog(user.id, 'REGISTER', 'تسجيل حساب جديد - ' + role);
@@ -1948,6 +1996,9 @@
             var otpDisplay = _regOtpSent ? 'block' : 'none';
             var passDisplay = _regOtpVerified ? 'block' : 'none';
             var otpInputDisabled = _regOtpVerified ? ' disabled' : '';
+            var phoneTabStyle = 'cursor:pointer;padding:12px;border-radius:12px;border:2px solid #f59e0b;background:rgba(245,158,11,0.05);display:flex;align-items:center;justify-content:center;gap:8px;';
+            var emailTabStyle = 'cursor:pointer;padding:12px;border-radius:12px;border:2px solid '+brdC+';display:flex;align-items:center;justify-content:center;gap:8px;';
+            if (_regContactType === 'email') { var tmp = phoneTabStyle; phoneTabStyle = emailTabStyle; emailTabStyle = tmp; }
 
             return '<div style="min-height:100vh;background:'+bgC+';display:flex;align-items:center;justify-content:center;padding:16px;">'+
             '<div style="background:'+cardC+';border-radius:20px;padding:32px;width:100%;max-width:440px;box-shadow:0 8px 32px rgba(0,0,0,0.2);position:relative;z-index:10;max-height:95vh;overflow-y:auto;">'+
@@ -1957,7 +2008,6 @@
             '<h1 style="font-size:22px;font-weight:800;color:'+txtC+';margin:0;">إنشاء حساب جديد</h1>'+
             '<p style="font-size:14px;color:'+mutC+';margin-top:4px;">انضم إلى ForexYemeni Wallet</p></div>'+
 
-            // All form fields in one column
             '<div style="display:flex;flex-direction:column;gap:14px;">'+
 
             // 1. Role selection
@@ -1968,26 +2018,40 @@
             '<div id="reg-role-MERCHANT" onclick="selectRegRole(\'MERCHANT\')" style="cursor:pointer;padding:12px;border-radius:12px;border:2px solid '+brdC+';display:flex;align-items:center;gap:8px;">'+
             '<input type="radio" name="reg-role" value="MERCHANT" style="accent-color:#f59e0b;width:18px;height:18px;"><span style="font-size:14px;color:'+txtC+'">🏪 تاجر</span></div></div></div>'+
 
-            // 2. Phone input
-            '<div><label style="display:block;font-size:14px;font-weight:500;color:'+txtC+';margin-bottom:6px;">رقم الهاتف</label>'+
-            '<input type="tel" id="reg-phone" autocomplete="tel" style="'+inputStyle+'" placeholder="أدخل رقم الهاتف (9 أرقام)" maxlength="15" inputmode="numeric"></div>'+
+            // 2. Contact type tabs (phone/email)
+            '<div><label style="display:block;font-size:14px;font-weight:500;color:'+txtC+';margin-bottom:6px;">طريقة التواصل</label>'+
+            '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">'+
+            '<div id="reg-tab-phone" onclick="selectRegContactType(\'phone\')" style="'+phoneTabStyle+'">'+
+            '<span style="font-size:14px;color:'+txtC+'">📱 رقم الهاتف</span></div>'+
+            '<div id="reg-tab-email" onclick="selectRegContactType(\'email\')" style="'+emailTabStyle+'">'+
+            '<span style="font-size:14px;color:'+txtC+'">📧 بريد إلكتروني</span></div></div></div>'+
 
-            // 2b. Referral code (optional)
+            // 3. Phone input (shown when phone tab active)
+            '<div id="reg-contact-phone">'+
+            '<div><label style="display:block;font-size:14px;font-weight:500;color:'+txtC+';margin-bottom:6px;">رقم الهاتف</label>'+
+            '<input type="tel" id="reg-phone" autocomplete="tel" style="'+inputStyle+'" placeholder="أدخل رقم الهاتف (9 أرقام)" maxlength="15" inputmode="numeric"></div></div>'+
+
+            // 3b. Email input (shown when email tab active, hidden by default)
+            '<div id="reg-contact-email" style="display:none;">'+
+            '<div><label style="display:block;font-size:14px;font-weight:500;color:'+txtC+';margin-bottom:6px;">البريد الإلكتروني</label>'+
+            '<input type="email" id="reg-email" autocomplete="email" style="'+inputStyle+'" placeholder="example@email.com"></div></div>'+
+
+            // 3c. Referral code (optional)
             '<div><label style="display:block;font-size:14px;font-weight:500;color:'+txtC+';margin-bottom:6px;">🎁 رمز الدعوة (اختياري)</label>'+
             '<input type="text" id="reg-referral" style="'+inputStyle+'text-transform:uppercase;" placeholder="أدخل رمز الدعوة إن وجد" maxlength="10"></div>'+
 
-            // 3. Send OTP button
-            '<button type="button" id="send-otp-btn" onclick="startRegOTP()" style="width:100%;padding:12px;border-radius:12px;background:linear-gradient(to left,#3b82f6,#6366f1);color:white;border:none;cursor:pointer;font-size:15px;font-weight:700;">📱 إرسال رمز التحقق</button>'+
+            // 4. Send OTP button
+            '<button type="button" id="send-otp-btn" onclick="startRegOTP()" style="width:100%;padding:12px;border-radius:12px;background:linear-gradient(to left,#3b82f6,#6366f1);color:white;border:none;cursor:pointer;font-size:15px;font-weight:700;">'+(_regContactType==='email'?'📧':'📱')+' إرسال رمز التحقق</button>'+
 
-            // 4. OTP box - appears BELOW
+            // 5. OTP box - appears BELOW
             '<div id="reg-otp-box" style="display:'+otpDisplay+';padding:16px;border-radius:12px;border:2px solid #f59e0b;background:rgba(245,158,11,0.05);margin-top:4px;">'+
             '<p style="font-size:13px;color:#f59e0b;font-weight:600;margin:0 0 12px 0;text-align:center;">أدخل رمز التحقق المكون من 6 أرقام</p>'+
             '<input type="text" id="otp-code-input" maxlength="6" style="'+inputStyle+'text-align:center;font-size:20px;letter-spacing:6px;font-weight:700;" placeholder="••••••" inputmode="numeric"'+otpInputDisabled+'>'+
             '<button type="button" id="verify-otp-btn" onclick="handleRegVerify(event)" style="width:100%;padding:12px;border-radius:10px;background:#0ECB81;color:white;border:none;cursor:pointer;font-size:15px;font-weight:700;margin-top:12px;">✅ تحقق</button></div>'+
 
-            // 5. Password box - appears BELOW OTP after verify
+            // 6. Password box - appears BELOW OTP after verify
             '<div id="reg-pass-box" style="display:'+passDisplay+';">'+
-            (_regOtpVerified ? '<div style="padding:8px 12px;border-radius:10px;border:2px solid #0ECB81;background:rgba(14,203,129,0.05);text-align:center;font-size:13px;font-weight:700;color:#0ECB81;margin-bottom:12px;">✅ تم التحقق من الرقم: '+escHtml(_regVerifiedContact)+'</div>' : '')+
+            (_regOtpVerified ? '<div style="padding:8px 12px;border-radius:10px;border:2px solid #0ECB81;background:rgba(14,203,129,0.05);text-align:center;font-size:13px;font-weight:700;color:#0ECB81;margin-bottom:12px;">✅ تم التحقق: '+escHtml(_regVerifiedContact)+'</div>' : '')+
             '<div><label style="display:block;font-size:14px;font-weight:500;color:'+txtC+';margin-bottom:6px;">كلمة المرور</label>'+
             '<input type="password" id="reg-pass" required minlength="6" autocomplete="new-password" style="'+inputStyle+'" placeholder="6 أحرف على الأقل"></div>'+
             '<button type="button" onclick="handleRegSetPassword(event)" style="width:100%;padding:14px;border-radius:14px;background:'+btnBg+';color:#1f2937;font-weight:700;font-size:18px;border:none;cursor:pointer;margin-top:4px;">إنشاء الحساب</button></div>'+
