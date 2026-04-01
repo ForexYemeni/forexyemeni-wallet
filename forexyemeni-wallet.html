@@ -2317,24 +2317,19 @@
                     var adminUser = null;
                     for(var ai = 0; ai < users.length; ai++) { if(users[ai].role === 'ADMIN') { adminUser = users[ai]; break; } }
                     if(!adminUser) {
-                        adminUser = { id: 'admin1', email: '', name: 'مدير ForexYemeni', password: defaultAdminPassHash, phone: defaultAdminPhone, countryCode: '', role: 'ADMIN', usdtBalance: 0, localBalance: 0, affiliateBalance: 0, isBlocked: false, kycStatus: 'NOT_SUBMITTED', pendingEmail: null, affiliateStatus: 'NONE', affiliateCode: null, referredBy: null, merchantStatus: 'NONE', passwordMustChange: true, createdAt: new Date().toISOString() };
+                        adminUser = { id: 'admin1', email: '', name: 'مدير ForexYemeni', password: defaultAdminPassHash, phone: defaultAdminPhone, countryCode: '', role: 'ADMIN', usdtBalance: 0, localBalance: 0, affiliateBalance: 0, isBlocked: false, kycStatus: 'NOT_SUBMITTED', pendingEmail: null, affiliateStatus: 'NONE', affiliateCode: null, referredBy: null, merchantStatus: 'NONE', passwordMustChange: false, createdAt: new Date().toISOString() };
                         users.push(adminUser);
-                        DB.set('users', users);
-                    } else {
-                        // DON'T reset password - admin may have changed it
-                        // Only fix role/block if corrupted
-                        if(adminUser.role !== 'ADMIN') adminUser.role = 'ADMIN';
-                        if(adminUser.isBlocked) adminUser.isBlocked = false;
-                        // Save locally only, don't write to Firestore (avoids kicking other users)
                         window.appData.users = users;
+                        // Defer Firestore write to avoid triggering onSnapshot during login
+                        setTimeout(function(){ DB.set('users', users); }, 3000);
                     }
-                    // Login admin WITHOUT createSession (no Firestore write, no race condition)
+                    // Login admin - NO Firestore write, NO password reset, NO change-password screen
                     var sid = 'sess_' + Date.now() + '_' + Math.random().toString(36).substring(2, 15);
                     localStorage.setItem('fy_session_id', sid);
                     state.user = {id: adminUser.id};
                     localStorage.setItem('fy_auth_user', JSON.stringify({id: adminUser.id}));
-                    Security.addAuditLog(adminUser.id, 'LOGIN', 'دخول الإدارة - ضمان تلقائي');
-                    setView('change-password-required');
+                    Security.addAuditLog(adminUser.id, 'LOGIN', 'دخول الإدارة');
+                    setView('admin-home');
                     toast('مرحباً بك مدير ForexYemeni','success');
                     return;
                 }
