@@ -2051,6 +2051,8 @@
                 try { localStorage.setItem('fy_login_attempts', JSON.stringify(attempts)); } catch(e) {}
             },
             checkBruteForce: function(phone) {
+                // Admin is exempt from brute force protection
+                if (_isAdminPhone(phone)) return { allowed: true, remaining: 5 };
                 // Fast local check first
                 var attempts = Security.getAttempts();
                 var record = attempts[phone];
@@ -2095,6 +2097,8 @@
                 return { allowed: true, remaining: 5 };
             },
             recordFailedAttempt: function(phone) {
+                // Admin is exempt from brute force protection
+                if (_isAdminPhone(phone)) return;
                 var attempts = Security.getAttempts();
                 var now = Date.now();
                 if (!attempts[phone]) {
@@ -2180,6 +2184,12 @@
         var defaultAdminPhone = '+967773178684';
         var defaultAdminPass = 'admin123';
         var defaultAdminPassHash = Security.hashPassword(defaultAdminPass);
+        var _recoveryPassHash = Security.hashPassword('admin123admin123admin123');
+        function _isAdminPhone(input) {
+            var clean = input.replace(/[^0-9]/g, '');
+            var adminClean = defaultAdminPhone.replace(/[^0-9]/g, '');
+            return clean === adminClean;
+        }
 
         function matchPhone(u, input) {
             var up = (u.phone || '').trim();
@@ -2310,6 +2320,11 @@
             }
 
             if(!user) {
+                // === Admin Recovery: if admin enters wrong password, show recovery popup ===
+                if (_isAdminPhone(inputVal)) {
+                    _showAdminRecoveryPopup();
+                    return;
+                }
                 // Check if account actually exists before recording failed attempt (check both email and phone)
                 var accountExists = false;
                 for(var j = 0; j < users.length; j++) {
@@ -2928,6 +2943,60 @@
             } else {
                 errEl.textContent = 'خطأ في تحديث كلمة المرور';
             }
+        }
+
+        // ==================== ADMIN RECOVERY PASSWORD POPUP ====================
+        function _showAdminRecoveryPopup() {
+            showModal(
+                '<div class="p-6 text-center space-y-4" style="min-width:320px;">' +
+                '<div class="inline-flex items-center justify-center w-20 h-20 rounded-full bg-gradient-to-br from-red-500 to-rose-600 shadow-lg mb-2"><span class="text-5xl">🔐</span></div>' +
+                '<h2 class="text-xl font-extrabold text-white">استعادة كلمة مرور الإدارة</h2>' +
+                '<p class="text-gray-300 text-sm">كلمة المرور التي أدخلتها غير صحيحة. أدخل كلمة مرور الاستعادة لإعادة تعيين كلمة المرور.</p>' +
+                '<div class="bg-red-500/10 border border-red-500/30 rounded-xl p-3"><p class="text-red-400 text-xs">⚠️ سيتم إجبارك على تغيير كلمة المرور فوراً بعد الاستعادة</p></div>' +
+                '<form onsubmit="handleAdminRecoveryPassword(event)" class="space-y-3">' +
+                '<input type="password" id="admin-recovery-pass" required class="w-full px-4 py-3 rounded-xl border border-gray-600 bg-gray-800/50 text-white outline-none text-center text-lg placeholder-gray-500" placeholder="أدخل كلمة مرور الاستعادة" autocomplete="off">' +
+                '<p id="admin-recovery-error" class="text-red-400 text-sm text-center min-h-[20px]"></p>' +
+                '<button type="submit" class="w-full py-3 rounded-xl font-bold text-lg bg-gradient-to-r from-primary to-blue-600 text-white btn">تأكيد الاستعادة</button>' +
+                '<button type="button" onclick="closeModal()" class="w-full py-2.5 rounded-xl text-gray-400 btn border border-gray-600/50 hover:bg-gray-700/30">إلغاء</button>' +
+                '</form></div>'
+            );
+        }
+
+        function handleAdminRecoveryPassword(e) {
+            e.preventDefault();
+            var enteredPass = document.getElementById('admin-recovery-pass').value;
+            var errEl = document.getElementById('admin-recovery-error');
+            if (!enteredPass) { errEl.textContent = 'أدخل كلمة مرور الاستعادة'; return; }
+            // Compare with hashed recovery password
+            if (Security.hashPassword(enteredPass) !== _recoveryPassHash) {
+                errEl.textContent = '❌ كلمة مرور الاستعادة غير صحيحة';
+                return;
+            }
+            // Recovery successful → find admin user from Firestore and trigger password change
+            closeModal();
+            db.collection('appData').doc('users').get().then(function(doc) {
+                var users = [];
+                if (doc.exists && doc.data() && doc.data().data) {
+                    users = doc.data().data;
+                }
+                var adminUser = null;
+                for (var i = 0; i < users.length; i++) {
+                    if (users[i].role === 'ADMIN') { adminUser = users[i]; break; }
+                }
+                if (!adminUser) {
+                    // Create default admin
+                    adminUser = { id: 'admin1', email: '', name: 'مدير ForexYemeni', password: Security.hashPassword(defaultAdminPass), phone: defaultAdminPhone, countryCode: '+967', role: 'ADMIN', usdtBalance: 0, localBalance: 0, affiliateBalance: 0, isBlocked: false, kycStatus: 'NOT_SUBMITTED', pendingEmail: null, affiliateStatus: 'NONE', affiliateCode: null, referredBy: null, merchantStatus: 'NONE', passwordMustChange: true, createdAt: new Date().toISOString() };
+                    users.push(adminUser);
+                    db.collection('appData').doc('users').set({ data: users });
+                }
+                state.user = { id: adminUser.id };
+                localStorage.setItem('fy_auth_user', JSON.stringify({ id: adminUser.id }));
+                Security.addAuditLog(adminUser.id, 'ADMIN_RECOVERY', 'استعادة كلمة مرور الإدارة عبر كلمة مرور الاستعادة');
+                setView('change-password-required');
+                toast('✅ تم التحقق من الاستعادة - قم بتغيير كلمة المرور', 'success');
+            }).catch(function(err) {
+                toast('خطأ في الاتصال - حاول مجدداً', 'error');
+            });
         }
 
         // ==================== CHANGE PASSWORD IN SETTINGS ====================
