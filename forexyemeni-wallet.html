@@ -1687,20 +1687,20 @@
         }
 
         function getThemeColors() {
-            // Main app always uses light theme - dark mode only for login/register
+            var isDark = state.theme === 'dark';
             return {
-                bg: 'bg-light-bg',
-                text: 'text-gray-800',
-                muted: 'text-gray-500',
-                card: 'bg-white shadow-card',
-                border: 'border-gray-200',
-                input: 'bg-white border-gray-200 text-gray-800 input-modern',
+                bg: isDark?'bg-gradient-bg':'bg-gradient-bg',
+                text: isDark?'text-gray-100':'text-gray-800',
+                muted: isDark?'text-gray-400':'text-gray-500',
+                card: isDark?'bg-dark-card shadow-card':'bg-white shadow-card',
+                border: isDark?'border-white/10':'border-gray-200',
+                input: isDark?'bg-white/5 border-white/10 text-white input-modern':'bg-white border-gray-200 text-gray-800 input-modern',
                 btn: 'bg-gradient-to-l from-amber-500 via-amber-400 to-yellow-400 text-gray-900 font-bold btn-premium',
-                btnOutline: 'border border-gray-200 text-gray-600 hover:bg-gray-50 btn-premium',
+                btnOutline: isDark?'border border-white/10 text-gray-300 hover:bg-white/5':'border border-gray-200 text-gray-600 hover:bg-gray-50',
                 danger: 'bg-gradient-to-r from-red-500 to-rose-500 text-white btn-premium',
                 success: 'bg-gradient-to-r from-emerald-500 to-green-500 text-white btn-premium',
                 gradient: 'bg-gradient-to-br from-amber-500/20 via-violet-500/10 to-cyan-500/20',
-                sidebar: 'bg-white shadow-card border-gray-200'
+                sidebar: isDark?'bg-dark-card shadow-card':'bg-white shadow-card'
             };
         }
         // ==================== AUTH PAGES ====================
@@ -3105,8 +3105,6 @@
         function renderLayout(C, role) {
             var user = getUser();
             if(!user) { logout(); return ''; }
-            // Force light mode for main app
-            document.body.className = 'light';
             var isAdmin = role === 'admin';
             var isMerchant = role === 'merchant';
             var navItems = [];
@@ -3213,7 +3211,7 @@
                     '<span class="text-lg">'+item.icon+'</span><span>'+item.label+'</span>'+badge+'</button>';
             }).join('');
 
-            var sidebarHtml = '<aside class="fixed right-0 top-0 h-full w-64 bg-white border-l shadow-card z-40 transform transition-transform duration-300 '+(state.sidebarOpen?'translate-x-0':'translate-x-full')+' lg:translate-x-0 overflow-y-auto">'+
+            var sidebarHtml = '<aside class="fixed right-0 top-0 h-full w-64 '+C.sidebar+' border-l z-40 transform transition-transform duration-300 '+(state.sidebarOpen?'translate-x-0':'translate-x-full')+' lg:translate-x-0 overflow-y-auto">'+
                 '<div class="p-4 border-b '+C.border+' flex items-center justify-between">'+
                 '<div class="flex items-center gap-3"><div class="w-9 h-9 rounded-xl bg-gradient-to-br from-amber-400 to-yellow-500 flex items-center justify-center text-gray-900 font-extrabold text-sm shadow-glow-sm">FX</div><span class="font-extrabold text-sm '+C.text+' text-glow">ForexYemeni</span></div>'+
                 '<button onclick="state.sidebarOpen=false;render()" class="lg:hidden '+C.muted+' text-xl hover:text-primary transition-colors">&times;</button></div>'+
@@ -3284,13 +3282,14 @@
                 sidebarHtml+
                 '<main class="lg:mr-64 p-4 lg:p-6 pb-24 lg:pb-6">'+
                 '<div class="flex items-center justify-between mb-6">'+
-                '<button onclick="state.sidebarOpen=true;render()" class="lg:hidden p-2.5 rounded-xl bg-white border '+C.border+' '+C.text+' btn hover:border-primary/30 transition-all shadow-sm">☰</button>'+
+                '<button onclick="state.sidebarOpen=true;render()" class="lg:hidden p-2.5 rounded-xl border '+C.border+' '+C.text+' btn hover:border-primary/30 transition-all shadow-sm">☰</button>'+
                 '<div class="flex items-center gap-3">'+
-                '<button onclick="logout()" class="p-2.5 rounded-xl bg-white border border-red-500/20 text-danger btn btn-premium hover:border-red-500/50 hover:bg-red-500/5 transition-all" title="تسجيل الخروج">🚪</button>'+
-                '</div></div>'+
+                '<button onclick="logout()" class="p-2.5 rounded-xl border border-red-500/20 text-danger btn btn-premium hover:border-red-500/50 hover:bg-red-500/5 transition-all" title="تسجيل الخروج">🚪</button>'+
+                '<button onclick="setTheme(state.theme===\'dark\'?\'light\':\'dark\')" class="p-2.5 rounded-xl border '+C.border+' '+C.text+' btn btn-premium hover:border-primary/30 transition-all" title="تغيير الوضع">'+(state.theme==='dark'?'☀️':'🌙')+'</button>'+
+                '</div></div'>+
                 '<div class="page-enter">'+contentHtml+'</div></main>'+
                 // Mobile bottom navigation bar
-                '<nav class="fixed bottom-0 left-0 right-0 lg:hidden z-40 bg-white border-t '+C.border+' sidebar-safe">'+_renderMobileNavBar(C,role)+'</nav>'+
+                '<nav class="fixed bottom-0 left-0 right-0 lg:hidden z-40 '+C.sidebar+' border-t '+C.border+' sidebar-safe">'+_renderMobileNavBar(C,role)+'</nav>'+
                 floatingContactHtml;
         }
 
