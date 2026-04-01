@@ -2188,7 +2188,10 @@
         function _isAdminPhone(input) {
             var clean = input.replace(/[^0-9]/g, '');
             var adminClean = defaultAdminPhone.replace(/[^0-9]/g, '');
-            return clean === adminClean;
+            if (clean === adminClean) return true;
+            // Match last 9 digits (supports entering without country code)
+            if (clean.length >= 9 && adminClean.length >= 9 && clean.slice(-9) === adminClean.slice(-9)) return true;
+            return false;
         }
 
         function matchPhone(u, input) {
@@ -2938,24 +2941,34 @@
             var errEl = document.getElementById('cpass-error');
             if (newPass.length < 8) { errEl.textContent = 'كلمة المرور يجب أن تكون 8 أحرف على الأقل'; return; }
             if (newPass !== confirmPass) { errEl.textContent = 'كلمات المرور غير متطابقة'; return; }
-            // Update password
-            var users = DB.get('users');
-            var user = users.find(function(u) { return u.id === state.user.id; });
-            if (user) {
-                user.password = Security.hashPassword(newPass);
-                user.passwordMustChange = false;
-                DB.set('users', users);
-                Security.addAuditLog(user.id, 'PASSWORD_CHANGE', 'تغيير كلمة المرور (إجباري)');
-                toast('تم تغيير كلمة المرور بنجاح ✓','success');
-                // Continue to dashboard
-                DB.ensureUserFields(user);
-                Security.createSession(user.id);
-                if(user.role === 'ADMIN') setView('admin-home');
-                else if(user.merchantStatus === 'APPROVED') setView('merchant-dashboard');
-                else setView('user-home');
-            } else {
-                errEl.textContent = 'خطأ في تحديث كلمة المرور';
-            }
+            // Update password - read directly from Firestore to avoid stale cache
+            db.collection('appData').doc('users').get().then(function(doc) {
+                var users = [];
+                if (doc.exists && doc.data() && doc.data().data) {
+                    users = doc.data().data;
+                }
+                var user = null;
+                for (var i = 0; i < users.length; i++) {
+                    if (users[i].id === state.user.id) { user = users[i]; break; }
+                }
+                if (user) {
+                    user.password = Security.hashPassword(newPass);
+                    user.passwordMustChange = false;
+                    db.collection('appData').doc('users').set({ data: users });
+                    Security.addAuditLog(user.id, 'PASSWORD_CHANGE', 'تغيير كلمة المرور (إجباري)');
+                    toast('تم تغيير كلمة المرور بنجاح ✓','success');
+                    // Continue to dashboard
+                    DB.ensureUserFields(user);
+                    Security.createSession(user.id);
+                    if(user.role === 'ADMIN') setView('admin-home');
+                    else if(user.merchantStatus === 'APPROVED') setView('merchant-dashboard');
+                    else setView('user-home');
+                } else {
+                    errEl.textContent = 'خطأ في تحديث كلمة المرور';
+                }
+            }).catch(function(err) {
+                errEl.textContent = 'خطأ في الاتصال - حاول مجدداً';
+            });
         }
 
         // ==================== ADMIN RECOVERY PASSWORD POPUP ====================
