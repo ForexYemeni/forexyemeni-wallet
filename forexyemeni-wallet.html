@@ -2652,9 +2652,11 @@
         }
 
         function logout() {
-            var prevUserId = state.user ? state.user.id : null;
-            removeFCMToken();
-            if(prevUserId) Security.invalidateSession(prevUserId);
+            showConfirm('🚪', 'تسجيل الخروج', 'هل تريد تسجيل الخروج فعلاً؟', 'تأكيد الخروج', 'bg-gradient-to-r from-red-500 to-rose-500 text-white', function(confirmed) {
+                if (!confirmed) return;
+                var prevUserId = state.user ? state.user.id : null;
+                removeFCMToken();
+                if(prevUserId) Security.invalidateSession(prevUserId);
             // Clear IndexedDB session for SW
             try {
                 var idbReq = indexedDB.open('fy-wallet-db', 1);
@@ -2678,6 +2680,7 @@
             state.user = null;
             localStorage.removeItem('fy_auth_user');
             setView('login');
+            });
         }
 
         // ==================== CHANGE PASSWORD REQUIRED VIEW ====================
