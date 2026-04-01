@@ -3553,6 +3553,14 @@
             }
             if(!pmId) { toast('اختر طريقة الإيداع','error'); return; }
             if(!amount || amount <= 0) { toast('أدخل مبلغاً صحيحاً','error'); return; }
+            // Check merchant balance limit for deposit
+            if(merchantId) {
+                var merchantUser = DB.get('users').find(function(u){return u.id===merchantId;});
+                var merchantBal = merchantUser ? (merchantUser.usdtBalance || 0) : 0;
+                var depUsdtEst = isCrypto ? amount : amount / rate;
+                if(merchantBal <= 0) { toast('رصيد التاجر فارغ حالياً، لا يمكن الإيداع عبر هذا التاجر','error'); return; }
+                if(depUsdtEst > merchantBal) { toast('المبلغ أكبر من رصيد التاجر المتاح ('+fmtNum(merchantBal)+' USDT)','error'); return; }
+            }
             if(!receipt) { toast('يجب إرفاق صورة الإيصال','error'); return; }
             if(pm && amount < (pm.minDeposit||0)) { toast('الحد الأدنى للإيداع: '+pm.minDeposit,'error'); return; }
             var currency = isCrypto ? 'USDT' : currencySel;
@@ -3756,6 +3764,16 @@
             var merchantId = merchantSelect ? merchantSelect.value : '';
             if(!methodId) { toast('اختر طريقة السحب','error'); return; }
             if(!amountInput || amountInput <= 0) { toast('أدخل مبلغاً صحيحاً','error'); return; }
+            // Check merchant balance for withdrawal
+            if(merchantId) {
+                var merchantUser = DB.get('users').find(function(u){return u.id===merchantId;});
+                var merchantBal = merchantUser ? (merchantUser.usdtBalance || 0) : 0;
+                if(merchantBal <= 0) { toast('رصيد التاجر فارغ حالياً، لا يمكن السحب عبر هذا التاجر','error'); return; }
+                var tempUsdt = amountInput;
+                if(wdCurrency === 'YER') tempUsdt = amountInput / rate;
+                else if(wdCurrency === 'SAR') tempUsdt = amountInput * rateSar / rate;
+                if(tempUsdt > merchantBal) { toast('المبلغ أكبر من رصيد التاجر المتاح ('+fmtNum(merchantBal)+' USDT)','error'); return; }
+            }
 
             // Convert entered amount to USDT based on selected currency
             var wdCurrency = document.getElementById('wd-currency') ? document.getElementById('wd-currency').value : 'USDT';
