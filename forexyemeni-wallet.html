@@ -1952,11 +1952,10 @@
                     _regOtpSent = true;
                     showOtpSection();
                     if (data.success) { toast('تم إرسال رمز التحقق إلى بريدك','success',false); }
-                    else { _otpCode = '123456'; toast('تم إنشاء الرمز - أدخل 123456 للتجربة','warning',8000); }
+                    else { toast('فشل إرسال الرمز - حاول مجدداً','error',false); }
                     if(btn) { btn.disabled = false; btn.textContent = '📧 إعادة إرسال رمز التحقق'; }
                 }).catch(function(err) {
-                    _regVerifiedContact = contact; _regOtpSent = true; _otpCode = '123456'; showOtpSection();
-                    toast('تم إنشاء الرمز - أدخل 123456 للتجربة','warning',8000);
+                    toast('خطأ في الاتصال - حاول مجدداً','error',false);
                     if(btn) { btn.disabled = false; btn.textContent = '📧 إعادة إرسال رمز التحقق'; }
                 });
             } else {
@@ -1968,11 +1967,10 @@
                 .then(function(data) {
                     _regVerifiedContact = contact; _regOtpSent = true; showOtpSection();
                     if (data.success) { toast('تم إرسال رمز التحقق بنجاح','success',false); }
-                    else { _otpCode = '123456'; toast('تم إنشاء الرمز - أدخل 123456 للتجربة','warning',8000); }
+                    else { toast('فشل إرسال الرمز - حاول مجدداً','error',false); }
                     if(btn) { btn.disabled = false; btn.textContent = '📱 إعادة إرسال رمز التحقق'; }
                 }).catch(function(err) {
-                    _regVerifiedContact = contact; _regOtpSent = true; _otpCode = '123456'; showOtpSection();
-                    toast('تم إنشاء الرمز - أدخل 123456 للتجربة','warning',8000);
+                    toast('خطأ في الاتصال - حاول مجدداً','error',false);
                     if(btn) { btn.disabled = false; btn.textContent = '📱 إعادة إرسال رمز التحقق'; }
                 });
             }
