@@ -99,9 +99,9 @@ module.exports = async (req, res) => {
             return res.status(400).json({ success: false, error: 'رقم الهاتف ورمز التحقق مطلوبان' });
         }
 
-        // Validate phone number format
+        // Validate phone number format (accept 7-15 digits)
         const cleanPhone = String(to).replace(/[^0-9+]/g, '');
-        if (!/^[\+]?[0-9]{10,15}$/.test(cleanPhone)) {
+        if (!/^[\+]?[0-9]{7,15}$/.test(cleanPhone)) {
             return res.status(400).json({ success: false, error: 'رقم هاتف غير صحيح' });
         }
 
