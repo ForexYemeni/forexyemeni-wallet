@@ -3549,24 +3549,73 @@
             var withdrawals = DB.get('withdrawals').filter(function(w){return w.userId===user.id;});
             var all = [];
             deposits.forEach(function(d){ all.push({id:d.id,type:'DEPOSIT',amount:d.usdtAmount||0,currency:'USDT',status:d.status,date:d.createdAt,desc:'إيداع '+fmtNum(d.amount)+' '+(d.currency||''),approveProof:d.approveProof||null}); });
-            withdrawals.forEach(function(w){ all.push({id:w.id,type:'WITHDRAW',amount:w.net||0,currency:'USDT',status:w.status,date:w.createdAt,desc:'سحب '+fmtNum(w.net)+' USDT',confirmScreenshot:w.confirmScreenshot||null}); });
+            withdrawals.forEach(function(w){ all.push({id:w.id,type:'WITHDRAW',amount:w.net||0,currency:'USDT',status:w.status,date:w.createdAt,desc:'سحب '+fmtNum(w.net)+' USDT',confirmScreenshot:w.confirmScreenshot||null,userReceiptProof:w.userReceiptProof||null}); });
             all.sort(function(a,b){ return new Date(b.date)-new Date(a.date); });
             if(all.length===0) return '<div class="'+C.card+' rounded-2xl p-8 border '+C.border+' text-center"><p class="text-4xl mb-4">📋</p><p class="'+C.muted+'">لا توجد عمليات بعد</p></div>';
             var html = '<div class="'+C.card+' rounded-2xl p-6 border '+C.border+'"><h2 class="text-xl font-bold '+C.text+' mb-4">📋 سجل العمليات</h2><div class="space-y-3 max-h-[70vh] overflow-y-auto">';
             all.forEach(function(item) {
                 var isDep = item.type === 'DEPOSIT';
+                var confirmBtn = '';
+                if(!isDep && item.status === 'APPROVED' && !item.userReceiptProof) {
+                    confirmBtn = '<button onclick="userConfirmReceipt(\''+item.id+'\')" class="w-full mt-3 py-2.5 rounded-xl font-bold btn btn-premium bg-gradient-to-r from-amber-500 via-amber-400 to-yellow-400 text-gray-900 shadow-card text-sm">📸 تأكيد الإيصال برفع لقطة شاشة</button>';
+                }
                 html += '<div class="py-3 border-b '+C.border+' last:border-0">'+
                     '<div class="flex items-center justify-between">'+
                     '<div class="flex items-center gap-3"><span class="text-xl">'+(isDep?'💰':'🏧')+'</span><div><p class="text-sm font-medium '+C.text+'">'+item.desc+'</p><p class="text-xs '+C.muted+'">'+fmtDate(item.date)+'</p></div></div>'+
                     '<div class="text-left"><p class="font-bold text-sm '+(isDep?'text-success':'text-danger')+'">'+(isDep?'+':'-')+fmtNum(item.amount)+' '+item.currency+'</p>'+statusBadge(item.status)+'</div></div>'+
-                    (item.confirmScreenshot?'<div class="mt-2"><p class="text-xs '+C.muted+' mb-1">📸 إثبات تنفيذ السحب:</p><img src="'+item.confirmScreenshot+'" class="h-20 rounded-lg border cursor-pointer object-cover" onclick="showImageModal(this.src)"></div>':'')+
+                    (item.userReceiptProof?'<div class="mt-2 p-2 rounded-xl bg-success/5 border border-success/20"><p class="text-xs text-success font-bold mb-1">✅ تم تأكيد الإيصال:</p><img src="'+item.userReceiptProof+'" class="h-20 rounded-lg border cursor-pointer object-cover" onclick="showImageModal(this.src)"></div>':'')+
+                    (item.confirmScreenshot?'<div class="mt-2"><p class="text-xs '+C.muted+' mb-1">📸 إثبات تنفيذ التاجر:</p><img src="'+item.confirmScreenshot+'" class="h-20 rounded-lg border cursor-pointer object-cover" onclick="showImageModal(this.src)"></div>':'')+
                     (item.approveProof?'<div class="mt-2"><p class="text-xs '+C.muted+' mb-1">✅ إثبات تنفيذ الإيداع:</p><img src="'+item.approveProof+'" class="h-20 rounded-lg border cursor-pointer object-cover" onclick="showImageModal(this.src)"></div>':'')+
+                    confirmBtn+
                     '</div>';
             });
             html += '</div></div>';
             var currentUser = getUser();
             html += '<button onclick="exportTransactionsCSV(\''+currentUser.id+'\')" class="'+C.btn+' w-full py-3 rounded-lg font-bold btn text-lg mt-4">📥 تصدير السجل CSV</button>';
             return html;
+        }
+
+        // ==================== USER: CONFIRM RECEIPT ====================
+        function userConfirmReceipt(wdId) {
+            var C = getThemeColors();
+            showModal('<h3 class="text-lg font-bold '+C.text+' mb-4">📸 تأكيد الإيصال</h3>'+
+                '<p class="'+C.muted+' text-sm mb-4">ارفع لقطة شاشة تثبت استلامك للتحويل</p>'+
+                '<div id="user-receipt-proof-preview"></div>'+
+                '<div class="flex gap-2 mb-4">'+
+                '<button type="button" onclick="captureForField(\'userReceiptProof\');showImagePreviewAfterCapture(\'userReceiptProof\',\'user-receipt-proof-preview\')" class="flex-1 px-4 py-3 rounded-xl border '+C.border+' '+C.text+' btn text-sm font-medium">📸 كاميرا</button>'+
+                '<label class="flex-1 px-4 py-3 rounded-xl border '+C.border+' '+C.text+' btn text-sm font-medium text-center cursor-pointer">📁 رفع ملف<input type="file" accept="image/*" class="hidden" onchange="fileForFieldWithPreview(\'userReceiptProof\',this,\'user-receipt-proof-preview\')"></label>'+
+                '</div>'+
+                '<div id="user-receipt-proof-actions" class="hidden">'+
+                '<button onclick="saveUserReceiptProof(\''+wdId+'\')" class="'+C.btn+' w-full py-3 rounded-xl font-bold btn text-lg">✅ تأكيد الإيصال</button>'+
+                '</div>'+
+                '<button onclick="closeModal()" class="w-full py-2.5 rounded-xl border '+C.border+' '+C.text+' btn mt-2">إلغاء</button>');
+        }
+
+        function saveUserReceiptProof(wdId) {
+            var proofImg = getFieldImage('userReceiptProof');
+            if(!proofImg) { toast('يجب رفع لقطة الإثبات أولاً','error'); return; }
+            closeModal();
+            var withdrawals = DB.get('withdrawals');
+            var w = withdrawals.find(function(x){return x.id===wdId;});
+            if(!w) return;
+            w.userReceiptProof = proofImg;
+            w.userConfirmedAt = new Date().toISOString();
+            DB.set('withdrawals', withdrawals);
+            addNotif(w.userId, 'تأكيد إيصال', 'تم تأكيد إيصال سحب بمبلغ '+fmtNum(w.net||0)+' USDT مع إثبات من المستخدم', 'WITHDRAW');
+            // Notify admin
+            var admins = DB.get('users').filter(function(u){return u.role==='ADMIN';});
+            admins.forEach(function(admin){
+                var userName = getUser().name;
+                addNotif(admin.id, 'تأكيد إيصال من مستخدم', userName+' أكد إيصال سحب '+fmtNum(w.net||0)+' USDT', 'WITHDRAW');
+            });
+            // Notify merchant if exists
+            if(w.assignedMerchantId) {
+                var merch = DB.get('users').find(function(u){return u.id===w.assignedMerchantId;});
+                if(merch) addNotif(merch.id, 'تأكيد إيصال من مستخدم', getUser().name+' أكد إيصال سحب '+fmtNum(w.net||0)+' USDT', 'WITHDRAW');
+            }
+            clearFieldImage('userReceiptProof');
+            toast('تم تأكيد الإيصال بنجاح ✅','success');
+            render();
         }
 
         // ==================== USER: NOTIFICATIONS ====================
