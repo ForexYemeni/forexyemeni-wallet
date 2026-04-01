@@ -7035,9 +7035,53 @@
                 '<div><label class="block text-sm '+C.muted+' mb-1">رقم واتساب</label><input type="text" id="set-admin-wa" value="'+escHtml(adminWA)+'" class="w-full px-4 py-2.5 rounded-xl border '+C.input+' outline-none" placeholder="+967..."></div></div></div>'+
                 renderAdminBannerSettings(C)+
                 (adminUser ? renderContactManagement(C, adminUser, 'ADMIN') : '')+
+                '<div class="'+C.card+' rounded-xl p-5 border-2 border-danger/40 bg-danger/5"><h3 class="font-bold text-danger mb-3 text-center text-lg">⚠️ إعادة تعيين التطبيق بالكامل</h3>'+
+                '<p class="'+C.muted+' text-sm mb-4 text-center">حذف جميع البيانات: المستخدمين، الإيداعات، السحوبات، التوثيق، الرسائل، الإشعارات، سجل العمليات — وإعادة التطبيق لحالة نظيفة تماماً (مع الإبقاء على حساب الإدارة وإعداداته)</p>'+
+                '<button onclick="resetAppData()" class="w-full py-3 rounded-lg font-bold text-white bg-gradient-to-r from-red-500 to-rose-600 btn text-lg">🗑️ حذف جميع البيانات وإعادة التعيين</button></div>'+
                 '<div class="'+C.card+' rounded-xl p-4 border '+C.border+'"><h3 class="font-bold '+C.text+' mb-3">🔐 كلمة مرور المدير</h3><div class="space-y-3">'+
                 '<div><label class="block text-sm '+C.muted+' mb-1">كلمة المرور الجديدة (اتركها فارغة لعدم التغيير)</label><input type="password" id="set-admin-pass" class="w-full px-4 py-2.5 rounded-xl border '+C.input+' outline-none" placeholder="كلمة المرور الجديدة"></div></div></div>'+
                 '<button onclick="saveAdminSettings()" class="'+C.btn+' w-full py-3 rounded-lg font-bold btn text-lg">💾 حفظ جميع الإعدادات</button></div></div>';
+        }
+
+        // ==================== RESET ALL APP DATA ====================
+        function resetAppData() {
+            showConfirm('⚠️', 'تأكيد حذف جميع البيانات', 'سيتم حذف جميع المستخدمين (ما عدا حساب الإدارة)، جميع الإيداعات، السحوبات، التوثيق (KYC)، الرسائل، الإشعارات، سجل العمليات، طلبات التوثيق، طلبات الدفع، وتقييمات التجار.\n\nهذا الإجراء لا يمكن التراجع عنه!\n\nسيتم الإبقاء على:\n• حساب الإدارة\n• إعدادات التطبيق\n• طرق الدفع', '🗑️ نعم، احذف الكل', 'bg-gradient-to-r from-red-500 to-rose-500 text-white', function(confirmed) {
+                if (!confirmed) return;
+                var users = DB.get('users') || [];
+                var adminUser = null;
+                var adminIndex = -1;
+                for (var i = 0; i < users.length; i++) {
+                    if (users[i].role === 'ADMIN') { adminUser = users[i]; adminIndex = i; break; }
+                }
+                // إبقاء الإدارة فقط مع إعادة تعيين جلساته
+                var cleanAdmin = null;
+                if (adminUser) {
+                    cleanAdmin = { id: adminUser.id, email: adminUser.email || '', name: 'مدير ForexYemeni', password: adminUser.password, phone: adminUser.phone, countryCode: adminUser.countryCode || '', role: 'ADMIN', usdtBalance: 0, localBalance: 0, affiliateBalance: 0, isBlocked: false, kycStatus: 'NOT_SUBMITTED', pendingEmail: null, affiliateStatus: 'NONE', affiliateCode: null, referredBy: null, merchantStatus: 'NONE', passwordMustChange: false, createdAt: adminUser.createdAt || new Date().toISOString() };
+                }
+                var cleanUsers = cleanAdmin ? [cleanAdmin] : [];
+
+                // حذف كل البيانات
+                var keysToDelete = ['deposits', 'withdrawals', 'transactionLog', 'messages', 'notifications', 'auditLog', 'kycDocuments', 'loginPermissions', 'merchantRequests', 'merchantTransactions', 'merchantPaymentData', 'merchantRatings', 'userWithdrawalMethods', 'deviceApprovals', 'profileChangeRequests'];
+                keysToDelete.forEach(function(key) {
+                    DB.set(key, []);
+                    window.appData[key] = [];
+                });
+
+                // إعادة تعيين المستخدمين
+                window.appData.users = cleanUsers;
+                DB.set('users', cleanUsers);
+
+                // إبقاء الإعدادات وطرق الدفع
+                // settings و paymentMethods لا يتم حذفها
+
+                // مسح localStorage
+                try { localStorage.removeItem('fy_reg_backup'); } catch(e) {}
+                try { localStorage.removeItem('fy_login_attempts'); } catch(e) {}
+
+                Security.addAuditLog(cleanAdmin ? cleanAdmin.id : 'SYSTEM', 'APP_RESET', 'إعادة تعيين التطبيق بالكامل');
+                toast('✅ تم حذف جميع البيانات بنجاح - التطبيق نظيف الآن', 'success', 5000);
+                setTimeout(function() { render(); }, 1000);
+            });
         }
 
         function saveAdminSettings() {
