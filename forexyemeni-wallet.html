@@ -329,11 +329,25 @@
             var btn = document.getElementById('verify-sms-btn');
             if (code === _smsCode) {
                 _smsPhoneVerified = true;
-                var status = document.getElementById('sms-status');
-                if (status) { status.textContent = '✅ تم التحقق من رقم الهاتف'; status.style.display = 'block'; status.style.color = '#0ECB81'; }
-                if (btn) { btn.disabled = true; btn.textContent = '✅ تم'; }
-                codeInput.disabled = true;
-                codeInput.style.borderColor = '#0ECB81';
+                var smsSection = document.getElementById('sms-section');
+                if (smsSection) {
+                    smsSection.style.opacity = '0';
+                    smsSection.style.transform = 'translateY(-10px) scale(0.95)';
+                    setTimeout(function() {
+                        smsSection.style.display = 'none';
+                        var passBlock = document.getElementById('reg-pass-block');
+                        if (passBlock) {
+                            passBlock.style.display = '';
+                            passBlock.style.opacity = '0';
+                            passBlock.style.transform = 'translateY(10px)';
+                            setTimeout(function() {
+                                passBlock.style.transition = 'all 0.4s ease';
+                                passBlock.style.opacity = '1';
+                                passBlock.style.transform = 'translateY(0)';
+                            }, 20);
+                        }
+                    }, 400);
+                }
                 toast('تم التحقق من رقم الهاتف بنجاح','success',false);
             } else {
                 toast('رمز التحقق غير صحيح','error',false);
@@ -423,10 +437,25 @@
             var verifyBtn = document.getElementById('verify-otp-btn');
             if (enteredCode === _otpCode) {
                 _otpEmailVerified = true;
-                var otpStatus = document.getElementById('otp-status');
-                if (otpStatus) { otpStatus.textContent = 'تم التحقق من البريد بنجاح'; otpStatus.className = 'text-success text-sm font-bold mt-1'; otpStatus.style.display = 'block'; }
-                if (verifyBtn) { verifyBtn.disabled = true; verifyBtn.textContent = 'تم التحقق'; }
-                codeInput.disabled = true; codeInput.style.borderColor = '#0ECB81';
+                var otpSection = document.getElementById('otp-section');
+                if (otpSection) {
+                    otpSection.style.opacity = '0';
+                    otpSection.style.transform = 'translateY(-10px) scale(0.95)';
+                    setTimeout(function() {
+                        otpSection.style.display = 'none';
+                        var passBlock = document.getElementById('reg-pass-block');
+                        if (passBlock) {
+                            passBlock.style.display = '';
+                            passBlock.style.opacity = '0';
+                            passBlock.style.transform = 'translateY(10px)';
+                            setTimeout(function() {
+                                passBlock.style.transition = 'all 0.4s ease';
+                                passBlock.style.opacity = '1';
+                                passBlock.style.transform = 'translateY(0)';
+                            }, 20);
+                        }
+                    }, 400);
+                }
                 toast('تم التحقق من البريد الإلكتروني بنجاح', 'success', false);
             } else {
                 toast('رمز التحقق غير صحيح', 'error', false);
@@ -1900,15 +1929,13 @@
 
             '<div id="reg-email-block" style="display:none;">'+
             '<div><label style="'+labelStyle+'">البريد الإلكتروني <span style="color:#ef4444">*</span></label>'+
-            '<div style="display:flex;gap:8px;align-items:center;">'+
-            '<input type="email" id="reg-email" autocomplete="email" style="'+inputStyle+'flex:1;min-width:0;" placeholder="example@email.com">'+
-            '<button type="button" id="send-otp-btn" onclick="sendOTP()" style="padding:10px 12px;border-radius:10px;background:#3b82f6;color:white;border:none;cursor:pointer;font-size:16px;flex-shrink:0;">📧</button></div>'+
-            '<div id="otp-section" style="display:none;margin-top:8px;padding:12px;border-radius:12px;border:1px solid rgba(59,130,246,0.3);background:rgba(59,130,246,0.05);">'+
-            '<p id="otp-sent-msg" style="font-size:12px;color:#3b82f6;font-weight:500;margin:0 0 8px 0;"></p>'+
-            '<div style="display:flex;gap:8px;align-items:center;">'+
-            '<input type="text" id="otp-code-input" maxlength="6" style="'+inputStyle+'flex:1;min-width:0;text-align:center;font-size:18px;letter-spacing:4px;" placeholder="••••••" inputmode="numeric" pattern="[0-9]+">'+
-            '<button type="button" id="verify-otp-btn" onclick="verifyOTP()" style="padding:10px 16px;border-radius:10px;background:#10b981;color:#1f2937;border:none;cursor:pointer;font-size:14px;font-weight:700;flex-shrink:0;">✅ تحقق</button></div>'+
-            '<p id="otp-status" style="font-size:12px;margin-top:4px;display:none;"></p></div></div></div>'+
+            '<input type="email" id="reg-email" autocomplete="email" style="'+inputStyle+'" placeholder="example@email.com">'+
+            '<button type="button" id="send-otp-btn" onclick="sendOTP()" style="width:100%;margin-top:8px;padding:12px;border-radius:12px;background:linear-gradient(to left,#3b82f6,#6366f1);color:white;border:none;cursor:pointer;font-size:15px;font-weight:700;">📧 إرسال رمز التحقق</button>'+
+            '<div id="otp-section" style="display:none;margin-top:8px;padding:16px;border-radius:12px;border:2px solid #3b82f6;background:rgba(59,130,246,0.05);transition:all 0.4s ease;">'+
+            '<p id="otp-sent-msg" style="font-size:13px;color:#3b82f6;font-weight:600;margin:0 0 10px 0;text-align:center;"></p>'+
+            '<input type="text" id="otp-code-input" maxlength="6" style="'+inputStyle+'text-align:center;font-size:20px;letter-spacing:6px;font-weight:700;" placeholder="••••••" inputmode="numeric" pattern="[0-9]+">'+
+            '<button type="button" id="verify-otp-btn" onclick="verifyOTP()" style="width:100%;margin-top:10px;padding:12px;border-radius:10px;background:#0ECB81;color:white;border:none;cursor:pointer;font-size:15px;font-weight:700;">✅ تحقق من الرمز</button>'+
+            '<p id="otp-status" style="font-size:12px;margin-top:6px;display:none;"></p></div></div></div>'+
 
             '<div id="reg-phone-block">'+
             '<div style="display:flex;gap:8px;">'+
@@ -1916,22 +1943,23 @@
             '<div style="width:100%;height:42px;border-radius:10px;border:2px solid '+brdC+';background:'+inpC+';color:'+txtC+';display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;cursor:default;">🇾🇪 +967</div>'+
             '<input type="hidden" id="reg-country" value="+967"></div>'+
             '<div style="flex:1;min-width:0;"><label style="font-size:14px;font-weight:500;color:'+txtC+';margin-bottom:6px;display:block;">رقم الهاتف</label>'+
-            '<div style="display:flex;gap:8px;align-items:center;">'+
-            '<input type="tel" id="reg-phone" autocomplete="tel" style="'+inputStyle+'flex:1;min-width:0;" pattern="[0-9]+">'+
-            '<button type="button" id="send-sms-btn" onclick="sendSMSOTP()" style="padding:10px 12px;border-radius:10px;background:#f59e0b;color:#1f2937;border:none;cursor:pointer;font-size:16px;flex-shrink:0;">📱</button></div>'+
-            '<div id="sms-section" style="display:none;margin-top:8px;padding:12px;border-radius:12px;border:1px solid rgba(245,158,11,0.3);background:rgba(245,158,11,0.05);">'+
-            '<p id="sms-sent-msg" style="font-size:12px;color:#f59e0b;font-weight:500;margin:0 0 8px 0;"></p>'+
-            '<div style="display:flex;gap:8px;align-items:center;">'+
-            '<input type="text" id="sms-code-input" maxlength="6" style="'+inputStyle+'flex:1;min-width:0;text-align:center;font-size:18px;letter-spacing:4px;" placeholder="••••••" inputmode="numeric" pattern="[0-9]+">'+
-            '<button type="button" id="verify-sms-btn" onclick="verifySMSOTP()" style="padding:10px 16px;border-radius:10px;background:#10b981;color:#1f2937;border:none;cursor:pointer;font-size:14px;font-weight:700;flex-shrink:0;">✅ تحقق</button></div>'+
-            '<p id="sms-status" style="font-size:12px;margin-top:4px;display:none;"></p></div></div></div></div>'+
+            '<input type="tel" id="reg-phone" autocomplete="tel" style="'+inputStyle+'" pattern="[0-9]+">'+
+            '<button type="button" id="send-sms-btn" onclick="sendSMSOTP()" style="width:100%;margin-top:8px;padding:12px;border-radius:12px;background:linear-gradient(to left,#f59e0b,#fbbf24);color:#1f2937;border:none;cursor:pointer;font-size:15px;font-weight:700;">📱 إرسال رمز التحقق</button>'+
+            '<div id="sms-section" style="display:none;margin-top:8px;padding:16px;border-radius:12px;border:2px solid #f59e0b;background:rgba(245,158,11,0.05);transition:all 0.4s ease;">'+
+            '<p id="sms-sent-msg" style="font-size:13px;color:#f59e0b;font-weight:600;margin:0 0 10px 0;text-align:center;"></p>'+
+            '<input type="text" id="sms-code-input" maxlength="6" style="'+inputStyle+'text-align:center;font-size:20px;letter-spacing:6px;font-weight:700;" placeholder="••••••" inputmode="numeric" pattern="[0-9]+">'+
+            '<button type="button" id="verify-sms-btn" onclick="verifySMSOTP()" style="width:100%;margin-top:10px;padding:12px;border-radius:10px;background:#0ECB81;color:white;border:none;cursor:pointer;font-size:15px;font-weight:700;">✅ تحقق من الرمز</button>'+
+            '<p id="sms-status" style="font-size:12px;margin-top:6px;display:none;"></p></div></div></div></div>'+
 
+            '<div id="reg-pass-block" style="display:none;">'+
+            '<div style="padding:8px 12px;border-radius:10px;border:2px solid #0ECB81;background:rgba(14,203,129,0.05);text-align:center;font-size:13px;font-weight:700;color:#0ECB81;margin-bottom:4px;">✅ تم التحقق من هويتك</div>'+
             '<div><label style="'+labelStyle+'">كلمة المرور</label>'+
             '<input type="password" id="reg-pass" required minlength="6" autocomplete="new-password" oninput="updatePasswordStrength()" style="'+inputStyle+'" placeholder="8 أحرف على الأقل">'+
             '<div id="reg-pass-strength"></div></div>'+
 
             '<div><label style="'+labelStyle+'">كود الإحالة (اختياري)</label>'+
-            '<input type="text" id="reg-ref" value="'+escHtml(refVal)+'" style="'+inputStyle+'" placeholder="إذا دعاك شخص أدخل رمزه"></div>'+
+            '<input type="text" id="reg-ref" value="'+escHtml(refVal)+'" style="'+inputStyle+'" placeholder="إذا دعاك شخص أدخل رمزه"></div></div>'+
+
 
             '<button type="submit" style="width:100%;padding:14px;border-radius:14px;background:'+btnBg+';color:#1f2937;font-weight:700;font-size:18px;border:none;cursor:pointer;margin-top:4px;">إنشاء الحساب</button></form>'+
 
