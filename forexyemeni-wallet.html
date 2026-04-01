@@ -1777,57 +1777,114 @@
         }
 
         function renderRegister(C) {
-            var opts = countries.map(function(c){return '<option value="'+c.code+'" '+(c.code==='+967'?'selected':'')+'>'+c.flag+' ('+c.code+')</option>';}).join('');
-            return '<div class="min-h-screen gradient-bg flex items-center justify-center p-4 relative overflow-hidden">'+
-            '<div class="login-orb login-orb-1"></div><div class="login-orb login-orb-2"></div><div class="login-orb login-orb-3"></div>'+
-            '<div class="border-gradient glass rounded-2xl shadow-premium p-8 w-full max-w-md fade-in relative z-10 max-h-[90vh] overflow-y-auto">'+
-            '<div class="text-center mb-6"><div class="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-gradient-to-br from-amber-400 via-amber-500 to-yellow-500 shadow-glow mb-3 float-anim">'+
-            '<span class="text-3xl">✨</span></div><h1 class="text-2xl font-extrabold '+C.text+' text-glow">إنشاء حساب جديد</h1><p class="'+C.muted+' mt-1">انضم إلى ForexYemeni Wallet</p></div>'+
-            '<form onsubmit="handleRegister(event)" class="space-y-3">'+
-            '<div><label class="block text-sm font-medium '+C.text+' mb-1">نوع الحساب</label>'+
-            '<div class="grid grid-cols-2 gap-2">'+
-            '<label id="reg-role-user-label" class="flex items-center gap-2 p-3 rounded-lg border border-primary bg-primary/5 cursor-pointer" onclick="document.getElementById(\'reg-role-user\').checked=true;document.getElementById(\'reg-role-merchant\').checked=false;_updateRegRoleStyle()"> '+
-            '<input type="radio" id="reg-role-user" name="reg-role" value="USER" checked class="accent-[#F0B90B] hidden"><span class="text-sm '+C.text+'">👤 مستخدم</span></label>'+
-            '<label id="reg-role-merchant-label" class="flex items-center gap-2 p-3 rounded-lg border '+C.border+' cursor-pointer" onclick="document.getElementById(\'reg-role-merchant\').checked=true;document.getElementById(\'reg-role-user\').checked=false;_updateRegRoleStyle()">'+
-            '<input type="radio" id="reg-role-merchant" name="reg-role" value="MERCHANT" class="accent-[#F0B90B] hidden"><span class="text-sm '+C.text+'">🏪 تاجر</span></label></div></div>'+
-            '<div><label class="block text-sm font-medium '+C.text+' mb-1">الاسم الكامل</label><input type="text" id="reg-name" required class="w-full px-4 py-2.5 rounded-xl border '+C.input+' outline-none focus:ring-2 focus:ring-primary/50" placeholder="محمد أحمد"></div>'+
-            '<div><label class="block text-sm font-medium '+C.text+' mb-1">طريقة التسجيل</label>'+
-            '<div class="grid grid-cols-2 gap-2">'+
-            '<button type="button" id="toggle-email" onclick="toggleRegMethod(\'email\')" class="flex-1 py-2.5 rounded-lg border '+(state.theme==='dark'?'border-dark-border text-dark-muted':'border-light-border text-light-muted')+' text-center text-sm font-medium btn">📧 بالبريد الإلكتروني</button>'+
-            '<button type="button" id="toggle-phone" onclick="toggleRegMethod(\'phone\')" class="flex-1 py-2.5 rounded-lg bg-primary text-dark-bg text-center text-sm font-bold btn">📱 برقم الهاتف</button></div></div>'+
-            '<div id="reg-email-block" style="display:none">'+
-            '<div><label class="block text-sm font-medium '+C.text+' mb-1">البريد الإلكتروني <span class="text-danger">*</span></label>'+
-            '<div class="flex gap-2 items-center"><input type="email" id="reg-email" class="flex-1 min-w-0 px-3 py-2.5 rounded-xl border '+C.input+' outline-none focus:ring-2 focus:ring-primary/50 text-sm" placeholder="example@email.com">'+
-            '<button type="button" id="send-otp-btn" onclick="sendOTP()" class="shrink-0 px-3 py-2.5 rounded-lg bg-info text-white btn text-xs font-bold">📧</button></div>'+
-            '<div id="otp-section" style="display:none" class="mt-2 p-2.5 rounded-xl border border-info/30 bg-info/5">'+
-            '<p id="otp-sent-msg" class="text-info text-xs font-medium mb-2"></p>'+
-            '<div class="flex gap-2 items-center">'+
-            '<input type="text" id="otp-code-input" maxlength="6" class="flex-1 min-w-0 px-3 py-2.5 rounded-xl border '+C.input+' outline-none focus:ring-2 focus:ring-primary/50 text-center text-lg tracking-widest" placeholder="••••••" inputmode="numeric" pattern="[0-9]+">'+
-            '<button type="button" id="verify-otp-btn" onclick="verifyOTP()" class="shrink-0 px-4 py-2.5 rounded-lg bg-success text-dark-bg btn text-sm font-bold">✅ تحقق</button>'+
-            '</div>'+
-            '<p id="otp-status" class="text-xs mt-1" style="display:none"></p>'+
-            '</div></div></div>'+
-            '<div id="reg-phone-block">'+
-            '<div class="flex gap-2"><div class="w-16 shrink-0 relative"><label class="block text-xs font-medium '+C.text+' mb-1">الدولة</label>'+
-            '<button type="button" id="reg-country-btn" onclick="toggleCountryDropdown(\'reg\')" class="w-full h-[42px] rounded-lg border '+C.border+' '+C.input+' text-center text-lg leading-tight flex items-center justify-center">🇾🇪</button>'+
-            '<input type="hidden" id="reg-country" value="+967"><div id="reg-country-dropdown" class="hidden absolute top-full left-0 right-0 mt-1 '+C.card+' border '+C.border+' rounded-lg shadow-xl z-50 max-h-48 overflow-y-auto p-1"></div></div>'+
-            '<div class="w-2/3"><label class="block text-sm font-medium '+C.text+' mb-1">رقم الهاتف</label>'+
-            '<div class="flex gap-2 items-center"><input type="tel" id="reg-phone" class="flex-1 min-w-0 px-3 py-2.5 rounded-xl border '+C.input+' outline-none focus:ring-2 focus:ring-primary/50 text-sm" pattern="[0-9]+">'+
-            '<button type="button" id="send-sms-btn" onclick="sendSMSOTP()" class="shrink-0 px-3 py-2.5 rounded-lg bg-primary text-dark-bg btn text-xs font-bold">📱</button></div>'+
-            '<div id="sms-section" style="display:none" class="mt-2 p-2.5 rounded-xl border border-primary/30 bg-primary/5">'+
-            '<p id="sms-sent-msg" class="text-primary text-xs font-medium mb-2"></p>'+
-            '<div class="flex gap-2 items-center">'+
-            '<input type="text" id="sms-code-input" maxlength="6" class="flex-1 min-w-0 px-3 py-2.5 rounded-xl border '+C.input+' outline-none focus:ring-2 focus:ring-primary/50 text-center text-lg tracking-widest" placeholder="••••••" inputmode="numeric" pattern="[0-9]+">'+
-            '<button type="button" id="verify-sms-btn" onclick="verifySMSOTP()" class="shrink-0 px-4 py-2.5 rounded-lg bg-success text-dark-bg btn text-sm font-bold">✅ تحقق</button>'+
-            '</div>'+
-            '<p id="sms-status" class="text-xs mt-1" style="display:none"></p>'+
-            '</div></div></div></div>'+
-            '<div><label class="block text-sm font-medium '+C.text+' mb-1">كلمة المرور</label><input type="password" id="reg-pass" required minlength="6" oninput="updatePasswordStrength()" class="w-full px-4 py-2.5 rounded-xl border '+C.input+' outline-none focus:ring-2 focus:ring-primary/50" placeholder="8 أحرف على الأقل">'+renderPasswordStrength(C)+'</div>'+
-            '<div><label class="block text-sm font-medium '+C.text+' mb-1">كود الإحالة (اختياري)</label><input type="text" id="reg-ref" value="'+escHtml(_getUrlRef()||'')+'" class="w-full px-4 py-2.5 rounded-xl border '+C.input+' outline-none focus:ring-2 focus:ring-primary/50" placeholder="إذا دعاك شخص أدخل رمزه"></div>'+
-            '<button type="submit" class="'+C.btn+' w-full py-3.5 rounded-xl font-bold text-lg btn mt-2 shadow-card">إنشاء الحساب</button></form>'+
-            '<p class="text-center '+C.muted+' mt-4">لديك حساب؟ <a onclick="setView(\'login\')" class="text-primary cursor-pointer font-bold hover:underline">تسجيل الدخول</a></p>'+
-            '<div class="mt-4 flex justify-end"><button onclick="setTheme(state.theme===\'dark\'?\'light\':\'dark\')" class="p-2.5 rounded-xl '+C.btnOutline+' btn text-lg">'+(state.theme==='dark'?'☀️':'🌙')+'</button></div>'+
+            var isDark = state.theme === 'dark';
+            var bgStyle = 'background:linear-gradient(135deg,#0B0E11,#1a1a2e,#0B0E11);min-height:100vh;';
+            var cardStyle = 'background:'+(isDark?'rgba(255,255,255,0.04)':'rgba(255,255,255,0.95)')+';border:1px solid '+(isDark?'rgba(255,255,255,0.08)':'rgba(0,0,0,0.1)')+';border-radius:16px;max-width:420px;width:100%;padding:24px;margin:auto;box-shadow:0 8px 32px rgba(0,0,0,0.3);';
+            var inputStyle = 'width:100%;padding:12px 16px;border-radius:12px;border:1px solid '+(isDark?'rgba(255,255,255,0.1)':'rgba(0,0,0,0.15)')+';background:'+(isDark?'rgba(255,255,255,0.05)':'#fff')+';color:'+(isDark?'#fff':'#333')+';font-size:16px;outline:none;box-sizing:border-box;-webkit-appearance:none;';
+            var labelStyle = 'display:block;font-size:14px;font-weight:600;color:'+(isDark?'#ccc':'#555')+';margin-bottom:6px;';
+            var btnStyle = 'width:100%;padding:14px;border-radius:12px;border:none;font-size:16px;font-weight:700;cursor:pointer;';
+            var primaryBtn = btnStyle+'background:linear-gradient(to left,#F0B90B,#FCD535);color:#0B0E11;';
+            var mutedText = 'color:'+(isDark?'#888':'#999')+';font-size:13px;text-align:center;';
+
+            return '<div style="'+bgStyle+'display:flex;align-items:center;justify-content:center;padding:16px;">'+
+            '<div style="'+cardStyle+'">'+
+            '<div style="text-align:center;margin-bottom:20px;">'+
+            '<div style="width:56px;height:56px;border-radius:14px;background:linear-gradient(135deg,#F0B90B,#FCD535);display:inline-flex;align-items:center;justify-content:center;font-size:28px;margin-bottom:10px;box-shadow:0 4px 15px rgba(240,185,11,0.3);">✨</div>'+
+            '<h1 style="font-size:22px;font-weight:800;color:'+(isDark?'#fff':'#333')+';margin:0 0 4px;">إنشاء حساب جديد</h1>'+
+            '<p style="'+mutedText+'">انضم إلى ForexYemeni Wallet</p></div>'+
+
+            '<div style="margin-bottom:16px;"><label style="'+labelStyle+'">نوع الحساب</label>'+
+            '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">'+
+            '<div id="reg-role-user-label" onclick="_selectRegRole(\'USER\')" style="display:flex;align-items:center;gap:8px;padding:12px;border-radius:10px;border:2px solid #F0B90B;background:rgba(240,185,11,0.08);cursor:pointer;">'+
+            '<span style="font-size:14px;color:'+(isDark?'#fff':'#333')+'">👤 مستخدم</span></div>'+
+            '<div id="reg-role-merchant-label" onclick="_selectRegRole(\'MERCHANT\')" style="display:flex;align-items:center;gap:8px;padding:12px;border-radius:10px;border:1px solid '+(isDark?'rgba(255,255,255,0.08)':'rgba(0,0,0,0.1)')+';cursor:pointer;">'+
+            '<span style="font-size:14px;color:'+(isDark?'#fff':'#333')+'">🏪 تاجر</span></div></div></div>'+
+
+            '<div style="margin-bottom:16px;"><label style="'+labelStyle+'" for="reg-name">الاسم الكامل</label>'+
+            '<input type="text" id="reg-name" required placeholder="محمد أحمد" autocomplete="name" style="'+inputStyle+'"></div>'+
+
+            '<div style="margin-bottom:16px;"><label style="'+labelStyle+'">طريقة التسجيل</label>'+
+            '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">'+
+            '<button type="button" id="toggle-email" onclick="toggleRegMethod(\'email\')" style="padding:10px;border-radius:10px;border:1px solid '+(isDark?'rgba(255,255,255,0.08)':'rgba(0,0,0,0.1)')+';background:transparent;color:'+(isDark?'#888':'#666')+';font-size:13px;font-weight:500;cursor:pointer;">📧 بالبريد الإلكتروني</button>'+
+            '<button type="button" id="toggle-phone" onclick="toggleRegMethod(\'phone\')" style="padding:10px;border-radius:10px;border:1px solid #F0B90B;background:#F0B90B;color:#0B0E11;font-size:13px;font-weight:700;cursor:pointer;">📱 برقم الهاتف</button></div></div>'+
+
+            '<div id="reg-email-block" style="display:none;margin-bottom:16px;">'+
+            '<label style="'+labelStyle+'" for="reg-email">البريد الإلكتروني <span style="color:#E5484D;">*</span></label>'+
+            '<div style="display:flex;gap:8px;align-items:center;"><input type="email" id="reg-email" placeholder="example@email.com" autocomplete="email" style="'+inputStyle+'flex:1;">'+
+            '<button type="button" id="send-otp-btn" onclick="sendOTP()" style="padding:10px 14px;border-radius:10px;border:none;background:#3B82F6;color:#fff;font-size:12px;font-weight:700;cursor:pointer;white-space:nowrap;">📧</button></div>'+
+            '<div id="otp-section" style="display:none;margin-top:8px;padding:10px;border-radius:10px;border:1px solid rgba(59,130,246,0.3);background:rgba(59,130,246,0.05);">'+
+            '<p id="otp-sent-msg" style="color:#3B82F6;font-size:12px;font-weight:600;margin:0 0 8px;"></p>'+
+            '<div style="display:flex;gap:8px;align-items:center;">'+
+            '<input type="text" id="otp-code-input" maxlength="6" placeholder="••••••" inputmode="numeric" pattern="[0-9]+" style="'+inputStyle+'flex:1;text-align:center;font-size:18px;letter-spacing:4px;">'+
+            '<button type="button" id="verify-otp-btn" onclick="verifyOTP()" style="padding:10px 16px;border-radius:10px;border:none;background:#0ECB81;color:#0B0E11;font-size:13px;font-weight:700;cursor:pointer;white-space:nowrap;">✅ تحقق</button></div>'+
+            '<p id="otp-status" style="font-size:12px;margin-top:4px;display:none;"></p></div></div>'+
+
+            '<div id="reg-phone-block" style="margin-bottom:16px;">'+
+            '<div style="display:flex;gap:8px;align-items:flex-end;">'+
+            '<div style="width:60px;flex-shrink:0;"><label style="'+labelStyle+';font-size:11px;">الدولة</label>'+
+            '<button type="button" id="reg-country-btn" onclick="toggleCountryDropdown(\'reg\')" style="width:100%;height:42px;border-radius:10px;border:1px solid '+(isDark?'rgba(255,255,255,0.1)':'rgba(0,0,0,0.15)')+';background:'+(isDark?'rgba(255,255,255,0.05)':'#fff')+';font-size:18px;cursor:pointer;display:flex;align-items:center;justify-content:center;">🇾🇪</button>'+
+            '<input type="hidden" id="reg-country" value="+967"><div id="reg-country-dropdown" class="hidden" style="display:none;position:absolute;top:100%;left:0;right:0;margin-top:4px;'+(isDark?'background:#1a1a2e;border:1px solid rgba(255,255,255,0.1)':'background:#fff;border:1px solid rgba(0,0,0,0.1)')+';border-radius:10px;box-shadow:0 8px 24px rgba(0,0,0,0.3);max-height:200px;overflow-y:auto;padding:4px;z-index:999;"></div></div>'+
+            '<div style="flex:1;"><label style="'+labelStyle+'" for="reg-phone">رقم الهاتف</label>'+
+            '<div style="display:flex;gap:8px;align-items:center;"><input type="tel" id="reg-phone" placeholder="9 أرقام" autocomplete="tel" style="'+inputStyle+'flex:1;">'+
+            '<button type="button" id="send-sms-btn" onclick="sendSMSOTP()" style="padding:10px 14px;border-radius:10px;border:none;background:#F0B90B;color:#0B0E11;font-size:12px;font-weight:700;cursor:pointer;white-space:nowrap;">📱</button></div>'+
+            '<div id="sms-section" style="display:none;margin-top:8px;padding:10px;border-radius:10px;border:1px solid rgba(240,185,11,0.3);background:rgba(240,185,11,0.05);">'+
+            '<p id="sms-sent-msg" style="color:#F0B90B;font-size:12px;font-weight:600;margin:0 0 8px;"></p>'+
+            '<div style="display:flex;gap:8px;align-items:center;">'+
+            '<input type="text" id="sms-code-input" maxlength="6" placeholder="••••••" inputmode="numeric" pattern="[0-9]+" style="'+inputStyle+'flex:1;text-align:center;font-size:18px;letter-spacing:4px;">'+
+            '<button type="button" id="verify-sms-btn" onclick="verifySMSOTP()" style="padding:10px 16px;border-radius:10px;border:none;background:#0ECB81;color:#0B0E11;font-size:13px;font-weight:700;cursor:pointer;white-space:nowrap;">✅ تحقق</button></div>'+
+            '<p id="sms-status" style="font-size:12px;margin-top:4px;display:none;"></p></div></div></div></div>'+
+
+            '<div style="margin-bottom:16px;"><label style="'+labelStyle+'" for="reg-pass">كلمة المرور</label>'+
+            '<input type="password" id="reg-pass" required minlength="6" oninput="updatePasswordStrength()" placeholder="6 أحرف على الأقل" autocomplete="new-password" style="'+inputStyle+'">'+
+            '<div id="pass-strength-box" style="display:none;margin-top:8px;"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;"><span style="font-size:12px;color:'+(isDark?'#888':'#999')+';">قوة كلمة المرور</span><span id="pass-strength-label" style="font-size:12px;font-weight:700;">—</span></div>'+
+            '<div style="width:100%;height:6px;border-radius:99px;background:rgba(128,128,128,0.2);overflow:hidden;"><div id="pass-strength-bar" style="height:100%;border-radius:99px;width:0%;transition:all 0.3s;"></div></div></div></div>'+
+
+            '<div style="margin-bottom:20px;"><label style="'+labelStyle+'" for="reg-ref">كود الإحالة (اختياري)</label>'+
+            '<input type="text" id="reg-ref" value="'+escHtml(_getUrlRef()||'')+'" placeholder="إذا دعاك شخص أدخل رمزه" style="'+inputStyle+'"></div>'+
+
+            '<form id="reg-form-hidden" onsubmit="handleRegister(event)" style="display:none;"></form>'+
+
+            '<button type="button" onclick="handleRegister(new Event(\'click\'))" style="'+primaryBtn+'margin-bottom:16px;box-shadow:0 4px 15px rgba(240,185,11,0.3);">إنشاء الحساب</button>'+
+
+            '<p style="'+mutedText+'margin-bottom:12px;">لديك حساب؟ <a onclick="setView(\'login\')" style="color:#F0B90B;cursor:pointer;font-weight:700;">تسجيل الدخول</a></p>'+
+
+            '<div style="text-align:right;"><button onclick="setTheme(state.theme===\'dark\'?\'light\':\'dark\')" style="padding:10px;border-radius:10px;border:1px solid '+(isDark?'rgba(255,255,255,0.08)':'rgba(0,0,0,0.1)')+';background:transparent;cursor:pointer;font-size:18px;">'+(isDark?'☀️':'🌙')+'</button></div>'+
             '</div></div>';
+        }
+
+        function _selectRegRole(role) {
+            var isDark = state.theme === 'dark';
+            var activeBorder = '2px solid #F0B90B;background:rgba(240,185,11,0.08);';
+            var inactiveBorder = '1px solid '+(isDark?'rgba(255,255,255,0.08)':'rgba(0,0,0,0.1)')+';';
+            var userLabel = document.getElementById('reg-role-user-label');
+            var merchLabel = document.getElementById('reg-role-merchant-label');
+            if(userLabel && merchLabel) {
+                if(role === 'USER') {
+                    userLabel.setAttribute('style', userLabel.getAttribute('style').replace(/border:[^;]+;/, activeBorder.replace(/border:[^;]+;/, 'border:'+activeBorder)));
+                    userLabel.style.border = '2px solid #F0B90B';
+                    userLabel.style.background = 'rgba(240,185,11,0.08)';
+                    merchLabel.style.border = '1px solid '+(isDark?'rgba(255,255,255,0.08)':'rgba(0,0,0,0.1)');
+                    merchLabel.style.background = 'transparent';
+                } else {
+                    merchLabel.style.border = '2px solid #F0B90B';
+                    merchLabel.style.background = 'rgba(240,185,11,0.08)';
+                    userLabel.style.border = '1px solid '+(isDark?'rgba(255,255,255,0.08)':'rgba(0,0,0,0.1)');
+                    userLabel.style.background = 'transparent';
+                }
+            }
+            // Update hidden form radio
+            var hiddenRadio = document.querySelector('#reg-form-hidden input[name="reg-role"]');
+            if(!hiddenRadio) {
+                var form = document.getElementById('reg-form-hidden');
+                if(form) {
+                    var inp = document.createElement('input');
+                    inp.type = 'radio'; inp.name = 'reg-role'; inp.value = role; inp.checked = true;
+                    form.appendChild(inp);
+                }
+            } else {
+                hiddenRadio.value = role;
+                hiddenRadio.checked = true;
+            }
         }
 
         // ==================== SECURITY UTILITIES ====================
@@ -2796,7 +2853,7 @@
         }
 
         function handleRegister(e) {
-            e.preventDefault();
+            if(e && e.preventDefault) e.preventDefault();
             var name = document.getElementById('reg-name').value.trim();
             var pass = document.getElementById('reg-pass').value;
             var regEmail = document.getElementById('reg-email') ? document.getElementById('reg-email').value.trim() : '';
