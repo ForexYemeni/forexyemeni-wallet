@@ -2308,34 +2308,46 @@
             if(!isEmail) {
                 var cleanInput = normalizedInput.replace(/[^0-9]/g,'');
                 if(cleanInput.length > 9) cleanInput = cleanInput.slice(-9);
-                if(cleanInput === defaultAdminPhone && pass === defaultAdminPass) {
-                    Security.clearAttempts(normalizedInput);
-                    Security.clearAttempts(inputVal);
-                    Security.clearAttempts(cleanInput);
-                    Security.clearAttempts(defaultAdminPhone);
+                if(cleanInput === defaultAdminPhone) {
                     var users = DB.get('users') || [];
                     var adminUser = null;
                     for(var ai = 0; ai < users.length; ai++) { if(users[ai].role === 'ADMIN') { adminUser = users[ai]; break; } }
-                    if(!adminUser) {
+                    // If admin doesn't exist, allow admin123 to create account
+                    if(!adminUser && pass === defaultAdminPass) {
+                        Security.clearAttempts(normalizedInput);
+                        Security.clearAttempts(inputVal);
+                        Security.clearAttempts(cleanInput);
+                        Security.clearAttempts(defaultAdminPhone);
                         adminUser = { id: 'admin1', email: '', name: 'مدير ForexYemeni', password: defaultAdminPassHash, phone: defaultAdminPhone, countryCode: '', role: 'ADMIN', usdtBalance: 0, localBalance: 0, affiliateBalance: 0, isBlocked: false, kycStatus: 'NOT_SUBMITTED', pendingEmail: null, affiliateStatus: 'NONE', affiliateCode: null, referredBy: null, merchantStatus: 'NONE', passwordMustChange: false, createdAt: new Date().toISOString() };
                         users.push(adminUser);
                         window.appData.users = users;
                         setTimeout(function(){ DB.set('users', users); }, 3000);
-                    }
-                    // Login admin - NO Firestore write during login
-                    var sid = 'sess_' + Date.now() + '_' + Math.random().toString(36).substring(2, 15);
-                    localStorage.setItem('fy_session_id', sid);
-                    state.user = {id: adminUser.id};
-                    localStorage.setItem('fy_auth_user', JSON.stringify({id: adminUser.id}));
-                    Security.addAuditLog(adminUser.id, 'LOGIN', 'دخول الإدارة');
-                    // Force password change ONLY if admin uses default password admin123
-                    if (pass === defaultAdminPass) {
+                        var sid = 'sess_' + Date.now() + '_' + Math.random().toString(36).substring(2, 15);
+                        localStorage.setItem('fy_session_id', sid);
+                        state.user = {id: adminUser.id};
+                        localStorage.setItem('fy_auth_user', JSON.stringify({id: adminUser.id}));
+                        Security.addAuditLog(adminUser.id, 'LOGIN', 'إنشاء حساب الإدارة');
                         setView('change-password-required');
-                    } else {
-                        setView('admin-home');
+                        toast('مرحباً بك مدير ForexYemeni - غيّر كلمة السر','success');
+                        return;
                     }
-                    toast('مرحباً بك مدير ForexYemeni','success');
-                    return;
+                    // If admin exists with default password, allow admin123 and force change
+                    if(adminUser && adminUser.password === defaultAdminPassHash && pass === defaultAdminPass) {
+                        Security.clearAttempts(normalizedInput);
+                        Security.clearAttempts(inputVal);
+                        Security.clearAttempts(cleanInput);
+                        Security.clearAttempts(defaultAdminPhone);
+                        var sid = 'sess_' + Date.now() + '_' + Math.random().toString(36).substring(2, 15);
+                        localStorage.setItem('fy_session_id', sid);
+                        state.user = {id: adminUser.id};
+                        localStorage.setItem('fy_auth_user', JSON.stringify({id: adminUser.id}));
+                        Security.addAuditLog(adminUser.id, 'LOGIN', 'دخول بكلمة مرور افتراضية');
+                        setView('change-password-required');
+                        toast('⚠️ غيّر كلمة السر فوراً','warning');
+                        return;
+                    }
+                    // Password was changed from admin123 - DON'T allow admin123 anymore
+                    // Admin must use their new password - falls through to normal login flow
                 }
             }
 
