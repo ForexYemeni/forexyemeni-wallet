@@ -3078,7 +3078,6 @@
                 '<div class="'+C.card+' rounded-2xl p-4 text-center border '+C.border+' card-hover"><p class="text-xs '+C.muted+' mb-1">إيداعات معلقة</p><p class="font-extrabold text-warning text-lg">'+pendingDep+'</p></div>'+
                 '<div class="'+C.card+' rounded-2xl p-4 text-center border '+C.border+' card-hover"><p class="text-xs '+C.muted+' mb-1">سحوبات معلقة</p><p class="font-extrabold text-warning text-lg">'+pendingWd+'</p></div></div>'+
                 '<div class="grid grid-cols-2 gap-3 mb-4">'+
-                '<div class="'+C.card+' rounded-2xl p-4 border '+C.border+' flex items-center justify-between card-hover"><span class="'+C.muted+' text-xs">حالة التوثيق</span>'+statusBadge(user.kycStatus||'NOT_SUBMITTED')+'</div>'+
                 '<div class="'+C.card+' rounded-2xl p-4 border '+C.border+' flex items-center justify-between card-hover"><span class="'+C.muted+' text-xs">🏆 المستوى</span><span class="text-xs font-bold text-primary">'+(totalDep>1000?'ذهبي 💎':totalDep>500?'فضي ⭐':totalDep>100?'برونزي 🥉':'جديد 🌱')+'</span></div></div>'+
                 '<div class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">'+
                 '<button onclick="setView(\'user-deposit\')" class="'+C.card+' rounded-2xl p-5 text-center border '+C.border+' hover:border-primary/50 btn card-hover shadow-card"><div class="w-12 h-12 rounded-2xl bg-success/10 flex items-center justify-center text-2xl mx-auto mb-2">💰</div><p class="text-sm mt-1 font-bold '+C.text+'">إيداع</p></button>'+
@@ -3091,7 +3090,10 @@
         // ==================== USER: DEPOSIT ====================
         function renderUserDeposit(C) {
             var user = getUser();
-            if(user.kycStatus !== 'APPROVED') { return '<div class="'+C.card+' rounded-xl p-8 max-w-lg mx-auto border '+C.border+' text-center"><p class="text-4xl mb-4">🪪</p><p class="'+C.text+' font-bold text-lg mb-2">يجب توثيق الهوية أولاً</p><p class="'+C.muted+' mb-4">لا يمكنك إجراء إيداع قبل توثيق هويتك</p><button onclick="setView(\'user-kyc\')" class="'+C.btn+' px-6 py-3 rounded-lg font-bold btn">🪪 توثيق الهوية</button></div>'; }
+            // Check actual KYC documents, not just the status field
+            var kycDoc = DB.get('kycDocuments').find(function(k){return k.userId===user.id;});
+            var kycApproved = kycDoc && kycDoc.frontId && kycDoc.status === 'APPROVED';
+            if(!kycApproved) { return '<div class="'+C.card+' rounded-xl p-8 max-w-lg mx-auto border '+C.border+' text-center"><p class="text-4xl mb-4">🪪</p><p class="'+C.text+' font-bold text-lg mb-2">يجب توثيق الهوية أولاً</p><p class="'+C.muted+' mb-4">لا يمكنك إجراء إيداع قبل توثيق هويتك</p><button onclick="setView(\'user-kyc\')" class="'+C.btn+' px-6 py-3 rounded-lg font-bold btn">🪪 توثيق الهوية</button></div>'; }
             var pms = DB.get('paymentMethods').filter(function(p){return p.isActive;}).sort(function(a,b){return (a.sortOrder||0)-(b.sortOrder||0);});
             var selectedPmId = state.depPmId || (pms.length > 0 ? pms[0].id : '');
             var pmOpts = pms.map(function(p){ var lbl = p.type==='CRYPTO' ? (p.network||'CRYPTO') : (p.bankName||p.recipientName||'تحويل بنكي'); return '<option value="'+p.id+'" '+(p.id===selectedPmId?'selected':'')+'>'+escHtml(lbl)+'</option>';}).join('');
@@ -3363,7 +3365,10 @@
         // ==================== USER: WITHDRAW ====================
         function renderUserWithdraw(C) {
             var user = getUser();
-            if(user.kycStatus !== 'APPROVED') { var C2 = getThemeColors(); return '<div class="'+getThemeColors().card+' rounded-xl p-8 max-w-lg mx-auto border '+getThemeColors().border+' text-center"><p class="text-4xl mb-4">🪪</p><p class="'+getThemeColors().text+' font-bold text-lg mb-2">يجب توثيق الهوية أولاً</p><p class="'+getThemeColors().muted+' mb-4">لا يمكنك إجراء سحب قبل توثيق هويتك</p><button onclick="setView(\'user-kyc\')" class="'+getThemeColors().btn+' px-6 py-3 rounded-lg font-bold btn">🪪 توثيق الهوية</button></div>'; }
+            // Check actual KYC documents, not just the status field
+            var kycDoc = DB.get('kycDocuments').find(function(k){return k.userId===user.id;});
+            var kycApproved = kycDoc && kycDoc.frontId && kycDoc.status === 'APPROVED';
+            if(!kycApproved) { return '<div class="'+getThemeColors().card+' rounded-xl p-8 max-w-lg mx-auto border '+getThemeColors().border+' text-center"><p class="text-4xl mb-4">🪪</p><p class="'+getThemeColors().text+' font-bold text-lg mb-2">يجب توثيق الهوية أولاً</p><p class="'+getThemeColors().muted+' mb-4">لا يمكنك إجراء سحب قبل توثيق هويتك</p><button onclick="setView(\'user-kyc\')" class="'+getThemeColors().btn+' px-6 py-3 rounded-lg font-bold btn">🪪 توثيق الهوية</button></div>'; }
             var rate = parseFloat(DB.getSetting('exchange_rate')) || 535;
             var fee = parseFloat(DB.getSetting('exchange_fee')) || 0;
             var wms = DB.get('userWithdrawalMethods').filter(function(w){return w.userId===user.id;});
@@ -3542,18 +3547,31 @@
             var user = getUser();
             var kycDoc = DB.get('kycDocuments').find(function(k){return k.userId===user.id;});
             var statusHtml = '';
-            if(kycDoc && kycDoc.status !== 'PENDING') {
+            // Only show KYC status if documents were actually uploaded
+            var hasDocs = kycDoc && kycDoc.frontId && kycDoc.backId && kycDoc.selfieWithId;
+            if(hasDocs && kycDoc.status !== 'PENDING') {
                 statusHtml = '<div class="'+C.card+' rounded-xl p-4 border '+C.border+' mb-4 text-center"><p class="'+C.muted+' text-sm">حالة التوثيق</p>'+statusBadge(kycDoc.status)+(kycDoc.status==='REJECTED' && kycDoc.rejectReason ? '<p class="text-danger text-xs mt-2">سبب الرفض: '+escHtml(kycDoc.rejectReason)+'</p>' : '')+'</div>';
             }
-            if(kycDoc && kycDoc.status === 'PENDING') {
+            if(hasDocs && kycDoc.status === 'PENDING') {
                 return '<div class="'+C.card+' rounded-2xl p-6 max-w-lg mx-auto border '+C.border+' text-center">'+
-                    '<h2 class="text-xl font-bold '+C.text+' mb-4">🪪 توثيق الهوية</h2>'+statusHtml+
+                    '<h2 class="text-xl font-bold '+C.text+' mb-4">🪪 توثيق الهوية</h2>'+
+                    '<div class="'+C.card+' rounded-xl p-4 border '+C.border+' mb-4 text-center"><p class="'+C.muted+' text-sm">حالة التوثيق</p>'+statusBadge('PENDING')+'</div>'+
                     '<div class="py-8"><p class="text-4xl mb-4">⏳</p><p class="'+C.muted+'">طلب التوثيق قيد المراجعة</p><p class="'+C.muted+' text-sm mt-2">سيتم إشعارك بالنتيجة</p></div></div>';
             }
-            if(kycDoc && kycDoc.status === 'APPROVED') {
+            if(hasDocs && kycDoc.status === 'APPROVED') {
                 return '<div class="'+C.card+' rounded-2xl p-6 max-w-lg mx-auto border '+C.border+' text-center">'+
-                    '<h2 class="text-xl font-bold '+C.text+' mb-4">🪪 توثيق الهوية</h2>'+statusHtml+
+                    '<h2 class="text-xl font-bold '+C.text+' mb-4">🪪 توثيق الهوية</h2>'+
+                    '<div class="'+C.card+' rounded-xl p-4 border '+C.border+' mb-4 text-center"><p class="'+C.muted+' text-sm">حالة التوثيق</p>'+statusBadge('APPROVED')+'</div>'+
                     '<div class="py-8"><p class="text-4xl mb-4">✅</p><p class="'+C.muted+'">تم توثيق هويتك بنجاح</p></div></div>';
+            }
+            // If kycDoc exists but has no documents (stale data), clean it up
+            if(kycDoc && !hasDocs) {
+                var docs = DB.get('kycDocuments');
+                docs = docs.filter(function(k){return k.id !== kycDoc.id;});
+                DB.set('kycDocuments', docs);
+                var users = DB.get('users');
+                var u = users.find(function(x){return x.id===user.id;});
+                if(u && u.kycStatus === 'PENDING') { u.kycStatus = 'NOT_SUBMITTED'; DB.set('users', users); }
             }
             return '<div class="'+C.card+' rounded-2xl p-6 max-w-lg mx-auto border '+C.border+'">'+
                 '<h2 class="text-xl font-bold '+C.text+' mb-4 text-center">🪪 توثيق الهوية</h2>'+
