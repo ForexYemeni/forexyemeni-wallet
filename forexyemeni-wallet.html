@@ -1590,7 +1590,7 @@
             };
             switch(state.view) {
                 case 'login': app.innerHTML = renderLogin(C); break;
-                case 'register': try { app.innerHTML = renderRegister(C); setTimeout(function(){ if(typeof updateRegPhoneLength === 'function') updateRegPhoneLength(); },50); } catch(e) { console.error('renderRegister error:', e); app.innerHTML = '<div class="min-h-screen gradient-bg flex items-center justify-center p-4"><div class="glass rounded-2xl p-8 text-center"><p class="text-danger text-xl mb-4">خطأ في تحميل صفحة التسجيل</p><button onclick="setView(\'login\')" class="px-6 py-3 rounded-xl bg-primary text-dark-bg font-bold btn">العودة</button></div></div>'; } break;
+                case 'register': try { app.innerHTML = renderRegister(C); } catch(e) { console.error('renderRegister error:', e); app.innerHTML = '<div class="min-h-screen gradient-bg flex items-center justify-center p-4"><div class="glass rounded-2xl p-8 text-center"><p class="text-danger text-xl mb-4">خطأ في تحميل صفحة التسجيل</p><button onclick="setView(\'login\')" class="px-6 py-3 rounded-xl bg-primary text-dark-bg font-bold btn">العودة</button></div></div>'; } break;
                 case 'change-password-required': app.innerHTML = renderChangePasswordRequired(C); break;
                 case 'loading': app.innerHTML = renderLoading(C); break;
                 default:
