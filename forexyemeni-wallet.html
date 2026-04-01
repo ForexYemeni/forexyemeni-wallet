@@ -97,7 +97,7 @@
         .btn-premium:active { transform: scale(0.97); }
 
         /* Modern inputs */
-        .input-modern { transition: all 0.3s ease; background: transparent; }
+        .input-modern { transition: all 0.3s ease; }
         .input-modern:focus { box-shadow: 0 0 0 3px rgba(240,185,11,0.2); border-color: rgba(240,185,11,0.5) !important; }
 
         /* Animated gradient border */
@@ -1580,20 +1580,7 @@
         // ==================== RENDER ENGINE ====================
         function render() {
             var app = document.getElementById('app');
-            var isDark = state.theme === 'dark';
-            var C = {
-                bg: isDark?'bg-gradient-bg':'bg-gradient-bg', text: isDark?'text-gray-100':'text-gray-800',
-                muted: isDark?'text-gray-400':'text-gray-500', card: 'glass',
-                border: isDark?'border-white/5':'border-white/20',
-                input: isDark?'bg-white/5 border-white/10 text-white input-modern':'bg-white/50 border-white/30 text-gray-800 input-modern',
-                btn: 'bg-gradient-to-l from-amber-500 via-amber-400 to-yellow-400 text-gray-900 font-bold btn-premium',
-                btnOutline: 'border '+(isDark?'border-white/10 text-gray-300 hover:bg-white/5':'border-gray-200 text-gray-600 hover:bg-gray-50')+' btn-premium',
-                danger: 'bg-gradient-to-r from-red-500 to-rose-500 text-white btn-premium',
-                success: 'bg-gradient-to-r from-emerald-500 to-green-500 text-white btn-premium',
-                gradient: 'bg-gradient-to-br from-amber-500/20 via-violet-500/10 to-cyan-500/20',
-                solid: isDark?'bg-dark-card':'bg-light-card',
-                sidebarBg: 'glass'
-            };
+            var C = getThemeColors();
             switch(state.view) {
                 case 'login': app.innerHTML = renderLogin(C); break;
                 case 'register': try { app.innerHTML = renderRegister(C); setTimeout(function(){ if(typeof updateRegPhoneLength === 'function') updateRegPhoneLength(); },50); } catch(e) { console.error('renderRegister error:', e); app.innerHTML = '<div class="min-h-screen gradient-bg flex items-center justify-center p-4"><div class="glass rounded-2xl p-8 text-center"><p class="text-danger text-xl mb-4">خطأ في تحميل صفحة التسجيل</p><button onclick="setView(\'login\')" class="px-6 py-3 rounded-xl bg-primary text-dark-bg font-bold btn">العودة</button></div></div>'; } break;
