@@ -46,7 +46,7 @@
         /* Glassmorphism */
         .glass { background: rgba(255,255,255,0.05); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); border: 1px solid rgba(255,255,255,0.08); }
         .dark .glass { background: rgba(15,20,40,0.6); border: 1px solid rgba(255,255,255,0.06); }
-        .light .glass { background: rgba(255,255,255,0.7); border: 1px solid rgba(255,255,255,0.3); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); }
+        .light .glass { background: rgba(255,255,255,0.75); border: 1px solid rgba(0,0,0,0.06); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); }
 
         /* Gradient backgrounds */
         .gradient-bg { background: linear-gradient(135deg, #0a0e1a 0%, #1a1040 30%, #0f1729 60%, #0a0e1a 100%); }
@@ -59,6 +59,8 @@
         .shadow-glow { box-shadow: 0 0 20px rgba(240,185,11,0.15), 0 0 60px rgba(240,185,11,0.05); }
         .shadow-glow-sm { box-shadow: 0 0 10px rgba(240,185,11,0.1); }
         .shadow-card { box-shadow: 0 4px 24px rgba(0,0,0,0.15), 0 1px 4px rgba(0,0,0,0.1); }
+        .light .shadow-premium { box-shadow: 0 8px 32px rgba(0,0,0,0.08), 0 2px 8px rgba(0,0,0,0.04); }
+        .light .shadow-card { box-shadow: 0 4px 24px rgba(0,0,0,0.06), 0 1px 4px rgba(0,0,0,0.03); }
 
         /* Animations */
         @keyframes float { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-10px); } }
@@ -1677,18 +1679,20 @@
         function getThemeColors() {
             var isDark = state.theme === 'dark';
             return {
-                bg: isDark?'bg-dark-bg':'bg-light-bg',
-                text: isDark?'text-dark-text':'text-light-text',
-                muted: isDark?'text-dark-muted':'text-light-muted',
-                card: isDark?'bg-dark-card':'bg-light-card',
-                border: isDark?'border-dark-border':'border-light-border',
+                bg: 'gradient-bg',
+                text: isDark?'text-gray-100':'text-gray-800',
+                muted: isDark?'text-gray-400':'text-gray-500',
+                card: 'glass',
+                border: isDark?'border-white/5':'border-white/20',
                 input: isDark?'bg-white/5 border-white/10 text-white input-modern':'bg-white/50 border-white/30 text-gray-800 input-modern',
                 btn: 'bg-gradient-to-l from-amber-500 via-amber-400 to-yellow-400 text-gray-900 font-bold btn-premium',
                 btnOutline: 'border '+(isDark?'border-white/10 text-gray-300 hover:bg-white/5':'border-gray-200 text-gray-600 hover:bg-gray-50')+' btn-premium',
                 danger: 'bg-gradient-to-r from-red-500 to-rose-500 text-white btn-premium',
                 success: 'bg-gradient-to-r from-emerald-500 to-green-500 text-white btn-premium',
                 gradient: 'bg-gradient-to-br from-amber-500/20 via-violet-500/10 to-cyan-500/20',
-                sidebar: isDark?'glass':'glass'
+                solid: isDark?'bg-dark-card':'bg-light-card',
+                sidebar: 'glass',
+                sidebarBg: 'glass'
             };
         }
         // ==================== AUTH PAGES ====================
@@ -1854,7 +1858,6 @@
             var inpC = isDark ? '#1f2937' : '#f3f4f6';
             var brdC = isDark ? '#374151' : '#d1d5db';
             var btnBg = 'linear-gradient(to left, #f59e0b, #fbbf24, #facc15)';
-            var opts = countries.map(function(c){return '<option value="'+c.code+'" '+(c.code==='+967'?'selected':'')+'>'+c.flag+' ('+c.code+')</option>';}).join('');
             var emailActive = 'border:2px solid #3b82f6;background:rgba(59,130,246,0.05);';
             var emailNormal = 'border:2px solid '+brdC+';';
             var phoneActive = 'border:2px solid #f59e0b;background:rgba(245,158,11,0.05);';
@@ -1902,9 +1905,9 @@
 
             '<div id="reg-phone-block">'+
             '<div style="display:flex;gap:8px;">'+
-            '<div style="width:64px;flex-shrink:0;position:relative;"><label style="font-size:11px;font-weight:500;color:'+txtC+';margin-bottom:4px;display:block;">الدولة</label>'+
-            '<button type="button" id="reg-country-btn" onclick="toggleCountryDropdown(\'reg\')" style="width:100%;height:42px;border-radius:10px;border:2px solid '+brdC+';background:'+inpC+';color:'+txtC+';text-align:center;font-size:18px;cursor:pointer;">🇾🇪</button>'+
-            '<input type="hidden" id="reg-country" value="+967"><div id="reg-country-dropdown" style="display:none;position:absolute;top:100%;left:0;right:0;margin-top:4px;background:'+cardC+';border:2px solid '+brdC+';border-radius:10px;box-shadow:0 8px 24px rgba(0,0,0,0.2);z-index:50;max-height:200px;overflow-y:auto;padding:4px;"></div></div>'+
+            '<div style="width:64px;flex-shrink:0;"><label style="font-size:14px;font-weight:500;color:'+txtC+';margin-bottom:6px;display:block;">الرمز</label>'+
+            '<div style="width:100%;height:42px;border-radius:10px;border:2px solid '+brdC+';background:'+inpC+';color:'+txtC+';display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;cursor:default;">🇾🇪 +967</div>'+
+            '<input type="hidden" id="reg-country" value="+967"></div>'+
             '<div style="flex:1;min-width:0;"><label style="font-size:14px;font-weight:500;color:'+txtC+';margin-bottom:6px;display:block;">رقم الهاتف</label>'+
             '<div style="display:flex;gap:8px;align-items:center;">'+
             '<input type="tel" id="reg-phone" autocomplete="tel" style="'+inputStyle+'flex:1;min-width:0;" pattern="[0-9]+">'+
