@@ -5011,41 +5011,126 @@
         function renderMerchantChat(C) {
             var user = getUser();
             if(!user) return '';
-            var adminUser = DB.get('users').find(function(u){return u.role==='ADMIN';});
-            var adminId = adminUser ? adminUser.id : 'admin1';
+            var allUsers = DB.get('users');
             var messages = DB.get('messages').filter(function(m){
-                return (m.fromId===user.id && m.toId===adminId)||(m.fromId===adminId && m.toId===user.id);
+                return m.fromId===user.id || m.toId===user.id;
             });
-            messages.sort(function(a,b){return new Date(a.createdAt)-new Date(b.createdAt);});
-            var msgsHtml = '';
-            if(messages.length===0) msgsHtml = '<p class="'+C.muted+' text-center py-8 text-sm">ابدأ المحادثة مع فريق الدعم</p>';
-            else {
-                messages.forEach(function(m) {
-                    var isMe = m.fromId === user.id;
-                    msgsHtml += '<div class="flex '+(isMe?'justify-start':'justify-end')+' mb-3">'+
-                        '<div class="max-w-[75%] px-4 py-2.5 rounded-xl '+(isMe?'chat-bubble-me':'chat-bubble-other')+'"><p>'+escHtml(m.text)+'</p><p class="text-[10px] opacity-60 mt-1">'+fmtDate(m.createdAt)+'</p></div></div>';
-                });
+            messages.sort(function(a,b){return new Date(b.createdAt)-new Date(a.createdAt);});
+
+            // Group messages by the OTHER person (not the merchant)
+            var chatPartners = {};
+            messages.forEach(function(m) {
+                var otherId = m.fromId === user.id ? m.toId : m.fromId;
+                if (!chatPartners[otherId]) {
+                    var otherUser = allUsers.find(function(u){return u.id===otherId;});
+                    chatPartners[otherId] = {
+                        userId: otherId,
+                        name: otherUser ? otherUser.name : 'مستخدم محذوف',
+                        role: otherUser ? otherUser.role : 'UNKNOWN',
+                        lastMsg: m,
+                        unread: 0
+                    };
+                }
+                chatPartners[otherId].lastMsg = m;
+                if (m.toId === user.id && !m.isRead) {
+                    chatPartners[otherId].unread++;
+                }
+            });
+
+            var partnerList = Object.values(chatPartners);
+            partnerList.sort(function(a,b){ return new Date(b.lastMsg.createdAt) - new Date(a.lastMsg.createdAt); });
+
+            var totalUnread = partnerList.reduce(function(s,p){return s+p.unread;},0);
+
+            if (partnerList.length === 0) {
+                return '<div class="'+C.card+' rounded-xl border '+C.border+' p-8 text-center"><p class="'+C.muted+'">لا توجد محادثات بعد</p></div>';
             }
-            var msgsUnread = messages.filter(function(m){return m.fromId===adminId && !m.isRead;});
-            if(msgsUnread.length>0) {
-                var allMsgs = DB.get('messages');
-                msgsUnread.forEach(function(m) {
-                    var idx = allMsgs.findIndex(function(x){return x.id===m.id;});
-                    if(idx>=0) allMsgs[idx].isRead = true;
-                });
-                DB.set('messages', allMsgs);
-                // Re-render to update sidebar badge
-                setTimeout(function(){ render(); }, 500);
+
+            var listHtml = partnerList.map(function(p) {
+                var roleIcon = p.role==='ADMIN' ? '👨‍💼' : (p.role==='MERCHANT' ? '🏪' : '👤');
+                var roleLabel = p.role==='ADMIN' ? '<span class="text-[10px] text-primary">إدارة</span>' : (p.role==='MERCHANT' ? '<span class="text-[10px] text-primary">تاجر</span>' : '');
+                var unreadBadge = p.unread > 0 ? '<span class="bg-danger text-white text-[10px] w-5 h-5 rounded-full flex items-center justify-center font-bold">'+p.unread+'</span>' : '';
+                var lastText = escHtml((p.lastMsg.text||'').substring(0,40)) + ((p.lastMsg.text||'').length>40 ? '...' : '');
+                return '<div onclick="openMerchantChatWith(\''+p.userId+'\')" class="flex items-center gap-3 p-3 rounded-xl border '+C.border+' cursor-pointer btn hover:border-primary/30" style="margin-bottom:8px;">'+
+                    '<div class="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center text-lg shrink-0">'+roleIcon+'</div>'+
+                    '<div class="flex-1 min-w-0"><div class="flex items-center gap-2"><p class="font-bold text-sm '+C.text+' truncate">'+escHtml(p.name)+'</p>'+roleLabel+unreadBadge+'</div>'+
+                    '<p class="text-xs '+C.muted+' truncate">'+(p.lastMsg.fromId===user.id?'أنت: ':'')+lastText+'</p>'+
+                    '<p class="text-[10px] opacity-40">'+fmtDate(p.lastMsg.createdAt)+'</p></div></div>';
+            }).join('');
+
+            var activeChatHtml = '';
+            if (state.merchantChatWithId) {
+                var chatPartner = allUsers.find(function(u){return u.id===state.merchantChatWithId;});
+                if (chatPartner) {
+                    var chatMsgs = messages.filter(function(m){
+                        return (m.fromId===user.id && m.toId===state.merchantChatWithId)||(m.fromId===state.merchantChatWithId && m.toId===user.id);
+                    });
+                    chatMsgs.sort(function(a,b){return new Date(a.createdAt)-new Date(b.createdAt);});
+                    var chatMsgsHtml = '';
+                    if (chatMsgs.length===0) chatMsgsHtml = '<p class="'+C.muted+' text-center py-8 text-sm">ابدأ المحادثة</p>';
+                    else {
+                        chatMsgs.forEach(function(m) {
+                            var isMe = m.fromId === user.id;
+                            chatMsgsHtml += '<div class="flex '+(isMe?'justify-start':'justify-end')+' mb-3">'+
+                                '<div class="max-w-[75%] px-4 py-2.5 rounded-xl '+(isMe?'chat-bubble-me':'chat-bubble-other')+'"><p>'+escHtml(m.text)+'</p><p class="text-[10px] opacity-60 mt-1">'+fmtDate(m.createdAt)+'</p></div></div>';
+                        });
+                    }
+                    // Mark as read
+                    var unreadMsgs = chatMsgs.filter(function(m){return m.fromId===state.merchantChatWithId && !m.isRead;});
+                    if(unreadMsgs.length>0) {
+                        var allMsgs = DB.get('messages');
+                        unreadMsgs.forEach(function(m) {
+                            var idx = allMsgs.findIndex(function(x){return x.id===m.id;});
+                            if(idx>=0) allMsgs[idx].isRead = true;
+                        });
+                        DB.set('messages', allMsgs);
+                        setTimeout(function(){ render(); }, 500);
+                    }
+                    var partnerIcon = chatPartner.role==='ADMIN' ? '👨‍💼' : (chatPartner.role==='MERCHANT' ? '🏪' : '👤');
+                    activeChatHtml = '<div class="fixed inset-0 z-[100] '+C.card+'" style="display:flex;flex-direction:column;">'+
+                        '<div class="p-4 border-b '+C.border+' flex items-center gap-3">'+
+                        '<button onclick="closeMerchantChat()" class="text-lg '+C.muted+' btn">→</button>'+
+                        '<div class="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center text-lg shrink-0">'+partnerIcon+'</div>'+
+                        '<div><p class="font-bold '+C.text+'">'+escHtml(chatPartner.name)+'</p><p class="text-xs '+C.muted+'">'+(chatPartner.role==='ADMIN'?'الدعم الفني':'مستخدم')+'</p></div></div>'+
+                        '<div id="merchant-active-chat-messages" class="flex-1 overflow-y-auto p-4 space-y-1" style="flex:1;">'+chatMsgsHtml+'</div>'+
+                        '<div class="p-3 border-t '+C.border+' flex gap-2"><input type="text" id="merchant-active-chat-input" class="flex-1 px-4 py-2.5 rounded-xl border '+C.input+' outline-none text-sm" placeholder="اكتب رسالتك..." onkeydown="if(event.key===\'Enter\')sendMerchantActiveChat()">'+
+                        '<button onclick="sendMerchantActiveChat()" class="'+C.btn+' px-5 py-2.5 rounded-lg btn text-sm">إرسال</button></div></div>';
+                    setTimeout(function(){
+                        var chatBox = document.getElementById('merchant-active-chat-messages');
+                        if(chatBox) chatBox.scrollTop = chatBox.scrollHeight;
+                    }, 100);
+                }
             }
-            setTimeout(function(){
-                var chatBox = document.getElementById('merchant-chat-messages');
-                if(chatBox) chatBox.scrollTop = chatBox.scrollHeight;
-            }, 100);
-            return '<div class="'+C.card+' rounded-xl border '+C.border+' flex flex-col" style="height:calc(100vh - 160px)">'+
-                '<div class="p-4 border-b '+C.border+' flex items-center gap-3"><span class="text-2xl">💬</span><div><p class="font-bold '+C.text+'">الدعم الفني</p><p class="text-xs '+C.muted+'">فريق ForexYemeni</p></div></div>'+
-                '<div id="merchant-chat-messages" class="flex-1 overflow-y-auto p-4 space-y-1">'+msgsHtml+'</div>'+
-                '<div class="p-3 border-t '+C.border+' flex gap-2"><input type="text" id="merchant-chat-input" class="flex-1 px-4 py-2.5 rounded-xl border '+C.input+' outline-none text-sm" placeholder="اكتب رسالتك..." onkeydown="if(event.key===\'Enter\')sendMerchantChat()">'+
-                '<button onclick="sendMerchantChat()" class="'+C.btn+' px-5 py-2.5 rounded-lg btn text-sm">إرسال</button></div></div>';
+
+            return '<div class="'+C.card+' rounded-xl border '+C.border+'" style="min-height:calc(100vh - 160px);">'+
+                '<div class="p-4 border-b '+C.border+' flex items-center gap-3"><span class="text-2xl">💬</span><div><p class="font-bold '+C.text+'">المحادثات</p>'+
+                '<p class="text-xs '+C.muted+'">'+partnerList.length+' محادثة'+(totalUnread>0?' | <span class="text-danger font-bold">'+totalUnread+' غير مقروءة</span>':'')+'</p></div></div>'+
+                '<div class="p-4 space-y-0">'+listHtml+'</div></div>'+activeChatHtml;
+        }
+
+        function openMerchantChatWith(partnerId) {
+            state.merchantChatWithId = partnerId;
+            render();
+        }
+
+        function closeMerchantChat() {
+            state.merchantChatWithId = null;
+            render();
+        }
+
+        function sendMerchantActiveChat() {
+            var user = getUser();
+            if(!user || !state.merchantChatWithId) return;
+            var input = document.getElementById('merchant-active-chat-input');
+            if(!input) return;
+            var text = input.value.trim();
+            if(!text) return;
+            var msgs = DB.get('messages');
+            msgs.push({id:DB.uid(),fromId:user.id,toId:state.merchantChatWithId,text:text,isRead:false,createdAt:new Date().toISOString()});
+            DB.set('messages', msgs);
+            addNotif(state.merchantChatWithId, '💬 رسالة جديدة', 'رسالة من ' + user.name + ': ' + text.substring(0, 50), 'CHAT');
+            input.value = '';
+            render();
         }
 
         function sendMerchantChat() {
