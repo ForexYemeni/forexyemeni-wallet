@@ -47,6 +47,13 @@
         .glass { background: rgba(255,255,255,0.05); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); border: 1px solid rgba(255,255,255,0.08); }
         .dark .glass { background: rgba(15,20,40,0.6); border: 1px solid rgba(255,255,255,0.06); }
         .light .glass { background: rgba(255,255,255,0.75); border: 1px solid rgba(0,0,0,0.06); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); }
+        /* Fix inputs inside glass containers - backdrop-filter blocks touch events on some browsers */
+        .glass input, .glass select, .glass textarea, .glass button {
+            position: relative;
+            pointer-events: auto;
+            -webkit-transform: translateZ(0);
+            transform: translateZ(0);
+        }
 
         /* Gradient backgrounds */
         .gradient-bg { background: linear-gradient(135deg, #0a0e1a 0%, #1a1040 30%, #0f1729 60%, #0a0e1a 100%); }
@@ -99,7 +106,7 @@
         .btn-premium:active { transform: scale(0.97); }
 
         /* Modern inputs */
-        .input-modern { transition: all 0.3s ease; }
+        .input-modern { transition: all 0.3s ease; pointer-events: auto; }
         .input-modern:focus { box-shadow: 0 0 0 3px rgba(240,185,11,0.2); border-color: rgba(240,185,11,0.5) !important; }
 
         /* Animated gradient border */
@@ -1575,7 +1582,7 @@
                 bg: 'gradient-bg', text: isDark?'text-gray-100':'text-gray-800',
                 muted: isDark?'text-gray-400':'text-gray-500', card: 'glass',
                 border: isDark?'border-white/5':'border-white/20',
-                input: isDark?'bg-white/5 border-white/10 text-white input-modern':'bg-white/50 border-white/30 text-gray-800 input-modern',
+                input: isDark?'bg-white/10 border-white/20 text-white input-modern':'bg-white/80 border-gray-300 text-gray-800 input-modern',
                 btn: 'bg-gradient-to-l from-amber-500 via-amber-400 to-yellow-400 text-gray-900 font-bold btn-premium',
                 btnOutline: 'border '+(isDark?'border-white/10 text-gray-300 hover:bg-white/5':'border-gray-200 text-gray-600 hover:bg-gray-50')+' btn-premium',
                 danger: 'bg-gradient-to-r from-red-500 to-rose-500 text-white btn-premium',
@@ -1684,7 +1691,7 @@
                 muted: isDark?'text-gray-400':'text-gray-500',
                 card: 'glass',
                 border: isDark?'border-white/5':'border-white/20',
-                input: isDark?'bg-white/5 border-white/10 text-white input-modern':'bg-white/50 border-white/30 text-gray-800 input-modern',
+                input: isDark?'bg-white/10 border-white/20 text-white input-modern':'bg-white/80 border-gray-300 text-gray-800 input-modern',
                 btn: 'bg-gradient-to-l from-amber-500 via-amber-400 to-yellow-400 text-gray-900 font-bold btn-premium',
                 btnOutline: 'border '+(isDark?'border-white/10 text-gray-300 hover:bg-white/5':'border-gray-200 text-gray-600 hover:bg-gray-50')+' btn-premium',
                 danger: 'bg-gradient-to-r from-red-500 to-rose-500 text-white btn-premium',
