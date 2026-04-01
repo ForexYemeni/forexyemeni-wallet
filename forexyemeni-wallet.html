@@ -1251,6 +1251,26 @@
         function confirmAction(yes) { document.getElementById('confirm-container').classList.add('hidden'); if(state.confirmCb) state.confirmCb(yes); state.confirmCb = null; }
 
         // ==================== NOTIFICATIONS & LOGS ====================
+
+        // Mark all chat messages as read for current user
+        function _markAllChatRead(role) {
+            var user = getUser();
+            if(!user) return;
+            var allMsgs = DB.get('messages') || [];
+            var changed = false;
+            allMsgs.forEach(function(m) {
+                if(m.toId === user.id && !m.isRead) {
+                    m.isRead = true;
+                    changed = true;
+                }
+            });
+            if(changed) {
+                DB.set('messages', allMsgs);
+                // Update badge immediately without full render
+                setTimeout(function(){ render(); }, 500);
+            }
+        }
+
         function addNotif(userId, title, msg, type) {
             type = type || 'INFO';
             var ns = DB.get('notifications') || [];
@@ -2734,7 +2754,7 @@
                 case 'user-notifications': contentHtml = renderUserNotifications(C); break;
                 case 'user-settings': contentHtml = renderUserSettings(C); break;
                 case 'user-withdrawal-methods': contentHtml = renderUserWithdrawalMethods(C); break;
-                case 'user-chat': contentHtml = renderUserChat(C); break;
+                case 'user-chat': contentHtml = renderUserChat(C); _markAllChatRead('USER'); break;
                 case 'user-affiliate': contentHtml = renderUserAffiliate(C); break;
                 case 'user-merchants': contentHtml = renderUserMerchants(C); break;
                 case 'user-merchant-chat': contentHtml = renderUserMerchantChat(C); break;
@@ -2746,7 +2766,7 @@
                 case 'merchant-settings': contentHtml = renderMerchantSettings(C); break;
                 case 'merchant-deposit': contentHtml = renderMerchantDeposit(C); break;
                 case 'merchant-withdraw': contentHtml = renderMerchantWithdraw(C); break;
-                case 'merchant-chat': contentHtml = renderMerchantChat(C); break;
+                case 'merchant-chat': contentHtml = renderMerchantChat(C); _markAllChatRead('MERCHANT'); break;
                 case 'admin-home': contentHtml = renderAdminHome(C); break;
                 case 'admin-users': contentHtml = renderAdminUsers(C); break;
                 case 'admin-deposits': contentHtml = renderAdminDeposits(C); break;
@@ -2754,7 +2774,7 @@
                 case 'admin-kyc': contentHtml = renderAdminKYC(C); break;
                 case 'admin-payment-methods': contentHtml = renderAdminPaymentMethods(C); break;
                 case 'admin-affiliate': contentHtml = renderAdminAffiliate(C); break;
-                case 'admin-chat': contentHtml = renderAdminChat(C); break;
+                case 'admin-chat': contentHtml = renderAdminChat(C); _markAllChatRead('ADMIN'); break;
                 case 'admin-merchants': contentHtml = renderAdminMerchants(C); break;
                 case 'admin-merchant-transactions': contentHtml = renderAdminMerchantTransactions(C); break;
                 case 'admin-profile-changes': contentHtml = renderAdminProfileChanges(C); break;
