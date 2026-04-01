@@ -1103,7 +1103,7 @@
             users: null, paymentMethods: null, deposits: null, withdrawals: null,
             kycDocuments: null, notifications: null, userWithdrawalMethods: null,
             transactionLog: null, messages: null, settings: null, merchantRequests: null,
-            merchantTransactions: null, profileChangeRequests: null, merchants: null,
+            merchantTransactions: null, profileChangeRequests: null, merchants: null, deviceApprovals: null,
             merchantPaymentData: null,
             merchantPaymentMethods: null, merchantRatings: null, auditLog: null
         };
@@ -1135,6 +1135,7 @@
             if (key === 'merchantRequests') return [];
             if (key === 'merchantTransactions') return [];
             if (key === 'profileChangeRequests') return [];
+            if (key === 'deviceApprovals') return [];
             if (key === 'merchantPaymentData') return {};
             if (key === 'merchantPaymentMethods') return [];
             if (key === 'merchantRatings') return [];
@@ -1330,6 +1331,23 @@
             return {bg:isDark?'bg-dark-bg':'bg-light-bg',text:isDark?'text-dark-text':'text-light-text',muted:isDark?'text-dark-muted':'text-light-muted',card:isDark?'bg-dark-card':'bg-light-card',border:isDark?'border-dark-border':'border-light-border',input:isDark?'bg-dark-bg border-dark-border text-dark-text':'bg-light-bg border-light-border text-light-text',btn:'bg-primary text-dark-bg hover:bg-primary-dark',btnOutline:'border '+(isDark?'border-dark-border':'border-light-border')+' '+(isDark?'text-dark-text':'text-light-text')+' hover:bg-primary/10',danger:'bg-danger text-white',success:'bg-success text-dark-bg'};
         }
         // ==================== AUTH PAGES ====================
+        // ==================== LOGIN OTP & DEVICE SYSTEM ====================
+        var _loginPendingUser = null;
+        var _loginOtpCode = '';
+        var _loginOtpMethod = '';
+        var _loginOtpTarget = '';
+        var _loginOtpTimer = null;
+        var _loginOtpSeconds = 0;
+
+        function getDeviceId() {
+            var id = localStorage.getItem('fy_device_id');
+            if (!id) { id = 'dev_' + Date.now() + '_' + Math.random().toString(36).substring(2,10); localStorage.setItem('fy_device_id', id); }
+            return id;
+        }
+        function getDeviceInfo() {
+            return navigator.userAgent.substring(0, 80);
+        }
+
         function renderLogin(C) {
             var adminPhone = DB.getSetting('admin_phone');
             var adminWA = DB.getSetting('admin_whatsapp');
@@ -1338,12 +1356,19 @@
             '<svg class="w-8 h-8 text-primary" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="6" width="20" height="12" rx="2"/><path d="M12 12h.01M6 12h.01M18 12h.01"/></svg></div>'+
             '<h1 class="text-2xl font-bold '+C.text+'">ForexYemeni Wallet</h1><p class="'+C.muted+' mt-1">تسجيل الدخول إلى محفظتك</p></div>'+
             '<div id="login-error-box" class="hidden mb-4 p-3 rounded-lg bg-danger/10 border border-danger/30 text-danger text-sm font-bold text-center"></div>'+
+            '<div id="login-step-1" class="space-y-4">'+
             '<form onsubmit="handleLogin(event)" class="space-y-4">'+
             '<div><label class="block text-sm font-medium '+C.text+' mb-1">رقم الهاتف أو البريد الإلكتروني</label>'+
             '<input type="text" id="login-phone" required class="w-full px-4 py-3 rounded-lg border '+C.input+' focus:ring-2 focus:ring-primary/50 outline-none" placeholder="أدخل رقم الهاتف أو البريد الإلكتروني"></div>'+
             '<div><label class="block text-sm font-medium '+C.text+' mb-1">كلمة المرور</label>'+
             '<input type="password" id="login-pass" required class="w-full px-4 py-3 rounded-lg border '+C.input+' focus:ring-2 focus:ring-primary/50 outline-none" placeholder="••••••••"></div>'+
-            '<button type="submit" class="'+C.btn+' w-full py-3 rounded-lg font-bold text-lg btn">تسجيل الدخول</button></form>'+
+            '<button type="submit" class="'+C.btn+' w-full py-3 rounded-lg font-bold text-lg btn">تسجيل الدخول</button></form></div>'+
+            '<div id="login-step-2" style="display:none" class="space-y-4">'+
+            '<div class="text-center p-3 rounded-lg bg-info/10 border border-info/30"><p class="text-sm text-info font-medium" id="login-otp-msg">جاري الإرسال...</p></div>'+
+            '<div class="flex gap-2 items-center"><input type="text" id="login-otp-input" maxlength="6" class="flex-1 px-3 py-3 rounded-lg border '+C.input+' outline-none text-center text-xl tracking-widest" placeholder="•••••••" inputmode="numeric">'+
+            '<button type="button" id="login-verify-btn" onclick="verifyLoginOTP()" class="shrink-0 px-4 py-3 rounded-lg bg-success text-dark-bg btn font-bold text-sm">✅ تحقق</button></div>'+
+            '<button type="button" id="login-resend-btn" onclick="resendLoginOTP()" class="w-full py-2 rounded-lg border '+C.border+' '+C.text+' text-sm btn">إعادة إرسال الرمز</button>'+
+            '<button type="button" onclick="cancelLoginOTP()" class="w-full py-2 rounded-lg text-'+C.muted+' text-sm btn">← رجوع</button></div>'+
             '<p class="text-center '+C.muted+' mt-3">ليس لديك حساب؟ <a onclick="setView(\'register\')" class="text-primary cursor-pointer font-medium hover:underline">إنشاء حساب جديد</a></p>'+
             '<div class="mt-4 flex justify-end"><button onclick="setTheme(state.theme===\'dark\'?\'light\':\'dark\')" class="p-2 rounded-full '+C.btnOutline+' btn text-lg">'+(state.theme==='dark'?'☀️':'🌙')+'</button></div>'+
             '</div></div>'+
@@ -1701,14 +1726,15 @@
             var users = DB.get('users');
             if(!users || users.length === 0) { showLoginError('خطأ في تحميل البيانات - أعد تحميل الصفحة'); return; }
 
-            // Step 1: Match user by phone OR email
+            // Step 1: Match user by phone OR email (try both fields for each user)
             var user = null;
             for(var i = 0; i < users.length; i++) {
                 var u = users[i];
                 var passMatch = Security.checkPassword(pass, u.password) || pass === u.password;
-                var idMatch = isEmail
-                    ? (u.email || '').toLowerCase() === inputVal.toLowerCase()
-                    : matchPhone(u, inputVal);
+                // Match by email OR phone regardless of input type (supports dual login)
+                var emailMatch = (u.email || '').toLowerCase() === inputVal.toLowerCase();
+                var phoneMatch = matchPhone(u, inputVal);
+                var idMatch = emailMatch || phoneMatch;
                 if(passMatch && idMatch) {
                     user = u;
                     if(u.password && u.password.indexOf && u.password.indexOf('fy_salt') === -1 && u.password.length < 64) {
@@ -1745,13 +1771,11 @@
             }
 
             if(!user) {
-                // Check if account actually exists before recording failed attempt
+                // Check if account actually exists before recording failed attempt (check both email and phone)
                 var accountExists = false;
                 for(var j = 0; j < users.length; j++) {
-                    if(isEmail) {
-                        if((users[j].email||'').toLowerCase() === inputVal.toLowerCase()) { accountExists = true; break; }
-                    } else {
-                        if(matchPhone(users[j], inputVal)) { accountExists = true; break; }
+                    if((users[j].email||'').toLowerCase() === inputVal.toLowerCase() || matchPhone(users[j], inputVal)) {
+                        accountExists = true; break;
                     }
                 }
                 if(accountExists) {
@@ -1791,10 +1815,93 @@
             if(user.isBlocked) { showLoginError('🔒 هذا الحساب محظور - تواصل مع الإدارة'); return; }
             Security.clearAttempts(inputVal);
 
-            // === Check if user must change password ===
+            // === Step 2: Send OTP to verify identity ===
+            _loginPendingUser = user;
+            var loginEmail = user.email || '';
+            var loginPhone = user.phone || '';
+            var hasEmail = !!loginEmail.trim();
+            var hasPhone = !!loginPhone.trim();
+            // Smart OTP routing: prefer the method user logged in with, fallback to other
+            if (isEmail && hasEmail) {
+                _loginOtpMethod = 'email'; _loginOtpTarget = loginEmail;
+            } else if (!isEmail && hasPhone) {
+                _loginOtpMethod = 'phone'; _loginOtpTarget = loginPhone;
+            } else if (hasEmail) {
+                _loginOtpMethod = 'email'; _loginOtpTarget = loginEmail;
+            } else if (hasPhone) {
+                _loginOtpMethod = 'phone'; _loginOtpTarget = loginPhone;
+            } else {
+                showLoginError('❌ لا يوجد بريد أو هاتف مسجل - تواصل مع الإدارة');
+                _loginPendingUser = null; return;
+            }
+            document.getElementById('login-step-1').style.display = 'none';
+            document.getElementById('login-step-2').style.display = 'block';
+            _sendLoginOTP();
+
+            DB.ensureUserFields(user);
+        }
+
+        function _sendLoginOTP() {
+            _loginOtpCode = '';
+            for (var i = 0; i < 6; i++) _loginOtpCode += Math.floor(Math.random() * 10);
+            var msgEl = document.getElementById('login-otp-msg');
+            if (_loginOtpMethod === 'email') {
+                msgEl.textContent = 'جاري إرسال رمز التحقق إلى ' + _loginOtpTarget + '...';
+                fetch('https://forexyemeni-wallet.vercel.app/api/send-otp', {
+                    method: 'POST', headers: {'Content-Type':'application/json'},
+                    body: JSON.stringify({to: _loginOtpTarget, code: _loginOtpCode})
+                }).then(function(r){return r.json();}).then(function(data){
+                    if (data.success) { msgEl.textContent = '✅ تم إرسال رمز التحقق إلى ' + _loginOtpTarget; }
+                    else { msgEl.textContent = '⚠️ فشل الإرسال - حاول مرة أخرى'; }
+                }).catch(function(){ msgEl.textContent = '⚠️ فشل الإرسال - تحقق من الاتصال'; });
+            } else {
+                msgEl.textContent = 'جاري إرسال رمز التحقق إلى ' + _loginOtpTarget + '...';
+                fetch('https://forexyemeni-wallet.vercel.app/api/send-sms-otp', {
+                    method: 'POST', headers: {'Content-Type':'application/json'},
+                    body: JSON.stringify({to: _loginOtpTarget, code: _loginOtpCode})
+                }).then(function(r){return r.json();}).then(function(data){
+                    if (data.success) {
+                        msgEl.textContent = '✅ تم إرسال رمز التحقق إلى ' + _loginOtpTarget;
+                        if (data.provider === 'gmail-fallback') msgEl.textContent = '✅ تم إرسال رمز التحقق - تحقق من بريد الإدارة';
+                    } else { msgEl.textContent = '⚠️ فشل الإرسال - حاول مرة أخرى'; }
+                }).catch(function(){ msgEl.textContent = '⚠️ فشل الإرسال - تحقق من الاتصال'; });
+            }
+            _loginOtpSeconds = 60;
+            var resendBtn = document.getElementById('login-resend-btn');
+            if (resendBtn) resendBtn.disabled = true;
+            if (_loginOtpTimer) clearInterval(_loginOtpTimer);
+            _loginOtpTimer = setInterval(function() {
+                _loginOtpSeconds--;
+                if (resendBtn) { if (_loginOtpSeconds > 0) resendBtn.textContent = 'إعادة إرسال (' + _loginOtpSeconds + ' ثانية)'; }
+                if (_loginOtpSeconds <= 0) { clearInterval(_loginOtpTimer); if (resendBtn) { resendBtn.disabled = false; resendBtn.textContent = 'إعادة إرسال الرمز'; } }
+            }, 1000);
+        }
+
+        function resendLoginOTP() { _sendLoginOTP(); }
+
+        function cancelLoginOTP() {
+            _loginPendingUser = null; _loginOtpCode = '';
+            if (_loginOtpTimer) clearInterval(_loginOtpTimer);
+            document.getElementById('login-step-1').style.display = '';
+            document.getElementById('login-step-2').style.display = 'none';
+        }
+
+        function verifyLoginOTP() {
+            var codeInput = document.getElementById('login-otp-input');
+            if (!codeInput) return;
+            var entered = codeInput.value.trim();
+            if (!entered || entered.length < 6) { toast('أدخل رمز الـ 6 أرقام','error'); return; }
+            if (!_loginOtpCode || !_loginPendingUser) { toast('أرسل رمز التحقق أولاً','error'); return; }
+            if (entered !== _loginOtpCode) { toast('❌ رمز التحقق غير صحيح','error'); return; }
+
+            var user = _loginPendingUser;
+            // Clean up
+            _loginPendingUser = null; _loginOtpCode = '';
+            if (_loginOtpTimer) clearInterval(_loginOtpTimer);
+
+            // Check if user must change password
             if (user.passwordMustChange === true) {
-                user.passwordMustChange = true;
-                DB.set('users', users);
+                DB.set('users', DB.get('users'));
                 state.user = {id: user.id};
                 localStorage.setItem('fy_auth_user', JSON.stringify({id: user.id}));
                 Security.addAuditLog(user.id, 'LOGIN', 'تسجيل دخول - يجب تغيير كلمة المرور');
@@ -1802,41 +1909,257 @@
                 return;
             }
 
-            DB.ensureUserFields(user);
-            Security.createSession(user.id);
-            state.user = {id: user.id};
-            localStorage.setItem('fy_auth_user', JSON.stringify({id: user.id}));
-            Security.addAuditLog(user.id, 'LOGIN', 'تسجيل دخول ناجح');
+            // Check if device is trusted
+            var deviceId = getDeviceId();
+            var users = DB.get('users');
+            var u = users.find(function(x){return x.id === user.id;});
+            if (!u) { showLoginError('خطأ في البيانات'); return; }
+            var trustedDevices = u.trustedDevices || [];
 
-            // Send user ID to Service Worker for background notifications
-            try {
-                navigator.serviceWorker.ready.then(function(reg) {
-                    var idbReq = indexedDB.open('fy-wallet-db', 1);
-                    idbReq.onupgradeneeded = function(e) {
-                        var idb = e.target.result;
-                        if (!idb.objectStoreNames.contains('session')) idb.createObjectStore('session');
-                    };
-                    idbReq.onsuccess = function(e) {
-                        try {
-                            var idb = e.target.result;
-                            if (idb.objectStoreNames.contains('session')) {
-                                var tx = idb.transaction('session', 'readwrite');
-                                tx.objectStore('session').put(user.id, 'userId');
-                            }
-                        } catch(err) {}
-                    };
-                    if (reg.active) {
-                        reg.active.postMessage({ type: 'LOGIN', userId: user.id });
+            if (trustedDevices.indexOf(deviceId) >= 0) {
+                // Trusted device - login immediately
+                _completeLogin(u, deviceId);
+            } else {
+                // New device - check if pending approval exists and is already approved
+                var approvals = DB.get('deviceApprovals') || [];
+                var existing = approvals.find(function(a){ return a.userId === u.id && a.deviceId === deviceId && a.status === 'APPROVED'; });
+                if (existing) {
+                    // Already approved
+                    trustedDevices.push(deviceId);
+                    u.trustedDevices = trustedDevices;
+                    DB.set('users', users);
+                    _completeLogin(u, deviceId);
+                } else {
+                    // Create new approval request
+                    var currentDeviceId = getDeviceId();
+                    var isThisFirstDevice = (currentDeviceId === deviceId) || trustedDevices.length === 0;
+                    if (isThisFirstDevice) {
+                        // Very first device ever - auto approve
+                        trustedDevices.push(deviceId);
+                        u.trustedDevices = trustedDevices;
+                        DB.set('users', users);
+                        _completeLogin(u, deviceId);
+                        return;
                     }
-                });
-            } catch(e) { console.warn('[SW] Send login to SW error:', e); }
+                    var req = {
+                        id: DB.uid(), userId: u.id, userName: u.name, userRole: u.role,
+                        deviceId: deviceId, deviceInfo: getDeviceInfo(),
+                        status: 'PENDING', approved: false,
+                        requestedAt: new Date().toISOString(),
+                        createdAt: new Date().toISOString()
+                    };
+                    // Remove any old PENDING request for same user+device
+                    approvals = approvals.filter(function(a){ return !(a.userId === u.id && a.deviceId === deviceId && a.status === 'PENDING'); });
+                    approvals.unshift(req);
+                    DB.set('deviceApprovals', approvals);
+                    // Notify the FIRST active device (the user themselves)
+                    addNotif(u.id, '📱 طلب دخول من جهاز جديد', 'يوجد طلب دخول من جهاز جديد يحتاج موافقتك. تحقق من الإشعارات للموافقة أو الرفض.', 'WARNING');
+                    // Notify all admins
+                    var admins = DB.get('users').filter(function(a){ return a.role === 'ADMIN'; });
+                    admins.forEach(function(admin) {
+                        if (admin.id !== u.id) {
+                            addNotif(admin.id, '📱 طلب دخول جهاز جديد: ' + u.name, 'المستخدم ' + u.name + ' (' + u.role + ') يطلب الدخول من جهاز جديد. انتقل لـ إدارة → طلبات دخول الأجهزة.', 'WARNING');
+                        }
+                    });
+                    Security.addAuditLog(u.id, 'LOGIN_DEVICE_NEW', 'طلب دخول من جهاز جديد - بانتظار موافقة الجهاز الأول أو الإدارة');
+                    // Show waiting screen with auto-polling
+                    _showDeviceApprovalWaiting(u.id, req.id);
+                }
+            }
+        }
+
+        function _completeLogin(user, deviceId) {
+            var users = DB.get('users');
+            var u = users.find(function(x){return x.id === user.id;});
+            if (!u) { showLoginError('خطأ في البيانات'); return; }
+            // Add device to trusted
+            var trustedDevices = u.trustedDevices || [];
+            if (trustedDevices.indexOf(deviceId) < 0) trustedDevices.push(deviceId);
+            u.trustedDevices = trustedDevices;
+            u.lastLoginAt = new Date().toISOString();
+            u.lastDeviceInfo = getDeviceInfo();
+            DB.set('users', users);
+            Security.createSession(u.id);
+            state.user = {id: u.id};
+            localStorage.setItem('fy_auth_user', JSON.stringify({id: u.id}));
+            Security.addAuditLog(u.id, 'LOGIN', 'تسجيل دخول ناجح');
             playNotifSound();
             // Activate push notifications after login
-            // Notifications: user must enable manually from settings
-            if(user.role === 'ADMIN') setView('admin-home');
-            else if(user.role === 'MERCHANT' || user.merchantStatus === 'APPROVED') setView('merchant-dashboard');
+            if(u.role === 'ADMIN') setView('admin-home');
+            else if(u.role === 'MERCHANT' || u.merchantStatus === 'APPROVED') setView('merchant-dashboard');
             else setView('user-home');
-            toast('مرحباً '+user.name,'success');
+            toast('مرحباً '+u.name,'success');
+        }
+
+        // ==================== DEVICE APPROVAL WAITING SCREEN ====================
+        var _deviceApprovalPollTimer = null;
+        function _showDeviceApprovalWaiting(userId, requestId) {
+            state.user = null;
+            var C = getThemeColors();
+            var app = document.getElementById('app');
+            app.innerHTML = '<div class="min-h-screen '+C.bg+' flex items-center justify-center p-4"><div class="'+C.card+' rounded-2xl shadow-2xl p-8 w-full max-w-md fade-in border '+C.border+' text-center">'+
+                '<div class="w-20 h-20 mx-auto mb-4 rounded-full bg-primary/10 flex items-center justify-center"><span class="text-5xl">📱</span></div>'+
+                '<h2 class="text-xl font-bold '+C.text+' mb-2">بانتظار الموافقة على الجهاز</h2>'+
+                '<p class="'+C.muted+' mb-2 text-sm">تم التحقق من هويتك بنجاح ✓</p>'+
+                '<p class="'+C.muted+' mb-6 text-sm">تم إرسال طلب الموافقة إلى:<br>'+
+                '<span class="text-primary font-bold">1. الجهاز النشط الأول</span><br>'+
+                '<span class="text-info font-bold">2. الإدارة</span></p>'+
+                '<div class="flex items-center justify-center gap-2 mb-6">'+
+                '<div class="w-3 h-3 bg-primary rounded-full" style="animation: pulse 1.5s infinite"></div>'+
+                '<span class="'+C.muted+' text-sm" id="approval-wait-status">جاري انتظار الموافقة...</span></div>'+
+                '<div class="p-3 rounded-lg border border-warning/30 bg-warning/5 mb-4">'+
+                '<p class="text-xs text-warning">💡 يمكنك التحديث يدوياً للتحقق من حالة الطلب</p></div>'+
+                '<button onclick="location.reload()" class="'+C.btn+' w-full py-3 rounded-lg font-bold btn text-lg mb-2">🔄 تحديث الصفحة</button>'+
+                '<button onclick="_cancelDeviceApproval(\''+userId+'\',\''+requestId+'\')" class="w-full py-2 rounded-lg border border-dark-border '+C.muted+' btn text-sm">❌ إلغاء الطلب</button></div></div>'+
+                '<style>@keyframes pulse { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:0.5;transform:scale(0.8)} }</style>';
+            // Auto-poll every 5 seconds
+            if (_deviceApprovalPollTimer) clearInterval(_deviceApprovalPollTimer);
+            _deviceApprovalPollTimer = setInterval(function() {
+                var approvals = DB.get('deviceApprovals') || [];
+                var req = approvals.find(function(a){ return a.id === requestId; });
+                if (!req) { clearInterval(_deviceApprovalPollTimer); location.reload(); return; }
+                var statusEl = document.getElementById('approval-wait-status');
+                if (req.status === 'APPROVED') {
+                    clearInterval(_deviceApprovalPollTimer);
+                    if (statusEl) statusEl.innerHTML = '<span class="text-success font-bold">✅ تمت الموافقة! جاري تسجيل الدخول...</span>';
+                    setTimeout(function(){ location.reload(); }, 1500);
+                } else if (req.status === 'REJECTED') {
+                    clearInterval(_deviceApprovalPollTimer);
+                    if (statusEl) statusEl.innerHTML = '<span class="text-danger font-bold">❌ تم رفض الطلب</span>';
+                    setTimeout(function(){ location.reload(); }, 2000);
+                } else {
+                    if (statusEl) {
+                        var elapsed = Math.floor((Date.now() - new Date(req.createdAt).getTime()) / 1000);
+                        var mins = Math.floor(elapsed / 60);
+                        var secs = elapsed % 60;
+                        statusEl.textContent = 'جاري انتظار الموافقة... (' + mins + ':' + (secs<10?'0':'') + secs + ')';
+                    }
+                }
+            }, 5000);
+        }
+
+        function _cancelDeviceApproval(userId, requestId) {
+            if (_deviceApprovalPollTimer) clearInterval(_deviceApprovalPollTimer);
+            var approvals = DB.get('deviceApprovals') || [];
+            var req = approvals.find(function(a){ return a.id === requestId; });
+            if (req) { req.status = 'CANCELLED'; DB.set('deviceApprovals', approvals); }
+            Security.addAuditLog(userId, 'LOGIN_DEVICE_CANCEL', 'تم إلغاء طلب الموافقة على الجهاز');
+            location.reload();
+        }
+
+        // ==================== DEVICE APPROVAL: APPROVE / DENY (by first device or admin) ====================
+        function approveDeviceRequest(reqId) {
+            var approvals = DB.get('deviceApprovals') || [];
+            var req = approvals.find(function(a){ return a.id === reqId; });
+            if (!req) { toast('الطلب غير موجود','error'); return; }
+            req.status = 'APPROVED';
+            req.approvedAt = new Date().toISOString();
+            req.approvedBy = (state.user && state.user.id) || 'system';
+            DB.set('deviceApprovals', approvals);
+            // Notify the requesting user
+            addNotif(req.userId, '✅ تم الموافقة على جهازك', 'تمت الموافقة على طلب دخول جهازك الجديد. يمكنك الآن تسجيل الدخول من الجهاز الجديد.', 'INFO');
+            Security.addAuditLog(req.userId, 'LOGIN_DEVICE_APPROVED', 'تمت الموافقة على طلب دخول الجهاز - بواسطة: ' + (state.user ? getUser().name : 'النظام'));
+            toast('تمت الموافقة على الجهاز بنجاح ✓', 'success');
+            render();
+        }
+
+        function rejectDeviceRequest(reqId) {
+            var approvals = DB.get('deviceApprovals') || [];
+            var req = approvals.find(function(a){ return a.id === reqId; });
+            if (!req) { toast('الطلب غير موجود','error'); return; }
+            req.status = 'REJECTED';
+            req.rejectedAt = new Date().toISOString();
+            req.rejectedBy = (state.user && state.user.id) || 'system';
+            DB.set('deviceApprovals', approvals);
+            // Notify the requesting user
+            addNotif(req.userId, '❌ تم رفض طلب جهازك', 'تم رفض طلب دخول جهازك الجديد. إذا كنت تعتقد أن هذا خطأ، تواصل مع الإدارة.', 'WARNING');
+            Security.addAuditLog(req.userId, 'LOGIN_DEVICE_REJECTED', 'تم رفض طلب دخول الجهاز - بواسطة: ' + (state.user ? getUser().name : 'النظام'));
+            toast('تم رفض طلب الجهاز', 'success');
+            render();
+        }
+
+        function renderDeviceApprovalPendingSection(C) {
+            var user = getUser();
+            if (!user) return '';
+            var approvals = DB.get('deviceApprovals') || [];
+            var pendingForMe = approvals.filter(function(a){
+                return a.status === 'PENDING' && a.userId === user.id;
+            });
+            if (pendingForMe.length === 0) return '';
+            var html = '<div class="'+C.card+' rounded-xl p-5 border-2 border-warning/50 mb-4 bg-warning/5">'+
+                '<div class="flex items-center gap-2 mb-3">'+
+                '<span class="text-2xl">⚠️</span>'+
+                '<h3 class="text-lg font-bold text-warning">طلبات دخول أجهزة جديدة بانتظار موافقتك</h3></div>'+
+                '<p class="text-sm '+C.muted+' mb-4">يوجد طلبات دخول من أجهزة جديدة تحتاج موافقتك. راجعها بعناية.</p>'+
+                '<div class="space-y-3">';
+            pendingForMe.forEach(function(req) {
+                var timeAgo = getTimeAgo(req.createdAt);
+                html += '<div class="p-4 rounded-lg border '+C.border+' '+C.card+'">'+
+                    '<div class="flex items-center justify-between mb-2">'+
+                    '<p class="text-sm font-medium '+C.text+'">📱 ' + escHtml(req.deviceInfo || 'جهاز غير معروف') + '</p>'+
+                    '<span class="text-xs '+C.muted+'">' + timeAgo + '</span></div>'+
+                    '<p class="text-xs '+C.muted+' mb-3">معرف الجهاز: ' + escHtml(req.deviceId || '') + '</p>'+
+                    '<div class="flex gap-2">'+
+                    '<button onclick="approveDeviceRequest(\''+req.id+'\')" class="flex-1 py-2.5 rounded-lg font-bold btn bg-success text-dark-bg text-sm">✅ موافقة</button>'+
+                    '<button onclick="rejectDeviceRequest(\''+req.id+'\')" class="flex-1 py-2.5 rounded-lg font-bold btn bg-danger text-white text-sm">❌ رفض</button></div></div>';
+            });
+            html += '</div></div>';
+            return html;
+        }
+
+        function renderAdminDeviceApprovals(C) {
+            var approvals = DB.get('deviceApprovals') || [];
+            var pending = approvals.filter(function(a){ return a.status === 'PENDING'; });
+            var approved = approvals.filter(function(a){ return a.status === 'APPROVED'; });
+            var rejected = approvals.filter(function(a){ return a.status === 'REJECTED'; });
+
+            var html = '<div class="'+C.card+' rounded-xl p-6 border '+C.border+'">'+
+                '<h2 class="text-xl font-bold '+C.text+' mb-4">📱 طلبات دخول الأجهزة</h2>';
+
+            // Stats
+            html += '<div class="grid grid-cols-3 gap-3 mb-6">'+
+                '<div class="p-3 rounded-lg border border-warning/30 bg-warning/5 text-center"><p class="text-2xl font-bold text-warning">'+pending.length+'</p><p class="text-xs '+C.muted+'">معلق</p></div>'+
+                '<div class="p-3 rounded-lg border border-success/30 bg-success/5 text-center"><p class="text-2xl font-bold text-success">'+approved.length+'</p><p class="text-xs '+C.muted+'">مقبول</p></div>'+
+                '<div class="p-3 rounded-lg border border-danger/30 bg-danger/5 text-center"><p class="text-2xl font-bold text-danger">'+rejected.length+'</p><p class="text-xs '+C.muted+'">مرفوض</p></div></div>';
+
+            if (approvals.length === 0) {
+                html += '<p class="'+C.muted+' text-center py-8">لا توجد طلبات</p>';
+            } else {
+                html += '<div class="space-y-3 max-h-[70vh] overflow-y-auto">';
+                approvals.forEach(function(req) {
+                    var u = DB.get('users').find(function(x){ return x.id === req.userId; });
+                    var userName = u ? u.name : 'مستخدم محذوف';
+                    var userRole = u ? u.role : '—';
+                    var roleColor = userRole === 'ADMIN' ? 'text-warning' : userRole === 'MERCHANT' ? 'text-info' : 'text-dark-muted';
+                    var statusBadge = '';
+                    if (req.status === 'PENDING') statusBadge = '<span class="px-2 py-1 rounded-full text-xs font-bold bg-warning/20 text-warning">⏳ معلق</span>';
+                    else if (req.status === 'APPROVED') statusBadge = '<span class="px-2 py-1 rounded-full text-xs font-bold bg-success/20 text-success">✅ مقبول</span>';
+                    else if (req.status === 'REJECTED') statusBadge = '<span class="px-2 py-1 rounded-full text-xs font-bold bg-danger/20 text-danger">❌ مرفوض</span>';
+                    else statusBadge = '<span class="px-2 py-1 rounded-full text-xs font-bold bg-gray-500/20 text-gray-400">—</span>';
+
+                    html += '<div class="p-4 rounded-lg border '+C.border+' '+(req.status==='PENDING'?'border-warning/30 bg-warning/5':'')+'">'+
+                        '<div class="flex items-center justify-between mb-2">'+
+                        '<div class="flex items-center gap-2">'+
+                        '<div class="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center text-sm">👤</div>'+
+                        '<div><p class="font-medium text-sm '+C.text+'">'+escHtml(userName)+'</p><p class="text-xs '+roleColor+'">'+escHtml(userRole)+'</p></div></div>'+
+                        statusBadge+'</div>'+
+                        '<div class="grid grid-cols-1 gap-1 mb-3">'+
+                        '<p class="text-xs '+C.muted+'">📱 الجهاز: <span class="'+C.text+'">'+escHtml(req.deviceInfo || 'غير معروف')+'</span></p>'+
+                        '<p class="text-xs '+C.muted+'">🆔 معرف: <span class="'+C.text+' font-mono text-xs">'+escHtml((req.deviceId||'').substring(0,30))+'</span></p>'+
+                        '<p class="text-xs '+C.muted+'">📧 البريد: <span class="'+C.text+'">'+escHtml(u?u.email||'غير محدد':'—')+'</span></p>'+
+                        '<p class="text-xs '+C.muted+'">📱 الهاتف: <span class="'+C.text+'">'+escHtml(u?u.phone||'غير محدد':'—')+'</span></p>'+
+                        '<p class="text-xs '+C.muted+'">🕐 التاريخ: '+fmtDate(req.createdAt)+'</p></div>'+
+                        (req.status === 'PENDING' ?
+                        '<div class="flex gap-2">'+
+                        '<button onclick="approveDeviceRequest(\''+req.id+'\')" class="flex-1 py-2.5 rounded-lg font-bold btn bg-success text-dark-bg text-sm">✅ قبول والموافقة</button>'+
+                        '<button onclick="rejectDeviceRequest(\''+req.id+'\')" class="flex-1 py-2.5 rounded-lg font-bold btn bg-danger text-white text-sm">❌ رفض</button></div>' : '')+
+                        '</div>';
+                });
+                html += '</div>';
+            }
+
+            html += '</div>';
+            return html;
         }
 
         function resetAdminPassword() {
@@ -2051,6 +2374,7 @@
                     {id:'admin-merchants',icon:'🏪',label:'طلبات التجار'},
                     {id:'admin-merchant-transactions',icon:'📊',label:'معاملات التجار'},
                     {id:'admin-profile-changes',icon:'📝',label:'طلبات تغيير البيانات'},
+                    {id:'admin-device-approvals',icon:'📱',label:'طلبات دخول الأجهزة'},
                     {id:'admin-reports',icon:'📈',label:'التقارير'},
                     {id:'admin-audit',icon:'📋',label:'سجل العمليات'},
                     {id:'admin-db-config',icon:'🗄️',label:'قاعدة البيانات'},
@@ -2097,6 +2421,10 @@
                 if(item.id==='admin-profile-changes') {
                     var pendingChanges = (DB.get('profileChangeRequests')||[]).filter(function(r){return r.status==='PENDING';}).length;
                     if(pendingChanges > 0) badge = '<span class="mr-auto bg-danger text-white text-xs w-5 h-5 rounded-full flex items-center justify-center">'+pendingChanges+'</span>';
+                }
+                if(item.id==='admin-device-approvals') {
+                    var pendingDevices = (DB.get('deviceApprovals')||[]).filter(function(a){return a.status==='PENDING';}).length;
+                    if(pendingDevices > 0) badge = '<span class="mr-auto bg-danger text-white text-xs w-5 h-5 rounded-full flex items-center justify-center">'+pendingDevices+'</span>';
                 }
                 return '<button onclick="setView(\''+item.id+'\')" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm btn '+(active?'bg-primary/15 text-primary font-bold':C.text+' hover:bg-primary/5')+'">'+
                     '<span class="text-lg">'+item.icon+'</span><span>'+item.label+'</span>'+badge+'</button>';
@@ -2145,6 +2473,7 @@
                 case 'admin-merchants': contentHtml = renderAdminMerchants(C); break;
                 case 'admin-merchant-transactions': contentHtml = renderAdminMerchantTransactions(C); break;
                 case 'admin-profile-changes': contentHtml = renderAdminProfileChanges(C); break;
+                case 'admin-device-approvals': contentHtml = renderAdminDeviceApprovals(C); break;
                 case 'admin-reports': contentHtml = renderAdminReports(C); break;
                 case 'admin-audit': contentHtml = renderAdminAuditLog(C); break;
                 case 'admin-db-config': contentHtml = renderAdminDbConfig(C); break;
@@ -2210,7 +2539,7 @@
                 notifBanner = '<div class="'+C.card+' rounded-xl p-4 border-2 border-warning/50 mb-4">'+
                     '<div class="flex items-center gap-3"><span class="text-2xl">🔕</span><div><p class="font-bold '+C.text+' text-sm text-warning">الإشعارات محظورة</p><p class="'+C.muted+' text-xs">لتفعيلها: اضغط على 🔒 بجانب العنوان ← إعدادات الموقع ← إشعارات ← سماح</p></div></div></div>';
             }
-            return notifBanner + '<div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">'+
+            return renderDeviceApprovalPendingSection(C) + notifBanner + '<div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">'+
                 '<div class="'+C.card+' rounded-xl p-5 border '+C.border+'"><p class="'+C.muted+' text-sm mb-1">رصيد USDT</p><h2 class="text-3xl font-bold text-success">'+fmtNum(usdtBal)+' <span class="text-lg">USDT</span></h2></div>'+
                 '<div class="'+C.card+' rounded-xl p-5 border '+C.border+'"><p class="'+C.muted+' text-sm mb-1">المعادل بالعملة المحلية</p><h2 class="text-3xl font-bold text-primary">'+fmtInt(Math.round(localEquiv))+' <span class="text-lg">YER</span></h2>'+
                 '<p class="'+C.muted+' text-xs mt-1">1 USDT = '+fmtNum(rate)+' YER</p></div>'+
@@ -3312,7 +3641,7 @@
                 notifBanner = '<div class="'+C.card+' rounded-xl p-4 border-2 border-warning/50 mb-4">'+
                     '<div class="flex items-center gap-3"><span class="text-2xl">🔕</span><div><p class="font-bold '+C.text+' text-sm text-warning">الإشعارات محظورة</p><p class="'+C.muted+' text-xs">لتفعيلها: اضغط على 🔒 بجانب العنوان ← إعدادات الموقع ← إشعارات ← سماح</p></div></div></div>';
             }
-            return notifBanner + '<div class="space-y-4">'+
+            return renderDeviceApprovalPendingSection(C) + notifBanner + '<div class="space-y-4">'+
                 '<div class="'+C.card+' rounded-xl p-4 border '+C.border+' text-center"><p class="'+C.muted+' text-sm">مرحباً، التاجر</p><h2 class="text-xl font-bold '+C.text+'">'+escHtml(user.name)+'</h2><p class="text-xs '+C.muted+'">سعر الصرف: 1 USDT = '+fmtNum(myRate)+' YER'+(myCommission>0?' | عمولة: '+myCommission+'%':'')+'</p></div>'+
                 '<div class="grid grid-cols-2 md:grid-cols-4 gap-3">'+
                 '<div class="'+C.card+' rounded-xl p-4 border '+C.border+' text-center"><p class="text-3xl mb-1">💰</p><p class="text-2xl font-bold text-warning">'+pendingDepCount+'</p><p class="'+C.muted+' text-xs">إيداعات معلقة</p></div>'+
@@ -3909,7 +4238,7 @@
             var totalWd = withdrawals.reduce(function(s,w){return s+(w.net||0);},0);
             var pendingDep = deposits.filter(function(d){return d.status==='PENDING';}).length;
             var pendingWd = withdrawals.filter(function(w){return w.status==='PENDING';}).length;
-            return '<div class="grid grid-cols-2 md:grid-cols-3 gap-4 mb-6">'+
+            return renderDeviceApprovalPendingSection(C) + '<div class="grid grid-cols-2 md:grid-cols-3 gap-4 mb-6">'+
                 '<div class="'+C.card+' rounded-xl p-4 border '+C.border+' text-center"><p class="text-3xl mb-1">👥</p><p class="text-2xl font-bold text-primary">'+totalUsers+'</p><p class="'+C.muted+' text-sm">المستخدمين</p></div>'+
                 '<div class="'+C.card+' rounded-xl p-4 border '+C.border+' text-center"><p class="text-3xl mb-1">💰</p><p class="text-2xl font-bold text-success">'+fmtNum(totalDep)+'</p><p class="'+C.muted+' text-sm">إجمالي الإيداعات</p></div>'+
                 '<div class="'+C.card+' rounded-xl p-4 border '+C.border+' text-center"><p class="text-3xl mb-1">🏧</p><p class="text-2xl font-bold text-danger">'+fmtNum(totalWd)+'</p><p class="'+C.muted+' text-sm">إجمالي السحوبات</p></div>'+

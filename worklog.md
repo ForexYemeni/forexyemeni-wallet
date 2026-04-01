@@ -253,3 +253,37 @@ Stage Summary:
 - تم إصلاح emailjs.init({ publicKey: EMAILJS_PUBLIC_KEY }) ليتوافق مع EmailJS v4
 - تمت إضافة رسائل خطأ تفصيلية: 401/403 (مفتاح API), 400 (بيانات القالب), 402/429 (حد الرسائل), 422 (بريد غير مقبول)
 - تم التحقق من بناء JavaScript بنجاح (450843 chars)
+
+---
+Task ID: 1
+Agent: Main Agent
+Task: Implement dual login (phone/email) and mandatory device approval system
+
+Work Log:
+- Read and analyzed the entire forexyemeni-wallet.html file (5935 lines)
+- Identified the handleLogin function and session management code
+- Identified the existing device approval system (partially implemented)
+- Modified handleLogin matching logic to search BOTH email and phone fields for any input
+- Modified account existence check to also search both fields
+- Improved OTP routing to be smarter (prefer login method, fallback to other)
+- Rewrote the device approval creation to handle first-device auto-approval
+- Added notification to the first active device AND all admins
+- Created _showDeviceApprovalWaiting() with auto-polling every 5 seconds
+- Created _cancelDeviceApproval() for canceling pending requests
+- Created approveDeviceRequest() and rejectDeviceRequest() shared functions
+- Created renderDeviceApprovalPendingSection() for user/merchant/admin home pages
+- Created renderAdminDeviceApprovals() admin view with stats and approve/deny buttons
+- Added admin-device-approvals case to render switch
+- Added badge counter for pending device approvals in admin sidebar
+- Added device approval banner to user-home, merchant-dashboard, and admin-home
+
+Stage Summary:
+- Feature 1 (Dual Login): Users can now login with phone OR email after both are verified. Matching searches both fields regardless of input type.
+- Feature 2 (Device Approval): Complete device approval system with:
+  - First device auto-approval (no approval needed for the very first login)
+  - Notification to the first active device with approve/deny buttons
+  - Admin panel view with stats (pending/approved/rejected) and full management
+  - Waiting screen with real-time auto-polling every 5 seconds
+  - Cancel request option for the requesting user
+  - Badge counter in admin sidebar
+  - Professional UI with user info, device info, timestamps
