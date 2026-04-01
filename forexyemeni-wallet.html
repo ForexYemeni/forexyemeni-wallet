@@ -1564,7 +1564,7 @@
             };
             switch(state.view) {
                 case 'login': app.innerHTML = renderLogin(C); break;
-                case 'register': app.innerHTML = renderRegister(C); setTimeout(function(){ if(typeof updateRegPhoneLength === 'function') updateRegPhoneLength(); },50); break;
+                case 'register': try { app.innerHTML = renderRegister(C); setTimeout(function(){ if(typeof updateRegPhoneLength === 'function') updateRegPhoneLength(); },50); } catch(e) { console.error('renderRegister error:', e); app.innerHTML = '<div class="min-h-screen gradient-bg flex items-center justify-center p-4"><div class="glass rounded-2xl p-8 text-center"><p class="text-danger text-xl mb-4">خطأ في تحميل صفحة التسجيل</p><button onclick="setView(\'login\')" class="px-6 py-3 rounded-xl bg-primary text-dark-bg font-bold btn">العودة</button></div></div>'; } break;
                 case 'change-password-required': app.innerHTML = renderChangePasswordRequired(C); break;
                 case 'loading': app.innerHTML = renderLoading(C); break;
                 default:
@@ -1634,6 +1634,20 @@
             try { var p = new URLSearchParams(window.location.search); return p.get('ref') || ''; } catch(e) { return ''; }
         }
 
+        function tryRegisterPage() {
+            try {
+                state.user = null;
+                localStorage.removeItem('fy_auth_user');
+                localStorage.removeItem('fy_session_id');
+                state.view = 'register';
+                state.sidebarOpen = false;
+                render();
+            } catch(e) {
+                console.error('Register page error:', e);
+                toast('خطأ في فتح صفحة التسجيل','error');
+            }
+        }
+
         function renderLogin(C) {
             var adminPhone = DB.getSetting('admin_phone');
             var adminWA = DB.getSetting('admin_whatsapp');
@@ -1656,7 +1670,9 @@
             '<input type="password" id="login-pass" required class="w-full pr-10 pl-4 py-3.5 rounded-xl border '+C.input+' outline-none" placeholder="••••••••"></div></div>'+
             '<button type="submit" class="'+C.btn+' w-full py-3.5 rounded-xl text-lg">تسجيل الدخول</button></form></div>'+
 
-            '<p class="text-center '+C.muted+' mt-4">ليس لديك حساب؟ <a onclick="setView(\'register\')" class="text-primary cursor-pointer font-bold hover:underline">إنشاء حساب جديد</a></p>'+
+            '<div class="mt-6">'+
+            '<button onclick="tryRegisterPage()" class="w-full py-3.5 rounded-xl font-bold text-lg border-2 border-dashed border-primary/50 text-primary btn hover:bg-primary/10 transition-all">✨ إنشاء حساب جديد</button>'+
+            '</div>'+
             '<div class="mt-4 flex justify-end"><button onclick="setTheme(state.theme===\'dark\'?\'light\':\'dark\')" class="p-2.5 rounded-xl '+C.btnOutline+' text-lg">'+(state.theme==='dark'?'☀️':'🌙')+'</button></div>'+
             '</div></div>'+
             (adminPhone || adminWA ? '<div class="fixed bottom-6 left-6 z-50 flex flex-col items-center gap-3">'+
