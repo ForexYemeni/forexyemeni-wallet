@@ -133,7 +133,7 @@
         .bottom-nav-item.active::after { content: ''; position: absolute; bottom: -4px; left: 50%; transform: translateX(-50%); width: 20px; height: 3px; background: #F0B90B; border-radius: 2px; }
 
         /* Login decorative particles */
-        .login-orb { position: absolute; border-radius: 50%; filter: blur(60px); opacity: 0.3; animation: float 8s ease-in-out infinite; }
+        .login-orb { position: absolute; border-radius: 50%; filter: blur(60px); opacity: 0.3; animation: float 8s ease-in-out infinite; pointer-events: none; }
         .login-orb-1 { width: 200px; height: 200px; background: #F0B90B; top: -50px; right: -50px; animation-delay: 0s; }
         .login-orb-2 { width: 150px; height: 150px; background: #8B5CF6; bottom: -30px; left: -30px; animation-delay: 2s; }
         .login-orb-3 { width: 100px; height: 100px; background: #06B6D4; top: 50%; left: 50%; animation-delay: 4s; }
@@ -1750,24 +1750,24 @@
             var opts = countries.map(function(c){return '<option value="'+c.code+'" '+(c.code==='+967'?'selected':'')+'>'+c.flag+' ('+c.code+')</option>';}).join('');
             return '<div class="min-h-screen gradient-bg flex items-center justify-center p-4 relative overflow-hidden">'+
             '<div class="login-orb login-orb-1"></div><div class="login-orb login-orb-2"></div><div class="login-orb login-orb-3"></div>'+
-            '<div class="border-gradient glass rounded-2xl shadow-premium p-8 w-full max-w-md fade-in relative z-10 max-h-[90vh] overflow-y-auto">'+
+            '<div class="border-gradient glass rounded-2xl shadow-premium p-8 w-full max-w-md fade-in relative z-10">'+
             '<div class="text-center mb-6"><div class="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-gradient-to-br from-amber-400 via-amber-500 to-yellow-500 shadow-glow mb-3 float-anim">'+
             '<span class="text-3xl">✨</span></div><h1 class="text-2xl font-extrabold '+C.text+' text-glow">إنشاء حساب جديد</h1><p class="'+C.muted+' mt-1">انضم إلى ForexYemeni Wallet</p></div>'+
             '<form onsubmit="handleRegister(event)" class="space-y-3">'+
             '<div><label class="block text-sm font-medium '+C.text+' mb-1">نوع الحساب</label>'+
             '<div class="grid grid-cols-2 gap-2">'+
-            '<label class="flex items-center gap-2 p-3 rounded-lg border '+C.border+' cursor-pointer has-[:checked]:border-primary has-[:checked]:bg-primary/5">'+
-            '<input type="radio" name="reg-role" value="USER" checked class="accent-[#F0B90B]"><span class="text-sm '+C.text+'">👤 مستخدم</span></label>'+
-            '<label class="flex items-center gap-2 p-3 rounded-lg border '+C.border+' cursor-pointer has-[:checked]:border-primary has-[:checked]:bg-primary/5">'+
-            '<input type="radio" name="reg-role" value="MERCHANT" class="accent-[#F0B90B]"><span class="text-sm '+C.text+'">🏪 تاجر</span></label></div></div>'+
-            '<div><label class="block text-sm font-medium '+C.text+' mb-1">الاسم الكامل</label><input type="text" id="reg-name" required class="w-full px-4 py-2.5 rounded-xl border '+C.input+' outline-none focus:ring-2 focus:ring-primary/50" placeholder="محمد أحمد"></div>'+
+            '<div id="reg-role-user" onclick="selectRegRole(\'USER\')" style="cursor:pointer;padding:12px;border-radius:12px;border:2px solid #F0B90B;background:rgba(240,185,11,0.05);display:flex;align-items:center;gap:8px">'+
+            '<input type="radio" name="reg-role" value="USER" checked style="accent-color:#F0B90B"><span class="text-sm '+C.text+'">👤 مستخدم</span></div>'+
+            '<div id="reg-role-MERCHANT" onclick="selectRegRole(\'MERCHANT\')" style="cursor:pointer;padding:12px;border-radius:12px;border:2px solid '+C.border+';display:flex;align-items:center;gap:8px">'+
+            '<input type="radio" name="reg-role" value="MERCHANT" style="accent-color:#F0B90B"><span class="text-sm '+C.text+'">🏪 تاجر</span></div></div></div>'+
+            '<div><label class="block text-sm font-medium '+C.text+' mb-1">الاسم الكامل</label><input type="text" id="reg-name" required autocomplete="name" class="w-full px-4 py-2.5 rounded-xl border '+C.input+' outline-none focus:ring-2 focus:ring-primary/50" placeholder="محمد أحمد"></div>'+
             '<div><label class="block text-sm font-medium '+C.text+' mb-1">طريقة التسجيل</label>'+
             '<div class="grid grid-cols-2 gap-2">'+
             '<button type="button" id="toggle-email" onclick="toggleRegMethod(\'email\')" class="flex-1 py-2.5 rounded-lg border '+(state.theme==='dark'?'border-dark-border text-dark-muted':'border-light-border text-light-muted')+' text-center text-sm font-medium btn">📧 بالبريد الإلكتروني</button>'+
             '<button type="button" id="toggle-phone" onclick="toggleRegMethod(\'phone\')" class="flex-1 py-2.5 rounded-lg bg-primary text-dark-bg text-center text-sm font-bold btn">📱 برقم الهاتف</button></div></div>'+
             '<div id="reg-email-block" style="display:none">'+
             '<div><label class="block text-sm font-medium '+C.text+' mb-1">البريد الإلكتروني <span class="text-danger">*</span></label>'+
-            '<div class="flex gap-2 items-center"><input type="email" id="reg-email" class="flex-1 min-w-0 px-3 py-2.5 rounded-xl border '+C.input+' outline-none focus:ring-2 focus:ring-primary/50 text-sm" placeholder="example@email.com">'+
+            '<div class="flex gap-2 items-center"><input type="email" id="reg-email" autocomplete="email" class="flex-1 min-w-0 px-3 py-2.5 rounded-xl border '+C.input+' outline-none focus:ring-2 focus:ring-primary/50 text-sm" placeholder="example@email.com">'+
             '<button type="button" id="send-otp-btn" onclick="sendOTP()" class="shrink-0 px-3 py-2.5 rounded-lg bg-info text-white btn text-xs font-bold">📧</button></div>'+
             '<div id="otp-section" style="display:none" class="mt-2 p-2.5 rounded-xl border border-info/30 bg-info/5">'+
             '<p id="otp-sent-msg" class="text-info text-xs font-medium mb-2"></p>'+
@@ -1782,7 +1782,7 @@
             '<button type="button" id="reg-country-btn" onclick="toggleCountryDropdown(\'reg\')" class="w-full h-[42px] rounded-lg border '+C.border+' '+C.input+' text-center text-lg leading-tight flex items-center justify-center">🇾🇪</button>'+
             '<input type="hidden" id="reg-country" value="+967"><div id="reg-country-dropdown" class="hidden absolute top-full left-0 right-0 mt-1 '+C.card+' border '+C.border+' rounded-lg shadow-xl z-50 max-h-48 overflow-y-auto p-1"></div></div>'+
             '<div class="w-2/3"><label class="block text-sm font-medium '+C.text+' mb-1">رقم الهاتف</label>'+
-            '<div class="flex gap-2 items-center"><input type="tel" id="reg-phone" class="flex-1 min-w-0 px-3 py-2.5 rounded-xl border '+C.input+' outline-none focus:ring-2 focus:ring-primary/50 text-sm" pattern="[0-9]+">'+
+            '<div class="flex gap-2 items-center"><input type="tel" id="reg-phone" autocomplete="tel" class="flex-1 min-w-0 px-3 py-2.5 rounded-xl border '+C.input+' outline-none focus:ring-2 focus:ring-primary/50 text-sm" pattern="[0-9]+">'+
             '<button type="button" id="send-sms-btn" onclick="sendSMSOTP()" class="shrink-0 px-3 py-2.5 rounded-lg bg-primary text-dark-bg btn text-xs font-bold">📱</button></div>'+
             '<div id="sms-section" style="display:none" class="mt-2 p-2.5 rounded-xl border border-primary/30 bg-primary/5">'+
             '<p id="sms-sent-msg" class="text-primary text-xs font-medium mb-2"></p>'+
@@ -1792,12 +1792,28 @@
             '</div>'+
             '<p id="sms-status" class="text-xs mt-1" style="display:none"></p>'+
             '</div></div></div></div>'+
-            '<div><label class="block text-sm font-medium '+C.text+' mb-1">كلمة المرور</label><input type="password" id="reg-pass" required minlength="6" oninput="updatePasswordStrength()" class="w-full px-4 py-2.5 rounded-xl border '+C.input+' outline-none focus:ring-2 focus:ring-primary/50" placeholder="8 أحرف على الأقل">'+renderPasswordStrength(C)+'</div>'+
+            '<div><label class="block text-sm font-medium '+C.text+' mb-1">كلمة المرور</label><input type="password" id="reg-pass" required minlength="6" autocomplete="new-password" oninput="updatePasswordStrength()" class="w-full px-4 py-2.5 rounded-xl border '+C.input+' outline-none focus:ring-2 focus:ring-primary/50" placeholder="8 أحرف على الأقل">'+renderPasswordStrength(C)+'</div>'+
             '<div><label class="block text-sm font-medium '+C.text+' mb-1">كود الإحالة (اختياري)</label><input type="text" id="reg-ref" value="'+escHtml(_getUrlRef()||'')+'" class="w-full px-4 py-2.5 rounded-xl border '+C.input+' outline-none focus:ring-2 focus:ring-primary/50" placeholder="إذا دعاك شخص أدخل رمزه"></div>'+
             '<button type="submit" class="'+C.btn+' w-full py-3.5 rounded-xl font-bold text-lg btn mt-2 shadow-card">إنشاء الحساب</button></form>'+
             '<p class="text-center '+C.muted+' mt-4">لديك حساب؟ <a onclick="setView(\'login\')" class="text-primary cursor-pointer font-bold hover:underline">تسجيل الدخول</a></p>'+
             '<div class="mt-4 flex justify-end"><button onclick="setTheme(state.theme===\'dark\'?\'light\':\'dark\')" class="p-2.5 rounded-xl '+C.btnOutline+' btn text-lg">'+(state.theme==='dark'?'☀️':'🌙')+'</button></div>'+
             '</div></div>';
+        }
+
+        function selectRegRole(role) {
+            var radios = document.querySelectorAll('input[name="reg-role"]');
+            radios.forEach(function(r){ r.checked = (r.value === role); });
+            var userDiv = document.getElementById('reg-role-user');
+            var merchDiv = document.getElementById('reg-role-MERCHANT');
+            var C = getThemeColors();
+            if(userDiv) {
+                userDiv.style.border = (role==='USER') ? '2px solid #F0B90B' : '2px solid '+C.border;
+                userDiv.style.background = (role==='USER') ? 'rgba(240,185,11,0.05)' : 'transparent';
+            }
+            if(merchDiv) {
+                merchDiv.style.border = (role==='MERCHANT') ? '2px solid #F0B90B' : '2px solid '+C.border;
+                merchDiv.style.background = (role==='MERCHANT') ? 'rgba(240,185,11,0.05)' : 'transparent';
+            }
         }
 
         // ==================== SECURITY UTILITIES ====================
