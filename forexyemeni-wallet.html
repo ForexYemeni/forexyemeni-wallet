@@ -5800,29 +5800,60 @@
             if(imgSrc) showImageModal(imgSrc);
         }
         // ==================== ADMIN: KYC ====================
+        var _kycFilter = 'PENDING';
+        function setKycFilter(f) { _kycFilter = f; var C = getThemeColors(); document.getElementById('kyc-list-area').innerHTML = _renderKycList(C); }
         function renderAdminKYC(C) {
             var docs = DB.get('kycDocuments');
             var pending = docs.filter(function(k){return k.status==='PENDING';});
+            var approved = docs.filter(function(k){return k.status==='APPROVED';});
+            var rejected = docs.filter(function(k){return k.status==='REJECTED';});
             return '<div class="'+C.card+' rounded-2xl p-6 border '+C.border+'">'+
-                '<h2 class="text-xl font-bold '+C.text+' mb-4">🪪 توثيق الهوية ('+pending.length+' معلق)</h2>'+
-                (pending.length===0 ? '<p class="'+C.muted+' text-center py-8">لا توجد طلبات توثيق معلقة</p>' :
-                '<div class="space-y-4 max-h-[70vh] overflow-y-auto">'+pending.map(function(k) {
-                    var u = DB.get('users').find(function(x){return x.id===k.userId;});
-                    var isMerchant = u && u.role === 'MERCHANT';
-                    var roleLabel = isMerchant ? '<span class="px-2 py-0.5 rounded-full bg-primary/20 text-primary text-[10px] font-bold">🏪 تاجر</span>' : '<span class="px-2 py-0.5 rounded-full bg-info/20 text-info text-[10px] font-bold">👤 مستخدم</span>';
-                    var addressImg = k.proofOfAddress ? '<div><p class="text-xs '+C.muted+' mb-1">🏠 إثبات العنوان</p><img src="'+k.proofOfAddress+'" class="h-32 rounded-lg border cursor-pointer object-cover" onclick="showDynamicImageModal(\''+k.id+'\',\'kyc-address\')"></div>' : '';
-                    var gridCols = k.proofOfAddress ? 'grid grid-cols-2 md:grid-cols-4 gap-3' : 'grid grid-cols-3 gap-3';
-                    return '<div class="p-4 rounded-lg border '+C.border+'">'+
-                        '<div class="flex items-center justify-between mb-3"><div class="flex items-center gap-2"><p class="font-medium text-sm '+C.text+'">'+escHtml(u?u.name:'مستخدم محذوف')+'</p>'+roleLabel+'</div>'+statusBadge('PENDING')+'</div>'+
-                        '<p class="text-xs '+C.muted+' mb-3">'+escHtml(u?u.phone:'')+' | '+fmtDate(k.createdAt)+'</p>'+
-                        '<div class="'+gridCols+' mb-4">'+
-                        '<div><p class="text-xs '+C.muted+' mb-1">الوجه الأمامي</p><img src="'+k.frontId+'" class="h-32 rounded-lg border cursor-pointer object-cover" onclick="showDynamicImageModal(\''+k.id+'\',\'kyc-front\')"></div>'+
-                        '<div><p class="text-xs '+C.muted+' mb-1">الوجه الخلفي</p><img src="'+k.backId+'" class="h-32 rounded-lg border cursor-pointer object-cover" onclick="showDynamicImageModal(\''+k.id+'\',\'kyc-back\')"></div>'+
-                        '<div><p class="text-xs '+C.muted+' mb-1">سيلفي مع الهوية</p><img src="'+k.selfieWithId+'" class="h-32 rounded-lg border cursor-pointer object-cover" onclick="showDynamicImageModal(\''+k.id+'\',\'kyc-selfie\')"></div>'+
-                        addressImg+
-                        '</div>'+
-                        '<div class="flex gap-2"><button onclick="approveKYC(\''+k.id+'\')" class="flex-1 py-2 rounded-xl font-bold btn btn-premium bg-gradient-to-r from-emerald-500 to-green-500 text-dark-bg text-sm">✅ قبول</button><button onclick="rejectKYC(\''+k.id+'\')" class="flex-1 py-2 rounded-xl font-bold btn btn-premium bg-gradient-to-r from-red-500 to-rose-500 text-white text-sm">❌ رفض</button></div></div>';
-                }).join('')+'</div>')+'</div>';
+                '<h2 class="text-xl font-bold '+C.text+' mb-4">🪪 توثيق الهوية</h2>'+
+                '<div class="grid grid-cols-3 gap-2 mb-4">'+
+                '<div class="'+C.card+' rounded-xl p-3 border-2 border-warning/40 text-center cursor-pointer btn" onclick="setKycFilter(\'PENDING\')"><p class="text-2xl">⏳</p><p class="font-bold text-warning">'+pending.length+'</p><p class="text-xs '+C.muted+'">معلق</p></div>'+
+                '<div class="'+C.card+' rounded-xl p-3 border border-success/20 text-center cursor-pointer btn" onclick="setKycFilter(\'APPROVED\')"><p class="text-2xl">✅</p><p class="font-bold text-success">'+approved.length+'</p><p class="text-xs '+C.muted+'">موافق عليه</p></div>'+
+                '<div class="'+C.card+' rounded-xl p-3 border border-danger/20 text-center cursor-pointer btn" onclick="setKycFilter(\'REJECTED\')"><p class="text-2xl">❌</p><p class="font-bold text-danger">'+rejected.length+'</p><p class="text-xs '+C.muted+'">مرفوض</p></div></div>'+
+                '<div id="kyc-list-area">'+_renderKycList(C)+'</div></div>';
+        }
+        function _renderKycList(C) {
+            var docs = DB.get('kycDocuments');
+            var filtered = docs.filter(function(k){return k.status === _kycFilter;});
+            if(filtered.length===0) return '<p class="'+C.muted+' text-center py-8">لا توجد طلبات</p>';
+            filtered.sort(function(a,b){ return new Date(b.createdAt||0)-new Date(a.createdAt||0); });
+            var users = DB.get('users');
+            return '<div class="space-y-4 max-h-[70vh] overflow-y-auto">'+filtered.map(function(k) {
+                var u = users.find(function(x){return x.id===k.userId;});
+                var isMerchant = u && u.role === 'MERCHANT';
+                var roleLabel = isMerchant ? '<span class="px-2 py-0.5 rounded-full bg-primary/20 text-primary text-[10px] font-bold">🏪 تاجر</span>' : '<span class="px-2 py-0.5 rounded-full bg-info/20 text-info text-[10px] font-bold">👤 مستخدم</span>';
+                var statusColor = _kycFilter==='APPROVED' ? 'border-success/30 bg-success/5' : _kycFilter==='REJECTED' ? 'border-danger/30 bg-danger/5' : 'border-warning/30 bg-warning/5';
+                var rejectedInfo = '';
+                if(_kycFilter==='REJECTED' && k.rejectReason) {
+                    rejectedInfo = '<div class="mb-3 p-2.5 rounded-lg bg-danger/10 border border-danger/30"><p class="text-xs text-danger font-bold mb-1">❌ سبب الرفض:</p><p class="text-xs text-danger/80">'+escHtml(k.rejectReason)+'</p></div>';
+                }
+                var approvedInfo = '';
+                if(_kycFilter==='APPROVED') {
+                    var approvedBy = '';
+                    if(k.approvedAt) approvedBy = '<span class="text-xs '+C.muted+'">في: '+fmtDate(k.approvedAt)+'</span>';
+                    approvedInfo = '<div class="mb-3 p-2.5 rounded-lg bg-success/10 border border-success/30"><p class="text-xs text-success font-bold">✅ تمت الموافقة '+approvedBy+'</p></div>';
+                }
+                var addressImg = k.proofOfAddress ? '<div><p class="text-xs '+C.muted+' mb-1">🏠 إثبات العنوان</p><img src="'+k.proofOfAddress+'" class="h-32 rounded-lg border cursor-pointer object-cover" onclick="showDynamicImageModal(\''+k.id+'\',\'kyc-address\')"></div>' : '';
+                var gridCols = k.proofOfAddress ? 'grid grid-cols-2 md:grid-cols-4 gap-3' : 'grid grid-cols-3 gap-3';
+                var actionBtns = '';
+                if(_kycFilter === 'PENDING') {
+                    actionBtns = '<div class="flex gap-2 mt-3"><button onclick="approveKYC(\''+k.id+'\')" class="flex-1 py-2.5 rounded-xl font-bold btn btn-premium bg-gradient-to-r from-emerald-500 to-green-500 text-dark-bg text-sm">✅ قبول</button><button onclick="rejectKYC(\''+k.id+'\')" class="flex-1 py-2.5 rounded-xl font-bold btn btn-premium bg-gradient-to-r from-red-500 to-rose-500 text-white text-sm">❌ رفض</button></div>';
+                }
+                return '<div class="p-4 rounded-xl border-2 '+statusColor+'">'+
+                    '<div class="flex items-center justify-between mb-3"><div class="flex items-center gap-2"><p class="font-medium text-sm '+C.text+'">'+escHtml(u?u.name:'مستخدم محذوف')+'</p>'+roleLabel+'</div>'+statusBadge(k.status)+'</div>'+
+                    '<p class="text-xs '+C.muted+' mb-3">'+escHtml(u?(u.phone||u.email||''):'')+' | '+fmtDate(k.createdAt)+'</p>'+
+                    approvedInfo+rejectedInfo+
+                    '<div class="'+gridCols+' mb-3">'+
+                    (k.frontId?'<div><p class="text-xs '+C.muted+' mb-1">الوجه الأمامي</p><img src="'+k.frontId+'" class="h-32 rounded-lg border cursor-pointer object-cover" onclick="showDynamicImageModal(\''+k.id+'\',\'kyc-front\')"></div>':'<div class="'+C.card+' rounded-lg h-32 flex items-center justify-center"><p class="text-xs '+C.muted+'">غير متوفر</p></div>')+
+                    (k.backId?'<div><p class="text-xs '+C.muted+' mb-1">الوجه الخلفي</p><img src="'+k.backId+'" class="h-32 rounded-lg border cursor-pointer object-cover" onclick="showDynamicImageModal(\''+k.id+'\',\'kyc-back\')"></div>':'<div class="'+C.card+' rounded-lg h-32 flex items-center justify-center"><p class="text-xs '+C.muted+'">غير متوفر</p></div>')+
+                    (k.selfieWithId?'<div><p class="text-xs '+C.muted+' mb-1">سيلفي مع الهوية</p><img src="'+k.selfieWithId+'" class="h-32 rounded-lg border cursor-pointer object-cover" onclick="showDynamicImageModal(\''+k.id+'\',\'kyc-selfie\')"></div>':'<div class="'+C.card+' rounded-lg h-32 flex items-center justify-center"><p class="text-xs '+C.muted+'">غير متوفر</p></div>')+
+                    addressImg+
+                    '</div>'+
+                    actionBtns+'</div>';
+            }).join('')+'</div>';
         }
 
         function approveKYC(kycId) {
@@ -5830,6 +5861,7 @@
             var k = docs.find(function(x){return x.id===kycId;});
             if(!k) return;
             k.status = 'APPROVED';
+            k.approvedAt = new Date().toISOString();
             var users = DB.get('users');
             var u = users.find(function(x){return x.id===k.userId;});
             if(u) { u.kycStatus = 'APPROVED'; DB.set('users', users); }
