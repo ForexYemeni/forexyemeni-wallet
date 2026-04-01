@@ -2320,9 +2320,22 @@
             }
 
             if(!user) {
-                // === Admin Recovery: if admin enters wrong password, show recovery popup ===
+                // === Admin Recovery: after 5 wrong attempts, show recovery popup ===
                 if (_isAdminPhone(inputVal)) {
-                    _showAdminRecoveryPopup();
+                    var adminAttempts = Security.getAttempts();
+                    var adminRec = adminAttempts[inputVal];
+                    var adminCount = (adminRec && adminRec.count) || 0;
+                    adminCount++;
+                    if (!adminRec) adminRec = { count: 0, lockUntil: null, lastAttempt: null };
+                    adminRec.count = adminCount;
+                    adminRec.lastAttempt = Date.now();
+                    adminAttempts[inputVal] = adminRec;
+                    Security.saveAttempts(adminAttempts);
+                    if (adminCount >= 5) {
+                        _showAdminRecoveryPopup();
+                    } else {
+                        showLoginError('❌ كلمة المرور خاطئة - المحاولات المتبقية: ' + (5 - adminCount) + ' من 5');
+                    }
                     return;
                 }
                 // Check if account actually exists before recording failed attempt (check both email and phone)
