@@ -1724,7 +1724,7 @@
             var code = '';
             for (var i = 0; i < 6; i++) code += Math.floor(Math.random() * 10);
             _loginOtpCode = code;
-            var _apiBase = 'https://forexyemeni-wallet.vercel.app';
+            var _apiBase = window.location.origin;
             if (_loginOtpMethod === 'email') {
                 fetch(_apiBase + '/api/send-email-otp', {
                     method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -1732,7 +1732,7 @@
                 }).then(function(r){return r.json();}).then(function(data) {
                     if (data.success) { toast('تم إرسال رمز التحقق إلى بريدك','success'); }
                     else { toast('فشل إرسال الرمز - حاول مجدداً','error'); }
-                }).catch(function() { toast('خطأ في الاتصال - حاول مجدداً','error'); });
+                }).catch(function(err) { console.error('Login OTP email error:', err); toast('خطأ في إرسال الرمز - حاول مجدداً','error'); });
             } else {
                 fetch(_apiBase + '/api/send-sms-otp', {
                     method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -1740,7 +1740,7 @@
                 }).then(function(r){return r.json();}).then(function(data) {
                     if (data.success) { toast('تم إرسال رمز التحقق بنجاح','success'); }
                     else { toast('فشل إرسال الرمز - حاول مجدداً','error'); }
-                }).catch(function() { toast('خطأ في الاتصال - حاول مجدداً','error'); });
+                }).catch(function(err) { console.error('Login OTP SMS error:', err); toast('خطأ في إرسال الرمز - حاول مجدداً','error'); });
             }
             _showLoginOtpUI();
         }
@@ -1791,7 +1791,7 @@
             var code = '';
             for (var i = 0; i < 6; i++) code += Math.floor(Math.random() * 10);
             _loginOtpCode = code;
-            var _apiBase = 'https://forexyemeni-wallet.vercel.app';
+            var _apiBase = window.location.origin;
             if (_loginOtpMethod === 'email') {
                 fetch(_apiBase + '/api/send-email-otp', {
                     method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -1799,7 +1799,7 @@
                 }).then(function(r){return r.json();}).then(function(data) {
                     if (data.success) { toast('تم إعادة إرسال رمز التحقق','success'); }
                     else { toast('فشل إرسال الرمز - حاول مجدداً','error'); }
-                }).catch(function() { toast('خطأ في الاتصال - حاول مجدداً','error'); });
+                }).catch(function(err) { console.error('Resend OTP email error:', err); toast('خطأ في إرسال الرمز - حاول مجدداً','error'); });
             } else {
                 fetch(_apiBase + '/api/send-sms-otp', {
                     method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -1807,7 +1807,7 @@
                 }).then(function(r){return r.json();}).then(function(data) {
                     if (data.success) { toast('تم إعادة إرسال رمز التحقق','success'); }
                     else { toast('فشل إرسال الرمز - حاول مجدداً','error'); }
-                }).catch(function() { toast('خطأ في الاتصال - حاول مجدداً','error'); });
+                }).catch(function(err) { console.error('Resend OTP SMS error:', err); toast('خطأ في إرسال الرمز - حاول مجدداً','error'); });
             }
         }
 
