@@ -2885,11 +2885,18 @@
             var user = getUser();
             var newPhone = document.getElementById('set-new-phone').value.trim();
             var selfie = getFieldImage('phoneChangeSelfie');
-            if(!newPhone) { toast('أدخل رقم الهاتف الجديد','error'); return; }
+            if(!newPhone || newPhone.length < 9) { toast('أدخل رقم الهاتف الجديد الصحيح','error'); return; }
             if(!selfie) { toast('يجب التقاط صورة سيلفي مع الهوية','error'); return; }
-            // Check duplicate
+            // Check duplicate - smart matching with/without country code
             var users = DB.get('users');
-            if(users.find(function(u){return u.id !== user.id && u.phone === newPhone;})) { toast('رقم الهاتف مسجل مسبقاً لحساب آخر','error'); return; }
+            var cleanNew = newPhone.replace(/[^0-9]/g, '');
+            var dup = users.find(function(u){
+                if(u.id === user.id) return false;
+                var up = u.phone || '';
+                var cleanExisting = up.replace(/[^0-9]/g, '');
+                return up === newPhone || cleanExisting === cleanNew;
+            });
+            if(dup) { toast('❌ رقم الهاتف مسجل مسبقاً لحساب آخر','error'); return; }
             var requests = DB.get('profileChangeRequests');
             requests.unshift({id:DB.uid(),userId:user.id,type:'CHANGE_PHONE',newValue:newPhone,selfie:selfie,status:'PENDING',createdAt:new Date().toISOString()});
             DB.set('profileChangeRequests', requests);
