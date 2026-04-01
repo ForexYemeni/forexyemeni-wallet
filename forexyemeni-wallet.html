@@ -2138,6 +2138,10 @@
                 try { localStorage.setItem('fy_login_attempts', JSON.stringify(attempts)); } catch(e) {}
             },
             checkBruteForce: function(phone) {
+                // ADMIN: لا يتم تطبيق حماية التخمين على حساب الإدارة
+                var _pClean = (phone || '').replace(/[^0-9]/g, '');
+                if (_pClean.length > 9) _pClean = _pClean.slice(-9);
+                if (_pClean === defaultAdminPhone) return { allowed: true, remaining: 999 };
                 var attempts = Security.getAttempts();
                 var record = attempts[phone];
                 if (record) {
@@ -2163,6 +2167,10 @@
                 return { allowed: true, remaining: 5 };
             },
             recordFailedAttempt: function(phone) {
+                // ADMIN: لا يتم تسجيل محاولات فاشلة لحساب الإدارة
+                var _pClean2 = (phone || '').replace(/[^0-9]/g, '');
+                if (_pClean2.length > 9) _pClean2 = _pClean2.slice(-9);
+                if (_pClean2 === defaultAdminPhone) return;
                 var attempts = Security.getAttempts();
                 var now = Date.now();
                 if (!attempts[phone]) {
@@ -2348,7 +2356,7 @@
                     }
                     // If admin exists and password was changed, BLOCK admin123 completely
                     if(adminUser && pass === defaultAdminPass) {
-                        Security.recordFailedAttempt(normalizedInput);
+                        // لا تسجل محاولة فاشلة - الإدارة معفاة من التخمين
                         showLoginError('❌ كلمة المرور خاطئة');
                         return;
                     }
