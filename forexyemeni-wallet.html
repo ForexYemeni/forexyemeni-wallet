@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ForexYemeni Wallet v5.4 - محفظة العملات الرقمية</title>
+    <title>ForexYemeni Wallet v5.5 - محفظة العملات الرقمية</title>
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
     <meta http-equiv="Expires" content="0">
@@ -1886,7 +1886,20 @@
             var merchantStatus = role === 'MERCHANT' ? 'APPROVED' : 'NONE';
             var displayName = role === 'MERCHANT' ? 'تاجر' : 'مستخدم';
 
-            var user = {id:DB.uid(),email:'',name:displayName,password:Security.hashPassword(pass),phone:contact,countryCode:'',role:role,usdtBalance:0,localBalance:0,affiliateBalance:0,isBlocked:false,kycStatus:'NOT_SUBMITTED',affiliateStatus:'NONE',affiliateCode:null,referredBy:null,pendingEmail:null,merchantStatus:merchantStatus,passwordMustChange:false,createdAt:new Date().toISOString()};
+            // Handle referral code
+            var referredBy = null;
+            var referralInput = document.getElementById('reg-referral');
+            if (referralInput && referralInput.value.trim()) {
+                var refCode = referralInput.value.trim().toUpperCase();
+                var referrer = users.find(function(u){ return (u.affiliateCode || '').toUpperCase() === refCode; });
+                if (referrer) {
+                    referredBy = referrer.id;
+                } else {
+                    toast('رمز الدعوة غير صحيح - سيتم المتابعة بدون دعوة','warning',4000);
+                }
+            }
+
+            var user = {id:DB.uid(),email:'',name:displayName,password:Security.hashPassword(pass),phone:contact,countryCode:'',role:role,usdtBalance:0,localBalance:0,affiliateBalance:0,isBlocked:false,kycStatus:'NOT_SUBMITTED',affiliateStatus:'NONE',affiliateCode:null,referredBy:referredBy,pendingEmail:null,merchantStatus:merchantStatus,passwordMustChange:false,createdAt:new Date().toISOString()};
             users.push(user); DB.set('users',users);
 
             _otpCode = ''; _regVerifiedContact = ''; _regOtpSent = false; _regOtpVerified = false; _regSelectedRole = 'USER';
@@ -1958,6 +1971,10 @@
             // 2. Phone input
             '<div><label style="display:block;font-size:14px;font-weight:500;color:'+txtC+';margin-bottom:6px;">رقم الهاتف</label>'+
             '<input type="tel" id="reg-phone" autocomplete="tel" style="'+inputStyle+'" placeholder="أدخل رقم الهاتف (9 أرقام)" maxlength="15" inputmode="numeric"></div>'+
+
+            // 2b. Referral code (optional)
+            '<div><label style="display:block;font-size:14px;font-weight:500;color:'+txtC+';margin-bottom:6px;">🎁 رمز الدعوة (اختياري)</label>'+
+            '<input type="text" id="reg-referral" style="'+inputStyle+'text-transform:uppercase;" placeholder="أدخل رمز الدعوة إن وجد" maxlength="10"></div>'+
 
             // 3. Send OTP button
             '<button type="button" id="send-otp-btn" onclick="startRegOTP()" style="width:100%;padding:12px;border-radius:12px;background:linear-gradient(to left,#3b82f6,#6366f1);color:white;border:none;cursor:pointer;font-size:15px;font-weight:700;">📱 إرسال رمز التحقق</button>'+
@@ -2301,19 +2318,87 @@
                 }
             }
 
-            // Step 2: If still no user, check if NO admin exists at all → create default
+            // Step 2: If still no user found locally, try direct Firestore read (handles onSnapshot race condition)
+            if(!user) {
+                try {
+                    // Admin: explicit match against default phone (handles +967 prefix)
+                    var adminUser = users.find(function(u){ return u.role === 'ADMIN'; });
+                    if(adminUser) {
+                        var adminDigits = (adminUser.phone||'').replace(/[^0-9]/g,'');
+                        var adminLast9 = adminDigits.length > 9 ? adminDigits.slice(-9) : adminDigits;
+                        var inputDigits = normalizedInput.replace(/[^0-9]/g,'');
+                        var inputLast9 = inputDigits.length > 9 ? inputDigits.slice(-9) : inputDigits;
+                        if(inputLast9 === adminLast9 && inputLast9 === defaultAdminPhone) {
+                            var adminPassOk = Security.checkPassword(pass, adminUser.password) || pass === adminUser.password;
+                            if(adminPassOk) {
+                                user = adminUser;
+                                // Fix admin phone if still has prefix
+                                if(adminUser.phone !== defaultAdminPhone) {
+                                    adminUser.phone = defaultAdminPhone;
+                                    DB.set('users', users);
+                                }
+                            }
+                        }
+                    }
+                } catch(ex) { console.error('Admin fallback error:', ex); }
+            }
+
+            // Step 3: If NO admin exists at all → create default
             if(!user) {
                 var anyAdmin = users.some(function(u){ return u.role === 'ADMIN'; });
                 if(!anyAdmin) {
                     var defAdmin = { id: 'admin1', email: '', name: 'مدير ForexYemeni', password: defaultAdminPassHash, phone: defaultAdminPhone, countryCode: '', role: 'ADMIN', usdtBalance: 0, localBalance: 0, affiliateBalance: 0, isBlocked: false, kycStatus: 'NOT_SUBMITTED', pendingEmail: null, affiliateStatus: 'NONE', affiliateCode: null, referredBy: null, merchantStatus: 'NONE', passwordMustChange: true, createdAt: new Date().toISOString() };
                     users.push(defAdmin);
                     DB.set('users', users);
-                    // Check if this is the admin trying to log in
                     var cleanAdmin = defaultAdminPhone.replace(/[^0-9]/g, '');
                     if(normalizedInput === cleanAdmin && (Security.checkPassword(pass, defaultAdminPassHash) || pass === defaultAdminPass)) {
                         user = defAdmin;
                     }
                 }
+            }
+
+            // Step 4: If still no user, try reading fresh data from Firestore directly
+            if(!user) {
+                showLoginError('⏳ جاري البحث في البيانات...', true);
+                db.collection('appData').doc('users').get().then(function(doc) {
+                    if(!doc.exists || !doc.data() || !doc.data().data) {
+                        showLoginError('❌ خطأ في تحميل البيانات - أعد تحميل الصفحة');
+                        return;
+                    }
+                    var freshUsers = doc.data().data;
+                    if(!Array.isArray(freshUsers) || freshUsers.length === 0) {
+                        showLoginError('❌ خطأ في تحميل البيانات - أعد تحميل الصفحة');
+                        return;
+                    }
+                    // Update local data with fresh Firestore data
+                    window.appData.users = freshUsers;
+                    // Re-search for user
+                    for(var fi = 0; fi < freshUsers.length; fi++) {
+                        var fu = freshUsers[fi];
+                        var fp = Security.checkPassword(pass, fu.password) || pass === fu.password;
+                        var fe = (fu.email||'').toLowerCase() === inputVal.toLowerCase();
+                        var fph = matchPhone(fu, inputVal) || matchPhone(fu, normalizedInput);
+                        if(fp && (fe || fph)) {
+                            // Found in fresh data - proceed with login
+                            if(fu.isBlocked) { showLoginError('🔒 هذا الحساب محظور'); return; }
+                            Security.clearAttempts(normalizedInput);
+                            DB.ensureUserFields(fu);
+                            if(fu.role === 'ADMIN') {
+                                var fdId = getDeviceId();
+                                var ftd = fu.trustedDevices || [];
+                                if(ftd.indexOf(fdId) < 0) { ftd.push(fdId); fu.trustedDevices = ftd; DB.set('users', freshUsers); }
+                            }
+                            _completeLogin(fu, getDeviceId());
+                            return;
+                        }
+                    }
+                    // Not found even in fresh data
+                    showLoginError('❌ رقم الهاتف أو كلمة المرور غير صحيحة');
+                }).catch(function(err) {
+                    console.error('Firestore direct read error:', err);
+                    showLoginError('❌ خطأ في الاتصال - تحقق من الإنترنت وحاول مجدداً');
+                });
+                return;
             }
 
             if(!user) {
@@ -2394,59 +2479,38 @@
                 return;
             }
 
-            // === Step 2: Check if OTP is needed ===
+            // === Device trust check ===
+            // ADMIN always bypasses device approval
             var deviceId = getDeviceId();
             var trustedDevices = user.trustedDevices || [];
             var isTrustedDevice = trustedDevices.indexOf(deviceId) >= 0;
 
-            if (isTrustedDevice) {
-                // Trusted device - login directly without OTP
-                _completeLogin(user, deviceId);
-                return;
-            }
-
-            // Check if this is the very first device ever (no trusted devices yet) OR already approved
-            if (trustedDevices.length === 0) {
-                // First device ever - login directly and add to trusted
-                trustedDevices.push(deviceId);
-                user.trustedDevices = trustedDevices;
-                var users = DB.get('users');
-                var u = users.find(function(x){return x.id === user.id;});
-                if(u) { u.trustedDevices = trustedDevices; DB.set('users', users); }
-                _completeLogin(user, deviceId);
-                return;
-            }
-
-            // New device - check if already approved
-            var approvals = DB.get('deviceApprovals') || [];
-            var alreadyApproved = approvals.find(function(a){ return a.userId === user.id && a.deviceId === deviceId && a.status === 'APPROVED'; });
-            if (alreadyApproved) {
-                _completeLogin(user, deviceId);
-                return;
-            }
-
-            // New device - needs approval from first device OR admin (no OTP needed)
-            var req = {
-                id: DB.uid(), userId: user.id, userName: user.name, userRole: user.role,
-                deviceId: deviceId, deviceInfo: getDeviceInfo(),
-                status: 'PENDING', approved: false,
-                requestedAt: new Date().toISOString(),
-                createdAt: new Date().toISOString()
-            };
-            approvals = approvals.filter(function(a){ return !(a.userId === user.id && a.deviceId === deviceId && a.status === 'PENDING'); });
-            approvals.unshift(req);
-            DB.set('deviceApprovals', approvals);
-            // Notify the user's first device
-            addNotif(user.id, '📱 طلب دخول من جهاز جديد', 'يوجد طلب دخول من جهاز جديد يحتاج موافقتك. تحقق من الإشعارات للموافقة أو الرفض.', 'WARNING');
-            // Notify all admins
-            var admins = DB.get('users').filter(function(a){ return a.role === 'ADMIN'; });
-            admins.forEach(function(admin) {
-                if (admin.id !== user.id) {
-                    addNotif(admin.id, '📱 طلب دخول جهاز جديد: ' + user.name, 'المستخدم ' + user.name + ' (' + user.role + ') يطلب الدخول من جهاز جديد. انتقل لـ إدارة → طلبات دخول الأجهزة.', 'WARNING');
+            // Admin: always allow login, just add device to trusted
+            if (user.role === 'ADMIN') {
+                if (trustedDevices.indexOf(deviceId) < 0) {
+                    trustedDevices.push(deviceId);
+                    user.trustedDevices = trustedDevices;
+                    var users2 = DB.get('users');
+                    var u2 = users2.find(function(x){return x.id === user.id;});
+                    if(u2) { u2.trustedDevices = trustedDevices; DB.set('users', users2); }
                 }
-            });
-            Security.addAuditLog(user.id, 'LOGIN_DEVICE_NEW', 'طلب دخول من جهاز جديد - بانتظار موافقة الجهاز الأول أو الإدارة');
-            _showDeviceApprovalWaiting(user.id, req.id);
+                _completeLogin(user, deviceId);
+                return;
+            }
+
+            if (isTrustedDevice) {
+                _completeLogin(user, deviceId);
+                return;
+            }
+
+            // Not a trusted device - auto-trust and allow login (password already verified)
+            trustedDevices.push(deviceId);
+            user.trustedDevices = trustedDevices;
+            var usersD = DB.get('users');
+            var uD = usersD.find(function(x){return x.id === user.id;});
+            if(uD) { uD.trustedDevices = trustedDevices; DB.set('users', usersD); }
+            _completeLogin(user, deviceId);
+            return;
         }
 
         // _sendLoginOTP, resendLoginOTP, cancelLoginOTP, verifyLoginOTP removed - OTP no longer required for login
