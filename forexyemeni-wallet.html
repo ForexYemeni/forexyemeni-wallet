@@ -7044,44 +7044,193 @@
         }
 
         // ==================== RESET ALL APP DATA ====================
+        var _resetOtpCode = '';
+        var _resetOtpVerified = false;
+
         function resetAppData() {
-            showConfirm('⚠️', 'تأكيد حذف جميع البيانات', 'سيتم حذف جميع المستخدمين (ما عدا حساب الإدارة)، جميع الإيداعات، السحوبات، التوثيق (KYC)، الرسائل، الإشعارات، سجل العمليات، طلبات التوثيق، طلبات الدفع، وتقييمات التجار.\n\nهذا الإجراء لا يمكن التراجع عنه!\n\nسيتم الإبقاء على:\n• حساب الإدارة\n• إعدادات التطبيق\n• طرق الدفع', '🗑️ نعم، احذف الكل', 'bg-gradient-to-r from-red-500 to-rose-500 text-white', function(confirmed) {
-                if (!confirmed) return;
-                var users = DB.get('users') || [];
-                var adminUser = null;
-                var adminIndex = -1;
-                for (var i = 0; i < users.length; i++) {
-                    if (users[i].role === 'ADMIN') { adminUser = users[i]; adminIndex = i; break; }
-                }
-                // إبقاء الإدارة فقط مع إعادة تعيين جلساته
-                var cleanAdmin = null;
-                if (adminUser) {
-                    cleanAdmin = { id: adminUser.id, email: adminUser.email || '', name: 'مدير ForexYemeni', password: adminUser.password, phone: adminUser.phone, countryCode: adminUser.countryCode || '', role: 'ADMIN', usdtBalance: 0, localBalance: 0, affiliateBalance: 0, isBlocked: false, kycStatus: 'NOT_SUBMITTED', pendingEmail: null, affiliateStatus: 'NONE', affiliateCode: null, referredBy: null, merchantStatus: 'NONE', passwordMustChange: false, createdAt: adminUser.createdAt || new Date().toISOString() };
-                }
-                var cleanUsers = cleanAdmin ? [cleanAdmin] : [];
+            var users = DB.get('users') || [];
+            var adminUser = null;
+            for (var i = 0; i < users.length; i++) {
+                if (users[i].role === 'ADMIN') { adminUser = users[i]; break; }
+            }
+            if (!adminUser) { toast('خطأ: لم يتم العثور على حساب الإدارة', 'error'); return; }
 
-                // حذف كل البيانات
-                var keysToDelete = ['deposits', 'withdrawals', 'transactionLog', 'messages', 'notifications', 'auditLog', 'kycDocuments', 'loginPermissions', 'merchantRequests', 'merchantTransactions', 'merchantPaymentData', 'merchantRatings', 'userWithdrawalMethods', 'deviceApprovals', 'profileChangeRequests'];
-                keysToDelete.forEach(function(key) {
-                    DB.set(key, []);
-                    window.appData[key] = [];
+            // تحديد طريقة الإرسال
+            var hasPhone = adminUser.phone && adminUser.phone.length >= 7;
+            var hasEmail = adminUser.email && adminUser.email.indexOf('@') > 0;
+
+            var targetInfo = '';
+            if (hasPhone) targetInfo += '📱 ' + adminUser.phone;
+            if (hasPhone && hasEmail) targetInfo += '\n';
+            if (hasEmail) targetInfo += '📧 ' + adminUser.email;
+            if (!hasPhone && !hasEmail) { toast('خطأ: لا يوجد رقم هاتف أو بريد للإدارة', 'error'); return; }
+
+            // إظهار نافذة الإدخال
+            var overlay = document.createElement('div');
+            overlay.id = 'reset-otp-overlay';
+            overlay.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.6);display:flex;align-items:center;justify-content:center;z-index:9999;padding:16px;';
+            var isDark = state.theme === 'dark';
+            var bgC = isDark ? '#111827' : '#ffffff';
+            var txtC = isDark ? '#f3f4f6' : '#1f2937';
+            var mutC = isDark ? '#9ca3af' : '#6b7280';
+            var inpC = isDark ? '#1f2937' : '#f3f4f6';
+            var brdC = isDark ? '#374151' : '#d1d5db';
+
+            overlay.innerHTML = '<div style="background:'+bgC+';border-radius:20px;padding:28px;width:100%;max-width:400px;box-shadow:0 20px 60px rgba(0,0,0,0.4);position:relative;z-index:10;">' +
+                '<div style="text-align:center;margin-bottom:20px;">' +
+                '<div style="font-size:40px;margin-bottom:8px;">⚠️</div>' +
+                '<h2 style="font-size:18px;font-weight:800;color:#ef4444;margin:0;">تأكيد إعادة التعيين</h2>' +
+                '<p style="font-size:13px;color:'+mutC+';margin-top:6px;white-space:pre-line;">سيتم إرسال رمز التحقق إلى:\n' + targetInfo + '</p></div>' +
+                '<button type="button" id="reset-send-otp-btn" onclick="_sendResetOtp()" style="width:100%;padding:12px;border-radius:12px;background:linear-gradient(to left,#ef4444,#f97316);color:white;border:none;cursor:pointer;font-size:15px;font-weight:700;">📤 إرسال رمز التحقق</button>' +
+                '<div id="reset-otp-box" style="display:none;margin-top:16px;">' +
+                '<input type="text" id="reset-otp-input" maxlength="6" style="width:100%;padding:14px;border-radius:12px;border:2px solid '+brdC+';background:'+inpC+';color:'+txtC+';font-size:22px;text-align:center;letter-spacing:8px;font-weight:700;outline:none;box-sizing:border-box;" placeholder="••••••" inputmode="numeric">' +
+                '<button type="button" id="reset-verify-btn" onclick="_verifyResetOtp()" style="width:100%;margin-top:10px;padding:12px;border-radius:12px;background:#0ECB81;color:white;border:none;cursor:pointer;font-size:15px;font-weight:700;">✅ تأكيد ومسح الكل</button>' +
+                '<p id="reset-otp-msg" style="font-size:12px;margin-top:8px;text-align:center;display:none;"></p></div>' +
+                '<button type="button" onclick="_closeResetOtp()" style="width:100%;margin-top:10px;padding:10px;border-radius:10px;border:none;background:transparent;color:'+mutC+';cursor:pointer;font-size:14px;">✕ إلغاء</button>' +
+                '</div>';
+
+            document.body.appendChild(overlay);
+            _resetOtpVerified = false;
+            _resetOtpCode = '';
+        }
+
+        function _sendResetOtp() {
+            var users = DB.get('users') || [];
+            var adminUser = null;
+            for (var i = 0; i < users.length; i++) {
+                if (users[i].role === 'ADMIN') { adminUser = users[i]; break; }
+            }
+            if (!adminUser) return;
+
+            var code = '';
+            for (var i = 0; i < 6; i++) code += Math.floor(Math.random() * 10);
+            _resetOtpCode = code;
+            _resetOtpVerified = false;
+
+            var sendBtn = document.getElementById('reset-send-otp-btn');
+            if (sendBtn) { sendBtn.disabled = true; sendBtn.textContent = '⏳ جاري الإرسال...'; }
+
+            var _apiBase = window.location.origin;
+            var sentCount = 0;
+            var totalExpected = 0;
+
+            // إرسال SMS إذا يوجد رقم
+            if (adminUser.phone && adminUser.phone.length >= 7) {
+                totalExpected++;
+                var fullPhone = (adminUser.countryCode || '+967') + adminUser.phone;
+                fetch(_apiBase + '/api/send-sms-otp', {
+                    method: 'POST', headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ to: fullPhone, code: code })
+                }).then(function(r){return r.json();}).then(function(data) {
+                    sentCount++;
+                    _checkResetOtpSent(sentCount, totalExpected);
+                }).catch(function() {
+                    sentCount++;
+                    _checkResetOtpSent(sentCount, totalExpected);
                 });
+            }
 
-                // إعادة تعيين المستخدمين
-                window.appData.users = cleanUsers;
-                DB.set('users', cleanUsers);
+            // إرسال Email إذا يوجد بريد
+            if (adminUser.email && adminUser.email.indexOf('@') > 0) {
+                totalExpected++;
+                fetch(_apiBase + '/api/send-email-otp', {
+                    method: 'POST', headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ to: adminUser.email, code: code })
+                }).then(function(r){return r.json();}).then(function(data) {
+                    sentCount++;
+                    _checkResetOtpSent(sentCount, totalExpected);
+                }).catch(function() {
+                    sentCount++;
+                    _checkResetOtpSent(sentCount, totalExpected);
+                });
+            }
 
-                // إبقاء الإعدادات وطرق الدفع
-                // settings و paymentMethods لا يتم حذفها
+            // إذا لم يرسل أي شيء (لا يوجد رقم ولا بريد)
+            if (totalExpected === 0) {
+                toast('خطأ: لا يوجد طريقة تواصل للإدارة', 'error');
+                if (sendBtn) { sendBtn.disabled = false; sendBtn.textContent = '📤 إرسال رمز التحقق'; }
+                return;
+            }
 
-                // مسح localStorage
-                try { localStorage.removeItem('fy_reg_backup'); } catch(e) {}
-                try { localStorage.removeItem('fy_login_attempts'); } catch(e) {}
+            // fallback timer
+            setTimeout(function() {
+                if (!_resetOtpVerified) _checkResetOtpSent(sentCount, totalExpected);
+            }, 10000);
+        }
 
-                Security.addAuditLog(cleanAdmin ? cleanAdmin.id : 'SYSTEM', 'APP_RESET', 'إعادة تعيين التطبيق بالكامل');
-                toast('✅ تم حذف جميع البيانات بنجاح - التطبيق نظيف الآن', 'success', 5000);
-                setTimeout(function() { render(); }, 1000);
+        function _checkResetOtpSent(sent, total) {
+            var sendBtn = document.getElementById('reset-send-otp-btn');
+            if (sendBtn) { sendBtn.disabled = false; sendBtn.textContent = '📤 إعادة إرسال الرمز'; }
+
+            var otpBox = document.getElementById('reset-otp-box');
+            if (otpBox) {
+                otpBox.style.display = '';
+                otpBox.style.opacity = '0';
+                otpBox.style.transform = 'translateY(10px)';
+                setTimeout(function() {
+                    otpBox.style.transition = 'all 0.4s ease';
+                    otpBox.style.opacity = '1';
+                    otpBox.style.transform = 'translateY(0)';
+                }, 20);
+            }
+            var msgEl = document.getElementById('reset-otp-msg');
+            if (msgEl) {
+                msgEl.style.display = 'block';
+                msgEl.style.color = '#0ECB81';
+                msgEl.textContent = '✅ تم إرسال رمز التحقق - أدخل الرمز المكون من 6 أرقام';
+            }
+            toast('تم إرسال رمز التحقق', 'success');
+        }
+
+        function _verifyResetOtp() {
+            var input = document.getElementById('reset-otp-input');
+            if (!input) return;
+            var code = input.value.trim();
+            if (!code || code.length < 6) { toast('أدخل رمز الـ 6 أرقام', 'error'); return; }
+            if (!_resetOtpCode) { toast('أرسل رمز التحقق أولاً', 'error'); return; }
+
+            if (code === _resetOtpCode) {
+                _resetOtpVerified = true;
+                toast('✅ تم التحقق - جاري الحذف...', 'success');
+                setTimeout(function() { _executeReset(); }, 500);
+            } else {
+                var msgEl = document.getElementById('reset-otp-msg');
+                if (msgEl) { msgEl.style.color = '#ef4444'; msgEl.textContent = '❌ رمز التحقق غير صحيح'; }
+                toast('رمز التحقق غير صحيح', 'error');
+            }
+        }
+
+        function _closeResetOtp() {
+            var overlay = document.getElementById('reset-otp-overlay');
+            if (overlay) overlay.remove();
+            _resetOtpCode = '';
+            _resetOtpVerified = false;
+        }
+
+        function _executeReset() {
+            _closeResetOtp();
+            var users = DB.get('users') || [];
+            var adminUser = null;
+            for (var i = 0; i < users.length; i++) {
+                if (users[i].role === 'ADMIN') { adminUser = users[i]; break; }
+            }
+            var cleanAdmin = null;
+            if (adminUser) {
+                cleanAdmin = { id: adminUser.id, email: adminUser.email || '', name: 'مدير ForexYemeni', password: adminUser.password, phone: adminUser.phone, countryCode: adminUser.countryCode || '', role: 'ADMIN', usdtBalance: 0, localBalance: 0, affiliateBalance: 0, isBlocked: false, kycStatus: 'NOT_SUBMITTED', pendingEmail: null, affiliateStatus: 'NONE', affiliateCode: null, referredBy: null, merchantStatus: 'NONE', passwordMustChange: false, createdAt: adminUser.createdAt || new Date().toISOString() };
+            }
+            var cleanUsers = cleanAdmin ? [cleanAdmin] : [];
+            var keysToDelete = ['deposits', 'withdrawals', 'transactionLog', 'messages', 'notifications', 'auditLog', 'kycDocuments', 'loginPermissions', 'merchantRequests', 'merchantTransactions', 'merchantPaymentData', 'merchantRatings', 'userWithdrawalMethods', 'deviceApprovals', 'profileChangeRequests'];
+            keysToDelete.forEach(function(key) {
+                DB.set(key, []);
+                window.appData[key] = [];
             });
+            window.appData.users = cleanUsers;
+            DB.set('users', cleanUsers);
+            try { localStorage.removeItem('fy_reg_backup'); } catch(e) {}
+            try { localStorage.removeItem('fy_login_attempts'); } catch(e) {}
+            Security.addAuditLog(cleanAdmin ? cleanAdmin.id : 'SYSTEM', 'APP_RESET', 'إعادة تعيين التطبيق بالكامل - تم التحقق بـ OTP');
+            toast('✅ تم حذف جميع البيانات بنجاح - التطبيق نظيف الآن', 'success', 5000);
+            setTimeout(function() { render(); }, 1000);
         }
 
         function saveAdminSettings() {
