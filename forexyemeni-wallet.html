@@ -1303,12 +1303,18 @@
                     else if(currentUser && (currentUser.role === 'MERCHANT' || currentUser.merchantStatus === 'APPROVED')) app.innerHTML = renderLayout(C,'merchant');
                     else app.innerHTML = renderLayout(C,'user');
             }
-            // Check session validity for logged-in views
+            // Check session validity for logged-in views - allow multiple devices
             if(state.user && state.user.id && state.view !== 'change-password-required') {
-                if(!Security.validateSession(state.user.id)) {
+                var users = DB.get('users');
+                var sessUser = users.find(function(u){return u.id === state.user.id;});
+                if(sessUser && sessUser.forceLogout === true) {
+                    // Admin forced logout for this user
+                    delete sessUser.forceLogout;
+                    DB.set('users', users);
                     state.user = null;
                     localStorage.removeItem('fy_auth_user');
-                    toast('تم تسجيل الدخول من جهاز آخر - تم تسجيل خروجك تلقائياً','warning',false);
+                    localStorage.removeItem('fy_session_id');
+                    toast('تم تسجيل خروجك من قبل الإدارة','warning',false);
                     setView('login');
                     return;
                 }
@@ -3998,8 +4004,26 @@
                 '<div><label class="block text-sm font-medium '+C.text+' mb-1">الاسم</label><input type="text" id="edit-user-name" value="'+escHtml(u.name)+'" class="w-full px-4 py-2.5 rounded-lg border '+C.input+' outline-none"></div>'+
                 '<div><label class="block text-sm font-medium '+C.text+' mb-1">رقم الهاتف</label><input type="text" id="edit-user-phone" value="'+escHtml(u.phone)+'" class="w-full px-4 py-2.5 rounded-lg border '+C.input+' outline-none"></div>'+
                 '<div><label class="block text-sm font-medium '+C.text+' mb-1">🔒 كلمة المرور</label><div class="flex gap-2"><button onclick="resetUserPassword(\''+userId+'\')" class="flex-1 px-4 py-2.5 rounded-lg bg-warning text-dark-bg font-bold btn text-sm">🔑 إعادة تعيين كلمة المرور</button></div></div>'+
+                '<div><label class="block text-sm font-medium '+C.text+' mb-1">📱 إدارة الأجهزة</label><div class="flex gap-2"><button onclick="forceLogoutUser(\''+userId+'\')" class="flex-1 px-4 py-2.5 rounded-lg bg-danger text-white font-bold btn text-sm">🚪 تسجيل خروج من جميع الأجهزة</button></div></div>'+
                 '<button onclick="saveEditUser(\''+userId+'\')" class="'+C.btn+' w-full py-2.5 rounded-lg font-bold btn">حفظ</button>'+
                 '<button onclick="closeModal()" class="w-full py-2.5 rounded-lg border '+C.border+' '+C.text+' btn">إلغاء</button></div>');
+        }
+
+        function forceLogoutUser(userId) {
+            showConfirm('🚪','تسجيل الخروج من جميع الأجهزة','سيتم تسجيل خروج المستخدم من جميع الأجهزة فوراً. هل تريد المتابعة؟','نعم','bg-danger text-white',function(yes){
+                if(!yes) return;
+                var users = DB.get('users');
+                var u = users.find(function(x){return x.id===userId;});
+                if(!u) return;
+                u.forceLogout = true;
+                delete u.sessionId;
+                DB.set('users', users);
+                closeModal();
+                addNotif(userId, '🚪 تم تسجيل الخروج', 'تم تسجيل خروجك من قبل الإدارة. قم بتسجيل الدخول مرة أخرى.', 'WARNING');
+                Security.addAuditLog(userId, 'FORCE_LOGOUT', 'تسجيل خروج من جميع الأجهزة من الإدارة');
+                toast('تم تسجيل خروج المستخدم من جميع الأجهزة','success');
+                render();
+            });
         }
 
         function saveEditUser(userId) {
@@ -4023,11 +4047,33 @@
                 var newPass = 'Fy' + Math.random().toString(36).substring(2, 8) + Math.random().toString(36).substring(2, 6);
                 u.password = Security.hashPassword(newPass);
                 u.passwordMustChange = true;
+                u.tempPassword = newPass; // Store temp password so user can see it
                 DB.set('users', users);
                 closeModal();
-                addNotif(userId, 'إعادة تعيين كلمة المرور', 'تم إعادة تعيين كلمة المرور الخاصة بحسابك من الإدارة. يجب عليك تغييرها عند تسجيل الدخول.', 'WARNING');
+                // Send password via email if user has email
+                var sendPromise = null;
+                if(u.email && u.email.trim()) {
+                    var _apiBase = 'https://forexyemeni-wallet.vercel.app';
+                    sendPromise = fetch(_apiBase + '/api/send-otp', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ to: u.email, code: newPass, isPasswordReset: true })
+                    }).catch(function(){});
+                }
+                // Notify user with the new password
+                addNotif(userId, '🔑 كلمة المرور الجديدة', 'تم إعادة تعيين كلمة المرور من الإدارة. كلمة المرور الجديدة: ' + newPass + ' - يجب عليك تغييرها فور تسجيل الدخول.', 'WARNING');
                 Security.addAuditLog(userId, 'PASSWORD_RESET', 'إعادة تعيين كلمة مرور من الإدارة');
-                toast('تم إعادة تعيين كلمة المرور وإشعار المستخدم','success');
+                // Show password to admin in a modal
+                var C = getThemeColors();
+                showModal('<div class="text-center"><div class="text-5xl mb-4">🔑</div><h3 class="text-lg font-bold '+C.text+' mb-3">تم إنشاء كلمة مرور جديدة</h3>'+
+                    '<p class="'+C.muted+' text-sm mb-3">المستخدم: <span class="font-bold '+C.text+'">'+escHtml(u.name)+'</span></p>'+
+                    (sendPromise ? '<p class="text-success text-xs mb-3">✅ تم إرسال كلمة المرور لبريد المستخدم</p>' : '')+
+                    '<div class="p-4 rounded-lg bg-primary/10 border-2 border-primary/30 mb-4">'+
+                    '<p class="text-xs '+C.muted+' mb-1">كلمة المرور الجديدة:</p>'+
+                    '<p class="text-2xl font-mono font-bold text-primary tracking-widest select-all" id="new-pass-display">'+escHtml(newPass)+'</p></div>'+
+                    '<p class="text-xs text-danger mb-4">⚠️ انسخ هذه الكلمة المرور - لن تظهر مرة أخرى!</p>'+
+                    '<div class="flex gap-2"><button onclick="navigator.clipboard.writeText(\''+newPass+'\');toast(\'تم النسخ\',\'success\')" class="flex-1 py-2.5 rounded-lg bg-primary text-dark-bg font-bold btn text-sm">📋 نسخ كلمة المرور</button>'+
+                    '<button onclick="closeModal()" class="flex-1 py-2.5 rounded-lg border '+C.border+' '+C.text+' btn text-sm">إغلاق</button></div></div>');
                 render();
             });
         }
