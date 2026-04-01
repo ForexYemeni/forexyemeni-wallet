@@ -46,14 +46,7 @@
         /* Glassmorphism */
         .glass { background: rgba(255,255,255,0.05); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); border: 1px solid rgba(255,255,255,0.08); }
         .dark .glass { background: rgba(15,20,40,0.6); border: 1px solid rgba(255,255,255,0.06); }
-        .light .glass { background: rgba(255,255,255,0.75); border: 1px solid rgba(0,0,0,0.06); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); }
-        /* Fix inputs inside glass containers - backdrop-filter blocks touch events on some browsers */
-        .glass input, .glass select, .glass textarea, .glass button {
-            position: relative;
-            pointer-events: auto;
-            -webkit-transform: translateZ(0);
-            transform: translateZ(0);
-        }
+        .light .glass { background: rgba(255,255,255,0.7); border: 1px solid rgba(255,255,255,0.3); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); }
 
         /* Gradient backgrounds */
         .gradient-bg { background: linear-gradient(135deg, #0a0e1a 0%, #1a1040 30%, #0f1729 60%, #0a0e1a 100%); }
@@ -66,8 +59,6 @@
         .shadow-glow { box-shadow: 0 0 20px rgba(240,185,11,0.15), 0 0 60px rgba(240,185,11,0.05); }
         .shadow-glow-sm { box-shadow: 0 0 10px rgba(240,185,11,0.1); }
         .shadow-card { box-shadow: 0 4px 24px rgba(0,0,0,0.15), 0 1px 4px rgba(0,0,0,0.1); }
-        .light .shadow-premium { box-shadow: 0 8px 32px rgba(0,0,0,0.08), 0 2px 8px rgba(0,0,0,0.04); }
-        .light .shadow-card { box-shadow: 0 4px 24px rgba(0,0,0,0.06), 0 1px 4px rgba(0,0,0,0.03); }
 
         /* Animations */
         @keyframes float { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-10px); } }
@@ -106,7 +97,7 @@
         .btn-premium:active { transform: scale(0.97); }
 
         /* Modern inputs */
-        .input-modern { transition: all 0.3s ease; pointer-events: auto; }
+        .input-modern { transition: all 0.3s ease; background: transparent; }
         .input-modern:focus { box-shadow: 0 0 0 3px rgba(240,185,11,0.2); border-color: rgba(240,185,11,0.5) !important; }
 
         /* Animated gradient border */
@@ -1263,11 +1254,6 @@
                 var el = document.getElementById(previewId);
                 if(el) { el.innerHTML = '<img src="'+imgSrc+'" class="h-20 rounded-lg border object-cover mt-2">'; }
             }
-            // Show confirm button if exists (for merchant/admin withdrawal proof)
-            var proofActions = document.getElementById('merch-wd-proof-actions');
-            if(proofActions && imgSrc) proofActions.classList.remove('hidden');
-            proofActions = document.getElementById('admin-wd-proof-actions');
-            if(proofActions && imgSrc) proofActions.classList.remove('hidden');
         }
         function fileForFieldWithPreview(fieldName, inputEl, previewId) {
             var file = inputEl.files[0];
@@ -1279,11 +1265,6 @@
                         var el = document.getElementById(previewId);
                         if(el) { el.innerHTML = '<img src="'+compressed+'" class="h-20 rounded-lg border object-cover mt-2">'; }
                     }
-                    // Show confirm button if exists (for merchant/admin withdrawal proof)
-                    var proofActions = document.getElementById('merch-wd-proof-actions');
-                    if(proofActions && compressed) proofActions.classList.remove('hidden');
-                    proofActions = document.getElementById('admin-wd-proof-actions');
-                    if(proofActions && compressed) proofActions.classList.remove('hidden');
                 });
             }
         }
@@ -1579,10 +1560,10 @@
             var app = document.getElementById('app');
             var isDark = state.theme === 'dark';
             var C = {
-                bg: 'gradient-bg', text: isDark?'text-gray-100':'text-gray-800',
+                bg: isDark?'bg-gradient-bg':'bg-gradient-bg', text: isDark?'text-gray-100':'text-gray-800',
                 muted: isDark?'text-gray-400':'text-gray-500', card: 'glass',
                 border: isDark?'border-white/5':'border-white/20',
-                input: isDark?'bg-white/10 border-white/20 text-white input-modern':'bg-white/80 border-gray-300 text-gray-800 input-modern',
+                input: isDark?'bg-white/5 border-white/10 text-white input-modern':'bg-white/50 border-white/30 text-gray-800 input-modern',
                 btn: 'bg-gradient-to-l from-amber-500 via-amber-400 to-yellow-400 text-gray-900 font-bold btn-premium',
                 btnOutline: 'border '+(isDark?'border-white/10 text-gray-300 hover:bg-white/5':'border-gray-200 text-gray-600 hover:bg-gray-50')+' btn-premium',
                 danger: 'bg-gradient-to-r from-red-500 to-rose-500 text-white btn-premium',
@@ -1622,84 +1603,23 @@
                     if(state.depPmId) renderDepPmDetails();
                 }, 100);
             }
-            // Check for pending receipt confirmation (blocking overlay)
-            if(state.user && state.user.id) {
-                setTimeout(function(){ _checkAndShowPendingReceipts(); }, 300);
-            }
-        }
-
-        // ==================== USER: PENDING RECEIPT CONFIRMATION ====================
-        function _checkAndShowPendingReceipts() {
-            var user = getUser();
-            if(!user) return;
-            var withdrawals = DB.get('withdrawals');
-            var pending = withdrawals.filter(function(w){
-                var hasProof = w.proofImage || w.confirmScreenshot;
-                return w.userId === user.id && hasProof && !w.userConfirmedAt && (w.status === 'APPROVED' || w.status === 'COMPLETED');
-            });
-            if(pending.length === 0) return;
-            // Show blocking overlay
-            var w = pending[0];
-            var C = getThemeColors();
-            var overlay = document.getElementById('pending-receipt-overlay');
-            if(overlay) return; // Already showing
-            // Sound + vibration
-            try { if(navigator.vibrate) navigator.vibrate([300,100,300]); } catch(e){}
-            var div = document.createElement('div');
-            div.id = 'pending-receipt-overlay';
-            div.style.cssText = 'position:fixed;inset:0;z-index:99999;background:rgba(0,0,0,0.7);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);display:flex;align-items:center;justify-content:center;padding:16px;';
-            div.innerHTML = '<div style="background:'+(C.card||'#111827')+';border-radius:20px;padding:24px;max-width:400px;width:100%;box-shadow:0 20px 60px rgba(0,0,0,0.5);text-align:center;">'+
-                '<div style="width:60px;height:60px;border-radius:50%;background:rgba(16,185,129,0.2);display:flex;align-items:center;justify-content:center;margin:0 auto 16px;font-size:28px;">✅</div>'+
-                '<h3 style="font-size:18px;font-weight:700;color:'+(C.text||'#f3f4f6')+';margin:0 0 8px;">تأكيد استلام السحب</h3>'+
-                '<p style="font-size:13px;color:'+(C.muted||'#9ca3af')+';margin:0 0 12px;">تم إكمال سحبك بمبلغ <strong style="color:'+(C.text||'#f3f4f6')+'">'+fmtNum(w.net||0)+' USDT</strong></p>'+
-                ((w.proofImage || w.confirmScreenshot) ? '<img src="'+(w.proofImage || w.confirmScreenshot)+'" style="width:100%;max-height:200px;object-fit:cover;border-radius:12px;margin:0 auto 12px;display:block;border:2px solid rgba(255,255,255,0.1);">' : '')+
-                '<p style="font-size:14px;color:'+(C.text||'#f3f4f6')+';margin:0 0 16px;font-weight:500;">أدخل كلمة المرور لتأكيد الاستلام</p>'+
-                '<input type="password" id="receipt-confirm-pass" placeholder="كلمة المرور" style="width:100%;padding:12px 16px;border-radius:12px;border:2px solid rgba(255,255,255,0.15);background:rgba(255,255,255,0.05);color:'+(C.text||'#f3f4f6')+';font-size:16px;outline:none;box-sizing:border-box;margin-bottom:12px;">'+
-                '<button onclick="_doConfirmReceipt(\''+w.id+'\')" style="width:100%;padding:14px;border-radius:14px;background:linear-gradient(to left,#10b981,#34d399,#6ee7b7);color:#1f2937;font-weight:700;font-size:16px;border:none;cursor:pointer;">✅ تأكيد الاستلام</button>'+
-                '</div>';
-            document.body.appendChild(div);
-        }
-
-        function _doConfirmReceipt(wdId) {
-            var passInput = document.getElementById('receipt-confirm-pass');
-            if(!passInput) return;
-            var pass = passInput.value;
-            if(!pass) { toast('أدخل كلمة المرور','error'); return; }
-            var user = getUser();
-            if(!user) return;
-            if(!Security.checkPassword(pass, user.password)) { toast('كلمة المرور غير صحيحة','error'); passInput.value=''; return; }
-            // Confirm receipt
-            var withdrawals = DB.get('withdrawals');
-            var w = withdrawals.find(function(x){return x.id===wdId;});
-            if(!w) return;
-            w.userConfirmedAt = new Date().toISOString();
-            w.status = 'COMPLETED';
-            DB.set('withdrawals', withdrawals);
-            addNotif(user.id, 'تأكيد الاستلام', 'تم تأكيد استلام سحب '+fmtNum(w.net||0)+' USDT بنجاح', 'WITHDRAW');
-            // Remove overlay
-            var overlay = document.getElementById('pending-receipt-overlay');
-            if(overlay) overlay.remove();
-            toast('تم تأكيد الاستلام بنجاح','success');
-            render();
         }
 
         function getThemeColors() {
             var isDark = state.theme === 'dark';
             return {
-                bg: 'gradient-bg',
-                text: isDark?'text-gray-100':'text-gray-800',
-                muted: isDark?'text-gray-400':'text-gray-500',
-                card: 'glass',
-                border: isDark?'border-white/5':'border-white/20',
-                input: isDark?'bg-white/10 border-white/20 text-white input-modern':'bg-white/80 border-gray-300 text-gray-800 input-modern',
+                bg: isDark?'bg-dark-bg':'bg-light-bg',
+                text: isDark?'text-dark-text':'text-light-text',
+                muted: isDark?'text-dark-muted':'text-light-muted',
+                card: isDark?'bg-dark-card':'bg-light-card',
+                border: isDark?'border-dark-border':'border-light-border',
+                input: isDark?'bg-white/5 border-white/10 text-white input-modern':'bg-white/50 border-white/30 text-gray-800 input-modern',
                 btn: 'bg-gradient-to-l from-amber-500 via-amber-400 to-yellow-400 text-gray-900 font-bold btn-premium',
                 btnOutline: 'border '+(isDark?'border-white/10 text-gray-300 hover:bg-white/5':'border-gray-200 text-gray-600 hover:bg-gray-50')+' btn-premium',
                 danger: 'bg-gradient-to-r from-red-500 to-rose-500 text-white btn-premium',
                 success: 'bg-gradient-to-r from-emerald-500 to-green-500 text-white btn-premium',
                 gradient: 'bg-gradient-to-br from-amber-500/20 via-violet-500/10 to-cyan-500/20',
-                solid: isDark?'bg-dark-card':'bg-light-card',
-                sidebar: 'glass',
-                sidebarBg: 'glass'
+                sidebar: isDark?'glass':'glass'
             };
         }
         // ==================== AUTH PAGES ====================
@@ -1865,6 +1785,7 @@
             var inpC = isDark ? '#1f2937' : '#f3f4f6';
             var brdC = isDark ? '#374151' : '#d1d5db';
             var btnBg = 'linear-gradient(to left, #f59e0b, #fbbf24, #facc15)';
+            var opts = countries.map(function(c){return '<option value="'+c.code+'" '+(c.code==='+967'?'selected':'')+'>'+c.flag+' ('+c.code+')</option>';}).join('');
             var emailActive = 'border:2px solid #3b82f6;background:rgba(59,130,246,0.05);';
             var emailNormal = 'border:2px solid '+brdC+';';
             var phoneActive = 'border:2px solid #f59e0b;background:rgba(245,158,11,0.05);';
@@ -1912,9 +1833,9 @@
 
             '<div id="reg-phone-block">'+
             '<div style="display:flex;gap:8px;">'+
-            '<div style="width:64px;flex-shrink:0;"><label style="font-size:14px;font-weight:500;color:'+txtC+';margin-bottom:6px;display:block;">الرمز</label>'+
-            '<div style="width:100%;height:42px;border-radius:10px;border:2px solid '+brdC+';background:'+inpC+';color:'+txtC+';display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;cursor:default;">🇾🇪 +967</div>'+
-            '<input type="hidden" id="reg-country" value="+967"></div>'+
+            '<div style="width:64px;flex-shrink:0;position:relative;"><label style="font-size:11px;font-weight:500;color:'+txtC+';margin-bottom:4px;display:block;">الدولة</label>'+
+            '<button type="button" id="reg-country-btn" onclick="toggleCountryDropdown(\'reg\')" style="width:100%;height:42px;border-radius:10px;border:2px solid '+brdC+';background:'+inpC+';color:'+txtC+';text-align:center;font-size:18px;cursor:pointer;">🇾🇪</button>'+
+            '<input type="hidden" id="reg-country" value="+967"><div id="reg-country-dropdown" style="display:none;position:absolute;top:100%;left:0;right:0;margin-top:4px;background:'+cardC+';border:2px solid '+brdC+';border-radius:10px;box-shadow:0 8px 24px rgba(0,0,0,0.2);z-index:50;max-height:200px;overflow-y:auto;padding:4px;"></div></div>'+
             '<div style="flex:1;min-width:0;"><label style="font-size:14px;font-weight:500;color:'+txtC+';margin-bottom:6px;display:block;">رقم الهاتف</label>'+
             '<div style="display:flex;gap:8px;align-items:center;">'+
             '<input type="tel" id="reg-phone" autocomplete="tel" style="'+inputStyle+'flex:1;min-width:0;" pattern="[0-9]+">'+
@@ -2331,8 +2252,7 @@
             DB.ensureUserFields(user);
 
             // === Check if user needs admin login permission (after force logout) ===
-            // ADMIN users always bypass login permission requirement
-            if (user.needsLoginPermission === true && user.role !== 'ADMIN') {
+            if (user.needsLoginPermission === true) {
                 var loginPerms = DB.get('loginPermissions') || [];
                 var existingPerm = loginPerms.find(function(p){ return p.userId === user.id && p.status === 'PENDING'; });
                 if (!existingPerm) {
@@ -2430,8 +2350,6 @@
             u.trustedDevices = trustedDevices;
             u.lastLoginAt = new Date().toISOString();
             u.lastDeviceInfo = getDeviceInfo();
-            // Clear login permission flag on successful login
-            u.needsLoginPermission = false;
             DB.set('users', users);
             Security.createSession(u.id);
             state.user = {id: u.id};
@@ -3142,7 +3060,7 @@
                 case 'merchant-settings': contentHtml = renderMerchantSettings(C); break;
                 case 'merchant-deposit': contentHtml = renderMerchantDeposit(C); break;
                 case 'merchant-withdraw': contentHtml = renderMerchantWithdraw(C); break;
-                case 'merchant-chat': contentHtml = renderMerchantChat(C); break;
+                case 'merchant-chat': contentHtml = renderMerchantChat(C); _markAllChatRead('MERCHANT'); break;
                 case 'admin-home': contentHtml = renderAdminHome(C); break;
                 case 'admin-users': contentHtml = renderAdminUsers(C); break;
                 case 'admin-deposits': contentHtml = renderAdminDeposits(C); break;
@@ -3278,7 +3196,7 @@
             var kycApproved = kycDoc && kycDoc.frontId && kycDoc.status === 'APPROVED';
             if(!kycApproved) { return '<div class="'+C.card+' rounded-xl p-8 max-w-lg mx-auto border '+C.border+' text-center"><p class="text-4xl mb-4">🪪</p><p class="'+C.text+' font-bold text-lg mb-2">يجب توثيق الهوية أولاً</p><p class="'+C.muted+' mb-4">لا يمكنك إجراء إيداع قبل توثيق هويتك</p><button onclick="setView(\'user-kyc\')" class="'+C.btn+' px-6 py-3 rounded-lg font-bold btn">🪪 توثيق الهوية</button></div>'; }
             var pms = DB.get('paymentMethods').filter(function(p){return p.isActive;}).sort(function(a,b){return (a.sortOrder||0)-(b.sortOrder||0);});
-            var selectedPmId = state.depPmId || '';
+            var selectedPmId = state.depPmId || (pms.length > 0 ? pms[0].id : '');
             var pmOpts = pms.map(function(p){ var lbl = p.type==='CRYPTO' ? (p.network||'CRYPTO') : (p.bankName||p.recipientName||'تحويل بنكي'); return '<option value="'+p.id+'" '+(p.id===selectedPmId?'selected':'')+'>'+escHtml(lbl)+'</option>';}).join('');
             return '<div class="'+C.card+' rounded-2xl p-6 max-w-lg mx-auto border '+C.border+'">'+
                 '<h2 class="text-xl font-bold '+C.text+' mb-6 text-center">💰 إيداع رصيد</h2>'+
@@ -3386,38 +3304,33 @@
             if(!pmSelectorEl) return;
             var C = getThemeColors();
             var pmOpts = '';
-            var allUsers = DB.get('users');
             if(merchantId) {
                 // Show merchant's payment methods
                 var mMethods = getMerchantMethods(merchantId);
-                var merchantUser = allUsers.find(function(u){return u.id===merchantId;});
-                var merchantBal = merchantUser ? (merchantUser.usdtBalance || 0) : 0;
-
-                if(merchantBal <= 0) {
-                    // Merchant has zero balance - show warning + fall back to admin methods
-                    renderDepMerchantBalance();
-                    // Fall back to admin's payment methods
-                    var pms = DB.get('paymentMethods').filter(function(p){return p.isActive;}).sort(function(a,b){return (a.sortOrder||0)-(b.sortOrder||0);});
-                    pmOpts = pms.map(function(p){ var lbl = p.type==='CRYPTO' ? (p.network||'CRYPTO') : (p.bankName||p.recipientName||'تحويل بنكي'); return '<option value="'+p.id+'">'+escHtml(lbl)+'</option>';}).join('');
-                    pmSelectorEl.innerHTML = '<div><label class="block text-sm font-medium '+C.text+' mb-1">طريقة الإيداع</label><select id="dep-pm" class="w-full px-4 py-2.5 rounded-xl border '+C.input+' outline-none" onchange="onDepPmChange()"><option value="">-- اختر طريقة --</option>'+pmOpts+'</select></div>';
-                } else if(mMethods.length === 0) {
-                    renderDepMerchantBalance();
+                pmOpts = mMethods.map(function(p){
+                    var lbl = p.type==='CRYPTO' ? (p.network||'CRYPTO') : (p.bankName||p.recipientName||'تحويل بنكي');
+                    var currTag = p.type==='BANK' && p.currency ? (p.currency==='SAR'?'🇸🇦':'🇾🇪') : '';
+                    return '<option value="'+p.id+'">'+escHtml(lbl)+(currTag?' '+currTag:'')+'</option>';
+                }).join('');
+                if(mMethods.length === 0) {
                     pmSelectorEl.innerHTML = '<p class="text-warning text-sm text-center py-2">⚠️ التاجر لم يقم بإضافة طرق إيداع بعد</p>';
-                    state.depPmId = '';
                 } else {
-                    renderDepMerchantBalance();
-                    pmOpts = mMethods.map(function(p){
-                        var lbl = p.type==='CRYPTO' ? (p.network||'CRYPTO') : (p.bankName||p.recipientName||'تحويل بنكي');
-                        var currTag = p.type==='BANK' && p.currency ? (p.currency==='SAR'?'🇸🇦':'🇾🇪') : '';
-                        return '<option value="'+p.id+'">'+escHtml(lbl)+(currTag?' '+currTag:'')+'</option>';
-                    }).join('');
                     pmSelectorEl.innerHTML = '<div><label class="block text-sm font-medium '+C.text+' mb-1">طريقة الإيداع (طرق التاجر)</label><select id="dep-pm" class="w-full px-4 py-2.5 rounded-xl border '+C.input+' outline-none" onchange="onDepPmChange()"><option value="">-- اختر طريقة --</option>'+pmOpts+'</select></div>';
+                    state.depPmId = mMethods[0].id;
+                    var newSel = document.getElementById('dep-pm');
+                    if(newSel) newSel.value = mMethods[0].id;
                 }
+                renderDepMerchantBalance();
             } else {
                 // Show admin's payment methods
                 var pms = DB.get('paymentMethods').filter(function(p){return p.isActive;}).sort(function(a,b){return (a.sortOrder||0)-(b.sortOrder||0);});
                 pmOpts = pms.map(function(p){ var lbl = p.type==='CRYPTO' ? (p.network||'CRYPTO') : (p.bankName||p.recipientName||'تحويل بنكي'); return '<option value="'+p.id+'">'+escHtml(lbl)+'</option>';}).join('');
                 pmSelectorEl.innerHTML = '<div><label class="block text-sm font-medium '+C.text+' mb-1">طريقة الإيداع</label><select id="dep-pm" class="w-full px-4 py-2.5 rounded-xl border '+C.input+' outline-none" onchange="onDepPmChange()"><option value="">-- اختر طريقة --</option>'+pmOpts+'</select></div>';
+                if(pms.length > 0) {
+                    state.depPmId = pms[0].id;
+                    var newSel = document.getElementById('dep-pm');
+                    if(newSel) newSel.value = pms[0].id;
+                }
                 // Clear merchant balance
                 var balEl = document.getElementById('dep-merchant-balance');
                 if(balEl) balEl.innerHTML = '';
@@ -3521,14 +3434,6 @@
             }
             if(!pmId) { toast('اختر طريقة الإيداع','error'); return; }
             if(!amount || amount <= 0) { toast('أدخل مبلغاً صحيحاً','error'); return; }
-            // Check merchant balance limit for deposit
-            if(merchantId) {
-                var merchantUser = DB.get('users').find(function(u){return u.id===merchantId;});
-                var merchantBal = merchantUser ? (merchantUser.usdtBalance || 0) : 0;
-                var depUsdtEst = isCrypto ? amount : amount / rate;
-                if(merchantBal <= 0) { toast('رصيد التاجر فارغ حالياً، لا يمكن الإيداع عبر هذا التاجر','error'); return; }
-                if(depUsdtEst > merchantBal) { toast('المبلغ أكبر من رصيد التاجر المتاح ('+fmtNum(merchantBal)+' USDT)','error'); return; }
-            }
             if(!receipt) { toast('يجب إرفاق صورة الإيصال','error'); return; }
             if(pm && amount < (pm.minDeposit||0)) { toast('الحد الأدنى للإيداع: '+pm.minDeposit,'error'); return; }
             var currency = isCrypto ? 'USDT' : currencySel;
@@ -3709,16 +3614,6 @@
             var merchantId = merchantSelect ? merchantSelect.value : '';
             if(!methodId) { toast('اختر طريقة السحب','error'); return; }
             if(!amountInput || amountInput <= 0) { toast('أدخل مبلغاً صحيحاً','error'); return; }
-            // Check merchant balance for withdrawal
-            if(merchantId) {
-                var merchantUser = DB.get('users').find(function(u){return u.id===merchantId;});
-                var merchantBal = merchantUser ? (merchantUser.usdtBalance || 0) : 0;
-                if(merchantBal <= 0) { toast('رصيد التاجر فارغ حالياً، لا يمكن السحب عبر هذا التاجر','error'); return; }
-                var tempUsdt = amountInput;
-                if(wdCurrency === 'YER') tempUsdt = amountInput / rate;
-                else if(wdCurrency === 'SAR') tempUsdt = amountInput * rateSar / rate;
-                if(tempUsdt > merchantBal) { toast('المبلغ أكبر من رصيد التاجر المتاح ('+fmtNum(merchantBal)+' USDT)','error'); return; }
-            }
 
             // Convert entered amount to USDT based on selected currency
             var wdCurrency = document.getElementById('wd-currency') ? document.getElementById('wd-currency').value : 'USDT';
@@ -5116,126 +5011,41 @@
         function renderMerchantChat(C) {
             var user = getUser();
             if(!user) return '';
-            var allUsers = DB.get('users');
+            var adminUser = DB.get('users').find(function(u){return u.role==='ADMIN';});
+            var adminId = adminUser ? adminUser.id : 'admin1';
             var messages = DB.get('messages').filter(function(m){
-                return m.fromId===user.id || m.toId===user.id;
+                return (m.fromId===user.id && m.toId===adminId)||(m.fromId===adminId && m.toId===user.id);
             });
-            messages.sort(function(a,b){return new Date(b.createdAt)-new Date(a.createdAt);});
-
-            // Group messages by the OTHER person (not the merchant)
-            var chatPartners = {};
-            messages.forEach(function(m) {
-                var otherId = m.fromId === user.id ? m.toId : m.fromId;
-                if (!chatPartners[otherId]) {
-                    var otherUser = allUsers.find(function(u){return u.id===otherId;});
-                    chatPartners[otherId] = {
-                        userId: otherId,
-                        name: otherUser ? otherUser.name : 'مستخدم محذوف',
-                        role: otherUser ? otherUser.role : 'UNKNOWN',
-                        lastMsg: m,
-                        unread: 0
-                    };
-                }
-                // Don't overwrite lastMsg - keep the newest (first encountered since sorted desc)
-                if (m.toId === user.id && !m.isRead) {
-                    chatPartners[otherId].unread++;
-                }
-            });
-
-            var partnerList = Object.values(chatPartners);
-            partnerList.sort(function(a,b){ return new Date(b.lastMsg.createdAt) - new Date(a.lastMsg.createdAt); });
-
-            var totalUnread = partnerList.reduce(function(s,p){return s+p.unread;},0);
-
-            if (partnerList.length === 0) {
-                return '<div class="'+C.card+' rounded-xl border '+C.border+' p-8 text-center"><p class="'+C.muted+'">لا توجد محادثات بعد</p></div>';
+            messages.sort(function(a,b){return new Date(a.createdAt)-new Date(b.createdAt);});
+            var msgsHtml = '';
+            if(messages.length===0) msgsHtml = '<p class="'+C.muted+' text-center py-8 text-sm">ابدأ المحادثة مع فريق الدعم</p>';
+            else {
+                messages.forEach(function(m) {
+                    var isMe = m.fromId === user.id;
+                    msgsHtml += '<div class="flex '+(isMe?'justify-start':'justify-end')+' mb-3">'+
+                        '<div class="max-w-[75%] px-4 py-2.5 rounded-xl '+(isMe?'chat-bubble-me':'chat-bubble-other')+'"><p>'+escHtml(m.text)+'</p><p class="text-[10px] opacity-60 mt-1">'+fmtDate(m.createdAt)+'</p></div></div>';
+                });
             }
-
-            var listHtml = partnerList.map(function(p) {
-                var roleIcon = p.role==='ADMIN' ? '👨‍💼' : (p.role==='MERCHANT' ? '🏪' : '👤');
-                var roleLabel = p.role==='ADMIN' ? '<span class="text-[10px] text-primary">إدارة</span>' : (p.role==='MERCHANT' ? '<span class="text-[10px] text-primary">تاجر</span>' : '');
-                var unreadBadge = p.unread > 0 ? '<span class="bg-danger text-white text-[10px] w-5 h-5 rounded-full flex items-center justify-center font-bold">'+p.unread+'</span>' : '';
-                var lastText = escHtml((p.lastMsg.text||'').substring(0,40)) + ((p.lastMsg.text||'').length>40 ? '...' : '');
-                return '<div onclick="openMerchantChatWith(\''+p.userId+'\')" class="flex items-center gap-3 p-3 rounded-xl border '+C.border+' cursor-pointer btn hover:border-primary/30" style="margin-bottom:8px;">'+
-                    '<div class="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center text-lg shrink-0">'+roleIcon+'</div>'+
-                    '<div class="flex-1 min-w-0"><div class="flex items-center gap-2"><p class="font-bold text-sm '+C.text+' truncate">'+escHtml(p.name)+'</p>'+roleLabel+unreadBadge+'</div>'+
-                    '<p class="text-xs '+C.muted+' truncate">'+(p.lastMsg.fromId===user.id?'أنت: ':'')+lastText+'</p>'+
-                    '<p class="text-[10px] opacity-40">'+fmtDate(p.lastMsg.createdAt)+'</p></div></div>';
-            }).join('');
-
-            var activeChatHtml = '';
-            if (state.merchantChatWithId) {
-                var chatPartner = allUsers.find(function(u){return u.id===state.merchantChatWithId;});
-                if (chatPartner) {
-                    var chatMsgs = messages.filter(function(m){
-                        return (m.fromId===user.id && m.toId===state.merchantChatWithId)||(m.fromId===state.merchantChatWithId && m.toId===user.id);
-                    });
-                    chatMsgs.sort(function(a,b){return new Date(a.createdAt)-new Date(b.createdAt);});
-                    var chatMsgsHtml = '';
-                    if (chatMsgs.length===0) chatMsgsHtml = '<p class="'+C.muted+' text-center py-8 text-sm">ابدأ المحادثة</p>';
-                    else {
-                        chatMsgs.forEach(function(m) {
-                            var isMe = m.fromId === user.id;
-                            chatMsgsHtml += '<div class="flex '+(isMe?'justify-start':'justify-end')+' mb-3">'+
-                                '<div class="max-w-[75%] px-4 py-2.5 rounded-xl '+(isMe?'chat-bubble-me':'chat-bubble-other')+'"><p>'+escHtml(m.text)+'</p><p class="text-[10px] opacity-60 mt-1">'+fmtDate(m.createdAt)+'</p></div></div>';
-                        });
-                    }
-                    // Mark as read
-                    var unreadMsgs = chatMsgs.filter(function(m){return m.fromId===state.merchantChatWithId && !m.isRead;});
-                    if(unreadMsgs.length>0) {
-                        var allMsgs = DB.get('messages');
-                        unreadMsgs.forEach(function(m) {
-                            var idx = allMsgs.findIndex(function(x){return x.id===m.id;});
-                            if(idx>=0) allMsgs[idx].isRead = true;
-                        });
-                        DB.set('messages', allMsgs);
-                        setTimeout(function(){ render(); }, 500);
-                    }
-                    var partnerIcon = chatPartner.role==='ADMIN' ? '👨‍💼' : (chatPartner.role==='MERCHANT' ? '🏪' : '👤');
-                    activeChatHtml = '<div class="fixed inset-0 z-[100] '+C.card+'" style="display:flex;flex-direction:column;">'+
-                        '<div class="p-4 border-b '+C.border+' flex items-center gap-3">'+
-                        '<button onclick="closeMerchantChat()" class="text-lg '+C.muted+' btn">→</button>'+
-                        '<div class="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center text-lg shrink-0">'+partnerIcon+'</div>'+
-                        '<div><p class="font-bold '+C.text+'">'+escHtml(chatPartner.name)+'</p><p class="text-xs '+C.muted+'">'+(chatPartner.role==='ADMIN'?'الدعم الفني':'مستخدم')+'</p></div></div>'+
-                        '<div id="merchant-active-chat-messages" class="flex-1 overflow-y-auto p-4 space-y-1" style="flex:1;">'+chatMsgsHtml+'</div>'+
-                        '<div class="p-3 border-t '+C.border+' flex gap-2"><input type="text" id="merchant-active-chat-input" class="flex-1 px-4 py-2.5 rounded-xl border '+C.input+' outline-none text-sm" placeholder="اكتب رسالتك..." onkeydown="if(event.key===\'Enter\')sendMerchantActiveChat()">'+
-                        '<button onclick="sendMerchantActiveChat()" class="'+C.btn+' px-5 py-2.5 rounded-lg btn text-sm">إرسال</button></div></div>';
-                    setTimeout(function(){
-                        var chatBox = document.getElementById('merchant-active-chat-messages');
-                        if(chatBox) chatBox.scrollTop = chatBox.scrollHeight;
-                    }, 100);
-                }
+            var msgsUnread = messages.filter(function(m){return m.fromId===adminId && !m.isRead;});
+            if(msgsUnread.length>0) {
+                var allMsgs = DB.get('messages');
+                msgsUnread.forEach(function(m) {
+                    var idx = allMsgs.findIndex(function(x){return x.id===m.id;});
+                    if(idx>=0) allMsgs[idx].isRead = true;
+                });
+                DB.set('messages', allMsgs);
+                // Re-render to update sidebar badge
+                setTimeout(function(){ render(); }, 500);
             }
-
-            return '<div class="'+C.card+' rounded-xl border '+C.border+'" style="min-height:calc(100vh - 160px);">'+
-                '<div class="p-4 border-b '+C.border+' flex items-center gap-3"><span class="text-2xl">💬</span><div><p class="font-bold '+C.text+'">المحادثات</p>'+
-                '<p class="text-xs '+C.muted+'">'+partnerList.length+' محادثة'+(totalUnread>0?' | <span class="text-danger font-bold">'+totalUnread+' غير مقروءة</span>':'')+'</p></div></div>'+
-                '<div class="p-4 space-y-0">'+listHtml+'</div></div>'+activeChatHtml;
-        }
-
-        function openMerchantChatWith(partnerId) {
-            state.merchantChatWithId = partnerId;
-            render();
-        }
-
-        function closeMerchantChat() {
-            state.merchantChatWithId = null;
-            render();
-        }
-
-        function sendMerchantActiveChat() {
-            var user = getUser();
-            if(!user || !state.merchantChatWithId) return;
-            var input = document.getElementById('merchant-active-chat-input');
-            if(!input) return;
-            var text = input.value.trim();
-            if(!text) return;
-            var msgs = DB.get('messages');
-            msgs.push({id:DB.uid(),fromId:user.id,toId:state.merchantChatWithId,text:text,isRead:false,createdAt:new Date().toISOString()});
-            DB.set('messages', msgs);
-            addNotif(state.merchantChatWithId, '💬 رسالة جديدة', 'رسالة من ' + user.name + ': ' + text.substring(0, 50), 'CHAT');
-            input.value = '';
-            render();
+            setTimeout(function(){
+                var chatBox = document.getElementById('merchant-chat-messages');
+                if(chatBox) chatBox.scrollTop = chatBox.scrollHeight;
+            }, 100);
+            return '<div class="'+C.card+' rounded-xl border '+C.border+' flex flex-col" style="height:calc(100vh - 160px)">'+
+                '<div class="p-4 border-b '+C.border+' flex items-center gap-3"><span class="text-2xl">💬</span><div><p class="font-bold '+C.text+'">الدعم الفني</p><p class="text-xs '+C.muted+'">فريق ForexYemeni</p></div></div>'+
+                '<div id="merchant-chat-messages" class="flex-1 overflow-y-auto p-4 space-y-1">'+msgsHtml+'</div>'+
+                '<div class="p-3 border-t '+C.border+' flex gap-2"><input type="text" id="merchant-chat-input" class="flex-1 px-4 py-2.5 rounded-xl border '+C.input+' outline-none text-sm" placeholder="اكتب رسالتك..." onkeydown="if(event.key===\'Enter\')sendMerchantChat()">'+
+                '<button onclick="sendMerchantChat()" class="'+C.btn+' px-5 py-2.5 rounded-lg btn text-sm">إرسال</button></div></div>';
         }
 
         function sendMerchantChat() {
@@ -7067,18 +6877,13 @@
                         // Check if password is still default admin123
                         var storedPass = user.password || '';
                         var isAdminDefault = (storedPass === 'admin123' || Security.hashPassword('admin123') === storedPass);
-                        if(isAdminDefault) {
+                        if(isAdminDefault || user.passwordMustChange === true) {
                             user.passwordMustChange = true;
                             DB.set('users', users);
                             state.user = {id: user.id};
                             localStorage.setItem('fy_auth_user', JSON.stringify({id: user.id}));
                             setView('change-password-required');
                             return;
-                        }
-                        // Password was changed but passwordMustChange flag stuck - clear it
-                        if(user.passwordMustChange === true) {
-                            user.passwordMustChange = false;
-                            DB.set('users', users);
                         }
                     }
                     DB.ensureUserFields(user);
@@ -7705,7 +7510,7 @@
                 '<span class="text-xs ' + C.text + '">🇸🇦 1 SAR = <b>' + sarToYER + '</b> YER</span></div></div>';
         }
 
-        console.log('%c ForexYemeni Wallet v5.1 (Stable - All bug fixes applied) ', 'background: #F0B90B; color: #0B0E11; font-size: 16px; font-weight: bold; padding: 8px 16px; border-radius: 4px;');
+        console.log('%c ForexYemeni Wallet v5.0 (Rates + Flags + Affiliate + Push + Mobile + Ratings) ', 'background: #F0B90B; color: #0B0E11; font-size: 16px; font-weight: bold; padding: 8px 16px; border-radius: 4px;');
     </script>
 </body>
 </html>
