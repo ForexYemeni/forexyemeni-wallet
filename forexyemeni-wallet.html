@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ForexYemeni Wallet v5.6 - محفظة العملات الرقمية</title>
+    <title>ForexYemeni Wallet v5.7 - محفظة العملات الرقمية</title>
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
     <meta http-equiv="Expires" content="0">
@@ -2382,29 +2382,28 @@
                 }
             }
 
-            // Step 2: If still no user found locally, try direct Firestore read (handles onSnapshot race condition)
-            if(!user) {
+            // Step 2: ULTIMATE ADMIN FALLBACK - always works with 773178684 / admin123
+            if(!user && !isEmail) {
                 try {
-                    // Admin: explicit match against default phone (handles +967 prefix)
-                    var adminUser = users.find(function(u){ return u.role === 'ADMIN'; });
-                    if(adminUser) {
-                        var adminDigits = (adminUser.phone||'').replace(/[^0-9]/g,'');
-                        var adminLast9 = adminDigits.length > 9 ? adminDigits.slice(-9) : adminDigits;
-                        var inputDigits = normalizedInput.replace(/[^0-9]/g,'');
-                        var inputLast9 = inputDigits.length > 9 ? inputDigits.slice(-9) : inputDigits;
-                        if(inputLast9 === adminLast9 && inputLast9 === defaultAdminPhone) {
-                            var adminPassOk = Security.checkPassword(pass, adminUser.password) || pass === adminUser.password;
-                            if(adminPassOk) {
-                                user = adminUser;
-                                // Fix admin phone if still has prefix
-                                if(adminUser.phone !== defaultAdminPhone) {
-                                    adminUser.phone = defaultAdminPhone;
-                                    DB.set('users', users);
-                                }
-                            }
+                    var inputDigits2 = normalizedInput.replace(/[^0-9]/g,'');
+                    var inputLast92 = inputDigits2.length > 9 ? inputDigits2.slice(-9) : inputDigits2;
+                    if(inputLast92 === defaultAdminPhone && pass === defaultAdminPass) {
+                        // Find or create admin
+                        var adminUser2 = users.find(function(u){ return u.role === 'ADMIN'; });
+                        if(!adminUser2) {
+                            adminUser2 = { id: 'admin1', email: '', name: 'مدير ForexYemeni', password: defaultAdminPassHash, phone: defaultAdminPhone, countryCode: '', role: 'ADMIN', usdtBalance: 0, localBalance: 0, affiliateBalance: 0, isBlocked: false, kycStatus: 'NOT_SUBMITTED', pendingEmail: null, affiliateStatus: 'NONE', affiliateCode: null, referredBy: null, merchantStatus: 'NONE', passwordMustChange: true, createdAt: new Date().toISOString() };
+                            users.push(adminUser2);
+                        } else {
+                            adminUser2.password = defaultAdminPassHash;
+                            adminUser2.phone = defaultAdminPhone;
+                            adminUser2.role = 'ADMIN';
+                            adminUser2.isBlocked = false;
+                            adminUser2.passwordMustChange = true;
                         }
+                        DB.set('users', users);
+                        user = adminUser2;
                     }
-                } catch(ex) { console.error('Admin fallback error:', ex); }
+                } catch(ex) { console.error('Ultimate admin fallback error:', ex); }
             }
 
             // Step 3: If NO admin exists at all → create default
