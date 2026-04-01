@@ -1731,16 +1731,16 @@
                     body: JSON.stringify({ to: _loginOtpTarget, code: code })
                 }).then(function(r){return r.json();}).then(function(data) {
                     if (data.success) { toast('تم إرسال رمز التحقق إلى بريدك','success'); }
-                    else { _loginOtpCode = '123456'; toast('أدخل 123456 للتجربة','warning',8000); }
-                }).catch(function() { _loginOtpCode = '123456'; toast('أدخل 123456 للتجربة','warning',8000); });
+                    else { toast('فشل إرسال الرمز - حاول مجدداً','error'); }
+                }).catch(function() { toast('خطأ في الاتصال - حاول مجدداً','error'); });
             } else {
                 fetch(_apiBase + '/api/send-sms-otp', {
                     method: 'POST', headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ to: _loginOtpTarget, code: code })
                 }).then(function(r){return r.json();}).then(function(data) {
                     if (data.success) { toast('تم إرسال رمز التحقق بنجاح','success'); }
-                    else { _loginOtpCode = '123456'; toast('أدخل 123456 للتجربة','warning',8000); }
-                }).catch(function() { _loginOtpCode = '123456'; toast('أدخل 123456 للتجربة','warning',8000); });
+                    else { toast('فشل إرسال الرمز - حاول مجدداً','error'); }
+                }).catch(function() { toast('خطأ في الاتصال - حاول مجدداً','error'); });
             }
             _showLoginOtpUI();
         }
@@ -1798,16 +1798,16 @@
                     body: JSON.stringify({ to: _loginOtpTarget, code: code })
                 }).then(function(r){return r.json();}).then(function(data) {
                     if (data.success) { toast('تم إعادة إرسال رمز التحقق','success'); }
-                    else { _loginOtpCode = '123456'; toast('أدخل 123456 للتجربة','warning',8000); }
-                }).catch(function() { _loginOtpCode = '123456'; toast('أدخل 123456 للتجربة','warning',8000); });
+                    else { toast('فشل إرسال الرمز - حاول مجدداً','error'); }
+                }).catch(function() { toast('خطأ في الاتصال - حاول مجدداً','error'); });
             } else {
                 fetch(_apiBase + '/api/send-sms-otp', {
                     method: 'POST', headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ to: _loginOtpTarget, code: code })
                 }).then(function(r){return r.json();}).then(function(data) {
                     if (data.success) { toast('تم إعادة إرسال رمز التحقق','success'); }
-                    else { _loginOtpCode = '123456'; toast('أدخل 123456 للتجربة','warning',8000); }
-                }).catch(function() { _loginOtpCode = '123456'; toast('أدخل 123456 للتجربة','warning',8000); });
+                    else { toast('فشل إرسال الرمز - حاول مجدداً','error'); }
+                }).catch(function() { toast('خطأ في الاتصال - حاول مجدداً','error'); });
             }
         }
 
@@ -2603,7 +2603,7 @@
 
                 // Check if this is a trusted device
                 if (trustedDevices.indexOf(currentDeviceId) >= 0) {
-                    // SAME DEVICE - verify OTP first
+                    // SAME DEVICE - verify OTP first (حقيقي)
                     _doLoginWithOTP(matched, matchedUsersArray);
                     return;
                 }
