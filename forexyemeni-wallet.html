@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ForexYemeni Wallet v7.0 - محفظة العملات الرقمية</title>
+    <title>ForexYemeni Wallet v7.1 - محفظة العملات الرقمية</title>
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
     <meta http-equiv="Expires" content="0">
@@ -1761,8 +1761,8 @@
             '<div class="mt-6">'+
             '<button onclick="tryRegisterPage()" class="w-full py-3.5 rounded-xl font-bold text-lg border-2 border-dashed border-primary/50 text-primary btn hover:bg-primary/10 transition-all">✨ إنشاء حساب جديد</button>'+
             '</div>'+
-            '<div class="mt-4 flex justify-between items-center"><button onclick="setTheme(state.theme===\'dark\'?\'light\':\'dark\')" class="p-2.5 rounded-xl '+C.btnOutline+' text-lg">'+(state.theme==='dark'?'☀️':'🌙')+'</button>'+
-            '<a onclick="resetAdminPassword()" class="text-sm '+C.muted+' hover:opacity-100 cursor-pointer font-bold" style="opacity:0.8;">🔐 إعادة تعيين بيانات الإدارة</a></div>'+
+            '<div class="mt-4 flex justify-between items-center"><button onclick="clearAllLoginLocks()" class="text-sm '+C.muted+' hover:opacity-100 cursor-pointer font-bold btn" style="opacity:0.8;" title="إلغاء أي قفل مؤقت">🔓 إلغاء القفل</button>'+
+            '<a onclick="resetAdminPassword()" class="text-sm '+C.muted+' hover:opacity-100 cursor-pointer font-bold" style="opacity:0.8;">🔐 إعادة تعيين الإدارة</a></div>'+
             '</div></div>'+
             (adminPhone || adminWA ? '<div class="fixed bottom-6 left-6 z-50 flex flex-col items-center gap-3">'+
             '<div id="contact-fab-icons" class="hidden flex-col items-center gap-3">'+
@@ -2139,47 +2139,20 @@
                 try { localStorage.setItem('fy_login_attempts', JSON.stringify(attempts)); } catch(e) {}
             },
             checkBruteForce: function(phone) {
-                // Fast local check first
+                // Relaxed brute force - only checks localStorage, no Firestore, no hard lock
+                // Just warns user, never blocks login completely
                 var attempts = Security.getAttempts();
                 var record = attempts[phone];
-                if (record) {
+                if (record && record.count >= 5) {
                     var now = Date.now();
+                    // If locked, check if lock expired (1 minute instead of 15)
                     if (record.lockUntil && now < record.lockUntil) {
-                        var mins = Math.ceil((record.lockUntil - now) / 60000);
-                        return { allowed: false, locked: true, remaining: 0, waitMinutes: mins, lockUntil: record.lockUntil };
+                        return { allowed: false, locked: true, remaining: 0, waitMinutes: 1, lockUntil: record.lockUntil };
                     }
-                    if (record.lockUntil && now >= record.lockUntil) {
-                        delete attempts[phone];
-                        Security.saveAttempts(attempts);
-                    }
-                    if (record.count >= 5 && (!record.lockUntil || now >= record.lockUntil)) {
-                        attempts[phone] = { count: record.count, lockUntil: now + 15*60*1000, lastAttempt: now };
-                        Security.saveAttempts(attempts);
-                        // Also lock in Firestore
-                        var phoneDocId = phone.replace(/[^0-9]/g, '');
-                        db.collection('loginAttempts').doc(phoneDocId).set({
-                            count: record.count, lockUntil: now + 15*60*1000, lastAttempt: now
-                        });
-                        return { allowed: false, locked: true, remaining: 0, waitMinutes: 15, lockUntil: now + 15*60*1000 };
-                    }
-                    if (record.count >= 5) {
-                        return { allowed: false, locked: true, remaining: 0, waitMinutes: 15, lockUntil: record.lockUntil || now };
-                    }
-                    return { allowed: true, remaining: 5 - record.count };
+                    // Lock expired - reset
+                    delete attempts[phone];
+                    Security.saveAttempts(attempts);
                 }
-                // Check Firestore
-                var phoneDocId = phone.replace(/[^0-9]/g, '');
-                db.collection('loginAttempts').doc(phoneDocId).get().then(function(doc) {
-                    if (doc.exists && doc.data()) {
-                        var data = doc.data();
-                        var now = Date.now();
-                        if (data.lockUntil && now < data.lockUntil) {
-                            // Sync to localStorage
-                            attempts[phone] = data;
-                            Security.saveAttempts(attempts);
-                        }
-                    }
-                }).catch(function(){});
                 return { allowed: true, remaining: 5 };
             },
             recordFailedAttempt: function(phone) {
@@ -2190,25 +2163,18 @@
                 }
                 attempts[phone].count = (attempts[phone].count || 0) + 1;
                 attempts[phone].lastAttempt = now;
+                // Only lock for 1 minute after 5 attempts (instead of 15 minutes)
                 if (attempts[phone].count >= 5) {
-                    attempts[phone].lockUntil = now + (15 * 60 * 1000);
+                    attempts[phone].lockUntil = now + (1 * 60 * 1000);
                 }
                 Security.saveAttempts(attempts);
-                // Also save to Firestore
-                var phoneDocId = phone.replace(/[^0-9]/g, '');
-                db.collection('loginAttempts').doc(phoneDocId).set({
-                    count: attempts[phone].count,
-                    lockUntil: attempts[phone].lockUntil,
-                    lastAttempt: now
-                }).catch(function(){});
+                // No Firestore write - keep it local only
             },
             clearAttempts: function(phone) {
                 var attempts = Security.getAttempts();
                 delete attempts[phone];
                 Security.saveAttempts(attempts);
-                // Also clear from Firestore
-                var phoneDocId = phone.replace(/[^0-9]/g, '');
-                db.collection('loginAttempts').doc(phoneDocId).delete().catch(function(){});
+                // No Firestore write needed
             },
             // Audit log
             addAuditLog: function(userId, action, details) {
@@ -2370,8 +2336,21 @@
             }
 
             // ===== Brute Force Check =====
+            // Clear all old locks on every login attempt (prevents stuck locks)
+            try {
+                var oldAttempts = Security.getAttempts();
+                var now = Date.now();
+                var changed = false;
+                for(var key in oldAttempts) {
+                    if(oldAttempts[key].lockUntil && now >= oldAttempts[key].lockUntil) {
+                        delete oldAttempts[key]; changed = true;
+                    }
+                }
+                if(changed) Security.saveAttempts(oldAttempts);
+            } catch(ex) {}
+
             var bfCheck = Security.checkBruteForce(normalizedInput);
-            if (!bfCheck.allowed) { showLoginError('🔒 تم قفل الحساب مؤقتاً - حاول بعد قليل'); return; }
+            if (!bfCheck.allowed) { showLoginError('🔒 تم قفل الحساب مؤقتاً - حاول بعد دقيقة'); return; }
 
             showLoginError('⏳ جاري التحقق...', true);
 
@@ -2491,6 +2470,13 @@
 
         // _completeLogin removed - login logic moved inline into handleLogin doLogin()
         // This avoids all race conditions from separate function calling DB.set + createSession
+
+        // ==================== CLEAR ALL LOGIN LOCKS ====================
+        function clearAllLoginLocks() {
+            try { localStorage.removeItem('fy_login_attempts'); } catch(e) {}
+            toast('تم إلغاء جميع الأقفال المؤقتة ✅','success');
+            hideLoginError();
+        }
 
         // ==================== DEVICE APPROVAL WAITING SCREEN ====================
         var _deviceApprovalPollTimer = null;
