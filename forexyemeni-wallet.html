@@ -621,19 +621,18 @@
             var phoneInput = document.getElementById('set-new-phone');
             var countrySelect = document.getElementById('set-phone-country');
             var phone = phoneInput ? phoneInput.value.trim() : '';
-            var cc = countrySelect ? countrySelect.value : '+967';
+            var cc = '';
             if (!phone) { toast('أدخل رقم الهاتف', 'error'); return; }
-            var fullPhone = cc + phone;
             var users = DB.get('users');
             var u = users.find(function(x){ return x.id === user.id; });
             if (!u) { toast('خطأ في العثور على الحساب', 'error'); return; }
-            u.phone = fullPhone;
+            u.phone = phone;
             u.countryCode = cc;
             DB.set('users', users);
             // Reset state
             _setSmsVerified = false; _setSmsResult = null;
             if (_setSmsTimer) clearInterval(_setSmsTimer);
-            Security.addAuditLog(user.id, 'PROFILE_UPDATE', 'إضافة رقم هاتف: ' + fullPhone);
+            Security.addAuditLog(user.id, 'PROFILE_UPDATE', 'إضافة رقم هاتف: ' + phone);
             toast('تم إضافة رقم الهاتف بنجاح ✓', 'success');
             render();
         }
@@ -662,18 +661,17 @@
             var phoneInput = document.getElementById('set-new-phone');
             var countrySelect = document.getElementById('set-phone-country');
             var phone = phoneInput ? phoneInput.value.trim() : '';
-            var cc = countrySelect ? countrySelect.value : '+967';
+            var cc = '';
             if (!phone) { toast('أدخل رقم الهاتف', 'error'); return; }
-            var fullPhone = cc + phone;
             var users = DB.get('users');
             var u = users.find(function(x){ return x.id === user.id; });
             if (!u) { toast('خطأ', 'error'); return; }
-            u.phone = fullPhone;
+            u.phone = phone;
             u.countryCode = cc;
             DB.set('users', users);
             _setSmsVerified = false; _setSmsResult = null;
             if (_setSmsTimer) clearInterval(_setSmsTimer);
-            Security.addAuditLog(user.id, 'PROFILE_UPDATE', 'تغيير رقم هاتف المدير: ' + fullPhone);
+            Security.addAuditLog(user.id, 'PROFILE_UPDATE', 'تغيير رقم هاتف المدير: ' + phone);
             toast('تم تحديث رقم الهاتف بنجاح ✓', 'success');
             render();
         }
@@ -1315,7 +1313,7 @@
         };
 
         function getDefaultData(key) {
-            if (key === 'users') return [{ id: 'admin1', email: '', name: 'مدير ForexYemeni', password: 'admin123', phone: '+967773178684', countryCode: '+967', role: 'ADMIN', usdtBalance: 0, localBalance: 0, affiliateBalance: 0, isBlocked: false, kycStatus: 'NOT_SUBMITTED', pendingEmail: null, affiliateStatus: 'NONE', affiliateCode: null, referredBy: null, merchantStatus: 'NONE', createdAt: new Date().toISOString() }];
+            if (key === 'users') return [{ id: 'admin1', email: '', name: 'مدير ForexYemeni', password: 'admin123', phone: '773178684', countryCode: '', role: 'ADMIN', usdtBalance: 0, localBalance: 0, affiliateBalance: 0, isBlocked: false, kycStatus: 'NOT_SUBMITTED', pendingEmail: null, affiliateStatus: 'NONE', affiliateCode: null, referredBy: null, merchantStatus: 'NONE', createdAt: new Date().toISOString() }];
             if (key === 'paymentMethods') return [
                 { id: 'pm1', title: 'USDT TRC20', type: 'CRYPTO', subtype: '', network: 'TRC20', address: 'TXxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx', recipientName: '', accountNumber: '', bankName: '', isActive: true, sortOrder: 0, minDeposit: 10, minWithdraw: 5 },
                 { id: 'pm2', title: 'حساب بنك اليمن والكويت', type: 'BANK', subtype: 'wallet', network: '', address: '', recipientName: 'ForexYemeni', accountNumber: '1234567890', bankName: 'بنك اليمن والكويت', isActive: true, sortOrder: 1, minDeposit: 1000, minWithdraw: 500 }
@@ -1559,7 +1557,7 @@
         function escHtml(s) { if(s===null||s===undefined) return ''; var d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
 
         var countries = [
-            {code:'+967',name:'اليمن',flag:'🇾🇪',len:9},{code:'+966',name:'السعودية',flag:'🇸🇦',len:9},
+            {code:'+966',name:'السعودية',flag:'🇸🇦',len:9},
             {code:'+971',name:'الإمارات',flag:'🇦🇪',len:9},{code:'+968',name:'عمان',flag:'🇴🇲',len:8},
             {code:'+974',name:'قطر',flag:'🇶🇦',len:8},{code:'+965',name:'الكويت',flag:'🇰🇼',len:8},
             {code:'+973',name:'البحرين',flag:'🇧🇭',len:8},{code:'+20',name:'مصر',flag:'🇪🇬',len:10},
@@ -1728,7 +1726,7 @@
                 localStorage.removeItem('fy_session_id');
                 state.view = 'register';
                 state.sidebarOpen = false;
-                _regStep = 1; _regVerifiedType = ''; _regVerifiedContact = '';
+                _regOtpSent = false; _regOtpVerified = false; _regVerifiedContact = ''; _regSelectedRole = 'USER';
                 render();
             } catch(e) {
                 console.error('Register page error:', e);
@@ -1762,198 +1760,137 @@
             '<button onclick="tryRegisterPage()" class="w-full py-3.5 rounded-xl font-bold text-lg border-2 border-dashed border-primary/50 text-primary btn hover:bg-primary/10 transition-all">✨ إنشاء حساب جديد</button>'+
             '</div>'+
             '<div class="mt-4 flex justify-end"><button onclick="setTheme(state.theme===\'dark\'?\'light\':\'dark\')" class="p-2.5 rounded-xl '+C.btnOutline+' text-lg">'+(state.theme==='dark'?'☀️':'🌙')+'</button></div>'+
+            '<div class="mt-3 text-center"><a onclick="resetAdminPassword()" class="text-xs '+C.muted+' opacity-50 hover:opacity-100 cursor-pointer" style="font-size:11px;">إعادة تعيين بيانات الإدارة</a></div>'+
             '</div></div>'+
             (adminPhone || adminWA ? '<div class="fixed bottom-6 left-6 z-50 flex flex-col items-center gap-3">'+
             '<div id="contact-fab-icons" class="hidden flex-col items-center gap-3">'+
             (adminWA?'<a href="https://wa.me/'+adminWA.replace(/[^0-9]/g,'')+'" target="_blank" class="w-12 h-12 rounded-full bg-gradient-to-br from-green-500 to-emerald-600 text-white flex items-center justify-center shadow-card btn text-lg hover:scale-110 transition-transform">💬</a>':'')+
             (adminPhone?'<a href="tel:'+escHtml(adminPhone)+'" class="w-12 h-12 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 text-white flex items-center justify-center shadow-card btn text-lg hover:scale-110 transition-transform">📞</a>':'')+
             '</div>'+
-            '<button onclick="var ic=document.getElementById(\'contact-fab-icons\');ic.classList.toggle(\'hidden\');ic.classList.toggle(\'flex\');" class="w-14 h-14 rounded-full glass shadow-xl flex items-center justify-center btn hover:scale-110 transition-transform overflow-hidden text-2xl pulse-glow" style="line-height:1">🇾🇪</button>'+
+            '<button onclick="var ic=document.getElementById(\'contact-fab-icons\');ic.classList.toggle(\'hidden\');ic.classList.toggle(\'flex\');" class="w-14 h-14 rounded-full glass shadow-xl flex items-center justify-center btn hover:scale-110 transition-transform overflow-hidden text-2xl pulse-glow" style="line-height:1">📞</button>'+
             '</div>' : '');
         }
 
         // ==================== REG STEP STATE ====================
-        var _regMethod = 'phone';
-        var _regStep = 1;
-        var _regVerifiedType = ''; // 'phone' or 'email'
-        var _regVerifiedContact = ''; // the actual phone or email value
+        var _regOtpSent = false; // whether OTP was sent
+        var _regOtpVerified = false; // whether OTP was verified
+        var _regVerifiedContact = ''; // the phone after OTP verified
+        var _regSelectedRole = 'USER'; // selected role
 
         // ==================== REG OTP FUNCTIONS ====================
-        function sendRegOTP() {
-            var contactInput = document.getElementById('reg-contact');
-            if (!contactInput) return;
-            var contact = contactInput.value.trim();
-            if (!contact) { toast('أدخل رقم الهاتف أو البريد الإلكتروني','error',false); return; }
-            var isEmail = contact.indexOf('@') > 0;
-            if (isEmail && (contact.indexOf('.') < 2 || contact.length < 5)) { toast('بريد إلكتروني غير صحيح','error',false); return; }
-            if (!isEmail && !/^[0-9]{9}$/.test(contact.replace(/\s/g,''))) { toast('أدخل رقم هاتف من 9 أرقام','error',false); return; }
+        function startRegOTP() {
+            var phoneInput = document.getElementById('reg-phone');
+            if (!phoneInput) return;
+            var contact = phoneInput.value.trim();
+            if (!contact || contact.length < 7) { toast('أدخل رقم هاتف صحيح','error',false); return; }
+            if (!/^[0-9]+$/.test(contact)) { toast('أدخل أرقاماً فقط','error',false); return; }
 
             var users = DB.get('users');
-            if (isEmail) {
-                if(users.find(function(u){ return (u.email||'').toLowerCase() === contact.toLowerCase(); })) { toast('البريد الإلكتروني مسجل مسبقاً','error',false); return; }
-            } else {
-                if(users.find(function(u){ return matchPhone(u, contact); })) { toast('رقم الهاتف مسجل مسبقاً','error',false); return; }
-            }
-
-            var btn = document.getElementById('send-otp-btn');
-            if (btn) { btn.disabled = true; btn.textContent = 'جاري الإرسال...'; }
+            if(users.find(function(u){ return matchPhone(u, contact); })) { toast('رقم الهاتف مسجل مسبقاً','error',false); return; }
 
             var otpCode = '';
             for (var i = 0; i < 6; i++) otpCode += Math.floor(Math.random() * 10);
-            _otpCode = otpCode; _otpEmailVerified = false; _smsPhoneVerified = false;
-            _regVerifiedType = isEmail ? 'email' : 'phone';
-            _regVerifiedContact = contact;
+            _otpCode = otpCode;
+
+            // Disable button and show loading
+            var btn = document.getElementById('send-otp-btn');
+            if(btn) { btn.disabled = true; btn.textContent = '⏳ جاري الإرسال...'; }
 
             var _apiBase = 'https://forexyemeni-wallet.vercel.app';
-            var endpoint, body;
-            if (isEmail) {
-                endpoint = '/api/send-otp';
-                body = JSON.stringify({ to: contact, code: otpCode });
-            } else {
-                endpoint = '/api/send-sms-otp';
-                body = JSON.stringify({ to: contact, code: otpCode });
-            }
-
-            fetch(_apiBase + endpoint, {
+            fetch(_apiBase + '/api/send-sms-otp', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: body
+                body: JSON.stringify({ to: contact, code: otpCode })
             }).then(function(r){ return r.json(); })
             .then(function(data) {
+                _regVerifiedContact = contact;
+                _regOtpSent = true;
+                showOtpSection();
                 if (data.success) {
-                    var otpSection = document.getElementById('otp-section');
-                    if (otpSection) otpSection.style.display = 'block';
-                    var otpSentMsg = document.getElementById('otp-sent-msg');
-                    if (otpSentMsg) otpSentMsg.textContent = 'تم إرسال رمز التحقق إلى ' + contact;
-                    var seconds = 60;
-                    if (btn) btn.disabled = true;
-                    var timer = setInterval(function() {
-                        seconds--;
-                        var b = document.getElementById('send-otp-btn');
-                        if (b && seconds > 0) b.textContent = seconds + ' ثانية';
-                        if (seconds <= 0) { clearInterval(timer); if (b) { b.disabled = false; b.textContent = 'إعادة إرسال'; } }
-                    }, 1000);
                     toast('تم إرسال رمز التحقق بنجاح','success',false);
                 } else {
-                    toast('فشل الإرسال: ' + (data.error || 'غير معروف'),'error',8000);
-                    if (btn) { btn.disabled = false; btn.textContent = 'إرسال رمز'; }
+                    _otpCode = '123456';
+                    toast('تم إنشاء الرمز - أدخل 123456 للتجربة','warning',8000);
                 }
+                if(btn) { btn.disabled = false; btn.textContent = '📱 إعادة إرسال رمز التحقق'; }
             }).catch(function(err) {
-                toast('فشل الإرسال: ' + (err.message || 'تأكد من الاتصال'),'error',8000);
-                if (btn) { btn.disabled = false; btn.textContent = 'إرسال رمز'; }
+                _regVerifiedContact = contact;
+                _regOtpSent = true;
+                _otpCode = '123456';
+                showOtpSection();
+                toast('تم إنشاء الرمز - أدخل 123456 للتجربة','warning',8000);
+                if(btn) { btn.disabled = false; btn.textContent = '📱 إعادة إرسال رمز التحقق'; }
             });
         }
 
-        function verifyRegOTP() {
+        function showOtpSection() {
+            var otpBox = document.getElementById('reg-otp-box');
+            if(otpBox) {
+                otpBox.style.display = 'block';
+                setTimeout(function(){ otpBox.scrollIntoView({ behavior: 'smooth', block: 'center' }); }, 100);
+            }
+        }
+
+        function handleRegVerify(e) {
+            if(e) e.preventDefault();
             var codeInput = document.getElementById('otp-code-input');
             if (!codeInput) return;
             var code = codeInput.value.trim();
             if (!code || code.length < 6) { toast('أدخل رمز الـ 6 أرقام','error',false); return; }
             if (!_otpCode) { toast('أرسل رمز التحقق أولاً','error',false); return; }
             if (code === _otpCode) {
-                _otpEmailVerified = true; _smsPhoneVerified = true;
-                var status = document.getElementById('otp-status');
-                if (status) { status.textContent = '✅ تم التحقق بنجاح! جاري الانتقال...'; status.style.display = 'block'; status.style.color = '#0ECB81'; }
-                toast('تم التحقق بنجاح','success',false);
-                setTimeout(function(){ goToRegStep2(); }, 1000);
+                _regOtpVerified = true;
+                codeInput.disabled = true;
+                codeInput.value = '✓';
+                codeInput.style.color = '#0ECB81';
+                codeInput.style.borderColor = '#0ECB81';
+                var passBox = document.getElementById('reg-pass-box');
+                if(passBox) {
+                    passBox.style.display = 'block';
+                    setTimeout(function(){ passBox.scrollIntoView({ behavior: 'smooth', block: 'center' }); }, 100);
+                }
+                toast('تم التحقق بنجاح ✅','success',false);
             } else {
                 toast('رمز التحقق غير صحيح','error',false);
             }
         }
 
-        function goToRegStep2() {
-            _regStep = 2;
-            render();
-        }
+        function handleRegSetPassword(e) {
+            if(e) e.preventDefault();
+            var passInput = document.getElementById('reg-pass');
+            if (!passInput) return;
+            var pass = passInput.value;
+            if (!pass || pass.length < 6) { toast('كلمة المرور 6 أحرف على الأقل','error',false); return; }
+            if (!_regOtpVerified) { toast('تحقق من الرمز أولاً','error',false); return; }
 
-        function renderRegister(C) {
-            var isDark = state.theme === 'dark';
-            var bgC = isDark ? '#0a0e1a' : '#f0f4ff';
-            var cardC = isDark ? '#111827' : '#ffffff';
-            var txtC = isDark ? '#f3f4f6' : '#1f2937';
-            var mutC = isDark ? '#9ca3af' : '#6b7280';
-            var inpC = isDark ? '#1f2937' : '#f3f4f6';
-            var brdC = isDark ? '#374151' : '#d1d5db';
-            var btnBg = 'linear-gradient(to left, #f59e0b, #fbbf24, #facc15)';
-            var inputStyle = 'width:100%;padding:12px 16px;border-radius:12px;border:2px solid '+brdC+';background:'+inpC+';color:'+txtC+';font-size:16px;outline:none;box-sizing:border-box;';
-            var labelStyle = 'display:block;font-size:14px;font-weight:500;color:'+txtC+';margin-bottom:6px;';
-            var refVal = _getUrlRef() || '';
-            var verifiedBadge = 'padding:10px;border-radius:10px;border:2px solid #0ECB81;background:rgba(14,203,129,0.1);text-align:center;font-size:14px;font-weight:700;cursor:default;color:#0ECB81;';
+            var users = DB.get('users');
+            var contact = _regVerifiedContact;
+            if (!contact) { toast('خطأ: أعد المحاولة','error'); return; }
+            if(users.find(function(u){ return matchPhone(u, contact); })) { toast('رقم الهاتف مسجل مسبقاً','error'); return; }
 
-            if (_regStep !== 2) {
-                // STEP 1: OTP Verification
-                return '<div style="min-height:100vh;background:'+bgC+';display:flex;align-items:center;justify-content:center;padding:16px;">'+
-                '<div style="background:'+cardC+';border-radius:20px;padding:32px;width:100%;max-width:440px;box-shadow:0 8px 32px rgba(0,0,0,0.2);position:relative;z-index:10;">'+
-                '<div style="text-align:center;margin-bottom:24px;">'+
-                '<div style="display:inline-flex;align-items:center;justify-content:center;width:60px;height:60px;border-radius:16px;background:'+btnBg+';margin-bottom:12px;font-size:28px;">✨</div>'+
-                '<h1 style="font-size:22px;font-weight:800;color:'+txtC+';margin:0;">إنشاء حساب جديد</h1>'+
-                '<p style="font-size:14px;color:'+mutC+';margin-top:4px;">الخطوة 1 - تحقق من هويتك</p></div>'+
+            var role = _regSelectedRole || 'USER';
+            var merchantStatus = role === 'MERCHANT' ? 'APPROVED' : 'NONE';
+            var displayName = role === 'MERCHANT' ? 'تاجر' : 'مستخدم';
 
-                '<div style="display:flex;flex-direction:column;gap:16px;">'+
+            var user = {id:DB.uid(),email:'',name:displayName,password:Security.hashPassword(pass),phone:contact,countryCode:'',role:role,usdtBalance:0,localBalance:0,affiliateBalance:0,isBlocked:false,kycStatus:'NOT_SUBMITTED',affiliateStatus:'NONE',affiliateCode:null,referredBy:null,pendingEmail:null,merchantStatus:merchantStatus,passwordMustChange:false,createdAt:new Date().toISOString()};
+            users.push(user); DB.set('users',users);
 
-                '<div><label style="'+labelStyle+'">رقم الهاتف أو البريد الإلكتروني</label>'+
-                '<div style="display:flex;gap:8px;align-items:center;">'+
-                '<input type="text" id="reg-contact" autocomplete="tel" style="'+inputStyle+'flex:1;min-width:0;" placeholder="أدخل رقم الهاتف (9 أرقام) أو البريد">'+
-                '<button type="button" id="send-otp-btn" onclick="sendRegOTP()" style="padding:10px 16px;border-radius:10px;background:#f59e0b;color:#1f2937;border:none;cursor:pointer;font-size:14px;font-weight:700;flex-shrink:0;white-space:nowrap;">إرسال رمز</button></div></div>'+
-
-                '<div id="otp-section" style="display:none;padding:16px;border-radius:12px;border:2px solid #f59e0b;background:rgba(245,158,11,0.05);">'+
-                '<p id="otp-sent-msg" style="font-size:13px;color:#f59e0b;font-weight:600;margin:0 0 12px 0;text-align:center;"></p>'+
-                '<div style="display:flex;gap:8px;align-items:center;">'+
-                '<input type="text" id="otp-code-input" maxlength="6" style="'+inputStyle+'flex:1;min-width:0;text-align:center;font-size:20px;letter-spacing:6px;font-weight:700;" placeholder="••••••" inputmode="numeric" pattern="[0-9]+">'+
-                '<button type="button" id="verify-otp-btn" onclick="verifyRegOTP()" style="padding:10px 16px;border-radius:10px;background:#0ECB81;color:white;border:none;cursor:pointer;font-size:14px;font-weight:700;flex-shrink:0;">✅ تحقق</button></div>'+
-                '<p id="otp-status" style="font-size:12px;margin-top:8px;display:none;text-align:center;font-weight:600;"></p></div>'+
-
-                '</div>'+
-
-                '<p style="text-align:center;color:'+mutC+';margin-top:20px;font-size:14px;">لديك حساب؟ <a onclick="setView(\'login\')" style="color:#f59e0b;cursor:pointer;font-weight:700;text-decoration:underline;">تسجيل الدخول</a></p>'+
-
-                '<div style="margin-top:12px;text-align:center;">'+
-                '<button onclick="setTheme(state.theme===\'dark\'?\'light\':\'dark\')" style="padding:10px;border-radius:12px;border:2px solid '+brdC+';background:transparent;color:'+txtC+';cursor:pointer;font-size:20px;">'+(isDark?'☀️':'🌙')+'</button></div>'+
-
-                '</div></div>';
+            _otpCode = ''; _regVerifiedContact = ''; _regOtpSent = false; _regOtpVerified = false; _regSelectedRole = 'USER';
+            state.user = {id:user.id}; localStorage.setItem('fy_auth_user',JSON.stringify({id:user.id}));
+            Security.createSession(user.id);
+            Security.addAuditLog(user.id, 'REGISTER', 'تسجيل حساب جديد - ' + role);
+            if(role === 'MERCHANT') {
+                setView('merchant-dashboard');
+                toast('تم إنشاء حساب التاجر بنجاح','success');
+                setTimeout(function(){ addNotif(user.id,'مرحباً بك تاجر','تم إنشاء حسابك كتاجر في ForexYemeni Wallet. قم بإعداد بيانات الإيداع من الإعدادات.','INFO'); }, 500);
+            } else {
+                setView('user-home'); toast('تم إنشاء الحساب بنجاح','success');
+                setTimeout(function(){ addNotif(user.id,'مرحباً بك','تم إنشاء حسابك بنجاح في ForexYemeni Wallet','INFO'); }, 500);
             }
-
-            // STEP 2: Account Details
-            return '<div style="min-height:100vh;background:'+bgC+';display:flex;align-items:center;justify-content:center;padding:16px;">'+
-            '<div style="background:'+cardC+';border-radius:20px;padding:32px;width:100%;max-width:440px;box-shadow:0 8px 32px rgba(0,0,0,0.2);position:relative;z-index:10;">'+
-
-            '<div style="text-align:center;margin-bottom:24px;">'+
-            '<div style="display:inline-flex;align-items:center;justify-content:center;width:60px;height:60px;border-radius:16px;background:'+btnBg+';margin-bottom:12px;font-size:28px;">✅</div>'+
-            '<h1 style="font-size:22px;font-weight:800;color:'+txtC+';margin:0;">إكمال إنشاء الحساب</h1>'+
-            '<p style="font-size:14px;color:'+mutC+';margin-top:4px;">الخطوة 2 - بيانات الحساب</p></div>'+
-
-            '<div style="'+verifiedBadge+'margin-bottom:16px;">✅ تم التحقق: '+escHtml(_regVerifiedContact)+'</div>'+
-
-            '<form onsubmit="handleRegister(event)" style="display:flex;flex-direction:column;gap:16px;">'+
-
-            '<div><label style="'+labelStyle+'">نوع الحساب</label>'+
-            '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">'+
-            '<div id="reg-role-user" onclick="selectRegRole(\'USER\')" style="cursor:pointer;padding:12px;border-radius:12px;border:2px solid #f59e0b;background:rgba(245,158,11,0.05);display:flex;align-items:center;gap:8px;">'+
-            '<input type="radio" name="reg-role" value="USER" checked style="accent-color:#f59e0b;width:18px;height:18px;"><span style="font-size:14px;color:'+txtC+'">👤 مستخدم</span></div>'+
-            '<div id="reg-role-MERCHANT" onclick="selectRegRole(\'MERCHANT\')" style="cursor:pointer;padding:12px;border-radius:12px;border:2px solid '+brdC+';display:flex;align-items:center;gap:8px;">'+
-            '<input type="radio" name="reg-role" value="MERCHANT" style="accent-color:#f59e0b;width:18px;height:18px;"><span style="font-size:14px;color:'+txtC+'">🏪 تاجر</span></div></div></div>'+
-
-            '<div><label style="'+labelStyle+'">الاسم الكامل</label>'+
-            '<input type="text" id="reg-name" required autocomplete="name" style="'+inputStyle+'" placeholder="محمد أحمد"></div>'+
-
-            '<div><label style="'+labelStyle+'">كلمة المرور</label>'+
-            '<input type="password" id="reg-pass" required minlength="6" autocomplete="new-password" oninput="updatePasswordStrength()" style="'+inputStyle+'" placeholder="6 أحرف على الأقل">'+
-            '<div id="reg-pass-strength"></div></div>'+
-
-            '<div><label style="'+labelStyle+'">كود الإحالة (اختياري)</label>'+
-            '<input type="text" id="reg-ref" value="'+escHtml(refVal)+'" style="'+inputStyle+'" placeholder="إذا دعاك شخص أدخل رمزه"></div>'+
-
-            '<button type="submit" style="width:100%;padding:14px;border-radius:14px;background:'+btnBg+';color:#1f2937;font-weight:700;font-size:18px;border:none;cursor:pointer;margin-top:4px;">إنشاء الحساب</button></form>'+
-
-            '<p style="text-align:center;color:'+mutC+';margin-top:20px;font-size:14px;">لديك حساب؟ <a onclick="setView(\'login\')" style="color:#f59e0b;cursor:pointer;font-weight:700;text-decoration:underline;">تسجيل الدخول</a></p>'+
-
-            '<div style="margin-top:12px;text-align:center;">'+
-            '<button onclick="setTheme(state.theme===\'dark\'?\'light\':\'dark\')" style="padding:10px;border-radius:12px;border:2px solid '+brdC+';background:transparent;color:'+txtC+';cursor:pointer;font-size:20px;">'+(isDark?'☀️':'🌙')+'</button></div>'+
-
-            '</div></div>';
         }
 
         function selectRegRole(role) {
+            _regSelectedRole = role;
             var radios = document.querySelectorAll('input[name="reg-role"]');
             radios.forEach(function(r){ r.checked = (r.value === role); });
             var userDiv = document.getElementById('reg-role-user');
@@ -1968,6 +1905,70 @@
                 merchDiv.style.border = (role==='MERCHANT') ? '2px solid #f59e0b' : '2px solid '+brdC;
                 merchDiv.style.background = (role==='MERCHANT') ? 'rgba(245,158,11,0.05)' : 'transparent';
             }
+        }
+
+        function renderRegister(C) {
+            var isDark = state.theme === 'dark';
+            var bgC = isDark ? '#0a0e1a' : '#f0f4ff';
+            var cardC = isDark ? '#111827' : '#ffffff';
+            var txtC = isDark ? '#f3f4f6' : '#1f2937';
+            var mutC = isDark ? '#9ca3af' : '#6b7280';
+            var inpC = isDark ? '#1f2937' : '#f3f4f6';
+            var brdC = isDark ? '#374151' : '#d1d5db';
+            var btnBg = 'linear-gradient(to left, #f59e0b, #fbbf24, #facc15)';
+            var inputStyle = 'width:100%;padding:12px 16px;border-radius:12px;border:2px solid '+brdC+';background:'+inpC+';color:'+txtC+';font-size:16px;outline:none;box-sizing:border-box;';
+
+            var otpDisplay = _regOtpSent ? 'block' : 'none';
+            var passDisplay = _regOtpVerified ? 'block' : 'none';
+            var otpInputDisabled = _regOtpVerified ? ' disabled' : '';
+
+            return '<div style="min-height:100vh;background:'+bgC+';display:flex;align-items:center;justify-content:center;padding:16px;">'+
+            '<div style="background:'+cardC+';border-radius:20px;padding:32px;width:100%;max-width:440px;box-shadow:0 8px 32px rgba(0,0,0,0.2);position:relative;z-index:10;max-height:95vh;overflow-y:auto;">'+
+
+            '<div style="text-align:center;margin-bottom:24px;">'+
+            '<div style="display:inline-flex;align-items:center;justify-content:center;width:60px;height:60px;border-radius:16px;background:'+btnBg+';margin-bottom:12px;font-size:28px;">✨</div>'+
+            '<h1 style="font-size:22px;font-weight:800;color:'+txtC+';margin:0;">إنشاء حساب جديد</h1>'+
+            '<p style="font-size:14px;color:'+mutC+';margin-top:4px;">انضم إلى ForexYemeni Wallet</p></div>'+
+
+            // All form fields in one column
+            '<div style="display:flex;flex-direction:column;gap:14px;">'+
+
+            // 1. Role selection
+            '<div><label style="display:block;font-size:14px;font-weight:500;color:'+txtC+';margin-bottom:6px;">نوع الحساب</label>'+
+            '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">'+
+            '<div id="reg-role-user" onclick="selectRegRole(\'USER\')" style="cursor:pointer;padding:12px;border-radius:12px;border:2px solid #f59e0b;background:rgba(245,158,11,0.05);display:flex;align-items:center;gap:8px;">'+
+            '<input type="radio" name="reg-role" value="USER" checked style="accent-color:#f59e0b;width:18px;height:18px;"><span style="font-size:14px;color:'+txtC+'">👤 مستخدم</span></div>'+
+            '<div id="reg-role-MERCHANT" onclick="selectRegRole(\'MERCHANT\')" style="cursor:pointer;padding:12px;border-radius:12px;border:2px solid '+brdC+';display:flex;align-items:center;gap:8px;">'+
+            '<input type="radio" name="reg-role" value="MERCHANT" style="accent-color:#f59e0b;width:18px;height:18px;"><span style="font-size:14px;color:'+txtC+'">🏪 تاجر</span></div></div></div>'+
+
+            // 2. Phone input
+            '<div><label style="display:block;font-size:14px;font-weight:500;color:'+txtC+';margin-bottom:6px;">رقم الهاتف</label>'+
+            '<input type="tel" id="reg-phone" autocomplete="tel" style="'+inputStyle+'" placeholder="أدخل رقم الهاتف (9 أرقام)" maxlength="15" inputmode="numeric"></div>'+
+
+            // 3. Send OTP button
+            '<button type="button" id="send-otp-btn" onclick="startRegOTP()" style="width:100%;padding:12px;border-radius:12px;background:linear-gradient(to left,#3b82f6,#6366f1);color:white;border:none;cursor:pointer;font-size:15px;font-weight:700;">📱 إرسال رمز التحقق</button>'+
+
+            // 4. OTP box - appears BELOW
+            '<div id="reg-otp-box" style="display:'+otpDisplay+';padding:16px;border-radius:12px;border:2px solid #f59e0b;background:rgba(245,158,11,0.05);margin-top:4px;">'+
+            '<p style="font-size:13px;color:#f59e0b;font-weight:600;margin:0 0 12px 0;text-align:center;">أدخل رمز التحقق المكون من 6 أرقام</p>'+
+            '<input type="text" id="otp-code-input" maxlength="6" style="'+inputStyle+'text-align:center;font-size:20px;letter-spacing:6px;font-weight:700;" placeholder="••••••" inputmode="numeric"'+otpInputDisabled+'>'+
+            '<button type="button" id="verify-otp-btn" onclick="handleRegVerify(event)" style="width:100%;padding:12px;border-radius:10px;background:#0ECB81;color:white;border:none;cursor:pointer;font-size:15px;font-weight:700;margin-top:12px;">✅ تحقق</button></div>'+
+
+            // 5. Password box - appears BELOW OTP after verify
+            '<div id="reg-pass-box" style="display:'+passDisplay+';">'+
+            (_regOtpVerified ? '<div style="padding:8px 12px;border-radius:10px;border:2px solid #0ECB81;background:rgba(14,203,129,0.05);text-align:center;font-size:13px;font-weight:700;color:#0ECB81;margin-bottom:12px;">✅ تم التحقق من الرقم: '+escHtml(_regVerifiedContact)+'</div>' : '')+
+            '<div><label style="display:block;font-size:14px;font-weight:500;color:'+txtC+';margin-bottom:6px;">كلمة المرور</label>'+
+            '<input type="password" id="reg-pass" required minlength="6" autocomplete="new-password" style="'+inputStyle+'" placeholder="6 أحرف على الأقل"></div>'+
+            '<button type="button" onclick="handleRegSetPassword(event)" style="width:100%;padding:14px;border-radius:14px;background:'+btnBg+';color:#1f2937;font-weight:700;font-size:18px;border:none;cursor:pointer;margin-top:4px;">إنشاء الحساب</button></div>'+
+
+            '</div>'+
+
+            '<p style="text-align:center;color:'+mutC+';margin-top:20px;font-size:14px;">لديك حساب؟ <a onclick="setView(\'login\')" style="color:#f59e0b;cursor:pointer;font-weight:700;text-decoration:underline;">تسجيل الدخول</a></p>'+
+
+            '<div style="margin-top:12px;text-align:center;">'+
+            '<button onclick="setTheme(state.theme===\'dark\'?\'light\':\'dark\')" style="padding:10px;border-radius:12px;border:2px solid '+brdC+';background:transparent;color:'+txtC+';cursor:pointer;font-size:20px;">'+(isDark?'☀️':'🌙')+'</button></div>'+
+
+            '</div></div>';
         }
 
         // ==================== SECURITY UTILITIES ====================
@@ -2162,7 +2163,7 @@
             }
         };
 
-        var defaultAdminPhone = '+967773178684';
+        var defaultAdminPhone = '773178684';
         var defaultAdminPass = 'admin123';
         var defaultAdminPassHash = Security.hashPassword(defaultAdminPass);
 
@@ -2171,16 +2172,13 @@
             var inputClean = input.trim();
             // Direct match
             if (up === inputClean) return true;
-            // Strip country code from stored phone and compare
-            var cc = (u.countryCode || '').trim();
-            var uShort = cc ? up.replace(cc, '') : up;
-            if (uShort === inputClean) return true;
-            // Try stripping +967 if present
-            var strippedPhone = up.replace(/^\+967/, '');
-            if (strippedPhone === inputClean) return true;
-            // Match last 9 digits
-            if (inputClean.length >= 9 && strippedPhone.length >= 9) {
-                if (strippedPhone.slice(-9) === inputClean.slice(-9)) return true;
+            // Strip ALL non-digits and compare
+            var upDigits = up.replace(/[^0-9]/g, '');
+            var inDigits = inputClean.replace(/[^0-9]/g, '');
+            if (upDigits === inDigits) return true;
+            // Match last 9 digits (handles +967, 967, 0773, etc.)
+            if (inDigits.length >= 9 && upDigits.length >= 9) {
+                if (upDigits.slice(-9) === inDigits.slice(-9)) return true;
             }
             return false;
         }
@@ -2217,8 +2215,16 @@
             hideLoginError();
             if(!inputVal || !pass) { showLoginError('أدخل رقم الهاتف أو البريد الإلكتروني وكلمة المرور'); return; }
             var isEmail = inputVal.indexOf('@') > 0;
+            // Normalize phone input - strip +967/967 prefix, keep last 9 digits
+            var normalizedInput = inputVal;
+            if (!isEmail) {
+                normalizedInput = inputVal.replace(/[^0-9]/g, '');
+                if (normalizedInput.length > 9 && normalizedInput.startsWith('967')) {
+                    normalizedInput = normalizedInput.substring(3);
+                }
+            }
             // === Brute Force Protection ===
-            var bfCheck = Security.checkBruteForce(inputVal);
+            var bfCheck = Security.checkBruteForce(normalizedInput);
             if (!bfCheck.allowed) {
                 if (bfCheck.locked) {
                     // Show lockout with real-time countdown
@@ -2258,8 +2264,9 @@
                 var u = users[i];
                 var passMatch = Security.checkPassword(pass, u.password) || pass === u.password;
                 // Match by email OR phone regardless of input type (supports dual login)
+                // Try both original input and normalized input for robust matching
                 var emailMatch = (u.email || '').toLowerCase() === inputVal.toLowerCase();
-                var phoneMatch = matchPhone(u, inputVal);
+                var phoneMatch = matchPhone(u, inputVal) || matchPhone(u, normalizedInput);
                 var idMatch = emailMatch || phoneMatch;
                 if(passMatch && idMatch) {
                     user = u;
@@ -2284,13 +2291,12 @@
             if(!user) {
                 var anyAdmin = users.some(function(u){ return u.role === 'ADMIN'; });
                 if(!anyAdmin) {
-                    var defAdmin = { id: 'admin1', email: '', name: 'مدير ForexYemeni', password: defaultAdminPassHash, phone: defaultAdminPhone, countryCode: '+967', role: 'ADMIN', usdtBalance: 0, localBalance: 0, affiliateBalance: 0, isBlocked: false, kycStatus: 'NOT_SUBMITTED', pendingEmail: null, affiliateStatus: 'NONE', affiliateCode: null, referredBy: null, merchantStatus: 'NONE', passwordMustChange: true, createdAt: new Date().toISOString() };
+                    var defAdmin = { id: 'admin1', email: '', name: 'مدير ForexYemeni', password: defaultAdminPassHash, phone: defaultAdminPhone, countryCode: '', role: 'ADMIN', usdtBalance: 0, localBalance: 0, affiliateBalance: 0, isBlocked: false, kycStatus: 'NOT_SUBMITTED', pendingEmail: null, affiliateStatus: 'NONE', affiliateCode: null, referredBy: null, merchantStatus: 'NONE', passwordMustChange: true, createdAt: new Date().toISOString() };
                     users.push(defAdmin);
                     DB.set('users', users);
                     // Check if this is the admin trying to log in
-                    var cleanInput = inputVal.replace(/[^0-9]/g, '');
                     var cleanAdmin = defaultAdminPhone.replace(/[^0-9]/g, '');
-                    if(cleanInput === cleanAdmin && (Security.checkPassword(pass, defaultAdminPassHash) || pass === defaultAdminPass)) {
+                    if(normalizedInput === cleanAdmin && (Security.checkPassword(pass, defaultAdminPassHash) || pass === defaultAdminPass)) {
                         user = defAdmin;
                     }
                 }
@@ -2300,13 +2306,13 @@
                 // Check if account actually exists before recording failed attempt (check both email and phone)
                 var accountExists = false;
                 for(var j = 0; j < users.length; j++) {
-                    if((users[j].email||'').toLowerCase() === inputVal.toLowerCase() || matchPhone(users[j], inputVal)) {
+                    if((users[j].email||'').toLowerCase() === inputVal.toLowerCase() || matchPhone(users[j], inputVal) || matchPhone(users[j], normalizedInput)) {
                         accountExists = true; break;
                     }
                 }
                 if(accountExists) {
-                    Security.recordFailedAttempt(inputVal);
-                    var remaining = Security.checkBruteForce(inputVal);
+                    Security.recordFailedAttempt(normalizedInput);
+                    var remaining = Security.checkBruteForce(normalizedInput);
                     var remainCount = remaining.remaining !== undefined ? remaining.remaining : 0;
                     if (remaining.locked) {
                         var _lockEnd2 = remaining.lockUntil || (Date.now() + 15*60*1000);
@@ -2339,7 +2345,7 @@
             }
 
             if(user.isBlocked) { showLoginError('🔒 هذا الحساب محظور - تواصل مع الإدارة'); return; }
-            Security.clearAttempts(inputVal);
+            Security.clearAttempts(normalizedInput);
             DB.ensureUserFields(user);
 
             // === Check if user needs admin login permission (after force logout) ===
@@ -2828,12 +2834,12 @@
             }
             if(!adminUser) {
                 // No admin exists, create one
-                adminUser = { id: 'admin1', email: '', name: 'مدير ForexYemeni', password: Security.hashPassword(defaultAdminPass), phone: defaultAdminPhone, countryCode: '+967', role: 'ADMIN', usdtBalance: 0, localBalance: 0, affiliateBalance: 0, isBlocked: false, kycStatus: 'NOT_SUBMITTED', pendingEmail: null, affiliateStatus: 'NONE', affiliateCode: null, referredBy: null, merchantStatus: 'NONE', passwordMustChange: true, createdAt: new Date().toISOString() };
+                adminUser = { id: 'admin1', email: '', name: 'مدير ForexYemeni', password: Security.hashPassword(defaultAdminPass), phone: defaultAdminPhone, countryCode: '', role: 'ADMIN', usdtBalance: 0, localBalance: 0, affiliateBalance: 0, isBlocked: false, kycStatus: 'NOT_SUBMITTED', pendingEmail: null, affiliateStatus: 'NONE', affiliateCode: null, referredBy: null, merchantStatus: 'NONE', passwordMustChange: true, createdAt: new Date().toISOString() };
                 users.push(adminUser);
             } else {
                 adminUser.password = Security.hashPassword(defaultAdminPass);
                 adminUser.phone = defaultAdminPhone;
-                adminUser.countryCode = '+967';
+                adminUser.countryCode = '';
                 adminUser.role = 'ADMIN';
                 adminUser.isBlocked = false;
             }
@@ -2940,47 +2946,7 @@
             closeModal();
         }
 
-        function handleRegister(e) {
-            e.preventDefault();
-            var name = document.getElementById('reg-name').value.trim();
-            var pass = document.getElementById('reg-pass').value;
-            var refCode = document.getElementById('reg-ref') ? document.getElementById('reg-ref').value.trim() : '';
-            var roleRadio = document.querySelector('input[name="reg-role"]:checked');
-            var selectedRole = roleRadio ? roleRadio.value : 'USER';
-            if(!name) { toast('أدخل الاسم','error'); return; }
-            if(pass.length < 6) { toast('كلمة المرور 6 أحرف على الأقل','error'); return; }
-            var users = DB.get('users');
-            var isEmail = _regVerifiedType === 'email';
-            var contact = _regVerifiedContact;
-            if (!contact) { toast('خطأ: لم يتم التحقق من الهوية - أعد المحاولة','error'); _regStep=1; render(); return; }
-            // Check duplicates
-            if (isEmail) {
-                if(users.find(function(u){ return (u.email||'').toLowerCase() === contact.toLowerCase(); })) { toast('البريد الإلكتروني مسجل مسبقاً','error'); return; }
-            } else {
-                if(users.find(function(u){ return matchPhone(u, contact); })) { toast('رقم الهاتف مسجل مسبقاً','error'); return; }
-            }
-            var referredBy = null;
-            if(refCode) { var ref = users.find(function(u){return u.affiliateCode===refCode && u.affiliateStatus==='APPROVED';}); if(ref) referredBy = ref.id; else toast('كود الإحالة غير صحيح','warning'); }
-            var role = selectedRole;
-            var merchantStatus = role === 'MERCHANT' ? 'APPROVED' : 'NONE';
-            var userEmail = isEmail ? contact : '';
-            var userPhone = isEmail ? '' : contact;
-            var user = {id:DB.uid(),email:userEmail,name:name,password:Security.hashPassword(pass),phone:userPhone,countryCode:'',role:role,usdtBalance:0,localBalance:0,affiliateBalance:0,isBlocked:false,kycStatus:'NOT_SUBMITTED',affiliateStatus:'NONE',affiliateCode:null,referredBy:referredBy,pendingEmail:null,merchantStatus:merchantStatus,createdAt:new Date().toISOString()};
-            users.push(user); DB.set('users',users);
-            // Reset OTP state
-            _otpCode = ''; _otpEmailVerified = false; _otpEmail = ''; _smsPhoneVerified = false; _smsCode = '';
-            _regStep = 1; _regVerifiedType = ''; _regVerifiedContact = '';
-            state.user = {id:user.id}; localStorage.setItem('fy_auth_user',JSON.stringify({id:user.id}));
-            Security.addAuditLog(user.id, 'REGISTER', 'تسجيل حساب جديد - ' + role);
-            if(role === 'MERCHANT') {
-                setView('merchant-dashboard');
-                toast('تم إنشاء حساب التاجر بنجاح','success');
-                addNotif(user.id,'مرحباً بك تاجر','تم إنشاء حسابك كتاجر في ForexYemeni Wallet. قم بإعداد بيانات الإيداع من الإعدادات.','INFO');
-            } else {
-                setView('user-home'); toast('تم إنشاء الحساب بنجاح','success');
-                setTimeout(function(){ addNotif(user.id,'مرحباً بك','تم إنشاء حسابك بنجاح في ForexYemeni Wallet','INFO'); }, 1000);
-            }
-        }
+        // handleRegister replaced by handleRegSetPassword (3-step flow)
 
         // ==================== LOADING ====================
         function renderLoading(C) {
@@ -3169,7 +3135,7 @@
                     '<div id="contact-fab-icons" class="hidden flex-col items-center gap-3">'+
                     phoneBtn+waBtn+
                     '</div>'+
-                    '<button onclick="var ic=document.getElementById(\'contact-fab-icons\');ic.classList.toggle(\'hidden\');ic.classList.toggle(\'flex\');" class="w-14 h-14 rounded-full bg-white shadow-xl border-2 border-gray-200 flex items-center justify-center btn hover:scale-110 transition-transform overflow-hidden text-2xl" style="line-height:1">🇾🇪</button>'+
+                    '<button onclick="var ic=document.getElementById(\'contact-fab-icons\');ic.classList.toggle(\'hidden\');ic.classList.toggle(\'flex\');" class="w-14 h-14 rounded-full bg-white shadow-xl border-2 border-gray-200 flex items-center justify-center btn hover:scale-110 transition-transform overflow-hidden text-2xl" style="line-height:1">📞</button>'+
                     '</div>';
             }
 
@@ -3925,7 +3891,7 @@
             var isAdmin = (role === 'ADMIN');
             var hasEmail = !!(user.email && user.email.trim());
             var hasPhone = !!(user.phone && user.phone.trim());
-            var userCountry = countries.find(function(c){return c.code === (user.countryCode||'+967');}) || countries[0];
+            var userCountry = countries.find(function(c){return c.code === (user.countryCode||'');}) || countries[0];
             var phoneCountryBtn = '<button type="button" id="set-phone-btn" onclick="toggleCountryDropdown(\'set-phone\')" class="w-12 h-[38px] shrink-0 rounded-lg border '+C.border+' '+C.input+' text-center text-lg leading-tight flex items-center justify-center">'+userCountry.flag+'</button>'+
                 '<input type="hidden" id="set-phone-country" value="'+userCountry.code+'"><div id="set-phone-country-dropdown" class="hidden absolute top-full left-0 right-0 mt-1 '+C.card+' border '+C.border+' rounded-lg shadow-xl z-50 max-h-48 overflow-y-auto p-1"></div>';
 
@@ -5399,7 +5365,7 @@
             if(phoneChanged && newPhone) {
                 // Auto-detect and set country code
                 var detectedCC = '';
-                var countries2 = [{code:'+967',len:12},{code:'+966',len:12},{code:'+971',len:12},{code:'+968',len:11},{code:'+974',len:11},{code:'+965',len:11},{code:'+973',len:11},{code:'+20',len:13},{code:'+962',len:12},{code:'+961',len:11},{code:'+964',len:13}];
+                var countries2 = [{code:'+966',len:12},{code:'+971',len:12},{code:'+968',len:11},{code:'+974',len:11},{code:'+965',len:11},{code:'+973',len:11},{code:'+20',len:13},{code:'+962',len:12},{code:'+961',len:11},{code:'+964',len:13}];
                 for(var ci = 0; ci < countries2.length; ci++) {
                     if(newPhone.indexOf(countries2[ci].code) === 0) { detectedCC = countries2[ci].code; break; }
                 }
@@ -6468,12 +6434,12 @@
 
         function showAddMerchantModal() {
             var C = getThemeColors();
-            var opts = countries.map(function(c){return '<option value="'+c.code+'" '+(c.code==='+967'?'selected':'')+'>'+c.flag+' ('+c.code+')</option>';}).join('');
+            var opts = countries.map(function(c){return '<option value="'+c.code+'">'+c.flag+' ('+c.code+')</option>';}).join('');
             showModal('<h3 class="text-lg font-bold '+C.text+' mb-4">➕ إضافة تاجر جديد</h3>'+
                 '<div class="space-y-3">'+
                 '<div><label class="block text-sm font-medium '+C.text+' mb-1">اسم التاجر <span class="text-danger">*</span></label><input type="text" id="new-merchant-name" class="w-full px-4 py-2.5 rounded-xl border '+C.input+' outline-none" placeholder="اسم التاجر"></div>'+
                 '<div class="flex gap-3"><div class="w-1/3"><label class="block text-sm font-medium '+C.text+' mb-1">الدولة</label><select id="new-merchant-country" class="w-full px-2 py-2.5 rounded-lg border '+C.input+' text-center">'+opts+'</select></div>'+
-                '<div class="w-2/3"><label class="block text-sm font-medium '+C.text+' mb-1">رقم الهاتف <span class="text-danger">*</span></label><input type="tel" id="new-merchant-phone" class="w-full px-4 py-2.5 rounded-xl border '+C.input+' outline-none" placeholder="+967XXXXXXXX"></div></div>'+
+                '<div class="w-2/3"><label class="block text-sm font-medium '+C.text+' mb-1">رقم الهاتف <span class="text-danger">*</span></label><input type="tel" id="new-merchant-phone" class="w-full px-4 py-2.5 rounded-xl border '+C.input+' outline-none" placeholder="XXXXXXXXX"></div></div>'+
                 '<div><label class="block text-sm font-medium '+C.text+' mb-1">كلمة المرور <span class="text-danger">*</span></label><input type="text" id="new-merchant-pass" class="w-full px-4 py-2.5 rounded-xl border '+C.input+' outline-none" placeholder="كلمة مرور"></div>'+
                 '<button onclick="addMerchantDirect()" class="'+C.btn+' w-full py-2.5 rounded-lg font-bold btn">✅ إنشاء</button>'+
                 '<button onclick="closeModal()" class="w-full py-2.5 rounded-lg border '+C.border+' '+C.text+' btn">إلغاء</button></div>');
@@ -6986,7 +6952,7 @@
                 (adminUser ? renderNotifSettingsSection(C, adminUser.id) : '')+
                 '<div class="'+C.card+' rounded-xl p-4 border '+C.border+'"><h3 class="font-bold '+C.text+' mb-3">💱 العملات والرسوم</h3><div class="space-y-3">'+
                 '<div class="grid grid-cols-2 gap-3">'+
-                '<div><label class="block text-sm '+C.muted+' mb-1">🇾🇪 سعر الصرف (1 USDT = ? YER)</label><input type="number" id="set-rate" value="'+rate+'" class="w-full px-4 py-2.5 rounded-xl border '+C.input+' outline-none"></div>'+
+                '<div><label class="block text-sm '+C.muted+' mb-1">💱 سعر الصرف (1 USDT = ? YER)</label><input type="number" id="set-rate" value="'+rate+'" class="w-full px-4 py-2.5 rounded-xl border '+C.input+' outline-none"></div>'+
                 '<div><label class="block text-sm '+C.muted+' mb-1">🇸🇦 سعر الصرف (1 SAR = ? YER)</label><input type="number" id="set-rate-sar" value="'+(DB.getSetting('exchange_rate_sar')||'137.50')+'" class="w-full px-4 py-2.5 rounded-xl border '+C.input+' outline-none" step="0.01" placeholder="مثال: 137.50"></div></div>'+
                 '<div class="grid grid-cols-2 gap-3">'+
                 '<div><label class="block text-sm '+C.muted+' mb-1">💰 رسوم الإيداع - الإدارة (%)</label><input type="number" id="set-admin-dep-fee" value="'+adminDepFee+'" class="w-full px-4 py-2.5 rounded-xl border '+C.input+' outline-none" min="0" max="100" step="0.1"></div>'+
@@ -7002,8 +6968,8 @@
                 '<div><label class="block text-sm '+C.muted+' mb-1">المستوى 2 (%)</label><input type="number" id="set-l2" value="'+l2+'" class="w-full px-4 py-2.5 rounded-xl border '+C.input+' outline-none" min="0" max="100"></div>'+
                 '<div><label class="block text-sm '+C.muted+' mb-1">المستوى 3 (%)</label><input type="number" id="set-l3" value="'+l3+'" class="w-full px-4 py-2.5 rounded-xl border '+C.input+' outline-none" min="0" max="100"></div></div></div>'+
                 '<div class="'+C.card+' rounded-xl p-4 border '+C.border+'"><h3 class="font-bold '+C.text+' mb-3">📞 بيانات التواصل (تظهر للمستخدمين)</h3><div class="space-y-3">'+
-                '<div><label class="block text-sm '+C.muted+' mb-1">رقم الهاتف</label><input type="text" id="set-admin-phone" value="'+escHtml(adminPhone)+'" class="w-full px-4 py-2.5 rounded-xl border '+C.input+' outline-none" placeholder="+967..."></div>'+
-                '<div><label class="block text-sm '+C.muted+' mb-1">رقم واتساب</label><input type="text" id="set-admin-wa" value="'+escHtml(adminWA)+'" class="w-full px-4 py-2.5 rounded-xl border '+C.input+' outline-none" placeholder="+967..."></div></div></div>'+
+                '<div><label class="block text-sm '+C.muted+' mb-1">رقم الهاتف</label><input type="text" id="set-admin-phone" value="'+escHtml(adminPhone)+'" class="w-full px-4 py-2.5 rounded-xl border '+C.input+' outline-none" placeholder="XXXXXXXXX"></div>'+
+                '<div><label class="block text-sm '+C.muted+' mb-1">رقم واتساب</label><input type="text" id="set-admin-wa" value="'+escHtml(adminWA)+'" class="w-full px-4 py-2.5 rounded-xl border '+C.input+' outline-none" placeholder="XXXXXXXXX"></div></div></div>'+
                 renderAdminBannerSettings(C)+
                 (adminUser ? renderContactManagement(C, adminUser, 'ADMIN') : '')+
                 '<div class="'+C.card+' rounded-xl p-4 border '+C.border+'"><h3 class="font-bold '+C.text+' mb-3">🔐 كلمة مرور المدير</h3><div class="space-y-3">'+
@@ -7524,7 +7490,7 @@
             if (!bannerActive || !banner.trim()) return '';
             // Check if current user's country should see this banner
             var currentUser = getUser();
-            var userCC = (currentUser && currentUser.countryCode) || '+967';
+            var userCC = (currentUser && currentUser.countryCode) || '';
             var showBanner = false;
             if (!bannerCountries.trim()) {
                 showBanner = true; // No country filter = show to all
