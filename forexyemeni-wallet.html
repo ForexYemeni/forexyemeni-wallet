@@ -3044,8 +3044,8 @@
             var sarEquiv = usdtBal * sarRate;
             var deposits = DB.get('deposits').filter(function(d){return d.userId===user.id;});
             var withdrawals = DB.get('withdrawals').filter(function(w){return w.userId===user.id;});
-            var totalDep = deposits.filter(function(d){return d.status==='APPROVED';}).reduce(function(s,d){return s+(d.usdtAmount||0);},0);
-            var totalWd = withdrawals.filter(function(w){return w.status==='APPROVED';}).reduce(function(s,w){return s+(w.net||0);},0);
+            var totalDep = deposits.filter(function(d){return d.status==='APPROVED';}).reduce(function(s,d){return s+(d.amount||0);},0);
+            var totalWd = withdrawals.filter(function(w){return w.status==='APPROVED';}).reduce(function(s,w){return s+(w.localAmount||w.net||0);},0);
             var pendingDep = deposits.filter(function(d){return d.status==='PENDING';}).length;
             var pendingWd = withdrawals.filter(function(w){return w.status==='PENDING';}).length;
             var recentLogs = (DB.get('transactionLog')||[]).filter(function(l){return l.userId===user.id;}).slice(0,5);
@@ -3072,8 +3072,8 @@
                 '<div class="'+C.card+' rounded-2xl p-6 border '+C.border+' card-hover shadow-card bg-gradient-to-br from-blue-500/10 to-indigo-500/5"><div class="flex items-center justify-between mb-2"><p class="'+C.muted+' text-sm">المعادل بالريال السعودي</p><div class="w-10 h-10 rounded-xl bg-info/10 flex items-center justify-center text-info text-xl">🇸🇦</div></div><h2 class="text-3xl font-extrabold text-info">'+fmtNum(sarEquiv,2)+' <span class="text-lg font-bold">SAR</span></h2>'+
                 '<p class="'+C.muted+' text-xs mt-2 opacity-70">1 SAR = '+fmtNum(sarCrossRate,2)+' YER</p></div></div>'+
                 '<div class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">'+
-                '<div class="'+C.card+' rounded-2xl p-4 text-center border '+C.border+' card-hover"><p class="text-xs '+C.muted+' mb-1">إجمالي الإيداعات</p><p class="font-extrabold text-success text-lg">'+fmtNum(totalDep)+'</p></div>'+
-                '<div class="'+C.card+' rounded-2xl p-4 text-center border '+C.border+' card-hover"><p class="text-xs '+C.muted+' mb-1">إجمالي السحوبات</p><p class="font-extrabold text-danger text-lg">'+fmtNum(totalWd)+'</p></div>'+
+                '<div class="'+C.card+' rounded-2xl p-4 text-center border '+C.border+' card-hover"><p class="text-xs '+C.muted+' mb-1">إجمالي الإيداعات</p><p class="font-extrabold text-success text-lg">'+fmtInt(totalDep)+'</p><p class="text-xs '+C.muted+' opacity-60">مجموع العملات</p></div>'+
+                '<div class="'+C.card+' rounded-2xl p-4 text-center border '+C.border+' card-hover"><p class="text-xs '+C.muted+' mb-1">إجمالي السحوبات</p><p class="font-extrabold text-danger text-lg">'+fmtInt(totalWd)+'</p><p class="text-xs '+C.muted+' opacity-60">مجموع العملات</p></div>'+
                 '<div class="'+C.card+' rounded-2xl p-4 text-center border '+C.border+' card-hover"><p class="text-xs '+C.muted+' mb-1">إيداعات معلقة</p><p class="font-extrabold text-warning text-lg">'+pendingDep+'</p></div>'+
                 '<div class="'+C.card+' rounded-2xl p-4 text-center border '+C.border+' card-hover"><p class="text-xs '+C.muted+' mb-1">سحوبات معلقة</p><p class="font-extrabold text-warning text-lg">'+pendingWd+'</p></div></div>'+
                 '<div class="grid grid-cols-2 gap-3 mb-4">'+
@@ -3481,7 +3481,12 @@
             if(totalWdToday + net > dailyWdLimit) { toast('لقد تجاوزت الحد اليومي للسحب: '+fmtNum(dailyWdLimit)+' USDT','error'); return; }
             var withdrawals = DB.get('withdrawals');
             var wdCurrency = document.getElementById('wd-currency') ? document.getElementById('wd-currency').value : 'USDT';
-            withdrawals.unshift({id:DB.uid(),userId:user.id,withdrawalMethodId:methodId,amount:amount,fee:feeAmount,net:net,currency:wdCurrency,notes:notes,status:'PENDING',assignedMerchantId:merchantId||null,createdAt:new Date().toISOString()});
+            var wdRate = parseFloat(DB.getSetting('exchange_rate')) || 535;
+            var wdSarCrossRate = parseFloat(DB.getSetting('exchange_rate_sar')) || 137.50;
+            var wdLocalAmount = net;
+            if(wdCurrency === 'YER') wdLocalAmount = Math.round(net * wdRate);
+            else if(wdCurrency === 'SAR') wdLocalAmount = parseFloat((net * wdRate / wdSarCrossRate).toFixed(2));
+            withdrawals.unshift({id:DB.uid(),userId:user.id,withdrawalMethodId:methodId,amount:amount,fee:feeAmount,net:net,currency:wdCurrency,localAmount:wdLocalAmount,notes:notes,status:'PENDING',assignedMerchantId:merchantId||null,createdAt:new Date().toISOString()});
             DB.set('withdrawals', withdrawals);
             addLog(user.id,'WITHDRAW',net,'USDT','طلب سحب '+fmtNum(net)+' USDT'+(wdCurrency!=='USDT'?' ('+wdCurrency+')':'')+(merchantId?' - عبر تاجر':''));
             addNotif(user.id,'طلب سحب','تم إرسال طلب سحب '+fmtNum(net)+' USDT بنجاح. سيتم مراجعته.','INFO');
@@ -3548,8 +3553,8 @@
             var deposits = DB.get('deposits').filter(function(d){return d.userId===user.id;});
             var withdrawals = DB.get('withdrawals').filter(function(w){return w.userId===user.id;});
             var all = [];
-            deposits.forEach(function(d){ all.push({id:d.id,type:'DEPOSIT',amount:d.usdtAmount||0,currency:'USDT',status:d.status,date:d.createdAt,desc:'إيداع '+fmtNum(d.amount)+' '+(d.currency||''),approveProof:d.approveProof||null}); });
-            withdrawals.forEach(function(w){ all.push({id:w.id,type:'WITHDRAW',amount:w.net||0,currency:'USDT',status:w.status,date:w.createdAt,desc:'سحب '+fmtNum(w.net)+' USDT',confirmScreenshot:w.confirmScreenshot||null,userReceiptProof:w.userReceiptProof||null}); });
+            deposits.forEach(function(d){ all.push({id:d.id,type:'DEPOSIT',amount:d.amount||0,currency:d.currency||'USDT',status:d.status,date:d.createdAt,desc:'إيداع '+fmtNum(d.amount)+' '+(d.currency||''),approveProof:d.approveProof||null}); });
+            withdrawals.forEach(function(w){ all.push({id:w.id,type:'WITHDRAW',amount:w.localAmount||w.net||0,currency:w.currency||'USDT',status:w.status,date:w.createdAt,desc:'سحب '+fmtNum(w.localAmount||w.net)+' '+(w.currency||'USDT'),confirmScreenshot:w.confirmScreenshot||null,userReceiptProof:w.userReceiptProof||null}); });
             all.sort(function(a,b){ return new Date(b.date)-new Date(a.date); });
             if(all.length===0) return '<div class="'+C.card+' rounded-2xl p-8 border '+C.border+' text-center"><p class="text-4xl mb-4">📋</p><p class="'+C.muted+'">لا توجد عمليات بعد</p></div>';
             var html = '<div class="'+C.card+' rounded-2xl p-6 border '+C.border+'"><h2 class="text-xl font-bold '+C.text+' mb-4">📋 سجل العمليات</h2><div class="space-y-3 max-h-[70vh] overflow-y-auto">';
@@ -4464,9 +4469,9 @@
                     html += '<div class="p-4 rounded-lg border '+C.border+'">'+
                         '<div class="flex items-center justify-between mb-2"><div><p class="font-medium text-sm '+C.text+'">'+escHtml(u?u.name:'مستخدم')+'</p><p class="text-xs '+C.muted+'">'+fmtDate(w.createdAt)+'</p></div>'+statusBadge(w.status)+'</div>'+
                         '<div class="grid grid-cols-3 gap-2 text-xs mb-3">'+
-                        '<div class="'+C.card+' rounded p-2"><p class="'+C.muted+'">المبلغ</p><p class="font-bold text-danger">'+fmtNum(w.amount)+'</p></div>'+
-                        '<div class="'+C.card+' rounded p-2"><p class="'+C.muted+'">الرسوم</p><p class="font-bold">'+fmtNum(w.fee||0)+'</p></div>'+
-                        '<div class="'+C.card+' rounded p-2"><p class="'+C.muted+'">الصافي</p><p class="font-bold text-danger">'+fmtNum(w.net||0)+'</p></div></div>'+
+                        '<div class="'+C.card+' rounded p-2"><p class="'+C.muted+'">المبلغ</p><p class="font-bold text-danger">'+fmtNum(w.amount)+'</p><p class="text-xs '+C.muted+'">'+(w.currency||'USDT')+'</p></div>'+
+                        '<div class="'+C.card+' rounded p-2"><p class="'+C.muted+'">الرسوم</p><p class="font-bold">'+fmtNum(w.fee||0)+' USDT</p></div>'+
+                        '<div class="'+C.card+' rounded p-2"><p class="'+C.muted+'">الصافي</p><p class="font-bold text-danger">'+fmtNum(w.localAmount||w.net||0)+'</p><p class="text-xs '+C.muted+'">'+(w.currency||'USDT')+'</p></div></div>'+
                         detailsHtml+
                         actionBtns+'</div>';
                 });
@@ -4888,15 +4893,15 @@
             var currentUser = getUser();
             var unreadMsgs = DB.get('messages').filter(function(m){return m.toId===(currentUser && currentUser.id) && !m.isRead;}).length;
             var totalUsers = users.length;
-            var totalDep = deposits.reduce(function(s,d){return s+(d.usdtAmount||0);},0);
-            var totalWd = withdrawals.reduce(function(s,w){return s+(w.net||0);},0);
+            var totalDep = deposits.reduce(function(s,d){return s+(d.amount||0);},0);
+            var totalWd = withdrawals.reduce(function(s,w){return s+(w.localAmount||w.net||0);},0);
             var pendingDep = deposits.filter(function(d){return d.status==='PENDING';}).length;
             var pendingWd = withdrawals.filter(function(w){return w.status==='PENDING';}).length;
             var pendingPerms = DB.get('loginPermissions').filter(function(p){return p.status==='PENDING';}).length;
             return renderAdminBanner(C) + renderDeviceApprovalPendingSection(C) + '<div class="grid grid-cols-2 md:grid-cols-3 gap-4 mb-6">'+
                 '<div class="'+C.card+' rounded-2xl p-5 border '+C.border+' text-center cursor-pointer btn card-hover shadow-card hover:border-info/50 bg-gradient-to-br from-blue-500/10 to-cyan-500/5" onclick="setView(\'admin-users\')"><div class="w-14 h-14 rounded-2xl bg-blue-500/10 flex items-center justify-center text-3xl mx-auto mb-2">👥</div><p class="text-2xl font-extrabold text-info">'+totalUsers+'</p><p class="'+C.muted+' text-sm">المستخدمين</p></div>'+
-                '<div class="'+C.card+' rounded-2xl p-5 border '+C.border+' text-center cursor-pointer btn card-hover shadow-card hover:border-success/50 bg-gradient-to-br from-emerald-500/10 to-green-500/5" onclick="setView(\'admin-deposits\')"><div class="w-14 h-14 rounded-2xl bg-success/10 flex items-center justify-center text-3xl mx-auto mb-2">💰</div><p class="text-2xl font-extrabold text-success">'+fmtNum(totalDep)+'</p><p class="'+C.muted+' text-sm">إجمالي الإيداعات</p></div>'+
-                '<div class="'+C.card+' rounded-2xl p-5 border '+C.border+' text-center cursor-pointer btn card-hover shadow-card hover:border-danger/50 bg-gradient-to-br from-red-500/10 to-rose-500/5" onclick="setView(\'admin-withdrawals\')"><div class="w-14 h-14 rounded-2xl bg-danger/10 flex items-center justify-center text-3xl mx-auto mb-2">🏧</div><p class="text-2xl font-extrabold text-danger">'+fmtNum(totalWd)+'</p><p class="'+C.muted+' text-sm">إجمالي السحوبات</p></div>'+
+                '<div class="'+C.card+' rounded-2xl p-5 border '+C.border+' text-center cursor-pointer btn card-hover shadow-card hover:border-success/50 bg-gradient-to-br from-emerald-500/10 to-green-500/5" onclick="setView(\'admin-deposits\')"><div class="w-14 h-14 rounded-2xl bg-success/10 flex items-center justify-center text-3xl mx-auto mb-2">💰</div><p class="text-2xl font-extrabold text-success">'+fmtInt(totalDep)+'</p><p class="'+C.muted+' text-sm">إجمالي الإيداعات</p><p class="'+C.muted+' text-xs opacity-60">مجموع العملات</p></div>'+
+                '<div class="'+C.card+' rounded-2xl p-5 border '+C.border+' text-center cursor-pointer btn card-hover shadow-card hover:border-danger/50 bg-gradient-to-br from-red-500/10 to-rose-500/5" onclick="setView(\'admin-withdrawals\')"><div class="w-14 h-14 rounded-2xl bg-danger/10 flex items-center justify-center text-3xl mx-auto mb-2">🏧</div><p class="text-2xl font-extrabold text-danger">'+fmtInt(totalWd)+'</p><p class="'+C.muted+' text-sm">إجمالي السحوبات</p><p class="'+C.muted+' text-xs opacity-60">مجموع العملات</p></div>'+
                 '<div class="'+C.card+' rounded-2xl p-5 border '+C.border+' text-center cursor-pointer btn card-hover shadow-card hover:border-warning/50 bg-gradient-to-br from-amber-500/10 to-yellow-500/5" onclick="setView(\'admin-deposits\')"><div class="w-14 h-14 rounded-2xl bg-warning/10 flex items-center justify-center text-3xl mx-auto mb-2 pulse-glow">⏳</div><p class="text-2xl font-extrabold text-warning">'+pendingDep+'</p><p class="'+C.muted+' text-sm">إيداعات معلقة</p></div>'+
                 '<div class="'+C.card+' rounded-2xl p-5 border '+C.border+' text-center cursor-pointer btn card-hover shadow-card hover:border-warning/50 bg-gradient-to-br from-amber-500/10 to-yellow-500/5" onclick="setView(\'admin-withdrawals\')"><div class="w-14 h-14 rounded-2xl bg-warning/10 flex items-center justify-center text-3xl mx-auto mb-2 pulse-glow">⏳</div><p class="text-2xl font-extrabold text-warning">'+pendingWd+'</p><p class="'+C.muted+' text-sm">سحوبات معلقة</p></div>'+
                 '<div class="'+C.card+' rounded-2xl p-5 border '+C.border+' text-center cursor-pointer btn card-hover shadow-card hover:border-warning/50 bg-gradient-to-br from-violet-500/10 to-purple-500/5" onclick="setView(\'admin-kyc\')"><div class="w-14 h-14 rounded-2xl bg-violet-500/10 flex items-center justify-center text-3xl mx-auto mb-2">🪪</div><p class="text-2xl font-extrabold text-accent-violet">'+pendingKyc+'</p><p class="'+C.muted+' text-sm">توثيق معلق</p></div>'+
@@ -4918,11 +4923,11 @@
             }
             deposits.forEach(function(d){
                 var u = users.find(function(x){return x.id===d.userId;});
-                all.push({date:d.createdAt||'',type:'إيداع',amount:d.usdtAmount||0,currency:'USDT',status:d.status,user:u?u.name:'مستخدم'});
+                all.push({date:d.createdAt||'',type:'إيداع',amount:d.amount||0,currency:d.currency||'USDT',status:d.status,user:u?u.name:'مستخدم'});
             });
             withdrawals.forEach(function(w){
                 var u = users.find(function(x){return x.id===w.userId;});
-                all.push({date:w.createdAt||'',type:'سحب',amount:w.net||0,currency:'USDT',status:w.status,user:u?u.name:'مستخدم'});
+                all.push({date:w.createdAt||'',type:'سحب',amount:w.localAmount||w.net||0,currency:w.currency||'USDT',status:w.status,user:u?u.name:'مستخدم'});
             });
             all.sort(function(a,b){return new Date(b.date)-new Date(a.date);});
             var statusMap = {PENDING:'معلق',APPROVED:'موافق',COMPLETED:'مكتمل',REJECTED:'مرفوض',PROCESSING:'قيد المعالجة',RECEIVED:'مستلم'};
@@ -5355,9 +5360,9 @@
                     '<div><p class="font-medium text-sm '+C.text+'">'+escHtml(u?u.name:'مستخدم محذوف')+'</p><p class="text-xs '+C.muted+'">'+fmtDate(w.createdAt)+'</p></div>'+
                     '<div class="text-left">'+statusBadge(w.status)+processedBy+'</div></div>'+
                     '<div class="grid grid-cols-3 gap-2 text-xs mb-3">'+
-                    '<div class="'+C.card+' rounded p-2"><p class="'+C.muted+'">المبلغ</p><p class="font-bold text-danger">'+fmtNum(w.amount)+(w.currency&&w.currency!=='USDT'?' '+w.currency:'')+'</p></div>'+
-                    '<div class="'+C.card+' rounded p-2"><p class="'+C.muted+'">الرسوم</p><p class="font-bold">'+fmtNum(w.fee||0)+'</p></div>'+
-                    '<div class="'+C.card+' rounded p-2"><p class="'+C.muted+'">الصافي</p><p class="font-bold text-danger">'+fmtNum(w.net||0)+'</p></div></div>'+
+                    '<div class="'+C.card+' rounded p-2"><p class="'+C.muted+'">المبلغ</p><p class="font-bold text-danger">'+fmtNum(w.amount)+'</p><p class="text-xs '+C.muted+'">'+(w.currency||'USDT')+'</p></div>'+
+                    '<div class="'+C.card+' rounded p-2"><p class="'+C.muted+'">الرسوم</p><p class="font-bold">'+fmtNum(w.fee||0)+' USDT</p></div>'+
+                    '<div class="'+C.card+' rounded p-2"><p class="'+C.muted+'">الصافي</p><p class="font-bold text-danger">'+fmtNum(w.localAmount||w.net||0)+'</p><p class="text-xs '+C.muted+'">'+(w.currency||'USDT')+'</p></div></div>'+
                     (copyableFields ? copyableFields : (methodInfo?'<p class="text-xs '+C.muted+' mb-2">طريقة السحب: <span class="'+C.text+'">'+methodInfo+'</span></p>':''))+
                     (assignedMerchantName?'<p class="text-xs '+C.muted+' mb-2">🏪 التاجر المعين: <span class="text-primary font-medium">'+assignedMerchantName+'</span></p>':'')+
                     (w.notes?'<p class="text-xs '+C.muted+' mb-2">ملاحظات: '+escHtml(w.notes)+'</p>':'')+
@@ -5365,7 +5370,7 @@
                     (w.confirmScreenshot?'<div class="mb-3"><p class="text-xs '+C.muted+' mb-1">لقطة تأكيد التنفيذ:</p><img src="'+w.confirmScreenshot+'" class="h-24 rounded-lg border cursor-pointer object-cover" onclick="showImageModal(this.src)"></div>':'')+
                     (w.status==='PENDING'?'<div class="flex gap-2"><button onclick="adminReceiveWithdrawal(\''+w.id+'\')" class="flex-1 py-2 rounded-lg font-bold btn bg-info text-white text-sm">📋 تم استلام الطلب</button><button onclick="adminRejectWithdrawal(\''+w.id+'\')" class="flex-1 py-2 rounded-xl font-bold btn btn-premium bg-gradient-to-r from-red-500 to-rose-500 text-white text-sm">❌ رفض</button></div>':'')+
                     (w.status==='RECEIVED'?'<div class="flex gap-2"><button onclick="adminStartProcessing(\''+w.id+'\')" class="flex-1 py-2 rounded-lg font-bold btn bg-warning text-dark-bg text-sm">✅ تمت الموافقة وخصم الرصيد</button><button onclick="adminRejectWithdrawal(\''+w.id+'\')" class="flex-1 py-2 rounded-xl font-bold btn btn-premium bg-gradient-to-r from-red-500 to-rose-500 text-white text-sm">❌ رفض</button></div>':'')+
-                    (w.status==='PROCESSING'?'<div class="flex gap-2"><button onclick="adminApproveWithdrawal(\''+w.id+'\')" class="flex-1 py-2 rounded-xl font-bold btn btn-premium bg-gradient-to-r from-emerald-500 to-green-500 text-dark-bg text-sm">✅ تأكيد التنفيذ</button></div>':'')+
+                    (w.status==='PROCESSING'?'<div class="flex gap-2"><button onclick="adminApproveWithdrawal(\''+w.id+'\')" class="flex-1 py-2 rounded-xl font-bold btn btn-premium bg-gradient-to-r from-emerald-500 to-green-500 text-dark-bg text-sm">📸 رفع إثبات التنفيذ (اجباري)</button></div>':'')+
                     '</div>';
             }).join('');
         }
@@ -5419,25 +5424,36 @@
 
         function adminApproveWithdrawal(wdId) {
             var C = getThemeColors();
-            showModal('<h3 class="text-lg font-bold '+C.text+' mb-4">✅ تأكيد تنفيذ السحب</h3>'+
-                '<p class="text-sm '+C.muted+' mb-4">سيتم تأكيد إكمال السحب وإرسال إشعار للمستخدم.</p>'+
-                '<button onclick="confirmAdminWdApprove(\''+wdId+'\')" class="'+C.btn+' w-full py-3 rounded-lg font-bold btn">نعم، تأكيد التنفيذ</button>'+
+            showModal('<h3 class="text-lg font-bold '+C.text+' mb-4">📸 رفع لقطة إثبات التنفيذ (اجباري)</h3>'+
+                '<p class="'+C.muted+' text-sm mb-4">ارفع لقطة شاشة تثبت إتمام التحويل إلى حساب المستخدم</p>'+
+                '<div id="admin-wd-proof-preview"></div>'+
+                '<div class="flex gap-2 mb-4">'+
+                '<button type="button" onclick="captureForField(\'adminWdProof\');showImagePreviewAfterCapture(\'adminWdProof\',\'admin-wd-proof-preview\')" class="flex-1 px-4 py-3 rounded-lg border '+C.border+' '+C.text+' btn text-sm font-medium">📸 كاميرا</button>'+
+                '<label class="flex-1 px-4 py-3 rounded-lg border '+C.border+' '+C.text+' btn text-sm font-medium text-center cursor-pointer">📁 رفع ملف<input type="file" accept="image/*" class="hidden" onchange="fileForFieldWithPreview(\'adminWdProof\',this,\'admin-wd-proof-preview\')"></label>'+
+                '</div>'+
+                '<div id="admin-wd-proof-actions" class="hidden">'+
+                '<button onclick="confirmAdminWdApprove(\''+wdId+'\')" class="'+C.btn+' w-full py-3 rounded-lg font-bold btn text-lg">✅ تأكيد ورفع الإثبات</button>'+
+                '</div>'+
                 '<button onclick="closeModal()" class="w-full py-2.5 rounded-lg border '+C.border+' '+C.text+' btn mt-2">إلغاء</button>');
         }
 
         function confirmAdminWdApprove(wdId) {
+            var proofImg = getFieldImage('adminWdProof');
+            if(!proofImg) { toast('يجب رفع لقطة الإثبات أولاً','error'); return; }
             closeModal();
             var withdrawals = DB.get('withdrawals');
             var w = withdrawals.find(function(x){return x.id===wdId;});
             if(!w) return;
             w.status = 'APPROVED';
+            w.confirmScreenshot = proofImg;
             var adminUser = getUser();
             w.processedBy = adminUser ? adminUser.id : w.processedBy;
             w.completedAt = new Date().toISOString();
             DB.set('withdrawals', withdrawals);
-            addLog(w.userId,'WITHDRAW_APPROVED',w.net,'USDT','تم إكمال سحب '+fmtNum(w.net)+' USDT');
-            addNotif(w.userId,'سحب مكتمل','تم إكمال سحبك بمبلغ '+fmtNum(w.net)+' USDT.','WITHDRAW');
-            toast('تم تأكيد إكمال السحب','success');
+            addLog(w.userId,'WITHDRAW_APPROVED',w.net,'USDT','تم إكمال سحب '+fmtNum(w.net)+' USDT مع إثبات التنفيذ');
+            addNotif(w.userId,'سحب مكتمل','تم إكمال سحبك بمبلغ '+fmtNum(w.net)+' USDT. تم رفع إثبات التنفيذ.','WITHDRAW');
+            clearFieldImage('adminWdProof');
+            toast('تم رفع الإثبات وإكمال السحب','success');
             render();
         }
 
@@ -6230,10 +6246,10 @@
             var users = DB.get('users').filter(function(u){return u.role!=='ADMIN';});
             var deposits = DB.get('deposits');
             var withdrawals = DB.get('withdrawals');
-            var totalDep = deposits.filter(function(d){return d.status==='APPROVED';}).reduce(function(s,d){return s+(d.usdtAmount||0);},0);
-            var totalWd = withdrawals.filter(function(w){return w.status==='APPROVED';}).reduce(function(s,w){return s+(w.net||0);},0);
-            var pendingDep = deposits.filter(function(d){return d.status==='PENDING';}).reduce(function(s,d){return s+(d.usdtAmount||0);},0);
-            var pendingWd = withdrawals.filter(function(w){return w.status==='PENDING';}).reduce(function(s,w){return s+(w.net||0);},0);
+            var totalDep = deposits.filter(function(d){return d.status==='APPROVED';}).reduce(function(s,d){return s+(d.amount||0);},0);
+            var totalWd = withdrawals.filter(function(w){return w.status==='APPROVED';}).reduce(function(s,w){return s+(w.localAmount||w.net||0);},0);
+            var pendingDep = deposits.filter(function(d){return d.status==='PENDING';}).reduce(function(s,d){return s+(d.amount||0);},0);
+            var pendingWd = withdrawals.filter(function(w){return w.status==='PENDING';}).reduce(function(s,w){return s+(w.localAmount||w.net||0);},0);
             var totalBalance = users.reduce(function(s,u){return s+(u.usdtBalance||0);},0);
             var rate = parseFloat(DB.getSetting('exchange_rate')) || 535;
             var totalFees = withdrawals.filter(function(w){return w.status==='APPROVED';}).reduce(function(s,w){return s+(w.fee||0);},0);
@@ -6241,14 +6257,14 @@
                 '<h2 class="text-xl font-bold '+C.text+' mb-4">📈 التقارير المالية</h2>'+
                 '<div class="grid grid-cols-2 md:grid-cols-3 gap-4 mb-6">'+
                 '<div class="'+C.card+' rounded-xl p-4 border '+C.border+' text-center"><p class="'+C.muted+' text-xs mb-1">إجمالي المستخدمين</p><p class="text-2xl font-bold text-primary">'+users.length+'</p></div>'+
-                '<div class="'+C.card+' rounded-xl p-4 border '+C.border+' text-center"><p class="'+C.muted+' text-xs mb-1">إجمالي أرصدة المستخدمين</p><p class="text-2xl font-bold text-success">'+fmtNum(totalBalance)+' <span class="text-sm">USDT</span></p></div>'+
+                '<div class="'+C.card+' rounded-xl p-4 border '+C.border+' text-center"><p class="'+C.muted+' text-xs mb-1">إجمالي أرصدة المستخدمين</p><p class="text-2xl font-bold text-success">'+fmtNum(totalBalance)+'</p><p class="'+C.muted+' text-xs opacity-60">USDT</p></div>'+
                 '<div class="'+C.card+' rounded-xl p-4 border '+C.border+' text-center"><p class="'+C.muted+' text-xs mb-1">المعادل YER</p><p class="text-2xl font-bold text-primary">'+fmtInt(Math.round(totalBalance*rate))+'</p></div>'+
-                '<div class="'+C.card+' rounded-xl p-4 border '+C.border+' text-center"><p class="'+C.muted+' text-xs mb-1">إجمالي الإيداعات (مقبولة)</p><p class="text-2xl font-bold text-success">'+fmtNum(totalDep)+' <span class="text-sm">USDT</span></p></div>'+
-                '<div class="'+C.card+' rounded-xl p-4 border '+C.border+' text-center"><p class="'+C.muted+' text-xs mb-1">إجمالي السحوبات (مقبولة)</p><p class="text-2xl font-bold text-danger">'+fmtNum(totalWd)+' <span class="text-sm">USDT</span></p></div>'+
+                '<div class="'+C.card+' rounded-xl p-4 border '+C.border+' text-center"><p class="'+C.muted+' text-xs mb-1">إجمالي الإيداعات (مقبولة)</p><p class="text-2xl font-bold text-success">'+fmtInt(totalDep)+'</p><p class="'+C.muted+' text-xs opacity-60">مجموع العملات</p></div>'+
+                '<div class="'+C.card+' rounded-xl p-4 border '+C.border+' text-center"><p class="'+C.muted+' text-xs mb-1">إجمالي السحوبات (مقبولة)</p><p class="text-2xl font-bold text-danger">'+fmtInt(totalWd)+'</p><p class="'+C.muted+' text-xs opacity-60">مجموع العملات</p></div>'+
                 '<div class="'+C.card+' rounded-xl p-4 border '+C.border+' text-center"><p class="'+C.muted+' text-xs mb-1">إجمالي الرسوم المحصلة</p><p class="text-2xl font-bold text-warning">'+fmtNum(totalFees)+' <span class="text-sm">USDT</span></p></div>'+
-                '<div class="'+C.card+' rounded-xl p-4 border '+C.border+' text-center"><p class="'+C.muted+' text-xs mb-1">إيداعات معلقة</p><p class="text-2xl font-bold text-warning">'+fmtNum(pendingDep)+' <span class="text-sm">USDT</span></p></div>'+
-                '<div class="'+C.card+' rounded-xl p-4 border '+C.border+' text-center"><p class="'+C.muted+' text-xs mb-1">سحوبات معلقة</p><p class="text-2xl font-bold text-warning">'+fmtNum(pendingWd)+' <span class="text-sm">USDT</span></p></div>'+
-                '<div class="'+C.card+' rounded-xl p-4 border '+C.border+' text-center"><p class="'+C.muted+' text-xs mb-1">صافي التدفق</p><p class="text-2xl font-bold '+(totalDep-totalWd>=0?'text-success':'text-danger')+'">'+fmtNum(totalDep-totalWd)+' <span class="text-sm">USDT</span></p></div></div></div>';
+                '<div class="'+C.card+' rounded-xl p-4 border '+C.border+' text-center"><p class="'+C.muted+' text-xs mb-1">إيداعات معلقة</p><p class="text-2xl font-bold text-warning">'+fmtInt(pendingDep)+'</p><p class="'+C.muted+' text-xs opacity-60">مجموع العملات</p></div>'+
+                '<div class="'+C.card+' rounded-xl p-4 border '+C.border+' text-center"><p class="'+C.muted+' text-xs mb-1">سحوبات معلقة</p><p class="text-2xl font-bold text-warning">'+fmtInt(pendingWd)+'</p><p class="'+C.muted+' text-xs opacity-60">مجموع العملات</p></div>'+
+                '<div class="'+C.card+' rounded-xl p-4 border '+C.border+' text-center"><p class="'+C.muted+' text-xs mb-1">صافي التدفق</p><p class="text-2xl font-bold '+(totalDep-totalWd>=0?'text-success':'text-danger')+'">'+fmtInt(totalDep-totalWd)+'</p><p class="'+C.muted+' text-xs opacity-60">مجموع العملات</p></div></div></div>';
         }
 
         // ==================== ADMIN: DB CONFIG (IMPROVED) ====================
