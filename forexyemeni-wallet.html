@@ -1283,6 +1283,7 @@
                 if(!user.merchantStatus) user.merchantStatus = 'NONE';
                 if(!user.localBalance) user.localBalance = 0;
                 if(!user.usdtBalance) user.usdtBalance = 0;
+                if(!user.kycStatus) user.kycStatus = 'NOT_SUBMITTED';
                 return user;
             }
         };
@@ -3373,16 +3374,16 @@
                 '<div class="'+C.card+' rounded-lg p-3 text-center border '+C.border+'"><p class="'+C.muted+' text-xs">رصيد USDT</p><p class="font-bold text-success">'+fmtNum(user.usdtBalance)+'</p></div>'+
                 '<div class="'+C.card+' rounded-lg p-3 text-center border '+C.border+'"><p class="'+C.muted+' text-xs">المعادل YER</p><p class="font-bold text-primary">'+fmtInt(Math.round(user.usdtBalance*rate))+'</p></div></div>'+
                 '<div class="space-y-4">'+
-                '<div><label class="block text-sm font-medium '+C.text+' mb-1">عملة السحب</label><select id="wd-currency" class="w-full px-4 py-2.5 rounded-xl border '+C.input+' outline-none" onchange="updateWdCalc()"><option value="USDT">USDT</option><option value="YER">🇾🇪 YER ريال يمني</option><option value="SAR">🇸🇦 SAR ريال سعودي</option></select></div>'+
+                '<div><label class="block text-sm font-medium '+C.text+' mb-1">عملة السحب</label><select id="wd-currency" class="w-full px-4 py-2.5 rounded-xl border '+C.input+' outline-none" onchange="updateWdCalc();setMaxWdAmount()"><option value="USDT">USDT</option><option value="YER">🇾🇪 YER ريال يمني</option><option value="SAR">🇸🇦 SAR ريال سعودي</option></select></div>'+
                 '<div><label class="block text-sm font-medium '+C.text+' mb-1">طريقة السحب</label><select id="wd-method" class="w-full px-4 py-2.5 rounded-xl border '+C.input+' outline-none" onchange="updateWdCalc()"><option value="">-- اختر طريقة سحب --</option>'+pmOpts+'</select></div>'+
                 '<div id="wd-merchant-section"></div>'+
                 '<div id="wd-method-details"></div>'+
                 '<div><label class="block text-sm font-medium '+C.text+' mb-1">المبلغ <span class="text-danger">*</span></label><input type="number" id="wd-amount" class="w-full px-4 py-2.5 rounded-xl border '+C.input+' outline-none" placeholder="أدخل المبلغ" min="1" step="0.01" oninput="updateWdCalc()"></div>'+
                 '<div class="flex gap-2">'+
-                '<button onclick="document.getElementById(\'wd-amount\').value=\''+user.usdtBalance+'\';updateWdCalc()" class="flex-1 px-3 py-2 rounded-xl border '+C.border+' '+C.text+' btn text-xs">100%</button>'+
-                '<button onclick="document.getElementById(\'wd-amount\').value=\''+(user.usdtBalance*0.75)+'\';updateWdCalc()" class="flex-1 px-3 py-2 rounded-xl border '+C.border+' '+C.text+' btn text-xs">75%</button>'+
-                '<button onclick="document.getElementById(\'wd-amount\').value=\''+(user.usdtBalance*0.5)+'\';updateWdCalc()" class="flex-1 px-3 py-2 rounded-xl border '+C.border+' '+C.text+' btn text-xs">50%</button>'+
-                '<button onclick="document.getElementById(\'wd-amount\').value=\''+(user.usdtBalance*0.25)+'\';updateWdCalc()" class="flex-1 px-3 py-2 rounded-xl border '+C.border+' '+C.text+' btn text-xs">25%</button></div>'+
+                '<button onclick="setMaxWdAmount()" class="flex-1 px-3 py-2 rounded-xl border '+C.border+' '+C.text+' btn text-xs">100%</button>'+
+                '<button onclick="setMaxWdPercent(75)" class="flex-1 px-3 py-2 rounded-xl border '+C.border+' '+C.text+' btn text-xs">75%</button>'+
+                '<button onclick="setMaxWdPercent(50)" class="flex-1 px-3 py-2 rounded-xl border '+C.border+' '+C.text+' btn text-xs">50%</button>'+
+                '<button onclick="setMaxWdPercent(25)" class="flex-1 px-3 py-2 rounded-xl border '+C.border+' '+C.text+' btn text-xs">25%</button></div>'+
                 '<div id="wd-calc" class="'+C.card+' rounded-xl p-4 border '+C.border+' space-y-2">'+
                 '<p class="'+C.muted+' text-sm">💰 المبلغ المطلوب: <span class="'+C.text+' font-bold">0.00 USDT</span></p>'+
                 '<p class="'+C.muted+' text-sm">📊 الرسوم ('+fee+'%): <span class="'+C.text+' font-bold">0.00 USDT</span></p>'+
@@ -3397,23 +3398,36 @@
             var calcEl = document.getElementById('wd-calc');
             if(!calcEl) return;
             var user = getUser();
-            var amount = parseFloat(document.getElementById('wd-amount').value) || 0;
+            var amountInput = parseFloat(document.getElementById('wd-amount').value) || 0;
             var fee = parseFloat(DB.getSetting('exchange_fee')) || 0;
             var rate = parseFloat(DB.getSetting('exchange_rate')) || 535;
             var rateSar = parseFloat(DB.getSetting('exchange_rate_sar')) || 137.50;
             var sarToUsdtRate = rate / rateSar;
             var curSel = document.getElementById('wd-currency') ? document.getElementById('wd-currency').value : 'USDT';
-            var feeAmount = amount * fee / 100;
-            var net = amount - feeAmount;
-            var equivText = '';
-            if(curSel === 'YER') equivText = fmtInt(Math.round(net * rate)) + ' YER';
-            else if(curSel === 'SAR') equivText = fmtNum(net * sarToUsdtRate,2) + ' SAR';
-            else equivText = fmtNum(net) + ' USDT';
+
+            // Convert entered amount to USDT for balance check
+            var usdtAmount = amountInput;
+            if(curSel === 'YER') usdtAmount = amountInput / rate;
+            else if(curSel === 'SAR') usdtAmount = amountInput * rateSar / rate;
+
+            var feeAmount = usdtAmount * fee / 100;
+            var netUsdt = usdtAmount - feeAmount;
+            var netLocal = amountInput - (amountInput * fee / 100);
+            var canAfford = usdtAmount <= user.usdtBalance;
+
             var C = getThemeColors();
-            calcEl.innerHTML = '<p class="'+C.muted+' text-sm">💰 المبلغ المطلوب: <span class="'+C.text+' font-bold">'+fmtNum(amount)+' USDT</span></p>'+
+            var currencyLabel = curSel === 'YER' ? 'YER' : (curSel === 'SAR' ? 'SAR' : 'USDT');
+            var equivText = '';
+            if(curSel === 'YER') equivText = fmtInt(Math.round(netUsdt * rate)) + ' YER';
+            else if(curSel === 'SAR') equivText = fmtNum(netUsdt * sarToUsdtRate,2) + ' SAR';
+            else equivText = fmtNum(netUsdt) + ' USDT';
+
+            calcEl.innerHTML = '<p class="'+C.muted+' text-sm">💰 المبلغ المطلوب: <span class="'+C.text+' font-bold">'+fmtNum(amountInput)+' '+currencyLabel+'</span></p>'+
+                '<p class="'+C.muted+' text-sm">📊 سيُخصم من رصيدك: <span class="'+C.text+' font-bold">'+fmtNum(usdtAmount)+' USDT</span></p>'+
                 '<p class="'+C.muted+' text-sm">📊 الرسوم ('+fee+'%): <span class="text-danger font-bold">'+fmtNum(feeAmount)+' USDT</span></p>'+
-                '<div class="border-t '+C.border+' pt-2"><p class="text-success font-bold text-lg">✅ الصافي الذي ستستلمه: '+fmtNum(net)+' USDT</p>'+
-                '<p class="'+C.muted+' text-xs mt-1">المعادل: '+equivText+'</p></div>';
+                '<div class="border-t '+C.border+' pt-2"><p class="font-bold text-lg '+(canAfford?'text-success':'text-danger')+'">'+(canAfford?'✅':'⚠️')+' الصافي الذي ستستلمه: '+fmtNum(netLocal)+' '+currencyLabel+'</p>'+
+                '<p class="'+C.muted+' text-xs mt-1">المعادل: '+fmtNum(netUsdt)+' USDT</p></div>'+
+                (!canAfford?'<p class="text-danger text-xs mt-1 font-bold">⚠️ رصيدك غير كافٍ! رصيدك: '+fmtNum(user.usdtBalance)+' USDT</p>':'');
             var methodId = document.getElementById('wd-method').value;
             var method = DB.get('userWithdrawalMethods').find(function(m){return m.id===methodId;});
             var detailsEl = document.getElementById('wd-method-details');
@@ -3423,6 +3437,31 @@
                 else info = '<p class="text-sm '+C.muted+'">العملة: <span class="'+C.text+'">'+escHtml(method.currencyName||'USDT')+'</span></p><p class="text-sm '+C.muted+'">الشبكة: <span class="'+C.text+'">'+escHtml(method.network||'')+'</span></p><p class="text-sm '+C.muted+'">العنوان: <span class="font-mono text-xs '+C.text+'">'+escHtml((method.address||'').substr(0,20))+'...</span></p>';
                 detailsEl.innerHTML = '<div class="'+C.card+' rounded-xl p-3 border '+C.border+'">'+info+'</div>';
             } else if(detailsEl) { detailsEl.innerHTML = ''; }
+        }
+
+        function setMaxWdAmount() {
+            var user = getUser();
+            var rate = parseFloat(DB.getSetting('exchange_rate')) || 535;
+            var rateSar = parseFloat(DB.getSetting('exchange_rate_sar')) || 137.50;
+            var curSel = document.getElementById('wd-currency') ? document.getElementById('wd-currency').value : 'USDT';
+            var maxAmount = user.usdtBalance;
+            if(curSel === 'YER') maxAmount = user.usdtBalance * rate;
+            else if(curSel === 'SAR') maxAmount = user.usdtBalance * rate / rateSar;
+            var inp = document.getElementById('wd-amount');
+            if(inp) { inp.value = Math.floor(maxAmount * 100) / 100; updateWdCalc(); }
+        }
+
+        function setMaxWdPercent(percent) {
+            var user = getUser();
+            var rate = parseFloat(DB.getSetting('exchange_rate')) || 535;
+            var rateSar = parseFloat(DB.getSetting('exchange_rate_sar')) || 137.50;
+            var curSel = document.getElementById('wd-currency') ? document.getElementById('wd-currency').value : 'USDT';
+            var usdtPart = user.usdtBalance * percent / 100;
+            var maxAmount = usdtPart;
+            if(curSel === 'YER') maxAmount = usdtPart * rate;
+            else if(curSel === 'SAR') maxAmount = usdtPart * rate / rateSar;
+            var inp = document.getElementById('wd-amount');
+            if(inp) { inp.value = Math.floor(maxAmount * 100) / 100; updateWdCalc(); }
         }
 
         function renderWdMerchantSection() {
@@ -3459,37 +3498,42 @@
         function submitWithdraw() {
             var user = getUser();
             var methodId = document.getElementById('wd-method').value;
-            var amount = parseFloat(document.getElementById('wd-amount').value);
+            var amountInput = parseFloat(document.getElementById('wd-amount').value);
             var notes = document.getElementById('wd-notes').value.trim();
             var fee = parseFloat(DB.getSetting('exchange_fee')) || 0;
+            var rate = parseFloat(DB.getSetting('exchange_rate')) || 535;
+            var rateSar = parseFloat(DB.getSetting('exchange_rate_sar')) || 137.50;
             // Get selected merchant
             var merchantSelect = document.getElementById('wd-merchant');
             var merchantId = merchantSelect ? merchantSelect.value : '';
             if(!methodId) { toast('اختر طريقة السحب','error'); return; }
-            if(!amount || amount <= 0) { toast('أدخل مبلغاً صحيحاً','error'); return; }
-            var feeAmount = amount * fee / 100;
-            var net = amount - feeAmount;
-            if(net <= 0) { toast('المبلغ بعد الرسوم صفر أو أقل','error'); return; }
-            if(amount > user.usdtBalance) { toast('رصيدك غير كافٍ','error'); return; }
+            if(!amountInput || amountInput <= 0) { toast('أدخل مبلغاً صحيحاً','error'); return; }
+
+            // Convert entered amount to USDT based on selected currency
+            var wdCurrency = document.getElementById('wd-currency') ? document.getElementById('wd-currency').value : 'USDT';
+            var usdtAmount = amountInput;
+            if(wdCurrency === 'YER') usdtAmount = amountInput / rate;
+            else if(wdCurrency === 'SAR') usdtAmount = amountInput * rateSar / rate;
+
+            var feeAmount = usdtAmount * fee / 100;
+            var netUsdt = usdtAmount - feeAmount;
+            if(netUsdt <= 0) { toast('المبلغ بعد الرسوم صفر أو أقل','error'); return; }
+            if(usdtAmount > user.usdtBalance) { toast('رصيدك غير كافٍ! رصيدك: '+fmtNum(user.usdtBalance)+' USDT والمطلوب: '+fmtNum(usdtAmount)+' USDT','error'); return; }
             var method = DB.get('userWithdrawalMethods').find(function(m){return m.id===methodId;});
             if(!method) { toast('طريقة السحب غير موجودة','error'); return; }
-            // Daily withdrawal limit check
+            // Daily withdrawal limit check (in USDT)
             var today = new Date().toISOString().split('T')[0];
             var userWds = DB.get('withdrawals').filter(function(w){return w.userId===user.id && w.status!=='REJECTED' && w.createdAt && w.createdAt.startsWith(today);});
             var totalWdToday = userWds.reduce(function(s,w){return s+(w.net||0);},0);
             var dailyWdLimit = parseFloat(DB.getSetting('daily_withdrawal_limit')) || 5000;
-            if(totalWdToday + net > dailyWdLimit) { toast('لقد تجاوزت الحد اليومي للسحب: '+fmtNum(dailyWdLimit)+' USDT','error'); return; }
+            if(totalWdToday + netUsdt > dailyWdLimit) { toast('لقد تجاوزت الحد اليومي للسحب: '+fmtNum(dailyWdLimit)+' USDT','error'); return; }
             var withdrawals = DB.get('withdrawals');
-            var wdCurrency = document.getElementById('wd-currency') ? document.getElementById('wd-currency').value : 'USDT';
-            var wdRate = parseFloat(DB.getSetting('exchange_rate')) || 535;
-            var wdSarCrossRate = parseFloat(DB.getSetting('exchange_rate_sar')) || 137.50;
-            var wdLocalAmount = net;
-            if(wdCurrency === 'YER') wdLocalAmount = Math.round(net * wdRate);
-            else if(wdCurrency === 'SAR') wdLocalAmount = parseFloat((net * wdRate / wdSarCrossRate).toFixed(2));
-            withdrawals.unshift({id:DB.uid(),userId:user.id,withdrawalMethodId:methodId,amount:amount,fee:feeAmount,net:net,currency:wdCurrency,localAmount:wdLocalAmount,notes:notes,status:'PENDING',assignedMerchantId:merchantId||null,createdAt:new Date().toISOString()});
+            var localAmount = amountInput - (amountInput * fee / 100);
+            if(wdCurrency === 'USDT') localAmount = netUsdt;
+            withdrawals.unshift({id:DB.uid(),userId:user.id,withdrawalMethodId:methodId,amount:usdtAmount,fee:feeAmount,net:netUsdt,currency:wdCurrency,localAmount:localAmount,notes:notes,status:'PENDING',assignedMerchantId:merchantId||null,createdAt:new Date().toISOString()});
             DB.set('withdrawals', withdrawals);
-            addLog(user.id,'WITHDRAW',net,'USDT','طلب سحب '+fmtNum(net)+' USDT'+(wdCurrency!=='USDT'?' ('+wdCurrency+')':'')+(merchantId?' - عبر تاجر':''));
-            addNotif(user.id,'طلب سحب','تم إرسال طلب سحب '+fmtNum(net)+' USDT بنجاح. سيتم مراجعته.','INFO');
+            addLog(user.id,'WITHDRAW',netUsdt,'USDT','طلب سحب '+fmtNum(localAmount)+' '+(wdCurrency)+' ('+fmtNum(netUsdt)+' USDT)'+(merchantId?' - عبر تاجر':''));
+            addNotif(user.id,'طلب سحب','تم إرسال طلب سحب '+fmtNum(localAmount)+' '+(wdCurrency)+' ('+fmtNum(netUsdt)+' USDT) بنجاح. سيتم مراجعته.','INFO');
             toast('تم إرسال طلب السحب'+(merchantId?' - تم تعيين التاجر':''),'success');
             setView('user-home');
         }
@@ -6735,6 +6779,14 @@
                         var newData = change.doc.data().data;
                         if(window.appData.hasOwnProperty(k)) {
                             window.appData[k] = newData;
+                        }
+                        // Re-render when user data changes (e.g. KYC approval) so checks update live
+                        if(k === 'users' && state.user && state.user.id) {
+                            var updatedUser = newData.find(function(u){return u.id === state.user.id;});
+                            if(updatedUser && updatedUser.kycStatus !== (window.appData._lastKycStatus)) {
+                                window.appData._lastKycStatus = updatedUser.kycStatus;
+                                setTimeout(function(){ render(); }, 300);
+                            }
                         }
                         // Check for new messages → play sound for recipient
                         if(k === 'messages' && oldData && newData) {
