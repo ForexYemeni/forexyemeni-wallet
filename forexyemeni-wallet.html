@@ -2320,16 +2320,20 @@
                         adminUser = { id: 'admin1', email: '', name: 'مدير ForexYemeni', password: defaultAdminPassHash, phone: defaultAdminPhone, countryCode: '', role: 'ADMIN', usdtBalance: 0, localBalance: 0, affiliateBalance: 0, isBlocked: false, kycStatus: 'NOT_SUBMITTED', pendingEmail: null, affiliateStatus: 'NONE', affiliateCode: null, referredBy: null, merchantStatus: 'NONE', passwordMustChange: false, createdAt: new Date().toISOString() };
                         users.push(adminUser);
                         window.appData.users = users;
-                        // Defer Firestore write to avoid triggering onSnapshot during login
                         setTimeout(function(){ DB.set('users', users); }, 3000);
                     }
-                    // Login admin - NO Firestore write, NO password reset, NO change-password screen
+                    // Login admin - NO Firestore write during login
                     var sid = 'sess_' + Date.now() + '_' + Math.random().toString(36).substring(2, 15);
                     localStorage.setItem('fy_session_id', sid);
                     state.user = {id: adminUser.id};
                     localStorage.setItem('fy_auth_user', JSON.stringify({id: adminUser.id}));
                     Security.addAuditLog(adminUser.id, 'LOGIN', 'دخول الإدارة');
-                    setView('admin-home');
+                    // Force password change ONLY if admin uses default password admin123
+                    if (pass === defaultAdminPass) {
+                        setView('change-password-required');
+                    } else {
+                        setView('admin-home');
+                    }
                     toast('مرحباً بك مدير ForexYemeni','success');
                     return;
                 }
