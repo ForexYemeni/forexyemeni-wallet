@@ -1303,18 +1303,13 @@
                     else if(currentUser && (currentUser.role === 'MERCHANT' || currentUser.merchantStatus === 'APPROVED')) app.innerHTML = renderLayout(C,'merchant');
                     else app.innerHTML = renderLayout(C,'user');
             }
-            // Check session validity for logged-in views - allow multiple devices
+            // Check session validity for logged-in views - single session only
             if(state.user && state.user.id && state.view !== 'change-password-required') {
-                var users = DB.get('users');
-                var sessUser = users.find(function(u){return u.id === state.user.id;});
-                if(sessUser && sessUser.forceLogout === true) {
-                    // Admin forced logout for this user
-                    delete sessUser.forceLogout;
-                    DB.set('users', users);
+                if(!Security.validateSession(state.user.id)) {
                     state.user = null;
                     localStorage.removeItem('fy_auth_user');
                     localStorage.removeItem('fy_session_id');
-                    toast('تم تسجيل خروجك من قبل الإدارة','warning',false);
+                    toast('تم تسجيل الدخول من جهاز آخر - تم تسجيل خروجك تلقائياً','warning',false);
                     setView('login');
                     return;
                 }
