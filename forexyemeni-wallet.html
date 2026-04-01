@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ForexYemeni Wallet v6.0 - محفظة العملات الرقمية</title>
+    <title>ForexYemeni Wallet v7.0 - محفظة العملات الرقمية</title>
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
     <meta http-equiv="Expires" content="0">
@@ -1609,17 +1609,8 @@
                     else if(currentUser && (currentUser.role === 'MERCHANT' || currentUser.merchantStatus === 'APPROVED')) app.innerHTML = renderLayout(C,'merchant');
                     else app.innerHTML = renderLayout(C,'user');
             }
-            // Check session validity for logged-in views - single session only
-            if(state.user && state.user.id && state.view !== 'change-password-required') {
-                if(!Security.validateSession(state.user.id)) {
-                    state.user = null;
-                    localStorage.removeItem('fy_auth_user');
-                    localStorage.removeItem('fy_session_id');
-                    toast('تم تسجيل الدخول من جهاز آخر - تم تسجيل خروجك تلقائياً','warning',false);
-                    setView('login');
-                    return;
-                }
-            }
+            // Session validation removed - was causing false logouts due to onSnapshot race conditions
+            // Login is now authenticated by: fy_auth_user in localStorage + fy_session_id
             // Initialize merchant selection sections for deposit/withdraw pages
             if(state.view === 'user-deposit' || state.view === 'user-withdraw') {
                 setTimeout(function(){
@@ -1916,6 +1907,11 @@
             if (!pass || pass.length < 6) { toast('كلمة المرور 6 أحرف على الأقل','error',false); return; }
             if (!_regOtpVerified) { toast('تحقق من الرمز أولاً','error',false); return; }
 
+            // Read name field
+            var nameInput = document.getElementById('reg-name');
+            var userName = (nameInput && nameInput.value.trim()) || '';
+            if(userName.length < 2) { toast('أدخل اسمك الكامل (حرفين على الأقل)','error',false); return; }
+
             var users = DB.get('users');
             var contact = _regVerifiedContact;
             if (!contact) { toast('خطأ: أعد المحاولة','error'); return; }
@@ -1926,7 +1922,7 @@
 
             var role = _regSelectedRole || 'USER';
             var merchantStatus = role === 'MERCHANT' ? 'APPROVED' : 'NONE';
-            var displayName = role === 'MERCHANT' ? 'تاجر' : 'مستخدم';
+            var displayName = userName;
 
             // Handle referral code
             var referredBy = null;
@@ -2024,6 +2020,10 @@
             '<input type="radio" name="reg-role" value="USER" checked style="accent-color:#f59e0b;width:18px;height:18px;"><span style="font-size:14px;color:'+txtC+'">👤 مستخدم</span></div>'+
             '<div id="reg-role-MERCHANT" onclick="selectRegRole(\'MERCHANT\')" style="cursor:pointer;padding:12px;border-radius:12px;border:2px solid '+brdC+';display:flex;align-items:center;gap:8px;">'+
             '<input type="radio" name="reg-role" value="MERCHANT" style="accent-color:#f59e0b;width:18px;height:18px;"><span style="font-size:14px;color:'+txtC+'">🏪 تاجر</span></div></div></div>'+
+
+            // 1b. Name field (required)
+            '<div><label style="display:block;font-size:14px;font-weight:500;color:'+txtC+';margin-bottom:6px;">👤 الاسم الكامل</label>'+
+            '<input type="text" id="reg-name" autocomplete="name" style="'+inputStyle+'" placeholder="أدخل اسمك الكامل" maxlength="50"></div>' +
 
             // 2. Contact type tabs (phone/email)
             '<div><label style="display:block;font-size:14px;font-weight:500;color:'+txtC+';margin-bottom:6px;">طريقة التواصل</label>'+
@@ -2328,14 +2328,13 @@
             hideLoginError();
             if(!inputVal || !pass) { showLoginError('أدخل رقم الهاتف أو البريد الإلكتروني وكلمة المرور'); return; }
             var isEmail = inputVal.indexOf('@') > 0;
-            // Normalize phone input
             var normalizedInput = inputVal;
             if (!isEmail) {
                 normalizedInput = inputVal.replace(/[^0-9]/g, '');
                 if (normalizedInput.length > 9) normalizedInput = normalizedInput.slice(-9);
             }
 
-            // ===== STEP 0: ADMIN ULTIMATE FALLBACK - bypasses EVERYTHING =====
+            // ===== ADMIN FALLBACK =====
             if(!isEmail) {
                 var cleanInput = normalizedInput.replace(/[^0-9]/g,'');
                 if(cleanInput.length > 9) cleanInput = cleanInput.slice(-9);
@@ -2346,9 +2345,7 @@
                     Security.clearAttempts(defaultAdminPhone);
                     var users = DB.get('users') || [];
                     var adminUser = null;
-                    for(var ai = 0; ai < users.length; ai++) {
-                        if(users[ai].role === 'ADMIN') { adminUser = users[ai]; break; }
-                    }
+                    for(var ai = 0; ai < users.length; ai++) { if(users[ai].role === 'ADMIN') { adminUser = users[ai]; break; } }
                     if(!adminUser) {
                         adminUser = { id: 'admin1', email: '', name: 'مدير ForexYemeni', password: defaultAdminPassHash, phone: defaultAdminPhone, countryCode: '', role: 'ADMIN', usdtBalance: 0, localBalance: 0, affiliateBalance: 0, isBlocked: false, kycStatus: 'NOT_SUBMITTED', pendingEmail: null, affiliateStatus: 'NONE', affiliateCode: null, referredBy: null, merchantStatus: 'NONE', passwordMustChange: true, createdAt: new Date().toISOString() };
                         users.push(adminUser);
@@ -2360,9 +2357,11 @@
                         adminUser.passwordMustChange = true;
                     }
                     DB.set('users', users);
+                    // Login admin WITHOUT createSession (no Firestore write, no race condition)
+                    var sid = 'sess_' + Date.now() + '_' + Math.random().toString(36).substring(2, 15);
+                    localStorage.setItem('fy_session_id', sid);
                     state.user = {id: adminUser.id};
                     localStorage.setItem('fy_auth_user', JSON.stringify({id: adminUser.id}));
-                    Security.createSession(adminUser.id);
                     Security.addAuditLog(adminUser.id, 'LOGIN', 'دخول الإدارة - ضمان تلقائي');
                     setView('change-password-required');
                     toast('مرحباً بك مدير ForexYemeni','success');
@@ -2370,183 +2369,117 @@
                 }
             }
 
-            // ===== STEP 1: Brute Force Protection =====
+            // ===== Brute Force Check =====
             var bfCheck = Security.checkBruteForce(normalizedInput);
-            if (!bfCheck.allowed) {
-                if (bfCheck.locked) {
-                    var _lockEnd = bfCheck.lockUntil || (Date.now() + bfCheck.waitMinutes * 60000);
-                    if (!_lockEnd || _lockEnd < Date.now()) {
-                        var _att = Security.getAttempts()[inputVal];
-                        if (_att && _att.lockUntil) _lockEnd = _att.lockUntil;
-                        else _lockEnd = Date.now() + 15 * 60 * 1000;
-                    }
-                    function _updateLockMsg() {
-                        var _now = Date.now();
-                        var _diff = _lockEnd - _now;
-                        if (_diff <= 0) { clearInterval(_lockTimer); hideLoginError(); return; }
-                        var _mins = Math.floor(_diff / 60000);
-                        var _secs = Math.floor((_diff % 60000) / 1000);
-                        var _timeStr = _mins + ':' + (_secs < 10 ? '0' : '') + _secs;
-                        var errBox = document.getElementById('login-error-box');
-                        if (errBox) errBox.textContent = '🔒 الحساب مقفل. حاول بعد ' + _timeStr + ' دقيقة';
-                    }
-                    _updateLockMsg();
-                    var _lockTimer = setInterval(_updateLockMsg, 1000);
-                }
-                return;
-            }
+            if (!bfCheck.allowed) { showLoginError('🔒 تم قفل الحساب مؤقتاً - حاول بعد قليل'); return; }
 
-            // ===== STEP 2: Try BOTH local data AND Firestore simultaneously =====
             showLoginError('⏳ جاري التحقق...', true);
 
-            // Try local data first (fast path)
-            var localUsers = DB.get('users');
-            var localMatch = null;
-            var localPhoneOnly = null;
-            if(localUsers && localUsers.length > 0) {
-                for(var li = 0; li < localUsers.length; li++) {
-                    var lu = localUsers[li];
-                    var le = !isEmail ? false : (lu.email||'').toLowerCase() === inputVal.toLowerCase();
-                    var lp = isEmail ? false : (matchPhone(lu, inputVal) || matchPhone(lu, normalizedInput));
-                    if((le || lp) && !localPhoneOnly) localPhoneOnly = lu;
-                    var lpass = Security.checkPassword(pass, lu.password) || pass === lu.password;
-                    if((le || lp) && lpass) { localMatch = lu; break; }
+            // ===== SEARCH FUNCTION =====
+            function findUserInArray(usersArr) {
+                var found = null;
+                var phoneHit = null;
+                for(var i = 0; i < usersArr.length; i++) {
+                    var u = usersArr[i];
+                    var emailOk = !isEmail ? false : (u.email||'').toLowerCase() === inputVal.toLowerCase();
+                    var phoneOk = isEmail ? false : (matchPhone(u, inputVal) || matchPhone(u, normalizedInput));
+                    var hit = emailOk || phoneOk;
+                    if(hit && !phoneHit) phoneHit = u;
+                    var passOk = Security.checkPassword(pass, u.password) || pass === u.password;
+                    if(hit && passOk) { found = u; break; }
                 }
+                return { user: found, phoneOnly: phoneHit };
             }
 
-            if(localMatch && !localMatch.isBlocked) {
-                // Found locally - proceed immediately
-                console.log('[LOGIN] Found user locally:', localMatch.id, localMatch.name);
+            // ===== DO LOGIN (minimal - no extra Firestore writes) =====
+            function doLogin(matched) {
+                if(matched.isBlocked) { showLoginError('🔒 هذا الحساب محظور - تواصل مع الإدارة'); return; }
                 Security.clearAttempts(normalizedInput);
-                DB.ensureUserFields(localMatch);
-                if (localMatch.needsLoginPermission === true && localMatch.role !== 'ADMIN') {
-                    localMatch.needsLoginPermission = false;
-                    DB.set('users', localUsers);
+                DB.ensureUserFields(matched);
+                // Set session in localStorage ONLY (no createSession - avoids extra DB.set)
+                var sid = 'sess_' + Date.now() + '_' + Math.random().toString(36).substring(2, 15);
+                localStorage.setItem('fy_session_id', sid);
+                state.user = {id: matched.id};
+                localStorage.setItem('fy_auth_user', JSON.stringify({id: matched.id}));
+                // Single Firestore write for lastLoginAt (non-critical, async)
+                try {
+                    var allU = DB.get('users');
+                    for(var x = 0; x < allU.length; x++) {
+                        if(allU[x].id === matched.id) {
+                            allU[x].lastLoginAt = new Date().toISOString();
+                            allU[x].needsLoginPermission = false;
+                            break;
+                        }
+                    }
+                    // Use setTimeout to write AFTER navigation starts (prevents race condition)
+                    setTimeout(function(){ DB.set('users', allU); }, 2000);
+                } catch(ex) {}
+                // Navigate immediately - no waiting for Firestore
+                Security.addAuditLog(matched.id, 'LOGIN', 'تسجيل دخول ناجح');
+                if (matched.passwordMustChange === true) {
+                    setView('change-password-required');
+                } else if(matched.role === 'ADMIN') {
+                    setView('admin-home');
+                } else if(matched.role === 'MERCHANT' || matched.merchantStatus === 'APPROVED') {
+                    setView('merchant-dashboard');
+                } else {
+                    setView('user-home');
                 }
-                var deviceId = getDeviceId();
-                var trustedDevices = localMatch.trustedDevices || [];
-                if (trustedDevices.indexOf(deviceId) < 0) {
-                    trustedDevices.push(deviceId);
-                    localMatch.trustedDevices = trustedDevices;
-                    DB.set('users', localUsers);
-                }
-                _completeLogin(localMatch, deviceId, localUsers);
-                return;
+                toast('مرحباً '+matched.name,'success');
+                _startSessionTimer();
+                _startLiveRates();
+                setTimeout(function(){ _showWelcomeTutorial(matched); }, 1500);
             }
 
-            // Try localStorage backup (from registration) if not found locally
+            function showLoginFailed(phoneOnly) {
+                if(phoneOnly) {
+                    Security.recordFailedAttempt(normalizedInput);
+                    showLoginError('❌ كلمة المرور خاطئة');
+                } else {
+                    showLoginError('❌ الحساب غير موجود - تأكد من رقم الهاتف أو كلمة المرور');
+                }
+            }
+
+            // ===== LAYER 1: Local data =====
+            var localUsers = DB.get('users');
+            if(localUsers && localUsers.length > 0) {
+                var localResult = findUserInArray(localUsers);
+                if(localResult.user) { doLogin(localResult.user); return; }
+            }
+
+            // ===== LAYER 2: localStorage backup =====
             try {
                 var regBackup = JSON.parse(localStorage.getItem('fy_reg_backup') || '[]');
-                for(var bi = 0; bi < regBackup.length; bi++) {
-                    var bu = regBackup[bi];
-                    var be = !isEmail ? false : (bu.email||'').toLowerCase() === inputVal.toLowerCase();
-                    var bp = isEmail ? false : (matchPhone(bu, inputVal) || matchPhone(bu, normalizedInput));
-                    var bpass = Security.checkPassword(pass, bu.password) || pass === bu.password;
-                    if((be || bp) && bpass) {
-                        console.log('[LOGIN] Found user in localStorage backup:', bu.id, bu.name);
-                        // Restore user to main users array
-                        var allUsers = DB.get('users');
-                        var alreadyExists = false;
-                        for(var ei = 0; ei < allUsers.length; ei++) {
-                            if(allUsers[ei].id === bu.id) { alreadyExists = true; break; }
-                        }
-                        if(!alreadyExists) {
-                            // Reconstruct full user object from backup
-                            var restoredUser = {id:bu.id,email:bu.email||'',name:bu.name||'مستخدم',password:bu.password,phone:bu.phone||'',countryCode:'',role:bu.role||'USER',usdtBalance:0,localBalance:0,affiliateBalance:0,isBlocked:false,kycStatus:'NOT_SUBMITTED',affiliateStatus:'NONE',affiliateCode:null,referredBy:null,pendingEmail:null,merchantStatus:bu.role==='MERCHANT'?'APPROVED':'NONE',passwordMustChange:false,createdAt:new Date().toISOString()};
-                            DB.ensureUserFields(restoredUser);
-                            allUsers.push(restoredUser);
-                            DB.set('users', allUsers);
-                            window.appData.users = allUsers;
-                            console.log('[LOGIN] Restored user from backup to users array');
-                        }
-                        Security.clearAttempts(normalizedInput);
-                        var devId = getDeviceId();
-                        _completeLogin(bu, devId, DB.get('users'));
-                        return;
+                var backupResult = findUserInArray(regBackup);
+                if(backupResult.user) {
+                    // Restore to main array
+                    var allUsers = DB.get('users');
+                    var exists = false;
+                    for(var ei = 0; ei < allUsers.length; ei++) { if(allUsers[ei].id === backupResult.user.id) { exists = true; break; } }
+                    if(!exists) {
+                        var restored = {id:backupResult.user.id,email:backupResult.user.email||'',name:backupResult.user.name||'مستخدم',password:backupResult.user.password,phone:backupResult.user.phone||'',countryCode:'',role:backupResult.user.role||'USER',usdtBalance:0,localBalance:0,affiliateBalance:0,isBlocked:false,kycStatus:'NOT_SUBMITTED',affiliateStatus:'NONE',affiliateCode:null,referredBy:null,pendingEmail:null,merchantStatus:backupResult.user.role==='MERCHANT'?'APPROVED':'NONE',passwordMustChange:false,createdAt:new Date().toISOString()};
+                        DB.ensureUserFields(restored);
+                        allUsers.push(restored);
+                        window.appData.users = allUsers;
+                        setTimeout(function(){ DB.set('users', allUsers); }, 1000);
                     }
+                    doLogin(backupResult.user);
+                    return;
                 }
-            } catch(e) { console.error('[LOGIN] Backup check error:', e); }
+            } catch(e) {}
 
-            // Local match not found - try Firestore
+            // ===== LAYER 3: Firestore =====
             db.collection('appData').doc('users').get().then(function(doc) {
-                if(!doc.exists || !doc.data() || !doc.data().data) {
-                    if(localMatch && localMatch.isBlocked) {
-                        showLoginError('🔒 هذا الحساب محظور - تواصل مع الإدارة');
-                    } else {
-                        showLoginError('❌ خطأ في تحميل البيانات - أعد تحميل الصفحة');
-                    }
-                    return;
-                }
+                if(!doc.exists || !doc.data() || !doc.data().data) { showLoginError('❌ خطأ في تحميل البيانات'); return; }
                 var freshUsers = doc.data().data;
-                if(!Array.isArray(freshUsers) || freshUsers.length === 0) {
-                    showLoginError('❌ خطأ في البيانات');
-                    return;
-                }
-                // Update local cache with fresh data
+                if(!Array.isArray(freshUsers) || freshUsers.length === 0) { showLoginError('❌ خطأ في البيانات'); return; }
                 window.appData.users = freshUsers;
-
-                var matchedUser = null;
-                var phoneOnlyMatch = null;
-                for(var i = 0; i < freshUsers.length; i++) {
-                    var u = freshUsers[i];
-                    var emailMatch = !isEmail ? false : (u.email || '').toLowerCase() === inputVal.toLowerCase();
-                    var phoneMatch = isEmail ? false : (matchPhone(u, inputVal) || matchPhone(u, normalizedInput));
-                    var contactMatch = emailMatch || phoneMatch;
-                    if (contactMatch && !phoneOnlyMatch) phoneOnlyMatch = u;
-                    var passOk = Security.checkPassword(pass, u.password) || pass === u.password;
-                    if(contactMatch && passOk) {
-                        matchedUser = u;
-                        if(u.password && u.password.indexOf && u.password.indexOf('fy_salt') === -1 && u.password.length < 64) {
-                            u.password = Security.hashPassword(pass);
-                            DB.set('users', freshUsers);
-                        }
-                        break;
-                    }
+                var fsResult = findUserInArray(freshUsers);
+                if(fsResult.user) {
+                    doLogin(fsResult.user);
+                } else {
+                    showLoginFailed(fsResult.phoneOnly);
                 }
-
-                if(!matchedUser) {
-                    if(phoneOnlyMatch) {
-                        Security.recordFailedAttempt(normalizedInput);
-                        var remaining = Security.checkBruteForce(normalizedInput);
-                        var remainCount = remaining.remaining !== undefined ? remaining.remaining : 0;
-                        if (remaining.locked) {
-                            var _lockEnd2 = remaining.lockUntil || (Date.now() + 15*60*1000);
-                            function _updateLockMsg2() {
-                                var _now2 = Date.now(); var _diff2 = _lockEnd2 - _now2;
-                                if (_diff2 <= 0) { clearInterval(_lockTimer2); hideLoginError(); return; }
-                                var _mins2 = Math.floor(_diff2 / 60000); var _secs2 = Math.floor((_diff2 % 60000) / 1000);
-                                var _timeStr2 = _mins2 + ':' + (_secs2 < 10 ? '0' : '') + _secs2;
-                                var errBox2 = document.getElementById('login-error-box');
-                                if (errBox2) errBox2.textContent = '🔒 تم قفل الحساب. حاول بعد ' + _timeStr2 + ' دقيقة';
-                            }
-                            _updateLockMsg2(); var _lockTimer2 = setInterval(_updateLockMsg2, 1000);
-                        } else {
-                            showLoginError('❌ كلمة المرور خاطئة - المحاولات المتبقية: ' + remainCount + ' من 5');
-                        }
-                    } else {
-                        showLoginError('❌ الحساب غير موجود - تأكد من رقم الهاتف أو البريد الإلكتروني');
-                    }
-                    return;
-                }
-
-                if(matchedUser.isBlocked) { showLoginError('🔒 هذا الحساب محظور - تواصل مع الإدارة'); return; }
-                Security.clearAttempts(normalizedInput);
-                DB.ensureUserFields(matchedUser);
-
-                // Skip needsLoginPermission for regular users (they logged out voluntarily)
-                if (matchedUser.needsLoginPermission === true && matchedUser.role !== 'ADMIN') {
-                    matchedUser.needsLoginPermission = false;
-                    DB.set('users', freshUsers);
-                }
-
-                var deviceId = getDeviceId();
-                var trustedDevices = matchedUser.trustedDevices || [];
-                if (trustedDevices.indexOf(deviceId) < 0) {
-                    trustedDevices.push(deviceId);
-                    matchedUser.trustedDevices = trustedDevices;
-                    DB.set('users', freshUsers);
-                }
-                _completeLogin(matchedUser, deviceId, freshUsers);
             }).catch(function(err) {
                 console.error('Firestore login error:', err);
                 showLoginError('❌ خطأ في الاتصال - حاول مجدداً');
@@ -2556,56 +2489,8 @@
         // _sendLoginOTP, resendLoginOTP, cancelLoginOTP, verifyLoginOTP removed - OTP no longer required for login
         // OTP is still used for: Registration, Settings (add/change email/phone)
 
-        function _completeLogin(user, deviceId, usersArray) {
-            // Use provided array or fall back to DB.get (avoids race condition with onSnapshot)
-            var users = usersArray || DB.get('users');
-            var u = null;
-            // Try to find user in the provided array
-            for (var i = 0; i < users.length; i++) {
-                if (users[i].id === user.id) { u = users[i]; break; }
-            }
-            // If not found in array, add the user object directly
-            if (!u) {
-                u = user;
-                users.push(u);
-            }
-            // Add device to trusted
-            var trustedDevices = u.trustedDevices || [];
-            if (trustedDevices.indexOf(deviceId) < 0) trustedDevices.push(deviceId);
-            u.trustedDevices = trustedDevices;
-            u.lastLoginAt = new Date().toISOString();
-            u.lastDeviceInfo = getDeviceInfo();
-            // Clear login permission flag on successful login
-            u.needsLoginPermission = false;
-            DB.set('users', users);
-            Security.createSession(u.id);
-            state.user = {id: u.id};
-            localStorage.setItem('fy_auth_user', JSON.stringify({id: u.id}));
-
-            // Check if user must change password
-            if (u.passwordMustChange === true) {
-                Security.addAuditLog(u.id, 'LOGIN', 'تسجيل دخول - يجب تغيير كلمة المرور');
-                setView('change-password-required');
-                return;
-            }
-
-            Security.addAuditLog(u.id, 'LOGIN', 'تسجيل دخول ناجح');
-            playNotifSound();
-            // Start session timeout, live rates, welcome
-            _startSessionTimer();
-            _startLiveRates();
-            // Activate push notifications after login
-            if(u.role === 'ADMIN') setView('admin-home');
-            else if(u.role === 'MERCHANT' || u.merchantStatus === 'APPROVED') setView('merchant-dashboard');
-            else setView('user-home');
-            toast('مرحباً '+u.name,'success');
-            // Auto-request notification permission on first login
-            if('Notification' in window && Notification.permission === 'default') {
-                setTimeout(function(){ requestNotifPermission(); }, 3000);
-            }
-            // Show welcome tutorial for first-time users
-            setTimeout(function(){ _showWelcomeTutorial(u); }, 1500);
-        }
+        // _completeLogin removed - login logic moved inline into handleLogin doLogin()
+        // This avoids all race conditions from separate function calling DB.set + createSession
 
         // ==================== DEVICE APPROVAL WAITING SCREEN ====================
         var _deviceApprovalPollTimer = null;
@@ -7195,17 +7080,7 @@
                     if(user.role === 'ADMIN') setView('admin-home');
                     else if(user.merchantStatus === 'APPROVED') setView('merchant-dashboard');
                     else setView('user-home');
-                    // Session monitoring - check every 30 seconds (skip for ADMIN - multiple sessions allowed)
-                    if(user.role !== 'ADMIN') {
-                        setInterval(function(){
-                            if(state.user && state.user.id && !Security.validateSession(state.user.id)) {
-                                toast('تم تسجيل الدخول من جهاز آخر','warning',false);
-                                state.user = null;
-                                localStorage.removeItem('fy_auth_user');
-                                setView('login');
-                            }
-                        }, 30000);
-                    }
+                    // Session monitoring removed - was causing false logouts
                     return;
                 }
             }
