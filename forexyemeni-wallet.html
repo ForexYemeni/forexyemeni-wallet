@@ -1564,7 +1564,15 @@
             };
             switch(state.view) {
                 case 'login': app.innerHTML = renderLogin(C); break;
-                case 'register': app.innerHTML = renderRegister(C); setTimeout(function(){ if(typeof updateRegPhoneLength === 'function') updateRegPhoneLength(); },50); break;
+                case 'register':
+                    try {
+                        app.innerHTML = renderRegister(C);
+                        setTimeout(function(){ if(typeof updateRegPhoneLength === 'function') updateRegPhoneLength(); },50);
+                    } catch(regErr) {
+                        console.error('[Register Render Error]', regErr);
+                        app.innerHTML = '<div class="min-h-screen gradient-bg flex items-center justify-center p-4"><div class="glass rounded-2xl p-8 text-center"><p class="text-danger text-lg mb-4">حدث خطأ في تحميل صفحة التسجيل</p><button onclick="setView(\'login\')" class="btn bg-gradient-to-l from-amber-500 to-yellow-400 text-gray-900 font-bold px-8 py-3 rounded-xl">العودة لتسجيل الدخول</button></div></div>';
+                    }
+                    break;
                 case 'change-password-required': app.innerHTML = renderChangePasswordRequired(C); break;
                 case 'loading': app.innerHTML = renderLoading(C); break;
                 default:
@@ -1656,8 +1664,8 @@
             '<input type="password" id="login-pass" required class="w-full pr-10 pl-4 py-3.5 rounded-xl border '+C.input+' outline-none" placeholder="••••••••"></div></div>'+
             '<button type="submit" class="'+C.btn+' w-full py-3.5 rounded-xl text-lg">تسجيل الدخول</button></form></div>'+
 
-            '<p class="text-center '+C.muted+' mt-4">ليس لديك حساب؟ <a onclick="setView(\'register\')" class="text-primary cursor-pointer font-bold hover:underline">إنشاء حساب جديد</a></p>'+
-            '<div class="mt-4 flex justify-end"><button onclick="setTheme(state.theme===\'dark\'?\'light\':\'dark\')" class="p-2.5 rounded-xl '+C.btnOutline+' text-lg">'+(state.theme==='dark'?'☀️':'🌙')+'</button></div>'+
+            '<button type="button" onclick="setView(\'register\')" class="w-full py-3.5 rounded-xl font-bold text-lg btn border-2 border-dashed border-primary/40 text-primary hover:bg-primary/10 transition-all mb-2">✨ إنشاء حساب جديد</button>'+
+            '<div class="flex justify-between items-center"><span class="text-xs '+C.muted+'">ForexYemeni Wallet v5.0</span><button onclick="setTheme(state.theme===\'dark\'?\'light\':\'dark\')" class="p-2.5 rounded-xl '+C.btnOutline+' text-lg">'+(state.theme==='dark'?'☀️':'🌙')+'</button></div>'+
             '</div></div>'+
             (adminPhone || adminWA ? '<div class="fixed bottom-6 left-6 z-50 flex flex-col items-center gap-3">'+
             '<div id="contact-fab-icons" class="hidden flex-col items-center gap-3">'+
@@ -6884,6 +6892,19 @@
                                 }
                             }
                         }
+                        // Check for new device approval requests → show real-time popup
+                        if(k === 'deviceApprovals' && oldData && newData && state.user && state.user.id) {
+                            var oldLenD = Array.isArray(oldData) ? oldData.length : 0;
+                            var newLenD = Array.isArray(newData) ? newData.length : 0;
+                            if (newLenD > oldLenD) {
+                                for (var di = oldLenD; di < newLenD; di++) {
+                                    var dReq = newData[di];
+                                    if (dReq && dReq.status === 'PENDING' && dReq.userId === state.user.id) {
+                                        _showDeviceApprovalPopup(dReq);
+                                    }
+                                }
+                            }
+                        }
                         if(_initDone) render();
                     }
                 });
@@ -6891,6 +6912,109 @@
         }
 
         initData();
+
+        // ==================== REAL-TIME DEVICE APPROVAL POPUP ====================
+        var _deviceApprovalPopupShown = {}; // Track shown request IDs to avoid duplicates
+
+        function _startDeviceApprovalWatcher() {
+            // Also poll every 5 seconds as backup for missed onSnapshot events
+            setInterval(function() {
+                if (!state.user || !state.user.id) return;
+                var approvals = DB.get('deviceApprovals') || [];
+                var myPending = approvals.filter(function(a){
+                    return a.status === 'PENDING' && a.userId === state.user.id && !_deviceApprovalPopupShown[a.id];
+                });
+                myPending.forEach(function(req) {
+                    _showDeviceApprovalPopup(req);
+                });
+            }, 5000);
+        }
+
+        function _showDeviceApprovalPopup(req) {
+            if (_deviceApprovalPopupShown[req.id]) return;
+            _deviceApprovalPopupShown[req.id] = true;
+
+            // Play notification sound and vibrate
+            playNotifSound();
+            try { if (navigator.vibrate) navigator.vibrate([300, 200, 300, 200, 300]); } catch(e) {}
+
+            var isDark = state.theme === 'dark';
+            var overlay = document.createElement('div');
+            overlay.id = 'device-approval-popup';
+            overlay.className = 'fixed inset-0 z-[9999] flex items-center justify-center p-4';
+            overlay.style.background = 'rgba(0,0,0,0.7)';
+            overlay.style.backdropFilter = 'blur(8px)';
+
+            overlay.innerHTML = '<div class="w-full max-w-sm fade-in">'+
+                '<div class="'+(isDark?'bg-gray-900 border-gray-700':'bg-white border-gray-200')+' border rounded-2xl shadow-2xl p-6 text-center">'+
+                '<div class="w-20 h-20 mx-auto mb-4 rounded-full bg-gradient-to-br from-orange-500 to-red-500 flex items-center justify-center shadow-lg" style="animation: pulse 1s infinite">'+
+                '<span class="text-4xl">📱</span></div>'+
+                '<h2 class="text-xl font-bold '+(isDark?'text-white':'text-gray-800')+' mb-2">تنبيه أمان!</h2>'+
+                '<p class="'+(isDark?'text-gray-300':'text-gray-600')+' text-sm mb-1">يوجد محاولة تسجيل دخول إلى حسابك من جهاز آخر</p>'+
+                '<div class="p-3 rounded-xl '+(isDark?'bg-white/5':'bg-gray-50')+' mb-4">'+
+                '<p class="text-xs '+(isDark?'text-gray-400':'text-gray-500')+' mb-1">معلومات الجهاز:</p>'+
+                '<p class="text-sm font-medium '+(isDark?'text-white':'text-gray-800')+'">'+escHtml(req.deviceInfo || 'جهاز غير معروف')+'</p>'+
+                '<p class="text-xs '+(isDark?'text-gray-500':'text-gray-400')+' mt-1">'+escHtml(new Date(req.createdAt).toLocaleString('ar-YE'))+'</p></div>'+
+                '<p class="'+(isDark?'text-yellow-300':'text-yellow-600')+' font-bold text-sm mb-4">هل أنت من يحاول الدخول من جهاز آخر؟</p>'+
+                '<div class="flex gap-3">'+
+                '<button id="dev-approve-yes" class="flex-1 py-3 rounded-xl font-bold btn text-white bg-gradient-to-r from-emerald-500 to-green-500 text-sm">نعم، أنا</button>'+
+                '<button id="dev-approve-no" class="flex-1 py-3 rounded-xl font-bold btn text-white bg-gradient-to-r from-red-500 to-rose-500 text-sm">لا، ليس أنا</button></div></div></div>'+
+                '<style>@keyframes pulse { 0%,100%{transform:scale(1);box-shadow:0 0 0 0 rgba(249,115,22,0.4)} 50%{transform:scale(1.05);box-shadow:0 0 0 15px rgba(249,115,22,0)}}</style>';
+
+            document.body.appendChild(overlay);
+
+            // "No" button - reject immediately
+            document.getElementById('dev-approve-no').onclick = function() {
+                rejectDeviceRequest(req.id);
+                document.getElementById('device-approval-popup').remove();
+                toast('تم رفض محاولة الدخول من الجهاز الآخر', 'success');
+            };
+
+            // "Yes" button - show step 2 confirmation
+            document.getElementById('dev-approve-yes').onclick = function() {
+                _showDeviceApprovalConfirmStep(req, overlay);
+            };
+        }
+
+        function _showDeviceApprovalConfirmStep(req, overlay) {
+            var isDark = state.theme === 'dark';
+            overlay.querySelector('div').innerHTML =
+                '<div class="w-20 h-20 mx-auto mb-4 rounded-full bg-gradient-to-br from-red-500 to-orange-500 flex items-center justify-center shadow-lg">'+
+                '<span class="text-4xl">⚠️</span></div>'+
+                '<h2 class="text-xl font-bold '+(isDark?'text-white':'text-gray-800')+' mb-2">تأكيد تسجيل الخروج</h2>'+
+                '<p class="'+(isDark?'text-gray-300':'text-gray-600')+' text-sm mb-2">بالموافقة، سيتم تسجيل خروجك من هذا الجهاز نهائياً وسيتم تسجيل الدخول من الجهاز الجديد.</p>'+
+                '<div class="p-3 rounded-xl bg-red-500/10 border border-red-500/30 mb-4">'+
+                '<p class="text-danger font-bold text-sm">⚠️ لن تتمكن من الدخول من هذا الجهاز مرة أخرى إلا بعد إعادة الموافقة!</p></div>'+
+                '<div class="flex gap-3">'+
+                '<button id="dev-confirm-yes" class="flex-1 py-3 rounded-xl font-bold btn text-white bg-gradient-to-r from-emerald-500 to-green-500 text-sm">تأكيد - سجل خروجي</button>'+
+                '<button id="dev-confirm-no" class="flex-1 py-3 rounded-xl font-bold btn text-white bg-gradient-to-r from-gray-500 to-gray-600 text-sm">إلغاء</button></div>';
+
+            document.getElementById('dev-confirm-no').onclick = function() {
+                document.getElementById('device-approval-popup').remove();
+                delete _deviceApprovalPopupShown[req.id]; // Allow popup again
+                toast('تم إلغاء الموافقة - لا يزال بإمكانك الموافقة لاحقاً من الإشعارات', 'warning');
+            };
+
+            document.getElementById('dev-confirm-yes').onclick = function() {
+                // Approve the device request
+                approveDeviceRequest(req.id);
+                // Remove popup
+                var popup = document.getElementById('device-approval-popup');
+                if (popup) popup.remove();
+                // Log out this device
+                toast('تم تسجيل خروجك - يمكنك الآن الدخول من الجهاز الجديد', 'warning', false);
+                setTimeout(function() {
+                    state.user = null;
+                    localStorage.removeItem('fy_auth_user');
+                    localStorage.removeItem('fy_session_id');
+                    Security.invalidateSession(req.userId);
+                    setView('login');
+                }, 1500);
+            };
+        }
+
+        // Start device approval watcher
+        _startDeviceApprovalWatcher();
 
         // Handle window resize for responsive sidebar
         window.addEventListener('resize', function() { if(window.innerWidth >= 1024) { state.sidebarOpen = false; } });
