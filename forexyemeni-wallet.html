@@ -1324,7 +1324,7 @@
         };
 
         function getDefaultData(key) {
-            if (key === 'users') return [{ id: 'admin1', email: '', name: 'مدير ForexYemeni', password: 'admin123', phone: '773178684', countryCode: '', role: 'ADMIN', usdtBalance: 0, localBalance: 0, affiliateBalance: 0, isBlocked: false, kycStatus: 'NOT_SUBMITTED', pendingEmail: null, affiliateStatus: 'NONE', affiliateCode: null, referredBy: null, merchantStatus: 'NONE', createdAt: new Date().toISOString() }];
+            if (key === 'users') return [{ id: 'admin1', email: '', name: 'مدير ForexYemeni', password: Security.hashPassword('admin123'), phone: '773178684', countryCode: '', role: 'ADMIN', usdtBalance: 0, localBalance: 0, affiliateBalance: 0, isBlocked: false, kycStatus: 'NOT_SUBMITTED', pendingEmail: null, affiliateStatus: 'NONE', affiliateCode: null, referredBy: null, merchantStatus: 'NONE', createdAt: new Date().toISOString() }];
             if (key === 'paymentMethods') return [
                 { id: 'pm1', title: 'USDT TRC20', type: 'CRYPTO', subtype: '', network: 'TRC20', address: 'TXxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx', recipientName: '', accountNumber: '', bankName: '', isActive: true, sortOrder: 0, minDeposit: 10, minWithdraw: 5 },
                 { id: 'pm2', title: 'حساب بنك اليمن والكويت', type: 'BANK', subtype: 'wallet', network: '', address: '', recipientName: 'ForexYemeni', accountNumber: '1234567890', bankName: 'بنك اليمن والكويت', isActive: true, sortOrder: 1, minDeposit: 1000, minWithdraw: 500 }
@@ -3048,24 +3048,47 @@
             var errEl = document.getElementById('cpass-error');
             if (newPass.length < 8) { errEl.textContent = 'كلمة المرور يجب أن تكون 8 أحرف على الأقل'; return; }
             if (newPass !== confirmPass) { errEl.textContent = 'كلمات المرور غير متطابقة'; return; }
-            // Update password
-            var users = DB.get('users');
-            var user = users.find(function(u) { return u.id === state.user.id; });
-            if (user) {
-                user.password = Security.hashPassword(newPass);
-                user.passwordMustChange = false;
-                DB.set('users', users);
-                Security.addAuditLog(user.id, 'PASSWORD_CHANGE', 'تغيير كلمة المرور (إجباري)');
-                toast('تم تغيير كلمة المرور بنجاح ✓','success');
-                // Continue to dashboard
-                DB.ensureUserFields(user);
-                Security.createSession(user.id);
-                if(user.role === 'ADMIN') setView('admin-home');
-                else if(user.merchantStatus === 'APPROVED') setView('merchant-dashboard');
-                else setView('user-home');
-            } else {
-                errEl.textContent = 'خطأ في تحديث كلمة المرور';
-            }
+            errEl.textContent = '⏳ جاري الحفظ...';
+            errEl.style.color = '#FCD535';
+            // قراءة المستخدمين مباشرة من Firestore لضمان البيانات الأحدث
+            db.collection('appData').doc('users').get().then(function(doc) {
+                if (!doc.exists || !doc.data() || !doc.data().data) {
+                    errEl.textContent = 'خطأ في تحميل البيانات';
+                    errEl.style.color = '#F6465D';
+                    return;
+                }
+                var users = doc.data().data;
+                if (!Array.isArray(users) || users.length === 0) {
+                    errEl.textContent = 'خطأ في البيانات';
+                    errEl.style.color = '#F6465D';
+                    return;
+                }
+                var user = users.find(function(u) { return u.id === state.user.id; });
+                if (user) {
+                    user.password = Security.hashPassword(newPass);
+                    user.passwordMustChange = false;
+                    // تحديث الذاكرة المحلية أولاً
+                    window.appData.users = users;
+                    // كتابة مرة واحدة فقط إلى Firestore
+                    DB.set('users', users);
+                    Security.addAuditLog(user.id, 'PASSWORD_CHANGE', 'تغيير كلمة المرور (إجباري)');
+                    toast('تم تغيير كلمة المرور بنجاح ✓','success');
+                    DB.ensureUserFields(user);
+                    // إنشاء جلسة محلية فقط - بدون كتابة إلى Firestore
+                    var sid = 'sess_' + Date.now() + '_' + Math.random().toString(36).substring(2, 15);
+                    localStorage.setItem('fy_session_id', sid);
+                    if(user.role === 'ADMIN') setView('admin-home');
+                    else if(user.merchantStatus === 'APPROVED') setView('merchant-dashboard');
+                    else setView('user-home');
+                } else {
+                    errEl.textContent = 'خطأ في تحديث كلمة المرور';
+                    errEl.style.color = '#F6465D';
+                }
+            }).catch(function(err) {
+                console.error('Force change password error:', err);
+                errEl.textContent = 'خطأ في الاتصال - حاول مجدداً';
+                errEl.style.color = '#F6465D';
+            });
         }
 
         // ==================== CHANGE PASSWORD IN SETTINGS ====================
