@@ -1683,6 +1683,8 @@
                 var users = DB.get('users');
                 var user = users.find(function(u){return u.id === userId;});
                 if(!user || !user.sessionId) return true; // No session tracking yet, allow
+                // ADMIN: allow multiple sessions (tabs/devices) without conflict
+                if(user.role === 'ADMIN') return true;
                 return user.sessionId === localSession;
             },
             invalidateSession: function(userId) {
@@ -6219,15 +6221,17 @@
                     if(user.role === 'ADMIN') setView('admin-home');
                     else if(user.merchantStatus === 'APPROVED') setView('merchant-dashboard');
                     else setView('user-home');
-                    // Session monitoring - check every 30 seconds
-                    setInterval(function(){
-                        if(state.user && state.user.id && !Security.validateSession(state.user.id)) {
-                            toast('تم تسجيل الدخول من جهاز آخر','warning',false);
-                            state.user = null;
-                            localStorage.removeItem('fy_auth_user');
-                            setView('login');
-                        }
-                    }, 30000);
+                    // Session monitoring - check every 30 seconds (skip for ADMIN - multiple sessions allowed)
+                    if(user.role !== 'ADMIN') {
+                        setInterval(function(){
+                            if(state.user && state.user.id && !Security.validateSession(state.user.id)) {
+                                toast('تم تسجيل الدخول من جهاز آخر','warning',false);
+                                state.user = null;
+                                localStorage.removeItem('fy_auth_user');
+                                setView('login');
+                            }
+                        }, 30000);
+                    }
                     return;
                 }
             }
