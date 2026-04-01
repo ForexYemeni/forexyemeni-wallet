@@ -3060,7 +3060,7 @@
                 case 'merchant-settings': contentHtml = renderMerchantSettings(C); break;
                 case 'merchant-deposit': contentHtml = renderMerchantDeposit(C); break;
                 case 'merchant-withdraw': contentHtml = renderMerchantWithdraw(C); break;
-                case 'merchant-chat': contentHtml = renderMerchantChat(C); _markAllChatRead('MERCHANT'); break;
+                case 'merchant-chat': contentHtml = renderMerchantChat(C); break;
                 case 'admin-home': contentHtml = renderAdminHome(C); break;
                 case 'admin-users': contentHtml = renderAdminUsers(C); break;
                 case 'admin-deposits': contentHtml = renderAdminDeposits(C); break;
@@ -5031,7 +5031,7 @@
                         unread: 0
                     };
                 }
-                chatPartners[otherId].lastMsg = m;
+                // Don't overwrite lastMsg - keep the newest (first encountered since sorted desc)
                 if (m.toId === user.id && !m.isRead) {
                     chatPartners[otherId].unread++;
                 }
