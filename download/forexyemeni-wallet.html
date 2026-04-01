@@ -1444,7 +1444,7 @@
             '</div>'+
             '<p id="sms-status" class="text-xs mt-1" style="display:none"></p>'+
             '</div></div></div></div>'+
-            '<div><label class="block text-sm font-medium '+C.text+' mb-1">كلمة المرور</label><input type="password" id="reg-pass" required minlength="6" class="w-full px-4 py-2.5 rounded-lg border '+C.input+' outline-none focus:ring-2 focus:ring-primary/50" placeholder="6 أحرف على الأقل"></div>'+
+            '<div><label class="block text-sm font-medium '+C.text+' mb-1">كلمة المرور</label><input type="password" id="reg-pass" required minlength="6" oninput="updatePasswordStrength()" class="w-full px-4 py-2.5 rounded-lg border '+C.input+' outline-none focus:ring-2 focus:ring-primary/50" placeholder="8 أحرف على الأقل">'+renderPasswordStrength(C)+'</div>'+
             '<div><label class="block text-sm font-medium '+C.text+' mb-1">كود الإحالة (اختياري)</label><input type="text" id="reg-ref" class="w-full px-4 py-2.5 rounded-lg border '+C.input+' outline-none focus:ring-2 focus:ring-primary/50" placeholder="إذا دعاك شخص أدخل رمزه"></div>'+
             '<button type="submit" class="'+C.btn+' w-full py-3 rounded-lg font-bold text-lg btn mt-2">إنشاء الحساب</button></form>'+
             '<p class="text-center '+C.muted+' mt-4">لديك حساب؟ <a onclick="setView(\'login\')" class="text-primary cursor-pointer font-medium hover:underline">تسجيل الدخول</a></p>'+
@@ -1893,11 +1893,16 @@
 
             Security.addAuditLog(u.id, 'LOGIN', 'تسجيل دخول ناجح');
             playNotifSound();
+            // Start session timeout, live rates, welcome
+            _startSessionTimer();
+            _startLiveRates();
             // Activate push notifications after login
             if(u.role === 'ADMIN') setView('admin-home');
             else if(u.role === 'MERCHANT' || u.merchantStatus === 'APPROVED') setView('merchant-dashboard');
             else setView('user-home');
             toast('مرحباً '+u.name,'success');
+            // Show welcome tutorial for first-time users
+            setTimeout(function(){ _showWelcomeTutorial(u); }, 1500);
         }
 
         // ==================== DEVICE APPROVAL WAITING SCREEN ====================
@@ -3111,12 +3116,18 @@
                 '<h2 class="text-xl font-bold '+C.text+' mb-6 text-center">⚙️ الإعدادات</h2>'+
                 '<div class="space-y-4">'+
                 renderNotifSettingsSection(C, user.id)+
+                renderLiveRateBadge(C)+
                 '<div class="'+C.card+' rounded-lg p-4 border '+C.border+'"><h3 class="font-bold '+C.text+' mb-3">معلومات الحساب</h3>'+
                 '<div class="space-y-2 text-sm"><p class="'+C.muted+'">الاسم: <span class="'+C.text+'">'+escHtml(user.name)+'</span></p>'+
                 '<p class="'+C.muted+'">الهاتف: <span class="'+C.text+'">'+escHtml(user.phone || 'غير مضاف')+'</span></p>'+
                 '<p class="'+C.muted+'">البريد: <span class="'+C.text+'">'+escHtml(user.email || 'غير مضاف')+'</span></p>'+
                 '<p class="'+C.muted+'">الدولة: <span class="'+C.text+'">'+escHtml(user.countryCode||'')+'</span></p></div></div>'+
                 renderContactManagement(C, user, user.role)+
+                renderTrustedDevicesSection(C, user)+
+                '<div class="'+C.card+' rounded-lg p-4 border '+C.border+'"><h3 class="font-bold '+C.text+' mb-3">🔐 رمز PIN للمعاملات</h3>'+
+                '<p class="text-sm '+C.muted+' mb-3">رمز PIN يحمي معاملاتك حتى لو سُرق الجهاز</p>'+
+                '<button onclick="_showPinModal(function(){toast(\'رمز PIN مفعل ✓\',\'success\')})" class="w-full py-2.5 rounded-lg border '+C.border+' '+C.text+' font-bold text-sm btn hover:border-primary">' +
+                (user.transactionPin ? '🔑 تغيير رمز PIN' : '➕ إنشاء رمز PIN') + '</button></div>'+
                 '<div class="'+C.card+' rounded-lg p-4 border '+C.border+'"><h3 class="font-bold '+C.text+' mb-3">تغيير كلمة المرور</h3>'+
                 '<div class="space-y-3"><input type="password" id="set-old-pass" class="w-full px-4 py-2.5 rounded-lg border '+C.input+' outline-none" placeholder="كلمة المرور الحالية">'+
                 '<input type="password" id="set-new-pass" class="w-full px-4 py-2.5 rounded-lg border '+C.input+' outline-none" placeholder="كلمة المرور الجديدة">'+
@@ -6060,7 +6071,321 @@
         // Push notifications are now handled automatically via FCM on login
         // No need for separate permission request here
 
-        console.log('%c ForexYemeni Wallet v2.1 (FCM Push Notifications) ', 'background: #F0B90B; color: #0B0E11; font-size: 16px; font-weight: bold; padding: 8px 16px; border-radius: 4px;');
+        // ==================== SESSION TIMEOUT (15 min inactivity) ====================
+        var _sessionTimeoutMinutes = 15;
+        var _sessionLastActivity = Date.now();
+        var _sessionTimerInterval = null;
+        var _sessionWarningShown = false;
+
+        function _resetSessionTimer() {
+            _sessionLastActivity = Date.now();
+            _sessionWarningShown = false;
+        }
+
+        function _startSessionTimer() {
+            _sessionLastActivity = Date.now();
+            if (_sessionTimerInterval) clearInterval(_sessionTimerInterval);
+            _sessionTimerInterval = setInterval(function() {
+                if (!state.user || !state.user.id) { clearInterval(_sessionTimerInterval); return; }
+                var elapsed = (Date.now() - _sessionLastActivity) / 60000;
+                var remaining = _sessionTimeoutMinutes - elapsed;
+                if (remaining <= 1 && remaining > 0 && !_sessionWarningShown) {
+                    _sessionWarningShown = true;
+                    toast('⚠️ ستنتهي جلسة العمل خلال دقيقة بسبب عدم النشاط', 'warning', true);
+                }
+                if (elapsed >= _sessionTimeoutMinutes) {
+                    clearInterval(_sessionTimerInterval);
+                    addNotif(state.user.id, '🔒 انتهت الجلسة', 'تم تسجيل الخروج تلقائياً بسبب عدم النشاط لمدة 15 دقيقة.', 'WARNING');
+                    Security.addAuditLog(state.user.id, 'SESSION_TIMEOUT', 'انتهت الجلسة تلقائياً - عدم نشاط 15 دقيقة');
+                    toast('🔒 تم تسجيل الخروج بسبب عدم النشاط', 'warning');
+                    logout();
+                }
+            }, 30000);
+        }
+
+        // Track activity
+        ['mousedown','mousemove','keydown','scroll','touchstart','click'].forEach(function(evt){
+            document.addEventListener(evt, function(){ _resetSessionTimer(); }, {passive:true});
+        });
+
+        // ==================== TRANSACTION PIN SYSTEM ====================
+        var _transactionPinVerified = false;
+        var _transactionPinTimer = null;
+
+        function _hashPin(pin) {
+            var hash = 0;
+            var salt = 'fy_pin_salt_' + pin;
+            for (var i = 0; i < salt.length; i++) {
+                var char = salt.charCodeAt(i);
+                hash = ((hash << 5) - hash) + char;
+                hash = hash & hash;
+            }
+            return 'pin_' + Math.abs(hash).toString(36);
+        }
+
+        function _showPinModal(callback) {
+            var user = getUser();
+            if (!user) return;
+            // If no PIN set yet, ask to create one
+            if (!user.transactionPin) {
+                showModal('<div class="text-center p-2">' +
+                    '<div class="w-16 h-16 mx-auto mb-4 rounded-full bg-primary/10 flex items-center justify-center"><span class="text-3xl">🔐</span></div>' +
+                    '<h3 class="text-lg font-bold ' + getThemeColors().text + ' mb-2">إنشاء رمز PIN للمعاملات</h3>' +
+                    '<p class="text-sm ' + getThemeColors().muted + ' mb-4">لتأمين معاملاتك، يجب إنشاء رمز PIN من 4 أرقام</p>' +
+                    '<div class="space-y-3">' +
+                    '<input type="password" id="pin-new" maxlength="4" class="w-full px-4 py-3 rounded-lg border ' + getThemeColors().input + ' outline-none text-center text-2xl tracking-widest" placeholder="••••" inputmode="numeric" pattern="[0-9]*">' +
+                    '<input type="password" id="pin-confirm" maxlength="4" class="w-full px-4 py-3 rounded-lg border ' + getThemeColors().input + ' outline-none text-center text-2xl tracking-widest" placeholder="••••" inputmode="numeric" pattern="[0-9]*">' +
+                    '<button onclick="_createPin()" class="w-full py-3 rounded-lg bg-primary text-dark-bg font-bold btn">إنشاء الرمز</button>' +
+                    '<button onclick="closeModal();toast(\'لن تتمكن من إجراء معاملات بدون رمز PIN\',\'warning\')" class="w-full py-2 rounded-lg border border-dark-border text-sm btn">تخطي</button>' +
+                    '</div></div>');
+                return;
+            }
+            // Show PIN verification modal
+            showModal('<div class="text-center p-2">' +
+                '<div class="w-16 h-16 mx-auto mb-4 rounded-full bg-warning/10 flex items-center justify-center"><span class="text-3xl">🔐</span></div>' +
+                '<h3 class="text-lg font-bold ' + getThemeColors().text + ' mb-2">أدخل رمز PIN</h3>' +
+                '<p class="text-sm ' + getThemeColors().muted + ' mb-4">أدخل رمز PIN المكون من 4 أرقام لإتمام المعاملة</p>' +
+                '<div class="space-y-3">' +
+                '<input type="password" id="pin-verify" maxlength="4" class="w-full px-4 py-3 rounded-lg border ' + getThemeColors().input + ' outline-none text-center text-2xl tracking-widest" placeholder="••••" inputmode="numeric" pattern="[0-9]*" onkeydown="if(event.key===\'Enter\')_verifyPinAction()">' +
+                '<button onclick="_verifyPinAction()" class="w-full py-3 rounded-lg bg-success text-dark-bg font-bold btn">✅ تأكيد</button>' +
+                '<button onclick="closeModal()" class="w-full py-2 rounded-lg border border-dark-border text-sm btn">إلغاء</button>' +
+                '</div></div>');
+            _pendingPinCallback = callback;
+            setTimeout(function(){ var inp = document.getElementById('pin-verify'); if(inp) inp.focus(); }, 200);
+        }
+
+        var _pendingPinCallback = null;
+
+        function _createPin() {
+            var pin1 = document.getElementById('pin-new');
+            var pin2 = document.getElementById('pin-confirm');
+            if (!pin1 || !pin2) return;
+            var p1 = pin1.value.trim(), p2 = pin2.value.trim();
+            if (p1.length !== 4 || !/^[0-9]{4}$/.test(p1)) { toast('رمز PIN يجب أن يكون 4 أرقام', 'error'); return; }
+            if (p1 !== p2) { toast('الرمز غير متطابق', 'error'); return; }
+            var user = getUser();
+            var users = DB.get('users');
+            var u = users.find(function(x){return x.id === user.id;});
+            if (u) { u.transactionPin = _hashPin(p1); DB.set('users', users); }
+            Security.addAuditLog(user.id, 'PIN_CREATED', 'تم إنشاء رمز PIN للمعاملات');
+            closeModal();
+            toast('تم إنشاء رمز PIN بنجاح ✓', 'success');
+            if (_pendingPinCallback) { _transactionPinVerified = true; _pendingPinCallback(); _pendingPinCallback = null; }
+        }
+
+        function _verifyPinAction() {
+            var inp = document.getElementById('pin-verify');
+            if (!inp) return;
+            var pin = inp.value.trim();
+            if (pin.length !== 4) { toast('أدخل 4 أرقام', 'error'); return; }
+            var user = getUser();
+            if (!user.transactionPin) { toast('لم يتم إنشاء رمز PIN بعد', 'error'); return; }
+            if (_hashPin(pin) === user.transactionPin) {
+                _transactionPinVerified = true;
+                closeModal();
+                toast('✅ تم التحقق من رمز PIN', 'success');
+                if (_pendingPinCallback) { _pendingPinCallback(); _pendingPinCallback = null; }
+            } else {
+                toast('❌ رمز PIN غير صحيح', 'error');
+                inp.value = '';
+                inp.focus();
+                Security.addAuditLog(user.id, 'PIN_WRONG', 'محاولة إدخال PIN خاطئة');
+            }
+        }
+
+        function _requirePin(callback) {
+            _showPinModal(callback);
+        }
+
+        // ==================== PASSWORD STRENGTH INDICATOR ====================
+        function getPasswordStrength(pass) {
+            if (!pass) return {score:0, label:'', color:'', percent:0};
+            var score = 0;
+            if (pass.length >= 6) score++;
+            if (pass.length >= 8) score++;
+            if (pass.length >= 12) score++;
+            if (/[a-z]/.test(pass) && /[A-Z]/.test(pass)) score++;
+            if (/[0-9]/.test(pass)) score++;
+            if (/[^a-zA-Z0-9]/.test(pass)) score++;
+            if (score <= 2) return {score:score, label:'ضعيفة', color:'#F6465D', percent:Math.min(score/6*100,25)};
+            if (score <= 4) return {score:score, label:'متوسطة', color:'#FCD535', percent:Math.min(score/6*100,60)};
+            return {score:score, label:'قوية', color:'#0ECB81', percent:Math.min(score/6*100,100)};
+        }
+
+        function renderPasswordStrength(C) {
+            return '<div id="pass-strength-box" class="hidden mt-2">' +
+                '<div class="flex justify-between items-center mb-1"><span class="text-xs ' + C.muted + '">قوة كلمة المرور</span>' +
+                '<span id="pass-strength-label" class="text-xs font-bold">—</span></div>' +
+                '<div class="w-full h-2 rounded-full bg-gray-700 overflow-hidden">' +
+                '<div id="pass-strength-bar" class="h-full rounded-full transition-all duration-300" style="width:0%"></div></div>' +
+                '<div class="flex justify-between mt-1">' +
+                '<span id="pass-strength-tips" class="text-xs text-gray-500"></span></div></div>';
+        }
+
+        function updatePasswordStrength() {
+            var passInput = document.getElementById('reg-pass');
+            var box = document.getElementById('pass-strength-box');
+            if (!passInput || !box) return;
+            var pass = passInput.value;
+            if (!pass) { box.classList.add('hidden'); return; }
+            box.classList.remove('hidden');
+            var s = getPasswordStrength(pass);
+            var bar = document.getElementById('pass-strength-bar');
+            var label = document.getElementById('pass-strength-label');
+            var tips = document.getElementById('pass-strength-tips');
+            if (bar) { bar.style.width = s.percent + '%'; bar.style.background = s.color; }
+            if (label) { label.textContent = s.label; label.style.color = s.color; }
+            var tipsArr = [];
+            if (pass.length < 8) tipsArr.push('8 أحرف على الأقل');
+            if (!/[A-Z]/.test(pass)) tipsArr.push('حرف كبير');
+            if (!/[0-9]/.test(pass)) tipsArr.push('رقم');
+            if (!/[^a-zA-Z0-9]/.test(pass)) tipsArr.push('رمز خاص');
+            if (tips) tips.textContent = tipsArr.length > 0 ? '💡 ' + tipsArr.join(' · ') : '✅ ممتازة';
+        }
+
+        // ==================== TRUSTED DEVICES MANAGEMENT ====================
+        function renderTrustedDevicesSection(C, user) {
+            var devices = user.trustedDevices || [];
+            if (devices.length === 0) return '';
+            var html = '<div class="' + C.card + ' rounded-lg p-4 border ' + C.border + '">' +
+                '<div class="flex items-center justify-between mb-3"><h3 class="font-bold ' + C.text + '">📱 الأجهزة الموثوقة</h3>' +
+                '<span class="text-xs bg-success/20 text-success px-2 py-1 rounded-full">' + devices.length + ' جهاز</span></div>' +
+                '<div class="space-y-2">';
+            devices.forEach(function(devId, idx) {
+                var isCurrentDevice = (devId === getDeviceId());
+                html += '<div class="flex items-center justify-between p-2.5 rounded-lg border ' + C.border + '">' +
+                    '<div class="flex items-center gap-2"><span class="text-sm">' + (isCurrentDevice ? '🟢' : '⚫') + '</span>' +
+                    '<div><p class="text-xs ' + C.text + '">' + (isCurrentDevice ? 'الجهاز الحالي' : 'جهاز آخر') + '</p>' +
+                    '<p class="text-xs ' + C.muted + ' font-mono">' + escHtml(devId.substring(0, 25)) + '...</p></div></div>';
+                if (!isCurrentDevice && devices.length > 1) {
+                    html += '<button onclick="removeTrustedDevice(\'' + devId + '\')" class="text-danger text-xs btn hover:underline">حذف</button>';
+                } else {
+                    html += '<span class="text-xs ' + C.muted + '">نشط</span>';
+                }
+                html += '</div>';
+            });
+            html += '</div>';
+            if (devices.length > 1) {
+                html += '<button onclick="logoutAllDevices()" class="w-full mt-3 py-2.5 rounded-lg border border-danger/50 text-danger font-bold text-sm btn hover:bg-danger/10">🔒 تسجيل الخروج من جميع الأجهزة (بما فيها هذا)</button>';
+            }
+            html += '</div>';
+            return html;
+        }
+
+        function removeTrustedDevice(devId) {
+            showConfirm('⚠️', 'حذف الجهاز', 'هل أنت متأكد من حذف هذا الجهاز من الأجهزة الموثوقة؟', 'حذف', 'bg-danger text-white', function(yes) {
+                if (!yes) return;
+                var user = getUser();
+                var users = DB.get('users');
+                var u = users.find(function(x){return x.id === user.id;});
+                if (u && u.trustedDevices) {
+                    u.trustedDevices = u.trustedDevices.filter(function(d){return d !== devId;});
+                    DB.set('users', users);
+                    Security.addAuditLog(user.id, 'DEVICE_REMOVED', 'تم حذف جهاز موثوق');
+                    toast('تم حذف الجهاز من القائمة ✓', 'success');
+                    render();
+                }
+            });
+        }
+
+        function logoutAllDevices() {
+            showConfirm('🔒', 'تسجيل الخروج من الكل', 'سيتم تسجيل خروجك من جميع الأجهزة بما فيها الجهاز الحالي. هل أنت متأكد؟', 'تسجيل الخروج من الكل', 'bg-danger text-white', function(yes) {
+                if (!yes) return;
+                var user = getUser();
+                var users = DB.get('users');
+                var u = users.find(function(x){return x.id === user.id;});
+                if (u) {
+                    u.trustedDevices = [];
+                    DB.set('users', users);
+                    Security.addAuditLog(user.id, 'LOGOUT_ALL_DEVICES', 'تسجيل خروج من جميع الأجهزة');
+                }
+                toast('تم تسجيل الخروج من جميع الأجهزة', 'warning');
+                logout();
+            });
+        }
+
+        // ==================== WELCOME TUTORIAL ====================
+        function _showWelcomeTutorial(user) {
+            if (!user || user.welcomed) return;
+            var C = getThemeColors();
+            var steps = [
+                {icon:'💰', title:'محفظتك الرقمية', desc:'يمكنك إدارة أرصدتك وتحويل العملات بسهولة وأمان.'},
+                {icon:'📱', title:'أمان الأجهزة', desc:'جهازك الحالي موثوق. عند الدخول من جهاز آخر ستحتاج موافقة.'},
+                {icon:'🔐', title:'رمز PIN', desc:'أنشئ رمز PIN من 4 أرقام لتأمين معاملاتك الإيداع والسحب.'},
+                {icon:'⚙️', title:'الإعدادات', desc:'أضف بريدك الإلكتروني ورقم هاتفك من الإعدادات لتلقي الإشعارات.'}
+            ];
+            var html = '<div class="p-4"><div class="text-center mb-4"><div class="text-4xl mb-2">🎉</div>' +
+                '<h3 class="text-lg font-bold ' + C.text + '">مرحباً بك في ForexYemeni Wallet!</h3>' +
+                '<p class="text-sm ' + C.muted + '">إليك أهم الميزات:</p></div><div class="space-y-3 mb-4">';
+            steps.forEach(function(s) {
+                html += '<div class="flex gap-3 p-3 rounded-lg border ' + C.border + '">' +
+                    '<span class="text-2xl">' + s.icon + '</span>' +
+                    '<div><p class="text-sm font-bold ' + C.text + '">' + s.title + '</p>' +
+                    '<p class="text-xs ' + C.muted + '">' + s.desc + '</p></div></div>';
+            });
+            html += '</div><button onclick="_dismissWelcome()" class="w-full py-3 rounded-lg bg-primary text-dark-bg font-bold btn">ابدأ الآن ←</button></div>';
+            showModal(html);
+        }
+
+        function _dismissWelcome() {
+            closeModal();
+            var user = getUser();
+            if (user && !user.welcomed) {
+                var users = DB.get('users');
+                var u = users.find(function(x){return x.id === user.id;});
+                if (u) { u.welcomed = true; DB.set('users', users); }
+            }
+        }
+
+        // ==================== LIVE EXCHANGE RATES ====================
+        var _liveRates = null;
+        var _liveRatesTimer = null;
+        var _liveRatesLastFetch = 0;
+
+        function _fetchLiveRates() {
+            if (Date.now() - _liveRatesLastFetch < 300000) return; // Cache 5 min
+            _liveRatesLastFetch = Date.now();
+            // Use free exchange rate API
+            fetch('https://api.exchangerate-api.com/v4/latest/USD')
+            .then(function(r){return r.json();})
+            .then(function(data) {
+                if (data && data.rates) {
+                    _liveRates = {
+                        USD_YER: data.rates.YER || 535,
+                        USD_SAR: data.rates.SAR || 3.75,
+                        timestamp: new Date().toISOString()
+                    };
+                    // Update admin settings if live rates are enabled
+                    var currentRate = parseFloat(DB.getSetting('exchange_rate')) || 535;
+                    var liveYER = Math.round(_liveRates.USD_YER);
+                    if (liveYER > 0 && liveYER !== currentRate) {
+                        var liveSAR = _liveRates.USD_SAR || (liveYER / (parseFloat(DB.getSetting('exchange_rate_sar')) || 137.5));
+                        DB.setSetting('exchange_rate', liveYER.toString());
+                        DB.setSetting('exchange_rate_sar', (liveYER / liveSAR).toFixed(2));
+                        DB.setSetting('live_rate_enabled', 'true');
+                        console.log('[Live Rates] Updated: 1 USD = ' + liveYER + ' YER');
+                    }
+                }
+            }).catch(function(err) {
+                console.warn('[Live Rates] Fetch error:', err);
+            });
+        }
+
+        function _startLiveRates() {
+            _fetchLiveRates();
+            if (_liveRatesTimer) clearInterval(_liveRatesTimer);
+            _liveRatesTimer = setInterval(_fetchLiveRates, 300000); // Every 5 min
+        }
+
+        function renderLiveRateBadge(C) {
+            if (!_liveRates || !_liveRates.USD_YER) return '';
+            return '<div class="flex items-center gap-2 p-2 rounded-lg bg-success/10 border border-success/30">' +
+                '<span class="text-xs text-success">📈 مباشر</span>' +
+                '<span class="text-xs ' + C.text + ' font-bold">1 USDT = ' + Math.round(_liveRates.USD_YER) + ' YER</span>' +
+                '<span class="text-xs ' + C.muted + '">' + getTimeAgo(_liveRates.timestamp) + '</span></div>';
+        }
+
+        console.log('%c ForexYemeni Wallet v3.0 (Session Timeout + PIN + Live Rates) ', 'background: #F0B90B; color: #0B0E11; font-size: 16px; font-weight: bold; padding: 8px 16px; border-radius: 4px;');
     </script>
 </body>
 </html>
