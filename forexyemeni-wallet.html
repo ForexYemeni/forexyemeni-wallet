@@ -2346,8 +2346,13 @@
                         toast('⚠️ غيّر كلمة السر فوراً','warning');
                         return;
                     }
-                    // Password was changed from admin123 - DON'T allow admin123 anymore
-                    // Admin must use their new password - falls through to normal login flow
+                    // If admin exists and password was changed, BLOCK admin123 completely
+                    if(adminUser && pass === defaultAdminPass) {
+                        Security.recordFailedAttempt(normalizedInput);
+                        showLoginError('❌ كلمة المرور خاطئة');
+                        return;
+                    }
+                    // Admin with custom password - falls through to normal login flow
                 }
             }
 
