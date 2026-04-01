@@ -584,14 +584,77 @@
         }
 
         // Register service worker for FCM
-        if ('serviceWorker' in navigator && messaging) {
+        if ('serviceWorker' in navigator) {
             navigator.serviceWorker.register('firebase-messaging-sw.js').then(function(reg) {
                 console.log('[FCM] Service Worker registered:', reg.scope);
-                try { messaging.useServiceWorker(reg); } catch(e) { console.warn('[FCM] useServiceWorker error:', e); }
+                try { messaging.useServiceWorker(reg); } catch(e) {}
+                // Listen for updates
+                reg.addEventListener('updatefound', function() {
+                    var newWorker = reg.installing;
+                    newWorker.addEventListener('statechange', function() {
+                        if (newWorker.state === 'activated') {
+                            toast('تم تحديث التطبيق - أعد تحميل الصفحة','success',false);
+                        }
+                    });
+                });
             }).catch(function(err) {
                 console.warn('[FCM] SW registration failed:', err);
             });
         }
+
+        // ==================== PWA INSTALL ====================
+        var _deferredPrompt = null;
+        window.addEventListener('beforeinstallprompt', function(e) {
+            e.preventDefault();
+            _deferredPrompt = e;
+            // Show install banner after 3 seconds
+            setTimeout(function() { _showPwaInstallBanner(); }, 3000);
+        });
+
+        function _showPwaInstallBanner() {
+            if (!_deferredPrompt) return;
+            // Check if already dismissed
+            if (localStorage.getItem('fy_pwa_dismissed') === 'true') return;
+            var C = getThemeColors();
+            var banner = document.createElement('div');
+            banner.id = 'pwa-install-banner';
+            banner.className = 'fixed bottom-20 lg:bottom-6 left-4 right-4 lg:left-auto lg:right-4 lg:w-96 z-[9998] '+C.card+' rounded-2xl shadow-2xl border-2 border-primary/50 p-4 slide-in';
+            banner.innerHTML = '<div class="flex items-center gap-3 mb-3">'+
+                '<div class="w-12 h-12 rounded-xl bg-primary/20 flex items-center justify-center text-2xl shrink-0">📱</div>'+
+                '<div class="flex-1 min-w-0"><p class="font-bold '+C.text+' text-sm">تثبيت ForexYemeni Wallet</p>'+
+                '<p class="text-xs '+C.muted+'">ثبّت التطبيق لاستقبال إشعارات فورية حتى لو كان مغلق</p></div></div>'+
+                '<div class="flex gap-2">'+
+                '<button onclick="_installPwa()" class="flex-1 py-2.5 rounded-lg bg-primary text-dark-bg font-bold btn text-sm">📥 تثبيت الآن</button>'+
+                '<button onclick="_dismissPwa()" class="px-4 py-2.5 rounded-lg border '+C.border+' '+C.text+' btn text-sm">لاحقاً</button></div>';
+            document.body.appendChild(banner);
+        }
+
+        window._installPwa = function() {
+            if (!_deferredPrompt) return;
+            _deferredPrompt.prompt();
+            _deferredPrompt.userChoice.then(function(choiceResult) {
+                if (choiceResult.outcome === 'accepted') {
+                    toast('جاري تثبيت التطبيق...','success',false);
+                }
+                _deferredPrompt = null;
+                var banner = document.getElementById('pwa-install-banner');
+                if (banner) banner.remove();
+            });
+        };
+
+        window._dismissPwa = function() {
+            localStorage.setItem('fy_pwa_dismissed', 'true');
+            var banner = document.getElementById('pwa-install-banner');
+            if (banner) banner.remove();
+        };
+
+        // Check if app is installed
+        window.addEventListener('appinstalled', function() {
+            toast('تم تثبيت التطبيق بنجاح ✓','success',false);
+            _deferredPrompt = null;
+            var banner = document.getElementById('pwa-install-banner');
+            if (banner) banner.remove();
+        });
 
         // Request notification permission and get FCM token
         function requestNotifPermission() {
@@ -3520,6 +3583,9 @@
                 '<p class="text-sm '+C.muted+' mb-3">رمز PIN يحمي معاملاتك حتى لو سُرق الجهاز</p>'+
                 '<button onclick="_showPinModal(function(){toast(\'رمز PIN مفعل ✓\',\'success\')})" class="w-full py-2.5 rounded-lg border '+C.border+' '+C.text+' font-bold text-sm btn hover:border-primary">' +
                 (user.transactionPin ? '🔑 تغيير رمز PIN' : '➕ إنشاء رمز PIN') + '</button></div>'+
+                '<div class="'+C.card+' rounded-lg p-4 border '+C.border+'"><h3 class="font-bold '+C.text+' mb-3">📱 تثبيت التطبيق</h3>'+
+                '<p class="text-sm '+C.muted+' mb-3">ثبّت التطبيق على جهازك لاستقبال إشعارات فورية حتى لو كان التطبيق مغلق</p>'+
+                '<button onclick="localStorage.removeItem(\'fy_pwa_dismissed\');_showPwaInstallBanner();toast(\'إذا لم يظهر النافذة، اضغط على زر المشاركة في المتصفح ثم \'إضافة إلى الشاشة الرئيسية\'\',\'info\')" class="'+C.btn+' w-full py-2.5 rounded-lg font-bold btn text-sm">📥 تثبيت التطبيق على الجهاز</button></div>'+
                 '<div class="'+C.card+' rounded-lg p-4 border '+C.border+'"><h3 class="font-bold '+C.text+' mb-3">تغيير كلمة المرور</h3>'+
                 '<div class="space-y-3"><input type="password" id="set-old-pass" class="w-full px-4 py-2.5 rounded-lg border '+C.input+' outline-none" placeholder="كلمة المرور الحالية">'+
                 '<input type="password" id="set-new-pass" class="w-full px-4 py-2.5 rounded-lg border '+C.input+' outline-none" placeholder="كلمة المرور الجديدة">'+

@@ -1,14 +1,16 @@
 {
     "name": "ForexYemeni Wallet",
     "short_name": "ForexYemeni",
-    "description": "محفظة ForexYemeni الرقمية",
+    "description": "محفظة العملات الرقمية - ForexYemeni Wallet",
     "start_url": "/forexyemeni-wallet.html",
+    "scope": "/",
     "display": "standalone",
     "orientation": "portrait",
     "background_color": "#0B0E11",
-    "theme_color": "#0B0E11",
+    "theme_color": "#F0B90B",
     "dir": "rtl",
     "lang": "ar",
+    "categories": ["finance", "utilities"],
     "icons": [
         {
             "src": "icon.png",
@@ -23,5 +25,7 @@
             "purpose": "any maskable"
         }
     ],
+    "screenshots": [],
+    "prefer_related_applications": false,
     "gcm_sender_id": "52486252073"
 }
