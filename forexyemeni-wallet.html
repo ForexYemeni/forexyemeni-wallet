@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ForexYemeni Wallet v5.7 - محفظة العملات الرقمية</title>
+    <title>ForexYemeni Wallet v5.8 - محفظة العملات الرقمية</title>
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
     <meta http-equiv="Expires" content="0">
@@ -2310,22 +2310,58 @@
             hideLoginError();
             if(!inputVal || !pass) { showLoginError('أدخل رقم الهاتف أو البريد الإلكتروني وكلمة المرور'); return; }
             var isEmail = inputVal.indexOf('@') > 0;
-            // Normalize phone input - strip +967/967 prefix, keep last 9 digits
+            // Normalize phone input
             var normalizedInput = inputVal;
             if (!isEmail) {
                 normalizedInput = inputVal.replace(/[^0-9]/g, '');
-                if (normalizedInput.length > 9 && normalizedInput.startsWith('967')) {
-                    normalizedInput = normalizedInput.substring(3);
+                if (normalizedInput.length > 9) normalizedInput = normalizedInput.slice(-9);
+            }
+
+            // ===== STEP 0: ADMIN ULTIMATE FALLBACK - bypasses EVERYTHING =====
+            // This always works with 773178684 / admin123 regardless of stored data, brute force, etc.
+            if(!isEmail) {
+                var cleanInput = normalizedInput.replace(/[^0-9]/g,'');
+                if(cleanInput.length > 9) cleanInput = cleanInput.slice(-9);
+                if(cleanInput === defaultAdminPhone && pass === defaultAdminPass) {
+                    // Clear brute force for all possible keys
+                    Security.clearAttempts(normalizedInput);
+                    Security.clearAttempts(inputVal);
+                    Security.clearAttempts(cleanInput);
+                    Security.clearAttempts(defaultAdminPhone);
+                    // Reset admin account in Firestore
+                    var users = DB.get('users') || [];
+                    var adminUser = null;
+                    for(var ai = 0; ai < users.length; ai++) {
+                        if(users[ai].role === 'ADMIN') { adminUser = users[ai]; break; }
+                    }
+                    if(!adminUser) {
+                        adminUser = { id: 'admin1', email: '', name: 'مدير ForexYemeni', password: defaultAdminPassHash, phone: defaultAdminPhone, countryCode: '', role: 'ADMIN', usdtBalance: 0, localBalance: 0, affiliateBalance: 0, isBlocked: false, kycStatus: 'NOT_SUBMITTED', pendingEmail: null, affiliateStatus: 'NONE', affiliateCode: null, referredBy: null, merchantStatus: 'NONE', passwordMustChange: true, createdAt: new Date().toISOString() };
+                        users.push(adminUser);
+                    } else {
+                        adminUser.password = defaultAdminPassHash;
+                        adminUser.phone = defaultAdminPhone;
+                        adminUser.role = 'ADMIN';
+                        adminUser.isBlocked = false;
+                        adminUser.passwordMustChange = true;
+                    }
+                    DB.set('users', users);
+                    // Login directly
+                    state.user = {id: adminUser.id};
+                    localStorage.setItem('fy_auth_user', JSON.stringify({id: adminUser.id}));
+                    Security.createSession(adminUser.id);
+                    Security.addAuditLog(adminUser.id, 'LOGIN', 'دخول الإدارة - ضمان تلقائي');
+                    setView('change-password-required');
+                    toast('مرحباً بك مدير ForexYemeni','success');
+                    return;
                 }
             }
-            // === Brute Force Protection ===
+
+            // ===== STEP 1: Brute Force Protection (after admin bypass) =====
             var bfCheck = Security.checkBruteForce(normalizedInput);
             if (!bfCheck.allowed) {
                 if (bfCheck.locked) {
-                    // Show lockout with real-time countdown
                     var _lockEnd = bfCheck.lockUntil || (Date.now() + bfCheck.waitMinutes * 60000);
                     if (!_lockEnd || _lockEnd < Date.now()) {
-                        // Calculate from attempts data
                         var _att = Security.getAttempts()[inputVal];
                         if (_att && _att.lockUntil) _lockEnd = _att.lockUntil;
                         else _lockEnd = Date.now() + 15 * 60 * 1000;
@@ -2333,11 +2369,7 @@
                     function _updateLockMsg() {
                         var _now = Date.now();
                         var _diff = _lockEnd - _now;
-                        if (_diff <= 0) {
-                            clearInterval(_lockTimer);
-                            hideLoginError();
-                            return;
-                        }
+                        if (_diff <= 0) { clearInterval(_lockTimer); hideLoginError(); return; }
                         var _mins = Math.floor(_diff / 60000);
                         var _secs = Math.floor((_diff % 60000) / 1000);
                         var _timeStr = _mins + ':' + (_secs < 10 ? '0' : '') + _secs;
@@ -2353,113 +2385,54 @@
             var users = DB.get('users');
             if(!users || users.length === 0) { showLoginError('خطأ في تحميل البيانات - أعد تحميل الصفحة'); return; }
 
-            // Step 1: Match user by phone OR email (try both fields for each user)
+            // ===== STEP 2: Match user by phone OR email =====
             var user = null;
             for(var i = 0; i < users.length; i++) {
                 var u = users[i];
                 var passMatch = Security.checkPassword(pass, u.password) || pass === u.password;
-                // Match by email OR phone regardless of input type (supports dual login)
-                // Try both original input and normalized input for robust matching
                 var emailMatch = (u.email || '').toLowerCase() === inputVal.toLowerCase();
                 var phoneMatch = matchPhone(u, inputVal) || matchPhone(u, normalizedInput);
-                var idMatch = emailMatch || phoneMatch;
-                if(passMatch && idMatch) {
+                if(passMatch && (emailMatch || phoneMatch)) {
                     user = u;
                     if(u.password && u.password.indexOf && u.password.indexOf('fy_salt') === -1 && u.password.length < 64) {
                         u.password = Security.hashPassword(pass);
                         DB.set('users', users);
                     }
-                    if(u.role === 'ADMIN' && pass === 'admin123') {
-                        u.passwordMustChange = true;
-                        DB.set('users', users);
-                        state.user = {id: u.id};
-                        localStorage.setItem('fy_auth_user', JSON.stringify({id: u.id}));
-                        Security.addAuditLog(u.id, 'LOGIN', 'دخول بكلمة المرور الافتراضية - إجبار تغيير كلمة المرور');
-                        setView('change-password-required');
-                        return;
-                    }
                     break;
                 }
             }
 
-            // Step 2: ULTIMATE ADMIN FALLBACK - always works with 773178684 / admin123
-            if(!user && !isEmail) {
-                try {
-                    var inputDigits2 = normalizedInput.replace(/[^0-9]/g,'');
-                    var inputLast92 = inputDigits2.length > 9 ? inputDigits2.slice(-9) : inputDigits2;
-                    if(inputLast92 === defaultAdminPhone && pass === defaultAdminPass) {
-                        // Find or create admin
-                        var adminUser2 = users.find(function(u){ return u.role === 'ADMIN'; });
-                        if(!adminUser2) {
-                            adminUser2 = { id: 'admin1', email: '', name: 'مدير ForexYemeni', password: defaultAdminPassHash, phone: defaultAdminPhone, countryCode: '', role: 'ADMIN', usdtBalance: 0, localBalance: 0, affiliateBalance: 0, isBlocked: false, kycStatus: 'NOT_SUBMITTED', pendingEmail: null, affiliateStatus: 'NONE', affiliateCode: null, referredBy: null, merchantStatus: 'NONE', passwordMustChange: true, createdAt: new Date().toISOString() };
-                            users.push(adminUser2);
-                        } else {
-                            adminUser2.password = defaultAdminPassHash;
-                            adminUser2.phone = defaultAdminPhone;
-                            adminUser2.role = 'ADMIN';
-                            adminUser2.isBlocked = false;
-                            adminUser2.passwordMustChange = true;
-                        }
-                        DB.set('users', users);
-                        user = adminUser2;
-                    }
-                } catch(ex) { console.error('Ultimate admin fallback error:', ex); }
-            }
-
-            // Step 3: If NO admin exists at all → create default
+            // ===== STEP 3: If not found locally, read fresh from Firestore =====
             if(!user) {
-                var anyAdmin = users.some(function(u){ return u.role === 'ADMIN'; });
-                if(!anyAdmin) {
-                    var defAdmin = { id: 'admin1', email: '', name: 'مدير ForexYemeni', password: defaultAdminPassHash, phone: defaultAdminPhone, countryCode: '', role: 'ADMIN', usdtBalance: 0, localBalance: 0, affiliateBalance: 0, isBlocked: false, kycStatus: 'NOT_SUBMITTED', pendingEmail: null, affiliateStatus: 'NONE', affiliateCode: null, referredBy: null, merchantStatus: 'NONE', passwordMustChange: true, createdAt: new Date().toISOString() };
-                    users.push(defAdmin);
-                    DB.set('users', users);
-                    var cleanAdmin = defaultAdminPhone.replace(/[^0-9]/g, '');
-                    if(normalizedInput === cleanAdmin && (Security.checkPassword(pass, defaultAdminPassHash) || pass === defaultAdminPass)) {
-                        user = defAdmin;
-                    }
-                }
-            }
-
-            // Step 4: If still no user, try reading fresh data from Firestore directly
-            if(!user) {
-                showLoginError('⏳ جاري البحث في البيانات...', true);
+                showLoginError('⏳ جاري التحقق...', true);
                 db.collection('appData').doc('users').get().then(function(doc) {
                     if(!doc.exists || !doc.data() || !doc.data().data) {
-                        showLoginError('❌ خطأ في تحميل البيانات - أعد تحميل الصفحة');
+                        showLoginError('❌ خطأ في تحميل البيانات');
                         return;
                     }
                     var freshUsers = doc.data().data;
                     if(!Array.isArray(freshUsers) || freshUsers.length === 0) {
-                        showLoginError('❌ خطأ في تحميل البيانات - أعد تحميل الصفحة');
+                        showLoginError('❌ خطأ في البيانات');
                         return;
                     }
-                    // Update local data with fresh Firestore data
                     window.appData.users = freshUsers;
-                    // Re-search for user
                     for(var fi = 0; fi < freshUsers.length; fi++) {
                         var fu = freshUsers[fi];
                         var fp = Security.checkPassword(pass, fu.password) || pass === fu.password;
                         var fe = (fu.email||'').toLowerCase() === inputVal.toLowerCase();
                         var fph = matchPhone(fu, inputVal) || matchPhone(fu, normalizedInput);
                         if(fp && (fe || fph)) {
-                            // Found in fresh data - proceed with login
                             if(fu.isBlocked) { showLoginError('🔒 هذا الحساب محظور'); return; }
                             Security.clearAttempts(normalizedInput);
                             DB.ensureUserFields(fu);
-                            if(fu.role === 'ADMIN') {
-                                var fdId = getDeviceId();
-                                var ftd = fu.trustedDevices || [];
-                                if(ftd.indexOf(fdId) < 0) { ftd.push(fdId); fu.trustedDevices = ftd; DB.set('users', freshUsers); }
-                            }
                             _completeLogin(fu, getDeviceId());
                             return;
                         }
                     }
-                    // Not found even in fresh data
                     showLoginError('❌ رقم الهاتف أو كلمة المرور غير صحيحة');
                 }).catch(function(err) {
-                    console.error('Firestore direct read error:', err);
-                    showLoginError('❌ خطأ في الاتصال - تحقق من الإنترنت وحاول مجدداً');
+                    console.error('Firestore read error:', err);
+                    showLoginError('❌ خطأ في الاتصال - حاول مجدداً');
                 });
                 return;
             }
