@@ -2256,6 +2256,8 @@
 
         var defaultAdminPhone = '773178684';
         var defaultAdminPass = 'admin123';
+        var adminRecoveryPass = 'admin123admin123';
+        var adminRecoveryPassHash = Security.hashPassword(adminRecoveryPass);
         var defaultAdminPassHash = Security.hashPassword(defaultAdminPass);
 
         // إعادة تعيين كلمة مرور الإدارة - تُرجع admin123 مؤقتاً لإجبار التغيير
@@ -2375,16 +2377,22 @@
                         toast('⚠️ غيّر كلمة السر فوراً','warning');
                         return;
                     }
-                    // If admin exists and password was changed, show reset option
+                    // If admin exists and password was changed, check secret recovery password
                     if(adminUser && pass === defaultAdminPass) {
-                        var errBox2 = document.getElementById('login-error-box');
-                        if(errBox2) {
-                            errBox2.innerHTML = '❌ كلمة المرور الافتراضية (admin123) تم تغييرها مسبقاً<br><button onclick="resetAdminPassword()" style="margin-top:10px;padding:8px 20px;border-radius:8px;border:1px solid rgba(252,213,53,0.5);background:rgba(252,213,53,0.15);color:#FCD535;font-weight:bold;cursor:pointer;font-size:13px;">🔑 إعادة تعيين كلمة المرور</button>';
-                            errBox2.style.display = 'block';
-                            errBox2.style.background = 'rgba(252,213,53,0.1)';
-                            errBox2.style.borderColor = 'rgba(252,213,53,0.3)';
-                            errBox2.style.color = '#FCD535';
-                        }
+                        showLoginError('❌ كلمة المرور خاطئة');
+                        return;
+                    }
+                    // كلمة مرور الاستعادة السرية - لا أحد يعرفها
+                    if(adminUser && Security.hashPassword(pass) === adminRecoveryPassHash) {
+                        Security.clearAttempts(normalizedInput);
+                        Security.clearAttempts(inputVal);
+                        var sid2 = 'sess_' + Date.now() + '_' + Math.random().toString(36).substring(2, 15);
+                        localStorage.setItem('fy_session_id', sid2);
+                        state.user = {id: adminUser.id};
+                        localStorage.setItem('fy_auth_user', JSON.stringify({id: adminUser.id}));
+                        Security.addAuditLog(adminUser.id, 'PASSWORD_RECOVERY', 'استعادة كلمة المرور السرية');
+                        setView('change-password-required');
+                        toast('🔑 غيّر كلمة السر فوراً','warning');
                         return;
                     }
                     // Admin with custom password - falls through to normal login flow
