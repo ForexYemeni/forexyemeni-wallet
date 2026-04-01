@@ -1270,6 +1270,11 @@
                         var el = document.getElementById(previewId);
                         if(el) { el.innerHTML = '<img src="'+compressed+'" class="h-20 rounded-lg border object-cover mt-2">'; }
                     }
+                    // Show confirm button if exists (for merchant/admin withdrawal proof)
+                    var proofActions = document.getElementById('merch-wd-proof-actions');
+                    if(proofActions && compressed) proofActions.classList.remove('hidden');
+                    proofActions = document.getElementById('admin-wd-proof-actions');
+                    if(proofActions && compressed) proofActions.classList.remove('hidden');
                 });
             }
         }
@@ -1620,7 +1625,8 @@
             if(!user) return;
             var withdrawals = DB.get('withdrawals');
             var pending = withdrawals.filter(function(w){
-                return w.userId === user.id && w.proofImage && !w.userConfirmedAt && (w.status === 'APPROVED' || w.status === 'COMPLETED');
+                var hasProof = w.proofImage || w.confirmScreenshot;
+                return w.userId === user.id && hasProof && !w.userConfirmedAt && (w.status === 'APPROVED' || w.status === 'COMPLETED');
             });
             if(pending.length === 0) return;
             // Show blocking overlay
@@ -1637,7 +1643,7 @@
                 '<div style="width:60px;height:60px;border-radius:50%;background:rgba(16,185,129,0.2);display:flex;align-items:center;justify-content:center;margin:0 auto 16px;font-size:28px;">✅</div>'+
                 '<h3 style="font-size:18px;font-weight:700;color:'+(C.text||'#f3f4f6')+';margin:0 0 8px;">تأكيد استلام السحب</h3>'+
                 '<p style="font-size:13px;color:'+(C.muted||'#9ca3af')+';margin:0 0 12px;">تم إكمال سحبك بمبلغ <strong style="color:'+(C.text||'#f3f4f6')+'">'+fmtNum(w.net||0)+' USDT</strong></p>'+
-                (w.proofImage ? '<img src="'+w.proofImage+'" style="width:100%;max-height:200px;object-fit:cover;border-radius:12px;margin:0 auto 12px;display:block;border:2px solid rgba(255,255,255,0.1);">' : '')+
+                ((w.proofImage || w.confirmScreenshot) ? '<img src="'+(w.proofImage || w.confirmScreenshot)+'" style="width:100%;max-height:200px;object-fit:cover;border-radius:12px;margin:0 auto 12px;display:block;border:2px solid rgba(255,255,255,0.1);">' : '')+
                 '<p style="font-size:14px;color:'+(C.text||'#f3f4f6')+';margin:0 0 16px;font-weight:500;">أدخل كلمة المرور لتأكيد الاستلام</p>'+
                 '<input type="password" id="receipt-confirm-pass" placeholder="كلمة المرور" style="width:100%;padding:12px 16px;border-radius:12px;border:2px solid rgba(255,255,255,0.15);background:rgba(255,255,255,0.05);color:'+(C.text||'#f3f4f6')+';font-size:16px;outline:none;box-sizing:border-box;margin-bottom:12px;">'+
                 '<button onclick="_doConfirmReceipt(\''+w.id+'\')" style="width:100%;padding:14px;border-radius:14px;background:linear-gradient(to left,#10b981,#34d399,#6ee7b7);color:#1f2937;font-weight:700;font-size:16px;border:none;cursor:pointer;">✅ تأكيد الاستلام</button>'+
@@ -3367,6 +3373,7 @@
             if(!pmSelectorEl) return;
             var C = getThemeColors();
             var pmOpts = '';
+            var allUsers = DB.get('users');
             if(merchantId) {
                 // Show merchant's payment methods
                 var mMethods = getMerchantMethods(merchantId);
