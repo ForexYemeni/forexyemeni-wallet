@@ -1931,7 +1931,7 @@
                 var html = '';
                 countries.forEach(function(c) {
                     html += '<div class="flex items-center gap-2 px-3 py-2 rounded cursor-pointer hover:bg-primary/10 text-sm" onclick="selectCountry(\'' + c.code + '\',\'' + prefix + '-country-btn\',null,\'' + prefix + '-phone\')">' +
-                        '<span class="text-lg">' + c.flag + '</span><span>' + c.name + '</span><span class="text-xs opacity-50">' + c.code + '</span></div>';
+                        '<span class="font-medium">' + c.code + '</span><span>' + c.name + '</span></div>';
                 });
                 dd.innerHTML = html;
                 dd.classList.remove('hidden');
@@ -1943,9 +1943,9 @@
         function selectCountry(code, btnId, codeId, phoneId) {
             var c = countries.find(function(x){return x.code === code;});
             if (!c) return;
-            // Update button flag
+            // Update button with country code
             var btn = document.getElementById(btnId);
-            if (btn) btn.textContent = c.flag;
+            if (btn) btn.textContent = c.code;
             // Update hidden input
             var codeInput = document.getElementById(codeId || btnId.replace('-btn', ''));
             if (codeInput) codeInput.value = c.code;
@@ -4568,7 +4568,7 @@
             var hasEmail = !!(user.email && user.email.trim());
             var hasPhone = !!(user.phone && user.phone.trim());
             var userCountry = countries.find(function(c){return c.code === (user.countryCode||'+967');}) || countries[0];
-            var phoneCountryBtn = '<button type="button" id="set-phone-btn" onclick="toggleCountryDropdown(\'set-phone\')" class="w-12 h-[38px] shrink-0 rounded-lg border '+C.border+' '+C.input+' text-center text-lg leading-tight flex items-center justify-center">'+userCountry.flag+'</button>'+
+            var phoneCountryBtn = '<button type="button" id="set-phone-btn" onclick="toggleCountryDropdown(\'set-phone\')" class="w-16 h-[38px] shrink-0 rounded-lg border '+C.border+' '+C.input+' text-center text-xs leading-tight flex items-center justify-center">'+userCountry.code+'</button>'+
                 '<input type="hidden" id="set-phone-country" value="'+userCountry.code+'"><div id="set-phone-country-dropdown" class="hidden absolute top-full left-0 right-0 mt-1 '+C.card+' border '+C.border+' rounded-lg shadow-xl z-50 max-h-48 overflow-y-auto p-1"></div>';
 
             // === EMAIL SECTION ===
@@ -4673,9 +4673,9 @@
                 '<div class="'+C.card+' rounded-xl p-4 border '+C.border+'"><h3 class="font-bold '+C.text+' mb-3">💱 عملة العرض</h3>'+
                 '<p class="text-sm '+C.muted+' mb-3">اختر العملة الافتراضية لعرض الإجماليات والأرصدة</p>'+
                 '<select id="set-display-currency" onchange="saveDisplayCurrency()" class="w-full px-4 py-2.5 rounded-xl border '+C.input+' outline-none">'+
-                '<option value="USDT"'+(getDisplayCurrency()==='USDT'?' selected':'')+'>💵 USDT - دولار أمريكي</option>'+
-                '<option value="YER"'+(getDisplayCurrency()==='YER'?' selected':'')+'>🇾🇪 YER - ريال يمني</option>'+
-                '<option value="SAR"'+(getDisplayCurrency()==='SAR'?' selected':'')+'>🇸🇦 SAR - ريال سعودي</option>'+
+                '<option value="USDT"'+(getDisplayCurrency()==='USDT'?' selected':'')+'>USDT - دولار أمريكي</option>'+
+                '<option value="YER"'+(getDisplayCurrency()==='YER'?' selected':'')+'>YER - ريال يمني</option>'+
+                '<option value="SAR"'+(getDisplayCurrency()==='SAR'?' selected':'')+'>SAR - ريال سعودي</option>'+
                 '</select></div>'+
                 '<div class="'+C.card+' rounded-xl p-4 border '+C.border+'"><h3 class="font-bold '+C.text+' mb-3">🔐 رمز PIN للمعاملات</h3>'+
                 '<p class="text-sm '+C.muted+' mb-3">رمز PIN يحمي معاملاتك حتى لو سُرق الجهاز</p>'+
@@ -7596,7 +7596,7 @@
 
         function showAddMerchantModal() {
             var C = getThemeColors();
-            var opts = countries.map(function(c){return '<option value="'+c.code+'" '+(c.code==='+967'?'selected':'')+'>'+c.flag+' ('+c.code+')</option>';}).join('');
+            var opts = countries.map(function(c){return '<option value="'+c.code+'" '+(c.code==='+967'?'selected':'')+'>'+c.name+' ('+c.code+')</option>';}).join('');
             showModal('<h3 class="text-lg font-bold '+C.text+' mb-4">➕ إضافة تاجر جديد</h3>'+
                 '<div class="space-y-3">'+
                 '<div><label class="block text-sm font-medium '+C.text+' mb-1">اسم التاجر <span class="text-danger">*</span></label><input type="text" id="new-merchant-name" class="w-full px-4 py-2.5 rounded-xl border '+C.input+' outline-none" placeholder="اسم التاجر"></div>'+
@@ -8369,43 +8369,43 @@
             var users = DB.get('users');
             var adminUser = users.find(function(u){return u.role==='ADMIN';});
             return '<div class="'+C.card+' rounded-2xl p-6 max-w-2xl mx-auto border '+C.border+'">'+
-                '<h2 class="text-xl font-bold '+C.text+' mb-6 text-center">⚙️ الإعدادات العامة</h2>'+
-                '<div class="space-y-6">'+
+                '<h2 class="text-xl font-bold '+C.text+' mb-5 text-center">الإعدادات العامة</h2>'+
+                '<div class="space-y-4">'+
                 (adminUser ? renderNotifSettingsSection(C, adminUser.id) : '')+
-                '<div class="'+C.card+' rounded-xl p-4 border '+C.border+'"><h3 class="font-bold '+C.text+' mb-3">💱 العملات والرسوم</h3><div class="space-y-3">'+
+                '<div class="'+C.card+' rounded-xl p-4 border '+C.border+'"><h3 class="font-bold '+C.text+' mb-3">العملات والرسوم</h3><div class="space-y-3">'+
                 '<div class="grid grid-cols-2 gap-3">'+
-                '<div><label class="block text-sm '+C.muted+' mb-1">🇾🇪 سعر الصرف (1 USDT = ? YER)</label><input type="number" id="set-rate" value="'+rate+'" class="w-full px-4 py-2.5 rounded-xl border '+C.input+' outline-none"></div>'+
-                '<div><label class="block text-sm '+C.muted+' mb-1">🇸🇦 سعر الصرف (1 SAR = ? YER)</label><input type="number" id="set-rate-sar" value="'+(DB.getSetting('exchange_rate_sar')||'137.50')+'" class="w-full px-4 py-2.5 rounded-xl border '+C.input+' outline-none" step="0.01" placeholder="مثال: 137.50"></div></div>'+
+                '<div><label class="block text-xs '+C.muted+' mb-1">سعر الصرف (1 USDT = ? YER)</label><input type="number" id="set-rate" value="'+rate+'" class="w-full px-3 py-2.5 rounded-xl border '+C.input+' outline-none text-sm"></div>'+
+                '<div><label class="block text-xs '+C.muted+' mb-1">سعر الصرف (1 SAR = ? YER)</label><input type="number" id="set-rate-sar" value="'+(DB.getSetting('exchange_rate_sar')||'137.50')+'" class="w-full px-3 py-2.5 rounded-xl border '+C.input+' outline-none text-sm" step="0.01" placeholder="مثال: 137.50"></div></div>'+
                 '<div class="grid grid-cols-2 gap-3">'+
-                '<div><label class="block text-sm '+C.muted+' mb-1">💰 رسوم الإيداع - الإدارة (%)</label><input type="number" id="set-admin-dep-fee" value="'+adminDepFee+'" class="w-full px-4 py-2.5 rounded-xl border '+C.input+' outline-none" min="0" max="100" step="0.1"></div>'+
-                '<div><label class="block text-sm '+C.muted+' mb-1">💸 رسوم السحب - الإدارة (%)</label><input type="number" id="set-admin-wd-fee" value="'+adminWdFee+'" class="w-full px-4 py-2.5 rounded-xl border '+C.input+' outline-none" min="0" max="100" step="0.1"></div></div>'+
+                '<div><label class="block text-xs '+C.muted+' mb-1">رسوم الإيداع - الإدارة (%)</label><input type="number" id="set-admin-dep-fee" value="'+adminDepFee+'" class="w-full px-3 py-2.5 rounded-xl border '+C.input+' outline-none text-sm" min="0" max="100" step="0.1"></div>'+
+                '<div><label class="block text-xs '+C.muted+' mb-1">رسوم السحب - الإدارة (%)</label><input type="number" id="set-admin-wd-fee" value="'+adminWdFee+'" class="w-full px-3 py-2.5 rounded-xl border '+C.input+' outline-none text-sm" min="0" max="100" step="0.1"></div></div>'+
                 '<div class="grid grid-cols-2 gap-3">'+
-                '<div><label class="block text-sm '+C.muted+' mb-1">عمولة التاجر (%)</label><input type="number" id="set-merch-comm" value="'+merchantComm+'" class="w-full px-4 py-2.5 rounded-xl border '+C.input+' outline-none" min="0" max="100" step="0.1"></div>'+
-                '<div><label class="block text-sm '+C.muted+' mb-1">رسوم عامة (%)</label><input type="number" id="set-fee" value="'+fee+'" class="w-full px-4 py-2.5 rounded-xl border '+C.input+' outline-none" min="0" max="100" step="0.1"></div></div></div>'+
-                '<div class="'+C.card+' rounded-xl p-4 border '+C.border+'"><h3 class="font-bold '+C.text+' mb-3">📊 الحدود اليومية</h3><div class="grid grid-cols-2 gap-3">'+
-                '<div><label class="block text-sm '+C.muted+' mb-1">الحد اليومي للايداع (USDT)</label><input type="number" id="set-daily-dep-limit" value="'+dailyDepLimit+'" class="w-full px-4 py-2.5 rounded-xl border '+C.input+' outline-none" min="0"></div>'+
-                '<div><label class="block text-sm '+C.muted+' mb-1">الحد اليومي للسحب (USDT)</label><input type="number" id="set-daily-wd-limit" value="'+dailyWdLimit+'" class="w-full px-4 py-2.5 rounded-xl border '+C.input+' outline-none" min="0"></div></div></div>'+
-                '<div class="'+C.card+' rounded-xl p-4 border '+C.border+'"><h3 class="font-bold '+C.text+' mb-3">🔗 نسب العمولة</h3><div class="grid grid-cols-3 gap-3">'+
-                '<div><label class="block text-sm '+C.muted+' mb-1">المستوى 1 (%)</label><input type="number" id="set-l1" value="'+l1+'" class="w-full px-4 py-2.5 rounded-xl border '+C.input+' outline-none" min="0" max="100"></div>'+
-                '<div><label class="block text-sm '+C.muted+' mb-1">المستوى 2 (%)</label><input type="number" id="set-l2" value="'+l2+'" class="w-full px-4 py-2.5 rounded-xl border '+C.input+' outline-none" min="0" max="100"></div>'+
-                '<div><label class="block text-sm '+C.muted+' mb-1">المستوى 3 (%)</label><input type="number" id="set-l3" value="'+l3+'" class="w-full px-4 py-2.5 rounded-xl border '+C.input+' outline-none" min="0" max="100"></div></div></div>'+
-                '<div class="'+C.card+' rounded-xl p-4 border '+C.border+'"><h3 class="font-bold '+C.text+' mb-3">📞 بيانات التواصل (تظهر للمستخدمين)</h3><div class="space-y-3">'+
-                '<div><label class="block text-sm '+C.muted+' mb-1">رقم الهاتف</label><input type="text" id="set-admin-phone" value="'+escHtml(adminPhone)+'" class="w-full px-4 py-2.5 rounded-xl border '+C.input+' outline-none" placeholder="+967..."></div>'+
-                '<div><label class="block text-sm '+C.muted+' mb-1">رقم واتساب</label><input type="text" id="set-admin-wa" value="'+escHtml(adminWA)+'" class="w-full px-4 py-2.5 rounded-xl border '+C.input+' outline-none" placeholder="+967..."></div></div></div>'+
-                '<div class="'+C.card+' rounded-xl p-4 border '+C.border+'"><h3 class="font-bold '+C.text+' mb-3">🔗 محفظة TRC20 للتحقق التلقائي من الإيداعات</h3><div class="space-y-3">'+
-                '<div><label class="block text-sm '+C.muted+' mb-1">📱 عنوان محفظة TRC20 (USDT)</label><input type="text" id="set-trc20-wallet" value="'+escHtml(DB.getSetting('admin_trc20_wallet')||'')+'" class="w-full px-4 py-2.5 rounded-xl border '+C.input+' outline-none font-mono text-sm" placeholder="T..."><p class="text-xs '+C.muted+' mt-1">عنوان محفظة USDT على شبكة TRON للتحقق التلقائي من TXID</p></div>'+
-                '<div class="flex items-center gap-3 p-3 rounded-lg border '+C.border+'"><div class="flex-1"><p class="text-sm font-medium '+C.text+'">⚡ موافقة تلقائية على الإيداعات المُحققة</p><p class="text-xs '+C.muted+'">عند التحقق من TXID يوافق تلقائياً ويضيف الرصيد</p></div>'+
+                '<div><label class="block text-xs '+C.muted+' mb-1">عمولة التاجر (%)</label><input type="number" id="set-merch-comm" value="'+merchantComm+'" class="w-full px-3 py-2.5 rounded-xl border '+C.input+' outline-none text-sm" min="0" max="100" step="0.1"></div>'+
+                '<div><label class="block text-xs '+C.muted+' mb-1">رسوم عامة (%)</label><input type="number" id="set-fee" value="'+fee+'" class="w-full px-3 py-2.5 rounded-xl border '+C.input+' outline-none text-sm" min="0" max="100" step="0.1"></div></div></div></div>'+
+                '<div class="'+C.card+' rounded-xl p-4 border '+C.border+'"><h3 class="font-bold '+C.text+' mb-3">الحدود اليومية</h3><div class="grid grid-cols-2 gap-3">'+
+                '<div><label class="block text-xs '+C.muted+' mb-1">الحد اليومي للايداع (USDT)</label><input type="number" id="set-daily-dep-limit" value="'+dailyDepLimit+'" class="w-full px-3 py-2.5 rounded-xl border '+C.input+' outline-none text-sm" min="0"></div>'+
+                '<div><label class="block text-xs '+C.muted+' mb-1">الحد اليومي للسحب (USDT)</label><input type="number" id="set-daily-wd-limit" value="'+dailyWdLimit+'" class="w-full px-3 py-2.5 rounded-xl border '+C.input+' outline-none text-sm" min="0"></div></div></div>'+
+                '<div class="'+C.card+' rounded-xl p-4 border '+C.border+'"><h3 class="font-bold '+C.text+' mb-3">نسب العمولة</h3><div class="grid grid-cols-3 gap-2">'+
+                '<div><label class="block text-xs '+C.muted+' mb-1">المستوى 1 (%)</label><input type="number" id="set-l1" value="'+l1+'" class="w-full px-3 py-2.5 rounded-xl border '+C.input+' outline-none text-sm" min="0" max="100"></div>'+
+                '<div><label class="block text-xs '+C.muted+' mb-1">المستوى 2 (%)</label><input type="number" id="set-l2" value="'+l2+'" class="w-full px-3 py-2.5 rounded-xl border '+C.input+' outline-none text-sm" min="0" max="100"></div>'+
+                '<div><label class="block text-xs '+C.muted+' mb-1">المستوى 3 (%)</label><input type="number" id="set-l3" value="'+l3+'" class="w-full px-3 py-2.5 rounded-xl border '+C.input+' outline-none text-sm" min="0" max="100"></div></div></div>'+
+                '<div class="'+C.card+' rounded-xl p-4 border '+C.border+'"><h3 class="font-bold '+C.text+' mb-3">بيانات التواصل</h3><p class="text-xs '+C.muted+' mb-3">تظهر للمستخدمين في صفحة التواصل</p><div class="grid grid-cols-2 gap-3">'+
+                '<div><label class="block text-xs '+C.muted+' mb-1">رقم الهاتف</label><input type="text" id="set-admin-phone" value="'+escHtml(adminPhone)+'" class="w-full px-3 py-2.5 rounded-xl border '+C.input+' outline-none text-sm" placeholder="+967..."></div>'+
+                '<div><label class="block text-xs '+C.muted+' mb-1">رقم واتساب</label><input type="text" id="set-admin-wa" value="'+escHtml(adminWA)+'" class="w-full px-3 py-2.5 rounded-xl border '+C.input+' outline-none text-sm" placeholder="+967..."></div></div></div>'+
+                '<div class="'+C.card+' rounded-xl p-4 border '+C.border+'"><h3 class="font-bold '+C.text+' mb-3">محفظة TRC20</h3><p class="text-xs '+C.muted+' mb-3">للتحقق التلقائي من الإيداعات</p><div class="space-y-3">'+
+                '<div><label class="block text-xs '+C.muted+' mb-1">عنوان محفظة TRC20 (USDT)</label><input type="text" id="set-trc20-wallet" value="'+escHtml(DB.getSetting('admin_trc20_wallet')||'')+'" class="w-full px-3 py-2.5 rounded-xl border '+C.input+' outline-none font-mono text-xs" placeholder="T..."></div>'+
+                '<div class="flex items-center gap-3 p-3 rounded-lg border '+C.border+'"><div class="flex-1"><p class="text-sm font-medium '+C.text+'">موافقة تلقائية على الإيداعات المُحققة</p><p class="text-xs '+C.muted+'">عند التحقق من TXID يوافق تلقائياً ويضيف الرصيد</p></div>'+
                 '<div onclick="var cb=document.getElementById(\'set-auto-approve-crypto\');cb.checked=!cb.checked;this.className=cb.checked?\'w-12 h-7 rounded-full bg-success relative cursor-pointer transition-colors\':\'w-12 h-7 rounded-full bg-gray-400 relative cursor-pointer transition-colors\';this.children[0].className=cb.checked?\'absolute top-[2px] right-[2px] w-6 h-6 bg-white rounded-full shadow transition-all\':\'absolute top-[2px] left-[2px] w-6 h-6 bg-white rounded-full shadow transition-all\'" class="'+(DB.getSetting('auto_approve_crypto')==='1'?'w-12 h-7 rounded-full bg-success relative cursor-pointer transition-colors':'w-12 h-7 rounded-full bg-gray-400 relative cursor-pointer transition-colors')+'"><div class="'+(DB.getSetting('auto_approve_crypto')==='1'?'absolute top-[2px] right-[2px] w-6 h-6 bg-white rounded-full shadow transition-all':'absolute top-[2px] left-[2px] w-6 h-6 bg-white rounded-full shadow transition-all')+'"></div></div>'+
-                '<input type="checkbox" id="set-auto-approve-crypto" class="hidden" '+(DB.getSetting('auto_approve_crypto')==='1'?'checked':'')+'></div></div>'+
+                '<input type="checkbox" id="set-auto-approve-crypto" class="hidden" '+(DB.getSetting('auto_approve_crypto')==='1'?'checked':'')+'></div></div></div>'+
                 renderAdminBannerSettings(C)+
                 renderAdminBannerAdSettings(C)+
                 (adminUser ? renderContactManagement(C, adminUser, 'ADMIN') : '')+
-                '<div class="'+C.card+' rounded-xl p-5 border-2 border-danger/40 bg-danger/5"><h3 class="font-bold text-danger mb-3 text-center text-lg">⚠️ إعادة تعيين التطبيق بالكامل</h3>'+
-                '<p class="'+C.muted+' text-sm mb-4 text-center">حذف جميع البيانات: المستخدمين، الإيداعات، السحوبات، التوثيق، الرسائل، الإشعارات، سجل العمليات — وإعادة التطبيق لحالة نظيفة تماماً (مع الإبقاء على حساب الإدارة وإعداداته)</p>'+
-                '<button onclick="resetAppData()" class="w-full py-3 rounded-lg font-bold text-white bg-gradient-to-r from-red-500 to-rose-600 btn text-lg">🗑️ حذف جميع البيانات وإعادة التعيين</button></div>'+
-                '<div class="'+C.card+' rounded-xl p-4 border '+C.border+'"><h3 class="font-bold '+C.text+' mb-3">🔐 كلمة مرور المدير</h3><div class="space-y-3">'+
-                '<div><label class="block text-sm '+C.muted+' mb-1">كلمة المرور الجديدة (اتركها فارغة لعدم التغيير)</label><input type="password" id="set-admin-pass" class="w-full px-4 py-2.5 rounded-xl border '+C.input+' outline-none" placeholder="كلمة المرور الجديدة"></div></div></div>'+
-                '<button onclick="saveAdminSettings()" class="'+C.btn+' w-full py-3 rounded-lg font-bold btn text-lg">💾 حفظ جميع الإعدادات</button></div></div>';
+                '<div class="'+C.card+' rounded-xl p-4 border-2 border-danger/40 bg-danger/5"><h3 class="font-bold text-danger mb-2 text-center">إعادة تعيين التطبيق بالكامل</h3>'+
+                '<p class="'+C.muted+' text-xs mb-3 text-center">حذف جميع البيانات وإعادة التطبيق لحالة نظيفة (مع الإبقاء على حساب الإدارة وإعداداته)</p>'+
+                '<button onclick="resetAppData()" class="w-full py-2.5 rounded-lg font-bold text-white bg-gradient-to-r from-red-500 to-rose-600 btn text-sm">حذف جميع البيانات وإعادة التعيين</button></div>'+
+                '<div class="'+C.card+' rounded-xl p-4 border '+C.border+'"><h3 class="font-bold '+C.text+' mb-3">كلمة مرور المدير</h3>'+
+                '<label class="block text-xs '+C.muted+' mb-1">كلمة المرور الجديدة (اتركها فارغة لعدم التغيير)</label><input type="password" id="set-admin-pass" class="w-full px-3 py-2.5 rounded-xl border '+C.input+' outline-none text-sm" placeholder="كلمة المرور الجديدة"></div>'+
+                '<button onclick="saveAdminSettings()" class="'+C.btn+' w-full py-3 rounded-lg font-bold btn text-base">حفظ جميع الإعدادات</button></div></div>';
         }
 
         // ==================== RESET ALL APP DATA ====================
@@ -9158,14 +9158,13 @@
                 'SUCCESS': {bg:'bg-success/10', border:'border-success/30', text:'text-success', icon:'✅'}
             };
             var c = colors[bannerType] || colors['INFO'];
-            var countryFlags = bannerCountries.trim() ? ' ' + bannerCountries.split(',').map(function(cc){
+            var countryLabel = bannerCountries.trim() ? ' ' + bannerCountries.split(',').map(function(cc){
                 var co = countries.find(function(x){return x.code===cc.trim();});
-                return co ? co.flag : '';
-            }).join('') : ' 🌍';
+                return co ? co.name : cc.trim();
+            }).join(', ') : '';
             return '<div class="p-3 rounded-lg border '+c.border+' '+c.bg+' flex items-center gap-3">'+
                 '<span class="text-xl shrink-0">'+c.icon+'</span>'+
-                '<p class="text-sm '+c.text+' flex-1">'+escHtml(banner)+'</p>'+
-                '<span class="text-sm shrink-0">'+countryFlags+'</span></div>';
+                '<p class="text-sm '+c.text+' flex-1">'+escHtml(banner)+'</p></div>';
         }
 
         function renderAdminBannerSettings(C) {
@@ -9174,54 +9173,31 @@
             var bannerActive = DB.getSetting('admin_banner_active') === 'true';
             var bannerCountries = DB.getSetting('admin_banner_countries') || '';
             var selectedCountries = bannerCountries ? bannerCountries.split(',').map(function(c){return c.trim();}) : [];
-            // Build country flags HTML
-            var flagsHtml = '<div class="flex flex-wrap gap-2 mb-3" id="banner-country-flags">';
-            // "All" button
-            flagsHtml += '<button onclick="setBannerCountry(\'ALL\')" class="w-10 h-10 rounded-lg flex items-center justify-center text-lg btn border-2 '+(selectedCountries.indexOf('ALL')>=0 ? 'border-primary bg-primary/20' : C.border+' '+C.card)+'" title="جميع الدول">🌍</button>';
+            // Build clean dropdown HTML instead of flags
+            var isAll = selectedCountries.length === 0 || selectedCountries.indexOf('ALL') >= 0;
+            var selectOpts = '<option value="ALL" '+(isAll?'selected':'')+'>جميع الدول</option>';
             countries.forEach(function(co) {
-                var isSelected = selectedCountries.indexOf(co.code) >= 0;
-                flagsHtml += '<button onclick="setBannerCountry(\''+co.code+'\')" class="w-10 h-10 rounded-lg flex items-center justify-center text-lg btn border-2 '+(isSelected ? 'border-primary bg-primary/20' : C.border+' '+C.card)+'" title="'+escHtml(co.name)+'">'+co.flag+'</button>';
+                var sel = selectedCountries.indexOf(co.code) >= 0 ? 'selected' : '';
+                selectOpts += '<option value="'+co.code+'" '+sel+'>'+escHtml(co.name)+' ('+co.code+')</option>';
             });
-            flagsHtml += '</div>';
-            // Show selected countries
-            var selectedLabel = '🌍 الجميع';
-            if (selectedCountries.length > 0 && selectedCountries[0] !== 'ALL') {
-                selectedLabel = selectedCountries.map(function(cc){
-                    var co = countries.find(function(x){return x.code===cc;});
-                    return co ? co.flag+' '+co.name : cc;
-                }).join(' • ');
-            }
             return '<div class="'+C.card+' rounded-xl p-4 border '+C.border+'"><h3 class="font-bold '+C.text+' mb-3">📢 شعار تنبيه للمستخدمين</h3>'+
                 '<p class="text-xs '+C.muted+' mb-3">يظهر هذا التنبيه للمستخدمين في أعلى الصفحة الرئيسية</p>'+
-                '<div class="'+C.card+' rounded-xl p-3 border '+C.border+' mb-3"><p class="text-xs '+C.muted+' mb-2">🎯 استهداف الدول (اختر أعلام الدول):</p>'+
-                '<p class="text-xs font-medium '+C.text+' mb-2">'+selectedLabel+'</p>'+flagsHtml+'</div>'+
+                '<div class="space-y-3 mb-3">'+
+                '<div><label class="block text-sm '+C.muted+' mb-1">استهداف الدول</label>'+
+                '<select id="set-banner-country" onchange="setBannerCountry(this.value)" class="w-full px-4 py-2.5 rounded-xl border '+C.input+' outline-none text-sm">'+selectOpts+'</select>'+
+                '<p class="text-xs '+C.muted+' mt-1">اختر الدولة المستهدفة أو "جميع الدول"</p></div></div>'+
                 '<div class="flex gap-2 mb-3">'+
-                '<button onclick="DB.setSetting(\'admin_banner_type\',\'INFO\');render()" class="flex-1 py-2 rounded-lg text-xs font-bold btn '+(bannerType==='INFO'?'bg-info text-white':'border border-info/30 '+C.text)+'">ℹ️ معلومة</button>'+
-                '<button onclick="DB.setSetting(\'admin_banner_type\',\'WARNING\');render()" class="flex-1 py-2 rounded-lg text-xs font-bold btn '+(bannerType==='WARNING'?'bg-warning text-dark-bg':'border border-warning/30 '+C.text)+'">⚠️ تحذير</button>'+
-                '<button onclick="DB.setSetting(\'admin_banner_type\',\'DANGER\');render()" class="flex-1 py-2 rounded-lg text-xs font-bold btn '+(bannerType==='DANGER'?'bg-danger text-white':'border border-danger/30 '+C.text)+'">🚨 خطر</button>'+
-                '<button onclick="DB.setSetting(\'admin_banner_type\',\'SUCCESS\');render()" class="flex-1 py-2 rounded-lg text-xs font-bold btn '+(bannerType==='SUCCESS'?'bg-success text-dark-bg':'border border-success/30 '+C.text)+'">✅ نجاح</button></div>'+
+                '<button onclick="DB.setSetting(\'admin_banner_type\',\'INFO\');render()" class="flex-1 py-2 rounded-lg text-xs font-bold btn '+(bannerType==='INFO'?'bg-info text-white':'border border-info/30 '+C.text)+'">معلومة</button>'+
+                '<button onclick="DB.setSetting(\'admin_banner_type\',\'WARNING\');render()" class="flex-1 py-2 rounded-lg text-xs font-bold btn '+(bannerType==='WARNING'?'bg-warning text-dark-bg':'border border-warning/30 '+C.text)+'">تحذير</button>'+
+                '<button onclick="DB.setSetting(\'admin_banner_type\',\'DANGER\');render()" class="flex-1 py-2 rounded-lg text-xs font-bold btn '+(bannerType==='DANGER'?'bg-danger text-white':'border border-danger/30 '+C.text)+'">خطر</button>'+
+                '<button onclick="DB.setSetting(\'admin_banner_type\',\'SUCCESS\');render()" class="flex-1 py-2 rounded-lg text-xs font-bold btn '+(bannerType==='SUCCESS'?'bg-success text-dark-bg':'border border-success/30 '+C.text)+'">نجاح</button></div>'+
                 '<textarea id="set-banner-text" class="w-full px-3 py-2.5 rounded-xl border '+C.input+' outline-none text-sm mb-3" rows="2" placeholder="اكتب نص التنبيه هنا...">'+escHtml(banner)+'</textarea>'+
-                '<button onclick="saveBanner()" class="w-full py-2.5 rounded-lg font-bold btn '+(bannerActive?'bg-danger text-white':'bg-success text-dark-bg')+' text-sm">'+(bannerActive?'🔒 إخفاء التنبيه':'📢 تفعيل وحفظ التنبيه')+'</button></div>';
+                '<button onclick="saveBanner()" class="w-full py-2.5 rounded-lg font-bold btn '+(bannerActive?'bg-danger text-white':'bg-success text-dark-bg')+' text-sm">'+(bannerActive?'إخفاء التنبيه':'تفعيل وحفظ التنبيه')+'</button></div>';
         }
 
         function setBannerCountry(code) {
-            var current = DB.getSetting('admin_banner_countries') || '';
-            var selected = current ? current.split(',').map(function(c){return c.trim();}) : [];
-            var idx = selected.indexOf(code);
-            if (code === 'ALL') {
-                selected = ['ALL']; // "All" clears everything else
-            } else {
-                // Remove 'ALL' if selecting specific country
-                selected = selected.filter(function(c){return c !== 'ALL';});
-                if (idx >= 0) {
-                    selected.splice(idx, 1);
-                } else {
-                    selected.push(code);
-                }
-            }
-            if (selected.length === 0) selected = ['ALL'];
-            DB.setSetting('admin_banner_countries', selected.join(','));
-            render();
+            // Single selection from dropdown
+            DB.setSetting('admin_banner_countries', code);
         }
 
         function saveBanner() {
