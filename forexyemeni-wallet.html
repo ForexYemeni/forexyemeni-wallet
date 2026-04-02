@@ -2269,14 +2269,27 @@
             createSession: function(userId) {
                 var sessionId = 'sess_' + Date.now() + '_' + Math.random().toString(36).substring(2, 15);
                 localStorage.setItem('fy_session_id', sessionId);
-                // Save to Firestore (users array)
-                var users = DB.get('users');
-                var user = users.find(function(u){return u.id === userId;});
-                if(user) {
-                    user.sessionId = sessionId;
-                    user.lastLoginAt = new Date().toISOString();
-                    DB.set('users', users);
-                }
+                // Update ONLY the specific user's session in Firestore (not the entire array)
+                // This prevents race conditions that could wipe other users
+                db.collection('appData').doc('users').get().then(function(doc) {
+                    if (doc.exists && doc.data() && doc.data().data) {
+                        var users = doc.data().data;
+                        var user = users.find(function(u){return u.id === userId;});
+                        if(user) {
+                            user.sessionId = sessionId;
+                            user.lastLoginAt = new Date().toISOString();
+                            db.collection('appData').doc('users').set({ data: users }).catch(function(err){
+                                console.error('[createSession] Firestore write error:', err);
+                            });
+                            // Update local cache
+                            var localUsers = window.appData.users || [];
+                            var localUser = localUsers.find(function(u){return u.id === userId;});
+                            if(localUser) { localUser.sessionId = sessionId; localUser.lastLoginAt = new Date().toISOString(); }
+                        }
+                    }
+                }).catch(function(err) {
+                    console.error('[createSession] Firestore read error:', err);
+                });
                 return sessionId;
             },
             validateSession: function(userId) {
@@ -3073,15 +3086,18 @@
                 if (user) {
                     user.password = Security.hashPassword(newPass);
                     user.passwordMustChange = false;
-                    db.collection('appData').doc('users').set({ data: users });
-                    // CRITICAL: Update local cache immediately so Security.createSession reads correct data
-                    var _localUsers = DB.get('users');
-                    var _localUser = _localUsers.find(function(u){ return u.id === state.user.id; });
-                    if (_localUser) {
-                        _localUser.password = user.password;
-                        _localUser.passwordMustChange = false;
-                        window.appData['users'] = _localUsers;
-                    }
+                    // Write to Firestore — onSnapshot will update local cache automatically
+                    db.collection('appData').doc('users').set({ data: users }).then(function() {
+                        // Verify write succeeded by re-reading from Firestore
+                        return db.collection('appData').doc('users').get();
+                    }).then(function(verifyDoc) {
+                        if (verifyDoc && verifyDoc.exists && verifyDoc.data() && verifyDoc.data().data) {
+                            // Sync local cache from Firestore (authoritative source)
+                            window.appData['users'] = verifyDoc.data().data;
+                        }
+                    }).catch(function(err) {
+                        console.error('[PasswordChange] Verify read error:', err);
+                    });
                     Security.addAuditLog(user.id, 'PASSWORD_CHANGE', 'تغيير كلمة المرور (إجباري)');
                     toast('تم تغيير كلمة المرور بنجاح ✓','success');
                     // Fire and forget: notify user via email/SMS
@@ -8638,7 +8654,17 @@
                         var isAdminDefault = (storedPass === 'admin123' || Security.hashPassword('admin123') === storedPass);
                         if(isAdminDefault) {
                             user.passwordMustChange = true;
-                            DB.set('users', users);
+                            // Update ONLY this field in Firestore, don't overwrite entire array
+                            db.collection('appData').doc('users').get().then(function(doc) {
+                                if (doc.exists && doc.data() && doc.data().data) {
+                                    var fsUsers = doc.data().data;
+                                    var fsUser = fsUsers.find(function(u){return u.id === user.id;});
+                                    if (fsUser) {
+                                        fsUser.passwordMustChange = true;
+                                        db.collection('appData').doc('users').set({ data: fsUsers }).catch(console.error);
+                                    }
+                                }
+                            }).catch(console.error);
                             state.user = {id: user.id};
                             localStorage.setItem('fy_auth_user', JSON.stringify({id: user.id}));
                             setView('change-password-required');
@@ -8647,7 +8673,17 @@
                         // Password was changed but passwordMustChange flag stuck - clear it
                         if(user.passwordMustChange === true) {
                             user.passwordMustChange = false;
-                            DB.set('users', users);
+                            // Update ONLY this field in Firestore, don't overwrite entire array
+                            db.collection('appData').doc('users').get().then(function(doc) {
+                                if (doc.exists && doc.data() && doc.data().data) {
+                                    var fsUsers = doc.data().data;
+                                    var fsUser = fsUsers.find(function(u){return u.id === user.id;});
+                                    if (fsUser) {
+                                        fsUser.passwordMustChange = false;
+                                        db.collection('appData').doc('users').set({ data: fsUsers }).catch(console.error);
+                                    }
+                                }
+                            }).catch(console.error);
                         }
                     }
                     DB.ensureUserFields(user);
@@ -8705,15 +8741,22 @@
                 db.collection('appData').doc(key).get().then(function(doc) {
                         if(doc.exists && doc.data() && doc.data().data) {
                             window.appData[key] = doc.data().data;
-                        } else {
+                        } else if(!doc.exists) {
+                            // ONLY write defaults if document doesn't exist at all
                             window.appData[key] = getDefaultData(key);
                             db.collection('appData').doc(key).set({ data: window.appData[key] }).catch(function(){});
+                        } else {
+                            // Document exists but data is null/empty — DO NOT overwrite with defaults!
+                            // This prevents losing users when Firestore has a read issue
+                            console.warn('[initData] ' + key + ' exists but has no data field — keeping current value');
+                            window.appData[key] = window.appData[key] || [];
                         }
                         pending--;
                         if(pending <= 0) finishInit();
                     }).catch(function(err) {
                         console.error('Load ' + key + ' error:', err);
-                        window.appData[key] = getDefaultData(key);
+                        // On network error, keep whatever we have — DON'T overwrite with defaults!
+                        window.appData[key] = window.appData[key] || [];
                         pending--;
                         if(pending <= 0) finishInit();
                     });
