@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ForexYemeni Wallet v10.1 - محفظة العملات الرقمية</title>
+    <title>ForexYemeni Wallet v10.3 - محفظة العملات الرقمية</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
         tailwind.config = {
@@ -1339,7 +1339,7 @@
             users: null, paymentMethods: null, deposits: null, withdrawals: null,
             kycDocuments: null, notifications: null, userWithdrawalMethods: null,
             transactionLog: null, messages: null, settings: null, merchantRequests: null,
-            merchantTransactions: null, profileChangeRequests: null, merchants: null, deviceApprovals: null,
+            merchantTransactions: null, profileChangeRequests: null, accountDeleteRequests: null, merchants: null, deviceApprovals: null,
             loginPermissions: null, fcmTokens: null,
             merchantPaymentData: null,
             merchantPaymentMethods: null, merchantRatings: null, auditLog: null
@@ -1373,6 +1373,7 @@
             if (key === 'merchantRequests') return [];
             if (key === 'merchantTransactions') return [];
             if (key === 'profileChangeRequests') return [];
+            if (key === 'accountDeleteRequests') return [];
             if (key === 'deviceApprovals') return [];
             if (key === 'merchantPaymentData') return {};
             if (key === 'merchantPaymentMethods') return [];
@@ -3207,6 +3208,7 @@
                     {id:'admin-affiliate',icon:'🔗',label:'العمولة'},
                     {id:'_sep2'},
                     {id:'admin-profile-changes',icon:'📝',label:'تغيير البيانات'},
+                    {id:'admin-delete-requests',icon:'🗑️',label:'حذف الحسابات'},
                     {id:'admin-device-approvals',icon:'📱',label:'الأجهزة'},
                     {id:'admin-login-permissions',icon:'🔐',label:'تصاريح الدخول'},
                     {id:'admin-chat',icon:'💬',label:'الدعم'},
@@ -3292,6 +3294,10 @@
                     var pendingMerch = (DB.get('merchantRequests')||[]).filter(function(r){return r.status==='PENDING';}).length;
                     if(pendingMerch > 0) badge = '<span class="mr-auto bg-warning text-dark-bg text-xs w-5 h-5 rounded-full flex items-center justify-center">'+pendingMerch+'</span>';
                 }
+                if(item.id==='admin-delete-requests') {
+                    var pendingDel = (DB.get('accountDeleteRequests')||[]).filter(function(r){return r.status==='PENDING';}).length;
+                    if(pendingDel > 0) badge = '<span class="mr-auto bg-danger text-white text-xs w-5 h-5 rounded-full flex items-center justify-center">'+pendingDel+'</span>';
+                }
                 return '<button onclick="setView(\''+item.id+'\')" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm sidebar-item btn '+(active?'active bg-primary/15 text-primary font-bold':C.text)+'">'+
                     '<span class="text-lg">'+item.icon+'</span><span>'+item.label+'</span>'+badge+'</button>';
             }).join('');
@@ -3339,6 +3345,7 @@
                 case 'admin-merchants': contentHtml = renderAdminMerchants(C); break;
                 case 'admin-merchant-transactions': contentHtml = renderAdminMerchantTransactions(C); break;
                 case 'admin-profile-changes': contentHtml = renderAdminProfileChanges(C); break;
+                case 'admin-delete-requests': contentHtml = renderAdminDeleteRequests(C); break;
                 case 'admin-device-approvals': contentHtml = renderAdminDeviceApprovals(C); break;
                 case 'admin-login-permissions': contentHtml = renderAdminLoginPermissions(C); break;
                 case 'admin-reports': contentHtml = renderAdminReports(C); break;
@@ -3414,7 +3421,7 @@
             var deposits = DB.get('deposits').filter(function(d){return d.userId===user.id;});
             var withdrawals = DB.get('withdrawals').filter(function(w){return w.userId===user.id;});
             var totalDepUsdt = deposits.filter(function(d){return d.status==='APPROVED';}).reduce(function(s,d){return s+(d.usdtAmount||0);},0);
-            var totalWdUsdt = withdrawals.filter(function(w){return w.status==='APPROVED';}).reduce(function(s,w){return s+(w.net||0);},0);
+            var totalWdUsdt = withdrawals.filter(function(w){return w.status==='APPROVED'||w.status==='COMPLETED'||w.status==='RECEIVED';}).reduce(function(s,w){return s+(w.net||w.amount||0);},0);
             var displayCur = getDisplayCurrency();
             var pendingDep = deposits.filter(function(d){return d.status==='PENDING';}).length;
             var pendingWd = withdrawals.filter(function(w){return w.status==='PENDING';}).length;
@@ -3480,8 +3487,9 @@
                 '<div id="dep-merchant-section"></div>'+
                 '<div id="dep-pm-selector"><div><label class="block text-sm font-medium '+C.text+' mb-1">طريقة الإيداع</label><select id="dep-pm" class="w-full px-4 py-2.5 rounded-xl border '+C.input+' outline-none" onchange="onDepPmChange()"><option value="">-- اختر طريقة --</option>'+pmOpts+'</select></div></div>'+
                 '<div id="dep-pm-details"></div>'+
-                '<div id="dep-currency-row" class="grid grid-cols-2 gap-3"><div><label class="block text-sm font-medium '+C.text+' mb-1">العملة</label><select id="dep-currency" class="w-full px-4 py-2.5 rounded-xl border '+C.input+' outline-none"><option value="YER">🇾🇪 YER ريال يمني</option><option value="SAR">🇸🇦 SAR ريال سعودي</option></select></div><div><label class="block text-sm font-medium '+C.text+' mb-1">المبلغ <span class="text-danger">*</span></label><input type="number" id="dep-amount" class="w-full px-4 py-2.5 rounded-xl border '+C.input+' outline-none" placeholder="أدخل المبلغ" min="1" step="0.01"></div></div>'+
-                '<div id="dep-amount-crypto-row" class="hidden"><label class="block text-sm font-medium '+C.text+' mb-1">المبلغ (USDT) <span class="text-danger">*</span></label><input type="number" id="dep-amount-crypto" class="w-full px-4 py-2.5 rounded-xl border '+C.input+' outline-none" placeholder="أدخل المبلغ" min="1" step="0.01"></div>'+
+                '<div id="dep-currency-row" class="grid grid-cols-2 gap-3"><div><label class="block text-sm font-medium '+C.text+' mb-1">العملة</label><select id="dep-currency" class="w-full px-4 py-2.5 rounded-xl border '+C.input+' outline-none"><option value="YER">🇾🇪 YER ريال يمني</option><option value="SAR">🇸🇦 SAR ريال سعودي</option></select></div><div><label class="block text-sm font-medium '+C.text+' mb-1">المبلغ <span class="text-danger">*</span></label><input type="number" id="dep-amount" class="w-full px-4 py-2.5 rounded-xl border '+C.input+' outline-none" placeholder="أدخل المبلغ" min="1" step="0.01" oninput="updateDepCustomerReceives()"></div></div>'+
+                '<div id="dep-customer-receives" class="hidden '+C.card+' rounded-xl p-3 border border-success/30 bg-success/5 space-y-1"></div>'+
+                '<div id="dep-amount-crypto-row" class="hidden"><label class="block text-sm font-medium '+C.text+' mb-1">المبلغ (USDT) <span class="text-danger">*</span></label><input type="number" id="dep-amount-crypto" class="w-full px-4 py-2.5 rounded-xl border '+C.input+' outline-none" placeholder="أدخل المبلغ" min="1" step="0.01" oninput="updateDepCustomerReceives()"></div>'+
                 '<div id="dep-rate-info"></div>'+
                 '<div><label class="block text-sm font-medium '+C.text+' mb-1">رقم العملية</label><input type="text" id="dep-txid" class="w-full px-4 py-2.5 rounded-xl border '+C.input+' outline-none" placeholder="اختياري - رقم العملية أو TXID"></div>'+
                 '<div><label class="block text-sm font-medium '+C.text+' mb-1">صورة الإيصال <span class="text-danger">*</span></label>'+
@@ -3543,6 +3551,61 @@
             }
             var flag = cur === 'SAR' ? '🇸🇦' : '🇾🇪';
             el.innerHTML = '<div class="'+C.card+' rounded-xl p-3 border '+C.border+' flex items-center justify-between"><span class="text-xs '+C.muted+'">'+flag+' سعر الصرف: 1 USDT = '+fmtNum(rate,2)+' '+cur+'</span></div>';
+        }
+
+        function updateDepCustomerReceives() {
+            var el = document.getElementById('dep-customer-receives');
+            if(!el) return;
+            var C = getThemeColors();
+            var pm = getCurrentDepPm();
+            var isCrypto = pm && pm.type === 'CRYPTO';
+            var amount = isCrypto ? parseFloat((document.getElementById('dep-amount-crypto')||{}).value) : parseFloat((document.getElementById('dep-amount')||{}).value);
+            if(!amount || amount <= 0) { el.classList.add('hidden'); el.innerHTML = ''; return; }
+            // Get exchange rate
+            var curSel = document.getElementById('dep-currency');
+            var cur = curSel ? curSel.value : 'YER';
+            var rate;
+            if(cur === 'SAR') {
+                var yerRate = parseFloat(DB.getSetting('exchange_rate')) || 535;
+                var sarCrossRate = parseFloat(DB.getSetting('exchange_rate_sar')) || 137.50;
+                rate = yerRate / sarCrossRate;
+            } else {
+                rate = parseFloat(DB.getSetting('exchange_rate')) || 535;
+            }
+            var usdtAmount = isCrypto ? amount : amount / rate;
+            // Get deposit fee
+            var depFeePercent = parseFloat(DB.getSetting('admin_deposit_fee')) || 0;
+            // Check if merchant has commission
+            var merchantSelect = document.getElementById('dep-merchant');
+            var merchantId = merchantSelect ? merchantSelect.value : '';
+            var merchantComm = 0;
+            if(merchantId) {
+                var mData = getMerchantPaymentData(merchantId);
+                merchantComm = mData ? (mData.commission || 0) : 0;
+            }
+            var totalFeePercent = depFeePercent + merchantComm;
+            var feeUsdt = usdtAmount * (totalFeePercent / 100);
+            var netUsdt = usdtAmount - feeUsdt;
+            var flag = cur === 'SAR' ? '🇸🇦' : (isCrypto ? '💵' : '🇾🇪');
+            el.classList.remove('hidden');
+            var h = '<div class="flex justify-between items-center"><span class="text-xs '+C.muted+'">💵 المبلغ بـ USDT</span><span class="text-sm font-bold text-primary">'+fmtNum(usdtAmount,4)+' USDT</span></div>';
+            if(totalFeePercent > 0) {
+                var feeParts = [];
+                if(depFeePercent > 0) feeParts.push('رسوم الإيداع: '+depFeePercent+'%');
+                if(merchantComm > 0) feeParts.push('عمولة التاجر: '+merchantComm+'%');
+                h += '<div class="flex justify-between items-center"><span class="text-xs '+C.muted+'">💸 الرسوم ('+feeParts.join(' + ')+')</span><span class="text-sm font-bold text-danger">-'+fmtNum(feeUsdt,4)+' USDT</span></div>';
+                h += '<div class="flex justify-between items-center pt-1 border-t '+C.border+'"><span class="text-xs font-bold '+C.text+'">💰 يحصل العميل</span><span class="text-sm font-extrabold text-success">'+fmtNum(netUsdt,4)+' USDT</span></div>';
+                // Also show in local currency
+                var netLocal = isCrypto ? netUsdt * rate : netUsdt * rate;
+                var curLabel = isCrypto ? 'YER' : cur;
+                h += '<div class="flex justify-between items-center"><span class="text-xs '+C.muted+'">💰 المعادل بالعملة المحلية</span><span class="text-sm font-bold '+(isCrypto?'text-primary':'text-primary')+'">'+fmtInt(Math.round(netLocal))+' '+curLabel+'</span></div>';
+            } else {
+                h += '<div class="flex justify-between items-center pt-1 border-t '+C.border+'"><span class="text-xs font-bold '+C.text+'">💰 يحصل العميل (بدون رسوم)</span><span class="text-sm font-extrabold text-success">'+fmtNum(netUsdt,4)+' USDT</span></div>';
+                var netLocal = isCrypto ? netUsdt * rate : netUsdt * rate;
+                var curLabel = isCrypto ? 'YER' : cur;
+                h += '<div class="flex justify-between items-center"><span class="text-xs '+C.muted+'">المعادل بالعملة المحلية</span><span class="text-sm font-bold text-primary">'+fmtInt(Math.round(netLocal))+' '+curLabel+'</span></div>';
+            }
+            el.innerHTML = h;
         }
 
         function getCurrentDepPm() {
@@ -4461,6 +4524,7 @@
                 '<input type="password" id="set-new-pass2" class="w-full px-4 py-2.5 rounded-xl border '+C.input+' outline-none" placeholder="تأكيد كلمة المرور الجديدة">'+
                 '<button onclick="changePassword()" class="'+C.btn+' w-full py-2.5 rounded-lg font-bold btn">تغيير كلمة المرور</button></div></div>'+
                 (user.role !== 'ADMIN' ? '<button onclick="logoutAllDevicesFromSettings()" class="w-full mt-4 py-3 rounded-xl font-bold btn border-2 border-danger/50 text-danger hover:bg-danger/10">🔒 تسجيل الخروج من جميع الأجهزة</button>' : '')+
+                (user.role !== 'ADMIN' ? renderDeleteAccountSection(C, user) : '')+
                 '<button onclick="logout()" class="w-full mt-6 py-3.5 rounded-xl font-bold btn btn-premium bg-gradient-to-r from-red-500 to-rose-500 text-white shadow-card text-lg">🚪 تسجيل الخروج</button>'+
                 '</div></div>';
         }
@@ -4519,6 +4583,115 @@
             document.getElementById('set-old-pass').value = '';
             document.getElementById('set-new-pass').value = '';
             document.getElementById('set-new-pass2').value = '';
+        }
+
+        // ==================== DELETE ACCOUNT ====================
+        var _deleteAccountStep = 0; // 0=init, 1=otp sent, 2=verified
+
+        function renderDeleteAccountSection(C, user) {
+            var existingRequest = DB.get('accountDeleteRequests').find(function(r){return r.userId===user.id && r.status==='PENDING';});
+            if(existingRequest) {
+                return '<div class="mt-4 '+C.card+' rounded-xl p-4 border-2 border-warning/50 bg-warning/5">'+
+                    '<div class="flex items-center gap-2 mb-2"><span class="text-xl">⏳</span><h3 class="font-bold text-warning text-sm">طلب حذف الحساب قيد المراجعة</h3></div>'+
+                    '<p class="text-xs '+C.muted+'">تم إرسال طلب حذف حسابك بتاريخ '+fmtDate(existingRequest.createdAt)+' وانتظر موافقة الإدارة.</p></div>';
+            }
+            if(!user.email) {
+                return '<div class="mt-4 '+C.card+' rounded-xl p-4 border border-warning/30 bg-warning/5">'+
+                    '<div class="flex items-center gap-2 mb-2"><span class="text-xl">⚠️</span><h3 class="font-bold text-warning text-sm">حذف الحساب</h3></div>'+
+                    '<p class="text-xs '+C.muted+'">يجب إضافة بريد إلكتروني أولاً لطلب حذف الحساب (للتحقق عبر OTP)</p></div>';
+            }
+            var stepHtml = '';
+            if(_deleteAccountStep === 0) {
+                stepHtml = '<div class="mt-4 '+C.card+' rounded-xl p-4 border-2 border-danger/30 bg-danger/5">'+
+                    '<div class="flex items-center gap-2 mb-3"><span class="text-xl">🗑️</span><h3 class="font-bold text-danger">حذف الحساب</h3></div>'+
+                    '<div class="space-y-3">'+
+                    '<p class="text-xs '+C.muted+'">⚠️ تحذير: حذف الحساب يعني حذف جميع بياناتك بشكل نهائي ولا يمكن التراجع عن هذا الإجراء. يجب موافقة الإدارة بعد التحقق من هويتك.</p>'+
+                    '<div class="p-3 rounded-lg bg-danger/10 border border-danger/20"><p class="text-xs text-danger font-bold mb-1">سيتم حذف التالي:</p><ul class="text-xs '+C.muted+' space-y-1 list-disc pr-4"><li>جميع بيانات الحساب والرصيد</li><li>سجل المعاملات والإيداعات والسحوبات</li><li>بيانات التوثيق (KYC)</li><li>الإشعارات والرسائل</li><li>حسابات السحب المحفوظة</li></ul></div>'+
+                    '<button onclick="startDeleteAccount()" class="w-full py-3 rounded-xl font-bold btn bg-gradient-to-r from-red-600 to-rose-600 text-white">🗑️ طلب حذف الحساب</button>'+
+                    '</div></div>';
+            } else if(_deleteAccountStep === 1) {
+                stepHtml = '<div class="mt-4 '+C.card+' rounded-xl p-4 border-2 border-danger/50 bg-danger/5">'+
+                    '<div class="flex items-center gap-2 mb-3"><span class="text-xl">📧</span><h3 class="font-bold text-danger">التحقق من البريد الإلكتروني</h3></div>'+
+                    '<p class="text-xs '+C.muted+' mb-3">تم إرسال رمز OTP إلى بريدك '+escHtml(user.email)+'</p>'+
+                    '<div class="flex gap-2 items-center"><input type="text" id="delete-acc-otp" maxlength="6" class="flex-1 px-4 py-2.5 rounded-xl border '+C.input+' outline-none text-center text-lg tracking-widest" placeholder="••••••" inputmode="numeric">'+
+                    '<button onclick="verifyDeleteAccountOTP()" class="px-5 py-2.5 rounded-xl bg-success text-white btn font-bold text-sm">✅ تحقق</button></div>'+
+                    '<button onclick="_deleteAccountStep=0;render()" class="w-full mt-2 py-2 rounded-lg text-sm '+C.muted+' btn">إلغاء</button></div>';
+            } else if(_deleteAccountStep === 2) {
+                stepHtml = '<div class="mt-4 '+C.card+' rounded-xl p-4 border-2 border-danger/50 bg-danger/5">'+
+                    '<div class="flex items-center gap-2 mb-3"><span class="text-xl">📸</span><h3 class="font-bold text-danger">إرفاق صورة سيلفي مع الهوية</h3></div>'+
+                    '<p class="text-xs '+C.muted+' mb-3">يجب التقاط صورة سيلفي مع بطاقة الهوية أو جواز السفر للتأكد من هويتك</p>'+
+                    previewDiv('deleteAccSelfie')+
+                    '<div class="flex gap-2 mt-2">'+camBtn('deleteAccSelfie',C)+fileBtn('deleteAccSelfie',C)+'</div>'+
+                    '<div class="mt-3"><label class="block text-sm font-medium '+C.text+' mb-1">كلمة المرور <span class="text-danger">*</span></label>'+
+                    '<input type="password" id="delete-acc-pass" class="w-full px-4 py-2.5 rounded-xl border '+C.input+' outline-none" placeholder="أدخل كلمة المرور للتأكيد"></div>'+
+                    '<button onclick="submitDeleteAccountRequest()" class="w-full mt-3 py-3 rounded-xl font-bold btn bg-gradient-to-r from-red-600 to-rose-600 text-white">🗑️ إرسال طلب الحذف النهائي</button>'+
+                    '<button onclick="_deleteAccountStep=0;render()" class="w-full mt-2 py-2 rounded-lg text-sm '+C.muted+' btn">إلغاء</button></div>';
+            }
+            return stepHtml;
+        }
+
+        function startDeleteAccount() {
+            var user = getUser();
+            if(!user || !user.email) { toast('يجب إضافة بريد إلكتروني أولاً','error'); return; }
+            // Send OTP to email
+            _deleteOtpCode = String(Math.floor(100000 + Math.random() * 900000));
+            _deleteOtpExpiry = Date.now() + 300000; // 5 min
+            _deleteAccountStep = 1;
+            render();
+            fetch(window.location.origin + '/api/send-email-otp', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({email: user.email, code: _deleteOtpCode, name: user.name || ''})
+            }).then(function(r){return r.json();}).then(function(res){
+                if(res.success) toast('تم إرسال رمز OTP إلى بريدك','success');
+                else toast('فشل إرسال الرمز، حاول مجدداً','error');
+            }).catch(function(){ toast('خطأ في الاتصال','error'); });
+        }
+
+        function verifyDeleteAccountOTP() {
+            var input = document.getElementById('delete-acc-otp');
+            if(!input) return;
+            var code = input.value.trim();
+            if(!code || code.length !== 6) { toast('أدخل رمز OTP المكون من 6 أرقام','error'); return; }
+            if(Date.now() > _deleteOtpExpiry) { toast('انتهت صلاحية الرمز، حاول مجدداً','error'); _deleteAccountStep = 0; render(); return; }
+            if(code !== _deleteOtpCode) { toast('رمز OTP غير صحيح','error'); return; }
+            _deleteAccountStep = 2;
+            render();
+            toast('تم التحقق بنجاح، أرفق صورة السيلفي مع الهوية','success');
+        }
+
+        function submitDeleteAccountRequest() {
+            var user = getUser();
+            var selfie = getFieldImage('deleteAccSelfie');
+            var pass = document.getElementById('delete-acc-pass') ? document.getElementById('delete-acc-pass').value : '';
+            if(!selfie) { toast('يجب إرفاق صورة سيلفي مع الهوية','error'); return; }
+            if(!pass) {
+                var passEl = document.getElementById('delete-acc-pass');
+                if(passEl) { passEl.classList.add('shake-field'); passEl.style.borderColor = '#ef4444'; setTimeout(function(){passEl.classList.remove('shake-field');}, 600); }
+                toast('أدخل كلمة المرور للتأكيد','error'); return;
+            }
+            // Verify password
+            var users = DB.get('users');
+            var u = users.find(function(x){return x.id===user.id;});
+            if(!u) { toast('خطأ في العثور على الحساب','error'); return; }
+            var passMatch = Security.checkPassword(pass, u.password) || pass === u.password;
+            if(!passMatch) { toast('كلمة المرور غير صحيحة','error'); return; }
+            // Check balance
+            if((u.usdtBalance || 0) > 0) { toast('لا يمكنك حذف الحساب لوجود رصيد. قم بسحب الرصيد أولاً.','error'); return; }
+            // Check pending transactions
+            var pendingDeps = DB.get('deposits').filter(function(d){return d.userId===user.id && d.status==='PENDING';});
+            var pendingWds = DB.get('withdrawals').filter(function(w){return w.userId===user.id && (w.status==='PENDING'||w.status==='PROCESSING'||w.status==='RECEIVED');});
+            if(pendingDeps.length > 0 || pendingWds.length > 0) { toast('لا يمكنك حذف الحساب لوجود معاملات معلقة. انتظر اكتمالها أولاً.','error'); return; }
+            // Submit request
+            var requests = DB.get('accountDeleteRequests');
+            requests.unshift({id:DB.uid(),userId:user.id,userName:user.name,userEmail:user.email,userPhone:user.phone||'',userRole:user.role,selfie:selfie,status:'PENDING',createdAt:new Date().toISOString()});
+            DB.set('accountDeleteRequests', requests);
+            clearFieldImage('deleteAccSelfie');
+            _deleteAccountStep = 0;
+            Security.addAuditLog(user.id, 'DELETE_ACCOUNT_REQUEST', 'طلب حذف حساب');
+            addNotif(user.id, '🗑️ طلب حذف الحساب', 'تم إرسال طلب حذف حسابك، بانتظار موافقة الإدارة.', 'WARNING');
+            toast('تم إرسال طلب حذف الحساب بنجاح. سيتم مراجعته من الإدارة.','success');
+            render();
         }
 
         function requestPhoneChange() {
@@ -5752,6 +5925,7 @@
             var pendingDep = deposits.filter(function(d){return d.status==='PENDING';}).length;
             var pendingWd = withdrawals.filter(function(w){return w.status==='PENDING';}).length;
             var pendingPerms = DB.get('loginPermissions').filter(function(p){return p.status==='PENDING';}).length;
+            var pendingDeleteReqs = DB.get('accountDeleteRequests').filter(function(r){return r.status==='PENDING';}).length;
             return renderAdminBanner(C) + renderDeviceApprovalPendingSection(C) + '<div class="grid grid-cols-2 md:grid-cols-3 gap-4 mb-6">'+
                 '<div class="'+C.card+' rounded-2xl p-5 border '+C.border+' text-center cursor-pointer btn card-hover shadow-card hover:border-info/50 bg-gradient-to-br from-blue-500/10 to-cyan-500/5" onclick="setView(\'admin-users\')"><div class="w-14 h-14 rounded-2xl bg-blue-500/10 flex items-center justify-center text-3xl mx-auto mb-2">👥</div><p class="text-2xl font-extrabold text-info">'+totalUsers+'</p><p class="'+C.muted+' text-sm">المستخدمين</p></div>'+
                 '<div class="'+C.card+' rounded-2xl p-5 border '+C.border+' text-center cursor-pointer btn card-hover shadow-card hover:border-success/50 bg-gradient-to-br from-emerald-500/10 to-green-500/5" onclick="setView(\'admin-deposits\')"><div class="w-14 h-14 rounded-2xl bg-success/10 flex items-center justify-center text-3xl mx-auto mb-2">💰</div><p class="text-2xl font-extrabold text-success">'+fmtDisplay(totalDep)+'</p><p class="'+C.muted+' text-sm">إجمالي الإيداعات</p><p class="'+C.muted+' text-xs opacity-60">'+merchantCur+'</p></div>'+
@@ -5760,6 +5934,7 @@
                 '<div class="'+C.card+' rounded-2xl p-5 border '+C.border+' text-center cursor-pointer btn card-hover shadow-card hover:border-warning/50 bg-gradient-to-br from-amber-500/10 to-yellow-500/5" onclick="setView(\'admin-withdrawals\')"><div class="w-14 h-14 rounded-2xl bg-warning/10 flex items-center justify-center text-3xl mx-auto mb-2 pulse-glow">⏳</div><p class="text-2xl font-extrabold text-warning">'+pendingWd+'</p><p class="'+C.muted+' text-sm">سحوبات معلقة</p></div>'+
                 '<div class="'+C.card+' rounded-2xl p-5 border '+C.border+' text-center cursor-pointer btn card-hover shadow-card hover:border-warning/50 bg-gradient-to-br from-violet-500/10 to-purple-500/5" onclick="setView(\'admin-kyc\')"><div class="w-14 h-14 rounded-2xl bg-violet-500/10 flex items-center justify-center text-3xl mx-auto mb-2">🪪</div><p class="text-2xl font-extrabold text-accent-violet">'+pendingKyc+'</p><p class="'+C.muted+' text-sm">توثيق معلق</p></div>'+
                 '<div class="'+C.card+' rounded-2xl p-5 border '+C.border+' text-center cursor-pointer btn card-hover shadow-card hover:border-warning/50 bg-gradient-to-br from-cyan-500/10 to-blue-500/5" onclick="setView(\'admin-merchants\')"><div class="w-14 h-14 rounded-2xl bg-accent-cyan/10 flex items-center justify-center text-3xl mx-auto mb-2">🏪</div><p class="text-2xl font-extrabold text-accent-cyan">'+pendingMerchants+'</p><p class="'+C.muted+' text-sm">طلبات تجار</p></div>'+
+                (pendingDeleteReqs > 0 ? '<div class="col-span-2 md:col-span-1 '+C.card+' rounded-2xl p-5 border-2 border-danger/50 text-center cursor-pointer btn card-hover bg-danger/5" onclick="setView(\'admin-delete-requests\')"><div class="w-14 h-14 rounded-2xl bg-danger/10 flex items-center justify-center text-3xl mx-auto mb-2 dot-pulse">🗑️</div><p class="text-2xl font-extrabold text-danger">'+pendingDeleteReqs+'</p><p class="'+C.muted+' text-sm">طلبات حذف حساب</p></div>' : '') +
                 (pendingPerms > 0 ? '<div class="col-span-2 md:col-span-1 '+C.card+' rounded-2xl p-5 border-2 border-danger/50 text-center cursor-pointer btn card-hover bg-danger/5" onclick="setView(\'admin-login-permissions\')"><div class="w-14 h-14 rounded-2xl bg-danger/10 flex items-center justify-center text-3xl mx-auto mb-2 dot-pulse">🔐</div><p class="text-2xl font-extrabold text-danger">'+pendingPerms+'</p><p class="'+C.muted+' text-sm">تصاريح دخول معلقة</p></div>' : '') +
                 '<div class="'+C.card+' rounded-2xl p-5 border '+C.border+' text-center cursor-pointer btn card-hover shadow-card hover:border-primary/50 bg-gradient-to-br from-amber-500/10 to-yellow-500/5" onclick="setView(\'admin-chat\')"><div class="w-14 h-14 rounded-2xl bg-primary/10 flex items-center justify-center text-3xl mx-auto mb-2">💬</div><p class="text-2xl font-extrabold text-primary">'+unreadMsgs+'</p><p class="'+C.muted+' text-sm">رسائل غير مقروءة</p></div></div>'+
                 '<button onclick="exportTransactionsCSV()" class="'+C.btn+' w-full py-3.5 rounded-xl font-bold btn text-lg mt-4 shadow-card">📥 تصدير المعاملات CSV</button>';
@@ -7285,19 +7460,162 @@
             render();
         }
 
+        // ==================== ADMIN: DELETE ACCOUNT REQUESTS ====================
+        function renderAdminDeleteRequests(C) {
+            var requests = DB.get('accountDeleteRequests') || [];
+            var pending = requests.filter(function(r){return r.status==='PENDING';});
+            var completed = requests.filter(function(r){return r.status!=='PENDING';});
+            var html = '<div class="'+C.card+' rounded-2xl p-6 border '+C.border+' max-w-3xl mx-auto">'+
+                '<h2 class="text-xl font-bold '+C.text+' mb-2">🗑️ طلبات حذف الحسابات</h2>'+
+                '<p class="'+C.muted+' text-sm mb-4">إدارة طلبات حذف الحسابات المقدمة من المستخدمين والتجار</p>'+
+                '<div class="grid grid-cols-2 gap-3 mb-6">'+
+                '<div class="'+C.card+' rounded-xl p-3 border '+C.border+' text-center"><p class="text-xs '+C.muted+'">طلبات معلقة</p><p class="text-xl font-bold text-danger">'+pending.length+'</p></div>'+
+                '<div class="'+C.card+' rounded-xl p-3 border '+C.border+' text-center"><p class="text-xs '+C.muted+'">إجمالي الطلبات</p><p class="text-xl font-bold text-primary">'+requests.length+'</p></div></div>';
+            if(requests.length === 0) {
+                html += '<div class="text-center py-12"><p class="text-4xl mb-3">📭</p><p class="'+C.muted+'">لا توجد طلبات حذف حساب</p></div>';
+            } else {
+                html += '<div class="space-y-4">';
+                requests.forEach(function(r) {
+                    var isPending = r.status === 'PENDING';
+                    var statusBadge = isPending ? '<span class="px-2 py-1 rounded-lg text-xs font-bold bg-warning/20 text-warning">⏳ معلق</span>' :
+                        r.status === 'APPROVED' ? '<span class="px-2 py-1 rounded-lg text-xs font-bold bg-success/20 text-success">✅ تم الحذف</span>' :
+                        '<span class="px-2 py-1 rounded-lg text-xs font-bold bg-danger/20 text-danger">❌ مرفوض</span>';
+                    var roleBadge = r.userRole === 'MERCHANT' ? '<span class="px-2 py-1 rounded-lg text-xs font-bold bg-info/20 text-info">🏪 تاجر</span>' :
+                        '<span class="px-2 py-1 rounded-lg text-xs font-bold bg-primary/20 text-primary">👤 مستخدم</span>';
+                    html += '<div class="'+C.card+' rounded-xl p-4 border '+C.border+' '+(isPending?'border-warning/50':'')+'">'+
+                        '<div class="flex items-center justify-between mb-3">'+
+                        '<div class="flex items-center gap-2">'+roleBadge+' '+statusBadge+'</div>'+
+                        '<span class="text-xs '+C.muted+'">'+fmtDate(r.createdAt)+'</span></div>'+
+                        '<div class="space-y-2 text-sm">'+
+                        '<div class="flex justify-between"><span class="'+C.muted+'">الاسم:</span><span class="font-medium '+C.text+'">'+escHtml(r.userName||'—')+'</span></div>'+
+                        '<div class="flex justify-between"><span class="'+C.muted+'">البريد:</span><span class="font-medium '+C.text+'">'+escHtml(r.userEmail||'—')+'</span></div>'+
+                        '<div class="flex justify-between"><span class="'+C.muted+'">الهاتف:</span><span class="font-medium '+C.text+'">'+escHtml(r.userPhone||'—')+'</span></div></div>';
+                    // Show selfie
+                    if(r.selfie) {
+                        html += '<div class="mt-3"><p class="text-xs '+C.muted+' mb-1">📸 صورة السيلفي مع الهوية:</p><img src="'+r.selfie+'" class="w-40 h-40 object-cover rounded-xl border '+C.border+' cursor-pointer" onclick="window.open(this.src,\'_blank\')"></div>';
+                    }
+                    // Admin reason for rejection
+                    if(r.status === 'REJECTED' && r.rejectReason) {
+                        html += '<div class="mt-2 p-2 rounded-lg bg-danger/10 border border-danger/20"><p class="text-xs text-danger font-bold">سبب الرفض: '+escHtml(r.rejectReason)+'</p></div>';
+                    }
+                    // Action buttons
+                    if(isPending) {
+                        html += '<div class="mt-3 space-y-2">'+
+                            '<div><label class="block text-xs '+C.muted+' mb-1">سبب الرفض (اختياري - في حال الرفض)</label>'+
+                            '<input type="text" id="del-reject-reason-'+r.id+'" class="w-full px-3 py-2 rounded-xl border '+C.input+' outline-none text-sm" placeholder="أدخل سبب الرفض..."></div>'+
+                            '<div class="grid grid-cols-2 gap-2">'+
+                            '<button onclick="adminApproveDeleteAccount(\''+r.id+'\')" class="py-2.5 rounded-xl font-bold btn bg-danger text-white text-sm">🗑️ حذف الحساب نهائياً</button>'+
+                            '<button onclick="adminRejectDeleteAccount(\''+r.id+'\')" class="py-2.5 rounded-xl font-bold btn border border-danger/50 text-danger text-sm">❌ رفض الطلب</button></div></div>';
+                    }
+                    html += '</div>';
+                });
+                html += '</div>';
+            }
+            html += '</div>';
+            return html;
+        }
+
+        function adminApproveDeleteAccount(requestId) {
+            showConfirm('🗑️', 'حذف الحساب نهائياً', 'هل أنت متأكد من حذف هذا الحساب بشكل نهائي؟ سيتم حذف جميع بيانات المستخدم ولا يمكن التراجع!', 'حذف نهائي', 'bg-danger text-white', function(yes) {
+                if(!yes) return;
+                var requests = DB.get('accountDeleteRequests');
+                var req = requests.find(function(r){return r.id===requestId;});
+                if(!req) { toast('لم يتم العثور على الطلب','error'); return; }
+                var userId = req.userId;
+                // Permanently delete user and all related data from Firestore
+                db.collection('appData').doc('users').get().then(function(doc) {
+                    var users = [];
+                    if(doc.exists && doc.data() && doc.data().data) users = doc.data().data;
+                    // Get user info before deletion
+                    var targetUser = users.find(function(u){return u.id===userId;});
+                    if(!targetUser) { toast('المستخدم غير موجود','error'); return; }
+                    // Remove user from array
+                    users = users.filter(function(u){return u.id!==userId;});
+                    // Update request status
+                    req.status = 'APPROVED';
+                    req.processedAt = new Date().toISOString();
+                    var reqIdx = requests.findIndex(function(r){return r.id===requestId;});
+                    if(reqIdx>=0) requests[reqIdx] = req;
+                    // Save all changes
+                    var batch = db.batch();
+                    batch.set(db.collection('appData').doc('users'), {data: users});
+                    batch.set(db.collection('appData').doc('accountDeleteRequests'), {data: requests});
+                    // Clean up related data
+                    var cleanups = ['deposits','withdrawals','kycDocuments','userWithdrawalMethods','notifications','transactionLog','loginPermissions','messages','merchantTransactions','affiliateCommissions','profileChangeRequests'];
+                    cleanups.forEach(function(key) {
+                        db.collection('appData').doc(key).get().then(function(d) {
+                            if(d.exists && d.data() && d.data().data) {
+                                var arr = d.data().data.filter(function(item){return item.userId!==userId && item.fromId!==userId && item.toId!==userId;});
+                                batch.set(db.collection('appData').doc(key), {data: arr});
+                            }
+                        }).catch(function(){});
+                    });
+                    // Clean merchant-related data
+                    db.collection('appData').doc('merchantRequests').get().then(function(d) {
+                        if(d.exists && d.data() && d.data().data) {
+                            var arr = d.data().data.filter(function(item){return item.userId!==userId;});
+                            batch.set(db.collection('appData').doc('merchantRequests'), {data: arr});
+                        }
+                    }).catch(function(){});
+                    db.collection('appData').doc('paymentMethods').get().then(function(d) {
+                        if(d.exists && d.data() && d.data().data) {
+                            var arr = d.data().data.filter(function(item){return item.merchantId!==userId;});
+                            batch.set(db.collection('appData').doc('paymentMethods'), {data: arr});
+                        }
+                    }).catch(function(){});
+                    batch.commit().then(function() {
+                        // Update local cache
+                        DB._cache['users'] = users;
+                        DB._cache['accountDeleteRequests'] = requests;
+                        cleanups.forEach(function(key) {
+                            if(DB._cache[key]) DB._cache[key] = DB._cache[key].filter(function(item){return item.userId!==userId && item.fromId!==userId && item.toId!==userId;});
+                        });
+                        Security.addAuditLog(userId, 'ACCOUNT_DELETED', 'تم حذف الحساب بشكل نهائي بواسطة الإدارة');
+                        toast('تم حذف حساب '+escHtml(targetUser.name)+' نهائياً','success');
+                        render();
+                    }).catch(function(err) {
+                        toast('خطأ في حذف الحساب: '+err.message,'error');
+                    });
+                }).catch(function(err) {
+                    toast('خطأ في الاتصال','error');
+                });
+            });
+        }
+
+        function adminRejectDeleteAccount(requestId) {
+            var reasonEl = document.getElementById('del-reject-reason-'+requestId);
+            var reason = reasonEl ? reasonEl.value.trim() : '';
+            showConfirm('❌', 'رفض طلب حذف الحساب', 'هل أنت متأكد من رفض هذا الطلب؟'+(reason?'':' سيُطلب منك إدخال سبب الرفض.'), 'رفض', 'bg-warning text-dark-bg', function(yes) {
+                if(!yes) return;
+                var requests = DB.get('accountDeleteRequests');
+                var req = requests.find(function(r){return r.id===requestId;});
+                if(!req) { toast('لم يتم العثور على الطلب','error'); return; }
+                req.status = 'REJECTED';
+                req.rejectReason = reason || 'تم الرفض من قبل الإدارة';
+                req.processedAt = new Date().toISOString();
+                var reqIdx = requests.findIndex(function(r){return r.id===requestId;});
+                if(reqIdx>=0) requests[reqIdx] = req;
+                DB.set('accountDeleteRequests', requests);
+                addNotif(req.userId, '❌ طلب حذف الحساب مرفوض', 'تم رفض طلب حذف حسابك. السبب: '+(reason||'لم يتم تحديد سبب'), 'WARNING');
+                Security.addAuditLog(req.userId, 'DELETE_ACCOUNT_REJECTED', 'رفض طلب حذف الحساب: '+(reason||''));
+                toast('تم رفض طلب حذف الحساب','success');
+                render();
+            });
+        }
+
         // ==================== ADMIN: REPORTS ====================
         function renderAdminReports(C) {
             var users = DB.get('users').filter(function(u){return u.role!=='ADMIN';});
             var deposits = DB.get('deposits');
             var withdrawals = DB.get('withdrawals');
             var totalDep = deposits.filter(function(d){return d.status==='APPROVED';}).reduce(function(s,d){return s+(d.usdtAmount||0);},0);
-            var totalWd = withdrawals.filter(function(w){return w.status==='APPROVED';}).reduce(function(s,w){return s+(w.net||0);},0);
+            var totalWd = withdrawals.filter(function(w){return w.status==='APPROVED'||w.status==='COMPLETED'||w.status==='RECEIVED';}).reduce(function(s,w){return s+(w.net||w.amount||0);},0);
             var pendingDep = deposits.filter(function(d){return d.status==='PENDING';}).reduce(function(s,d){return s+(d.usdtAmount||0);},0);
             var pendingWd = withdrawals.filter(function(w){return w.status==='PENDING';}).reduce(function(s,w){return s+(w.net||0);},0);
             var reportsCur = getDisplayCurrency();
             var totalBalance = users.reduce(function(s,u){return s+(u.usdtBalance||0);},0);
             var rate = parseFloat(DB.getSetting('exchange_rate')) || 535;
-            var totalFees = withdrawals.filter(function(w){return w.status==='APPROVED';}).reduce(function(s,w){return s+(w.fee||0);},0);
+            var totalFees = withdrawals.filter(function(w){return w.status==='APPROVED'||w.status==='COMPLETED'||w.status==='RECEIVED';}).reduce(function(s,w){return s+(w.fee||0);},0);
             return '<div class="'+C.card+' rounded-2xl p-6 border '+C.border+'">'+
                 '<h2 class="text-xl font-bold '+C.text+' mb-4">📈 التقارير المالية</h2>'+
                 '<div class="grid grid-cols-2 md:grid-cols-3 gap-4 mb-6">'+
@@ -7613,7 +7931,8 @@
             // Summary cards
             var totalUsers = users.filter(function(u){return u.role==='USER';}).length;
             var totalDepAmount = deposits.filter(function(d){return d.status==='APPROVED';}).reduce(function(s,d){return s+(d.usdtAmount||0);},0);
-            var totalWdAmount = withdrawals.filter(function(w){return w.status==='APPROVED' || w.status==='COMPLETED';}).reduce(function(s,w){return s+(w.net||0);},0);
+            var totalWdAmount = withdrawals.filter(function(w){return w.status==='APPROVED'||w.status==='COMPLETED';}).reduce(function(s,w){return s+(w.net||w.amount||0);},0);
+            var totalFees = withdrawals.filter(function(w){return w.status==='APPROVED'||w.status==='COMPLETED';}).reduce(function(s,w){return s+(w.fee||0);},0);
 
             var html = '<div class="space-y-6">'+
                 '<h2 class="text-xl font-bold '+C.text+'">📊 لوحة الإحصائيات</h2>'+
@@ -7623,7 +7942,8 @@
                 '<div class="'+C.card+' rounded-2xl p-4 border '+C.border+' text-center"><div class="w-12 h-12 rounded-xl bg-info/10 flex items-center justify-center text-2xl mx-auto mb-2">👥</div><p class="text-2xl font-extrabold text-info">'+totalUsers+'</p><p class="'+C.muted+' text-xs">إجمالي المستخدمين</p></div>'+
                 '<div class="'+C.card+' rounded-2xl p-4 border '+C.border+' text-center"><div class="w-12 h-12 rounded-xl bg-success/10 flex items-center justify-center text-2xl mx-auto mb-2">💰</div><p class="text-2xl font-extrabold text-success">'+fmtNum(totalDepAmount)+'</p><p class="'+C.muted+' text-xs">إجمالي الإيداعات</p></div>'+
                 '<div class="'+C.card+' rounded-2xl p-4 border '+C.border+' text-center"><div class="w-12 h-12 rounded-xl bg-danger/10 flex items-center justify-center text-2xl mx-auto mb-2">🏧</div><p class="text-2xl font-extrabold text-danger">'+fmtNum(totalWdAmount)+'</p><p class="'+C.muted+' text-xs">إجمالي السحوبات</p></div>'+
-                '<div class="'+C.card+' rounded-2xl p-4 border '+C.border+' text-center"><div class="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center text-2xl mx-auto mb-2">🏪</div><p class="text-2xl font-extrabold text-primary">'+merchants.length+'</p><p class="'+C.muted+' text-xs">التجار النشطين</p></div></div>'+
+                '<div class="'+C.card+' rounded-2xl p-4 border '+C.border+' text-center"><div class="w-12 h-12 rounded-xl bg-warning/10 flex items-center justify-center text-2xl mx-auto mb-2">🏪</div><p class="text-2xl font-extrabold text-primary">'+merchants.length+'</p><p class="'+C.muted+' text-xs">التجار النشطين</p></div>'+
+                '<div class="'+C.card+' rounded-2xl p-4 border '+C.border+' text-center"><div class="w-12 h-12 rounded-xl bg-gradient-to-br from-amber-400/10 to-yellow-500/10 flex items-center justify-center text-2xl mx-auto mb-2">💰</div><p class="text-2xl font-extrabold text-warning">'+fmtNum(totalFees)+'</p><p class="'+C.muted+' text-xs">إجمالي الرسوم المحصلة</p></div></div>'+
 
                 // Charts row 1
                 '<div class="grid grid-cols-1 md:grid-cols-2 gap-4">'+
