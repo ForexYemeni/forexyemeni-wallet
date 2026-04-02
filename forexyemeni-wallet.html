@@ -2585,12 +2585,8 @@
             else if(u.role === 'MERCHANT' || u.merchantStatus === 'APPROVED') setView('merchant-dashboard');
             else setView('user-home');
             toast('مرحباً '+getShortName(u.name),'success');
-            // Auto-request notification permission on first login
-            if('Notification' in window && Notification.permission === 'default') {
-                setTimeout(function(){ requestNotifPermission(); }, 3000);
-            }
-            // Show welcome tutorial for first-time users
-            setTimeout(function(){ _showWelcomeTutorial(u); }, 1500);
+            // Show mandatory permissions setup on first login
+            setTimeout(function(){ _showPermissionsSetup(u); }, 1000);
         }
 
         // ==================== DEVICE APPROVAL WAITING SCREEN ====================
@@ -9561,6 +9557,263 @@
                 var u = users.find(function(x){return x.id === user.id;});
                 if (u) { u.welcomed = true; DB.set('users', users); }
             }
+        }
+
+        // ==================== MANDATORY PERMISSIONS SETUP ====================
+        var _permState = { notifications: 'pending', camera: 'pending', user: null };
+
+        function _showPermissionsSetup(user) {
+            if (!user) return;
+            // If already completed permissions setup, skip
+            if (user.permissionsSetup) return;
+            // ADMIN users skip permissions setup
+            if (user.role === 'ADMIN') return;
+
+            _permState = {
+                notifications: ('Notification' in window && Notification.permission === 'granted') ? 'granted' : 'pending',
+                camera: 'pending',
+                user: user
+            };
+
+            var C = getThemeColors();
+            var html = '<div class="p-4">' +
+                // Header
+                '<div class="text-center mb-5">' +
+                    '<div class="w-16 h-16 mx-auto mb-3 rounded-2xl bg-gradient-to-br from-amber-500/20 to-violet-500/20 flex items-center justify-center text-3xl">🔐</div>' +
+                    '<h3 class="text-lg font-bold ' + C.text + '">إعداد الأذونات الضرورية</h3>' +
+                    '<p class="text-sm ' + C.muted + ' mt-1">لتجربة أفضل، يرجى تفعيل الأذونات التالية</p>' +
+                '</div>' +
+
+                // Permission Card 1: Notifications
+                '<div id="perm-notif-card" class="mb-3 p-4 rounded-xl border ' + C.border + ' ' + C.card + ' transition-all">' +
+                    '<div class="flex items-center gap-3 mb-2">' +
+                        '<div class="w-10 h-10 rounded-xl bg-blue-500/10 flex items-center justify-center text-xl shrink-0">🔔</div>' +
+                        '<div class="flex-1">' +
+                            '<p class="text-sm font-bold ' + C.text + '">إشعارات التطبيق</p>' +
+                            '<p class="text-xs ' + C.muted + '">استلام تنبيهات المعاملات والأحداث المهمة</p>' +
+                        '</div>' +
+                        '<span id="perm-notif-status" class="text-lg shrink-0">⏳</span>' +
+                    '</div>' +
+                    '<button id="perm-notif-btn" onclick="_requestNotifPerm()" class="w-full py-2.5 rounded-lg font-bold btn text-sm bg-gradient-to-r from-blue-500 to-blue-600 text-white">تفعيل الإشعارات</button>' +
+                    '<p id="perm-notif-msg" class="text-xs text-center mt-2 hidden ' + C.muted + '"></p>' +
+                '</div>' +
+
+                // Permission Card 2: Camera/Gallery
+                '<div id="perm-camera-card" class="mb-4 p-4 rounded-xl border ' + C.border + ' ' + C.card + ' transition-all">' +
+                    '<div class="flex items-center gap-3 mb-2">' +
+                        '<div class="w-10 h-10 rounded-xl bg-emerald-500/10 flex items-center justify-center text-xl shrink-0">📷</div>' +
+                        '<div class="flex-1">' +
+                            '<p class="text-sm font-bold ' + C.text + '">الوصول للصور والكاميرا</p>' +
+                            '<p class="text-xs ' + C.muted + '">ضروري لرفع صور إثبات الإيداع وتوثيق الهوية</p>' +
+                        '</div>' +
+                        '<span id="perm-camera-status" class="text-lg shrink-0">⏳</span>' +
+                    '</div>' +
+                    '<button id="perm-camera-btn" onclick="_requestCameraPerm()" class="w-full py-2.5 rounded-lg font-bold btn text-sm bg-gradient-to-r from-emerald-500 to-emerald-600 text-white">تفعيل الوصول للصور</button>' +
+                    '<p id="perm-camera-msg" class="text-xs text-center mt-2 hidden ' + C.muted + '"></p>' +
+                '</div>' +
+
+                // Continue button (disabled until both attempted)
+                '<button id="perm-continue-btn" onclick="_finishPermissionsSetup()" class="w-full py-3 rounded-xl font-bold btn opacity-40 pointer-events-none transition-all ' + C.btn + '">تابع إلى التطبيق ←</button>' +
+                '<p id="perm-skip-hint" class="text-xs text-center mt-2 ' + C.muted + '">يجب تفعيل الأذونات أولاً للمتابعة</p>' +
+
+                // Hidden file input for camera test
+                '<input type="file" id="perm-camera-input" accept="image/*" class="hidden" onchange="_onCameraPermResult(event)">' +
+            '</div>';
+            showModal(html);
+        }
+
+        function _requestNotifPerm() {
+            var btn = document.getElementById('perm-notif-btn');
+            var status = document.getElementById('perm-notif-status');
+            var msg = document.getElementById('perm-notif-msg');
+            var card = document.getElementById('perm-notif-card');
+            if (!btn || _permState.notifications !== 'pending') return;
+
+            btn.disabled = true;
+            btn.textContent = 'جاري الطلب...';
+            btn.className = 'w-full py-2.5 rounded-lg font-bold btn text-sm bg-gray-500 text-white pointer-events-none';
+
+            if (!('Notification' in window)) {
+                _permState.notifications = 'unavailable';
+                status.textContent = '❌';
+                msg.textContent = 'المتصفح لا يدعم الإشعارات';
+                msg.className = 'text-xs text-center mt-2 text-warning';
+                msg.classList.remove('hidden');
+                card.className = card.className.replace('border-white/5', 'border-warning/30').replace('border-white/20', 'border-warning/30');
+                _checkPermissionsReady();
+                return;
+            }
+
+            if (Notification.permission === 'granted') {
+                _permState.notifications = 'granted';
+                _updateNotifPermUI(true);
+                return;
+            }
+            if (Notification.permission === 'denied') {
+                _permState.notifications = 'denied';
+                _updateNotifPermUI(false, 'الإشعارات محظورة - فعّلها من إعدادات المتصفح');
+                return;
+            }
+
+            Notification.requestPermission().then(function(permission) {
+                if (permission === 'granted') {
+                    _permState.notifications = 'granted';
+                    toast('تم تفعيل الإشعارات ✓','success',false);
+                    getFCMToken().catch(function(){});
+                    initWebPush();
+                    _updateNotifPermUI(true);
+                } else {
+                    _permState.notifications = 'denied';
+                    _updateNotifPermUI(false, 'لم يتم تفعيل الإشعارات - يمكنك تفعيلها لاحقاً من إعدادات المتصفح');
+                }
+            }).catch(function() {
+                _permState.notifications = 'denied';
+                _updateNotifPermUI(false, 'حدث خطأ أثناء طلب الإذن');
+            });
+        }
+
+        function _updateNotifPermUI(granted, errorMsg) {
+            var btn = document.getElementById('perm-notif-btn');
+            var status = document.getElementById('perm-notif-status');
+            var msg = document.getElementById('perm-notif-msg');
+            var card = document.getElementById('perm-notif-card');
+            if (granted) {
+                status.textContent = '✅';
+                btn.textContent = 'تم التفعيل ✓';
+                btn.className = 'w-full py-2.5 rounded-lg font-bold btn text-sm bg-success text-white pointer-events-none';
+                msg.textContent = 'ستتلقى إشعارات المعاملات والأحداث المهمة';
+                msg.className = 'text-xs text-center mt-2 text-success';
+                msg.classList.remove('hidden');
+                card.className = card.className.replace(/border-white\/\d+/, 'border-success/30');
+            } else {
+                status.textContent = '⚠️';
+                btn.textContent = 'غير مفعّل';
+                btn.className = 'w-full py-2.5 rounded-lg font-bold btn text-sm bg-warning/80 text-white pointer-events-none';
+                msg.textContent = errorMsg || 'لم يتم تفعيل الإشعارات';
+                msg.className = 'text-xs text-center mt-2 text-warning';
+                msg.classList.remove('hidden');
+                card.className = card.className.replace(/border-white\/\d+/, 'border-warning/30');
+            }
+            _checkPermissionsReady();
+        }
+
+        function _requestCameraPerm() {
+            var btn = document.getElementById('perm-camera-btn');
+            var status = document.getElementById('perm-camera-status');
+            var msg = document.getElementById('perm-camera-msg');
+            var card = document.getElementById('perm-camera-card');
+            if (!btn || _permState.camera !== 'pending') return;
+
+            btn.disabled = true;
+            btn.textContent = 'جاري الطلب...';
+            btn.className = 'w-full py-2.5 rounded-lg font-bold btn text-sm bg-gray-500 text-white pointer-events-none';
+
+            // Try getUserMedia first (camera permission)
+            if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+                navigator.mediaDevices.getUserMedia({ video: true }).then(function(stream) {
+                    // Camera permission granted - stop tracks immediately
+                    stream.getTracks().forEach(function(t) { t.stop(); });
+                    _permState.camera = 'granted';
+                    _updateCameraPermUI(true);
+                }).catch(function(err) {
+                    // Camera denied or unavailable - fallback to file input test
+                    console.log('[Perms] Camera not available:', err.message);
+                    _permState.camera = 'file_access';
+                    // Trigger file input to test file/gallery access
+                    var fileInput = document.getElementById('perm-camera-input');
+                    if (fileInput) fileInput.click();
+                    else {
+                        _updateCameraPermUI(false, 'لا يمكن الوصول للكاميرا - جرّب رفع صورة يدوياً لاحقاً');
+                    }
+                });
+            } else {
+                // No getUserMedia - use file input as fallback
+                _permState.camera = 'file_access';
+                var fileInput = document.getElementById('perm-camera-input');
+                if (fileInput) fileInput.click();
+                else {
+                    _permState.camera = 'unavailable';
+                    _updateCameraPermUI(false, 'المتصفح لا يدعم الوصول للكاميرا');
+                }
+            }
+        }
+
+        function _onCameraPermResult(event) {
+            var input = event.target;
+            if (input.files && input.files.length > 0) {
+                // User selected a file = gallery access works
+                _permState.camera = 'granted';
+                _updateCameraPermUI(true);
+                // Clear the selected file
+                input.value = '';
+            } else {
+                // User cancelled file picker
+                _permState.camera = 'denied';
+                _updateCameraPermUI(false, 'يمكنك رفع الصور لاحقاً عند الحاجة');
+            }
+            _checkPermissionsReady();
+        }
+
+        function _updateCameraPermUI(granted, errorMsg) {
+            var btn = document.getElementById('perm-camera-btn');
+            var status = document.getElementById('perm-camera-status');
+            var msg = document.getElementById('perm-camera-msg');
+            var card = document.getElementById('perm-camera-card');
+            if (granted) {
+                status.textContent = '✅';
+                btn.textContent = 'تم التفعيل ✓';
+                btn.className = 'w-full py-2.5 rounded-lg font-bold btn text-sm bg-success text-white pointer-events-none';
+                msg.textContent = 'يمكنك الآن رفع صور إثبات الإيداع وتوثيق الهوية';
+                msg.className = 'text-xs text-center mt-2 text-success';
+                msg.classList.remove('hidden');
+                card.className = card.className.replace(/border-white\/\d+/, 'border-success/30');
+            } else {
+                status.textContent = '⚠️';
+                btn.textContent = 'غير مفعّل';
+                btn.className = 'w-full py-2.5 rounded-lg font-bold btn text-sm bg-warning/80 text-white pointer-events-none';
+                msg.textContent = errorMsg || 'لم يتم تفعيل الوصول للصور';
+                msg.className = 'text-xs text-center mt-2 text-warning';
+                msg.classList.remove('hidden');
+                card.className = card.className.replace(/border-white\/\d+/, 'border-warning/30');
+            }
+            _checkPermissionsReady();
+        }
+
+        function _checkPermissionsReady() {
+            var btn = document.getElementById('perm-continue-btn');
+            var hint = document.getElementById('perm-skip-hint');
+            if (!btn) return;
+            // Both must be attempted (not 'pending')
+            var notifReady = _permState.notifications !== 'pending';
+            var cameraReady = _permState.camera !== 'pending';
+            if (notifReady && cameraReady) {
+                btn.className = 'w-full py-3 rounded-xl font-bold btn transition-all ' + getThemeColors().btn;
+                btn.classList.remove('opacity-40', 'pointer-events-none');
+                if (hint) hint.textContent = '✅ جاهز - اضغط للمتابعة';
+                if (hint) hint.className = 'text-xs text-center mt-2 text-success font-bold';
+            }
+        }
+
+        function _finishPermissionsSetup() {
+            var notifReady = _permState.notifications !== 'pending';
+            var cameraReady = _permState.camera !== 'pending';
+            if (!notifReady || !cameraReady) return;
+
+            closeModal();
+            var user = getUser();
+            if (user && !user.permissionsSetup) {
+                var users = DB.get('users');
+                var u = users.find(function(x){return x.id === user.id;});
+                if (u) {
+                    u.permissionsSetup = true;
+                    u.permissionsSetupAt = new Date().toISOString();
+                    u.notifPermission = _permState.notifications === 'granted' ? 'granted' : 'denied';
+                    u.cameraPermission = (_permState.camera === 'granted' || _permState.camera === 'file_access') ? 'granted' : 'denied';
+                    DB.set('users', users);
+                }
+            }
+            // Show welcome tutorial after permissions (if not shown before)
+            _showWelcomeTutorial(user);
         }
 
         // ==================== ADMIN BANNER / ALERT SYSTEM ====================
