@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ForexYemeni Wallet v10.5 - محفظة العملات الرقمية</title>
+    <title>ForexYemeni Wallet v15.3 - محفظة العملات الرقمية</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
         tailwind.config = {
@@ -4921,17 +4921,36 @@
             var wms = DB.get('userWithdrawalMethods').filter(function(w){return w.userId===user.id;});
             var html = '<div class="'+C.card+' rounded-2xl p-6 border '+C.border+'"><div class="flex items-center justify-between mb-4"><h2 class="text-xl font-bold '+C.text+'">🏦 حسابات السحب</h2>'+
                 '<button onclick="showAddWmModal()" class="'+C.btn+' px-4 py-2 rounded-lg font-bold btn text-sm">+ إضافة</button></div>';
-            if(wms.length===0) html += '<p class="'+C.muted+' text-center py-8">لا توجد حسابات سحب محفوظة</p>';
+            if(wms.length===0) html += '<div class="text-center py-10"><p class="text-4xl mb-3">🏦</p><p class="'+C.muted+' text-sm">لا توجد حسابات سحب محفوظة</p><p class="'+C.muted+' text-xs mt-1">أضف حساب سحب لاستخدامه في عمليات السحب</p></div>';
             else {
                 html += '<div class="space-y-3">';
                 wms.forEach(function(w) {
+                    var typeIcon = w.type==='CRYPTO' ? '💰' : '🏦';
+                    var typeBg = w.type==='CRYPTO' ? 'bg-primary/10' : 'bg-info/10';
                     var info = '';
-                    var currLabel = w.currency === 'SAR' ? 'SAR' : (w.currency === 'YER' ? 'YER' : '');
-                    var subLabel = w.subtype === 'transfer' ? 'تحويل' : 'إيداع لمحفظة';
-                    if(w.type==='BANK') info = '<p class="text-sm font-medium '+C.text+'">'+escHtml(w.bankName||'تحويل بنكي')+'</p><p class="text-xs '+C.muted+'">'+currLabel+' | '+subLabel+'</p><p class="text-xs '+C.muted+'">رقم الحساب: '+escHtml(w.accountNumber||'')+'</p><p class="text-xs '+C.muted+'">الاسم: '+escHtml(w.recipientName||'')+'</p>';
-                    else info = '<p class="text-sm font-medium '+C.text+'">'+escHtml(w.currencyName||'USDT')+' ('+escHtml(w.network||'') +')</p><p class="text-xs '+C.muted+' font-mono">'+escHtml((w.address||'').substr(0,24))+'...</p>';
-                    html += '<div class="flex items-center justify-between p-4 rounded-lg border '+C.border+'"><div>'+info+'</div>'+
-                        '<button onclick="requestDeleteWm(\''+w.id+'\')" class="text-danger text-sm btn hover:underline px-2 py-1">🗑️ حذف</button></div>';
+                    if(w.type==='BANK') {
+                        var currLabel = w.currency === 'SAR' ? '<span class="px-2 py-0.5 rounded bg-warning/20 text-warning text-[10px] font-bold">SAR</span>' : (w.currency === 'YER' ? '<span class="px-2 py-0.5 rounded bg-success/20 text-success text-[10px] font-bold">YER</span>' : '');
+                        var subLabel = w.subtype === 'transfer' ? '<span class="px-2 py-0.5 rounded bg-accent-violet/20 text-accent-violet text-[10px] font-bold">تحويل</span>' : '<span class="px-2 py-0.5 rounded bg-info/20 text-info text-[10px] font-bold">إيداع لمحفظة</span>';
+                        info = '<div class="flex items-center gap-2 mb-2">'+currLabel+subLabel+'</div>'+
+                            '<p class="text-sm font-bold '+C.text+' mb-1">'+escHtml(w.bankName||'تحويل بنكي')+'</p>'+
+                            '<div class="space-y-1">'+
+                            '<div class="flex justify-between py-1 border-b '+C.border+'"><span class="'+C.muted+' text-xs">رقم الحساب</span><span class="font-mono text-xs font-bold '+C.text+'">'+escHtml(w.accountNumber||'')+'</span></div>'+
+                            '<div class="flex justify-between py-1"><span class="'+C.muted+' text-xs">اسم صاحب الحساب</span><span class="text-xs font-medium '+C.text+'">'+escHtml(w.recipientName||'')+'</span></div></div>';
+                    } else {
+                        var netLabel = '<span class="px-2 py-0.5 rounded bg-primary/20 text-primary text-[10px] font-bold">'+escHtml(w.network||'CRYPTO')+'</span>';
+                        var addrVal = w.address || '';
+                        info = '<div class="flex items-center gap-2 mb-2">'+netLabel+'</div>'+
+                            '<p class="text-sm font-bold '+C.text+' mb-1">'+escHtml(w.currencyName||'USDT')+'</p>'+
+                            '<div class="py-1"><p class="'+C.muted+' text-xs mb-1">عنوان المحفظة</p>'+
+                            '<div class="flex items-center gap-2"><p class="font-mono text-xs '+C.text+' break-all flex-1">'+escHtml(addrVal)+'</p>'+
+                            '<button onclick="copyText(\''+escHtml(addrVal).replace(/'/g,"\\'")+'\')" class="copy-btn shrink-0 text-xs px-2 py-1 rounded border '+C.border+' btn">📋</button></div></div>';
+                    }
+                    html += '<div class="'+C.card+' rounded-xl p-4 border '+C.border+' card-hover shadow-card">'+
+                        '<div class="flex items-start justify-between gap-3">'+
+                        '<div class="flex items-start gap-3 flex-1 min-w-0">'+
+                        '<div class="w-10 h-10 rounded-xl '+typeBg+' flex items-center justify-center text-lg shrink-0">'+typeIcon+'</div>'+
+                        '<div class="flex-1 min-w-0">'+info+'</div></div>'+
+                        '<button onclick="requestDeleteWm(\''+w.id+'\')" class="shrink-0 w-8 h-8 rounded-lg bg-danger/10 text-danger flex items-center justify-center text-sm btn hover:bg-danger/20">🗑️</button></div></div>';
                 });
                 html += '</div>';
             }
