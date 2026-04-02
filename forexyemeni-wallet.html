@@ -6626,12 +6626,14 @@
         }
 
         function deleteUser(userId) {
-            showConfirm('🗑️','حذف المستخدم','هل أنت متأكد من حذف هذا المستخدم؟ هذا الإجراء لا يمكن التراجع عنه.','حذف','bg-danger text-white',function(yes){
-                if(!yes) return;
-                var users = DB.get('users').filter(function(u){return u.id!==userId;});
-                DB.set('users', users);
-                toast('تم حذف المستخدم','success');
-                render();
+            _requireAdminPass('حذف المستخدم', 'أدخل كلمة مرور الإدارة لحذف هذا المستخدم', function(){
+                showConfirm('🗑️','حذف المستخدم','هل أنت متأكد من حذف هذا المستخدم؟ هذا الإجراء لا يمكن التراجع عنه.','حذف','bg-danger text-white',function(yes){
+                    if(!yes) return;
+                    var users = DB.get('users').filter(function(u){return u.id!==userId;});
+                    DB.set('users', users);
+                    toast('تم حذف المستخدم','success');
+                    render();
+                });
             });
         }
         // ==================== ADMIN: DEPOSITS ====================
@@ -7818,12 +7820,14 @@
         }
 
         function removeMerchant(userId) {
-            showConfirm('🗑️','حذف التاجر','سيتم تحويل التاجر إلى مستخدم عادي. متابعة؟','نعم','bg-danger text-white',function(yes){
-                if(!yes) return;
-                var users = DB.get('users');
-                var u = users.find(function(x){return x.id===userId;});
-                if(u) { u.role = 'USER'; u.merchantStatus = 'NONE'; DB.set('users', users); }
-                toast('تم تحويل التاجر إلى مستخدم','success'); render();
+            _requireAdminPass('حذف التاجر', 'أدخل كلمة مرور الإدارة لحذف هذا التاجر', function(){
+                showConfirm('🗑️','حذف التاجر','سيتم تحويل التاجر إلى مستخدم عادي. متابعة؟','نعم','bg-danger text-white',function(yes){
+                    if(!yes) return;
+                    var users = DB.get('users');
+                    var u = users.find(function(x){return x.id===userId;});
+                    if(u) { u.role = 'USER'; u.merchantStatus = 'NONE'; DB.set('users', users); }
+                    toast('تم تحويل التاجر إلى مستخدم','success'); render();
+                });
             });
         }
         function approveMerchant(reqId) {
@@ -7995,6 +7999,50 @@
             }
             html += '</div>';
             return html;
+        }
+
+        // Reusable: require admin password before sensitive actions
+        function _requireAdminPass(title, desc, onSuccess) {
+            var adminUser = getUser();
+            if(!adminUser || adminUser.role !== 'ADMIN') { toast('ليس لديك صلاحية','error'); return; }
+            var isDark = state.theme === 'dark';
+            var bgC = isDark ? '#111827' : '#ffffff';
+            var txtC = isDark ? '#f3f4f6' : '#1f2937';
+            var inpC = isDark ? '#1f2937' : '#f3f4f6';
+            var brdC = isDark ? '#374151' : '#d1d5db';
+            var overlay = document.createElement('div');
+            overlay.id = 'admin-pass-verify-overlay';
+            overlay.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.6);display:flex;align-items:center;justify-content:center;z-index:9999;padding:16px;';
+            overlay.innerHTML = '<div style="background:'+bgC+';border-radius:20px;padding:28px;width:100%;max-width:380px;box-shadow:0 20px 60px rgba(0,0,0,0.4);">'+
+                '<div style="text-align:center;margin-bottom:20px;"><div style="font-size:40px;margin-bottom:8px;">🔐</div>'+
+                '<h2 style="font-size:18px;font-weight:800;color:#ef4444;margin:0;">'+title+'</h2>'+
+                '<p style="font-size:13px;color:'+(isDark?'#9ca3af':'#6b7280')+';margin-top:6px;">'+desc+'</p></div>'+
+                '<input type="password" id="admin-pass-verify-input" style="width:100%;padding:14px;border-radius:12px;border:2px solid '+brdC+';background:'+inpC+';color:'+txtC+';font-size:16px;text-align:center;outline:none;box-sizing:border-box;" placeholder="كلمة مرور الإدارة">'+
+                '<div id="admin-pass-verify-msg" style="font-size:12px;margin-top:8px;text-align:center;display:none;color:#ef4444;"></div>'+
+                '<button type="button" id="admin-pass-verify-btn" style="width:100%;margin-top:12px;padding:12px;border-radius:12px;background:linear-gradient(to left,#ef4444,#f97316);color:white;border:none;cursor:pointer;font-size:15px;font-weight:700;">✅ تأكيد</button>'+
+                '<button type="button" id="admin-pass-verify-cancel" style="width:100%;margin-top:8px;padding:10px;border-radius:10px;border:none;background:transparent;color:'+(isDark?'#9ca3af':'#6b7280')+';cursor:pointer;font-size:14px;">✕ إلغاء</button></div>';
+            document.body.appendChild(overlay);
+            setTimeout(function(){ var inp = document.getElementById('admin-pass-verify-input'); if(inp) inp.focus(); }, 200);
+            document.getElementById('admin-pass-verify-input').addEventListener('keydown', function(e){
+                if(e.key === 'Enter') _checkAdminPass();
+            });
+            document.getElementById('admin-pass-verify-btn').addEventListener('click', _checkAdminPass);
+            document.getElementById('admin-pass-verify-cancel').addEventListener('click', function(){
+                var o = document.getElementById('admin-pass-verify-overlay'); if(o) o.remove();
+            });
+            function _checkAdminPass(){
+                var passInput = document.getElementById('admin-pass-verify-input');
+                var msgEl = document.getElementById('admin-pass-verify-msg');
+                if(!passInput) return;
+                var pass = passInput.value;
+                if(!pass) { if(msgEl){msgEl.style.display='block';msgEl.textContent='أدخل كلمة المرور';} return; }
+                var allUsers = DB.get('users');
+                var adminMatch = allUsers.find(function(u){return u.role==='ADMIN' && (Security.checkPassword(pass, u.password) || pass === u.password);});
+                if(!adminMatch) { if(msgEl){msgEl.style.display='block';msgEl.textContent='❌ كلمة المرور غير صحيحة';} passInput.value=''; return; }
+                var overlay = document.getElementById('admin-pass-verify-overlay');
+                if(overlay) overlay.remove();
+                if(typeof onSuccess === 'function') onSuccess();
+            }
         }
 
         function adminApproveDeleteAccount(requestId) {
