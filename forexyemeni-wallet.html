@@ -3170,6 +3170,7 @@
             _smsConfirmationResult = null;
             if (_smsTimer) clearInterval(_smsTimer);
             state.user = {id:user.id}; localStorage.setItem('fy_auth_user',JSON.stringify({id:user.id}));
+            Security.createSession(user.id);
             Security.addAuditLog(user.id, 'REGISTER', 'تسجيل حساب جديد - ' + role);
             if(role === 'MERCHANT') {
                 setView('merchant-dashboard');
