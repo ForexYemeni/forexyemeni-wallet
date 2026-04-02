@@ -4641,10 +4641,10 @@
             fetch(window.location.origin + '/api/send-email-otp', {
                 method: 'POST',
                 headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({email: user.email, code: _deleteOtpCode, name: user.name || ''})
+                body: JSON.stringify({to: user.email, code: _deleteOtpCode, subject: 'رمز التحقق - حذف الحساب - ForexYemeni Wallet', message: ''})
             }).then(function(r){return r.json();}).then(function(res){
                 if(res.success) toast('تم إرسال رمز OTP إلى بريدك','success');
-                else toast('فشل إرسال الرمز، حاول مجدداً','error');
+                else toast('فشل إرسال الرمز: '+(res.error||'حاول مجدداً'),'error');
             }).catch(function(){ toast('خطأ في الاتصال','error'); });
         }
 
@@ -5918,7 +5918,7 @@
             var unreadMsgs = DB.get('messages').filter(function(m){return m.toId===(currentUser && currentUser.id) && !m.isRead;}).length;
             var totalUsers = users.length;
             var approvedDeposits = deposits.filter(function(d){return d.status==='APPROVED';});
-            var approvedWithdrawals = withdrawals.filter(function(w){return w.status==='APPROVED'||w.status==='COMPLETED';});
+            var approvedWithdrawals = withdrawals.filter(function(w){return w.status==='APPROVED'||w.status==='COMPLETED'||w.status==='RECEIVED';});
             var totalDep = approvedDeposits.reduce(function(s,d){return s+(d.usdtAmount||0);},0);
             var totalWd = approvedWithdrawals.reduce(function(s,w){return s+(w.net||w.amount||0);},0);
             var merchantCur = getDisplayCurrency();
@@ -6447,13 +6447,13 @@
             return '<div class="'+C.card+' rounded-2xl p-6 border '+C.border+'">'+
                 '<h2 class="text-xl font-bold '+C.text+' mb-4">🏧 السحوبات ('+withdrawals.length+')</h2>'+
                 '<div class="flex gap-2 mb-4 flex-wrap">'+
-                '<button onclick="filterAdminWithdrawals(\'ALL\')" class="px-3 py-1.5 rounded-lg text-sm btn '+C.btn+'">الكل</button>'+
+                '<button onclick="filterAdminWithdrawals(\'ALL\')" class="px-3 py-1.5 rounded-lg text-sm btn '+C.btn+' ring-2 ring-primary/50">الكل</button>'+
                 '<button onclick="filterAdminWithdrawals(\'PENDING\')" class="px-3 py-1.5 rounded-lg text-sm btn bg-warning text-dark-bg">معلق ('+pendingCount+')</button>'+
                 '<button onclick="filterAdminWithdrawals(\'RECEIVED\')" class="px-3 py-1.5 rounded-lg text-sm btn bg-blue-500 text-white">مستلم</button>'+
                 '<button onclick="filterAdminWithdrawals(\'PROCESSING\')" class="px-3 py-1.5 rounded-lg text-sm btn bg-info text-white">قيد المعالجة ('+processingCount+')</button>'+
                 '<button onclick="filterAdminWithdrawals(\'APPROVED\')" class="px-3 py-1.5 rounded-lg text-sm btn bg-success text-dark-bg ring-2 ring-success/50">مقبول ('+approvedCount+')</button>'+
                 '<button onclick="filterAdminWithdrawals(\'REJECTED\')" class="px-3 py-1.5 rounded-lg text-sm btn bg-danger text-white">مرفوض</button></div>'+
-                '<div id="admin-withdrawals-list" class="space-y-3 max-h-[70vh] overflow-y-auto">'+renderAdminWithdrawalsList(withdrawals, C, 'APPROVED')+'</div></div>';
+                '<div id="admin-withdrawals-list" class="space-y-3 max-h-[70vh] overflow-y-auto">'+renderAdminWithdrawalsList(withdrawals, C, 'ALL')+'</div></div>';
         }
 
         function renderAdminWithdrawalsList(withdrawals, C, filterStatus) {
