@@ -1961,8 +1961,8 @@
             '<div id="reg-role-MERCHANT" onclick="selectRegRole(\'MERCHANT\')" style="cursor:pointer;padding:12px;border-radius:12px;border:2px solid '+brdC+';display:flex;align-items:center;gap:8px;">'+
             '<input type="radio" name="reg-role" value="MERCHANT" style="accent-color:#f59e0b;width:18px;height:18px;"><span style="font-size:14px;color:'+txtC+'">🏪 تاجر</span></div></div></div>'+
 
-            '<div><label style="'+labelStyle+'">الاسم الرباعي <span style="color:#ef4444">*</span></label>'+
-            '<input type="text" id="reg-name" required autocomplete="name" style="'+inputStyle+'" placeholder="محمد أحمد علي حسين"></div>'+
+            '<div><label style="'+labelStyle+'">الاسم الثلاثي <span style="color:#ef4444">*</span></label>'+
+            '<input type="text" id="reg-name" required autocomplete="name" style="'+inputStyle+'" placeholder="Forex Yemeni wallet 1"></div>'+
 
             '<div><label style="'+labelStyle+'">طريقة التسجيل</label>'+
             '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">'+
@@ -3134,7 +3134,9 @@
             var refCode = document.getElementById('reg-ref') ? document.getElementById('reg-ref').value.trim() : '';
             var roleRadio = document.querySelector('input[name="reg-role"]:checked');
             var selectedRole = roleRadio ? roleRadio.value : 'USER';
-            if(!name) { toast('أدخل الاسم الرباعي','error'); shakeField(document.getElementById('reg-name')); return; }
+            if(!name) { toast('أدخل الاسم','error'); shakeField(document.getElementById('reg-name')); return; }
+            var nameParts = name.trim().split(/\s+/);
+            if(nameParts.length < 3) { toast('يجب أن يكون الاسم 3 أجزاء على الأقل','error'); shakeField(document.getElementById('reg-name')); return; }
             if(pass.length < 6) { toast('كلمة المرور 6 أحرف على الأقل','error'); return; }
             // === OTP Verification Check (based on reg method) ===
             if (_regMethod === 'email') {
