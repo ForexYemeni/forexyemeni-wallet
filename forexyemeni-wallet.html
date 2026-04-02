@@ -1377,7 +1377,7 @@
                 { id: 'pm1', title: 'USDT TRC20', type: 'CRYPTO', subtype: '', network: 'TRC20', address: 'TXxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx', recipientName: '', accountNumber: '', bankName: '', isActive: true, sortOrder: 0, minDeposit: 10, minWithdraw: 5 },
                 { id: 'pm2', title: 'حساب بنك اليمن والكويت', type: 'BANK', subtype: 'wallet', network: '', address: '', recipientName: 'ForexYemeni', accountNumber: '1234567890', bankName: 'بنك اليمن والكويت', isActive: true, sortOrder: 1, minDeposit: 1000, minWithdraw: 500 }
             ];
-            if (key === 'settings') return { exchange_rate: '535', exchange_rate_sar: '137.50', exchange_fee: '0', admin_deposit_fee: '0', admin_withdrawal_fee: '0', aff_l1: '5', aff_l2: '3', aff_l3: '1', admin_phone: '', admin_whatsapp: '', merchant_commission: '2', admin_trc20_wallet: 'TSJJodihEAbgqLENZvMzh62rEDaM5QxoLn', auto_approve_crypto: '0', txid_max_age_minutes: '120' };
+            if (key === 'settings') return { exchange_rate: '535', exchange_rate_sar: '137.50', exchange_fee: '0', admin_deposit_fee: '0', admin_withdrawal_fee: '0', aff_l1: '5', aff_l2: '3', aff_l3: '1', admin_phone: '', admin_whatsapp: '', merchant_commission: '2', admin_trc20_wallet: 'TSJJodihEAbgqLENZvMzh62rEDaM5QxoLn', auto_approve_crypto: '0', txid_max_age_minutes: '120', crypto_fee_trc20: '1', crypto_fee_bep20: '5', crypto_fee_erc20: '15', large_withdrawal_threshold: '1000' };
             if (key === 'merchantRequests') return [];
             if (key === 'merchantTransactions') return [];
             if (key === 'profileChangeRequests') return [];
@@ -4121,6 +4121,19 @@
             }, 300);
         }
         initMerchantSections();
+        // ==================== WITHDRAWAL FEE HELPER ====================
+        function getWithdrawalFeePercent(method) {
+            // If method is CRYPTO, use network-specific fee; otherwise use exchange_fee
+            if (method && method.type === 'CRYPTO' && method.network) {
+                var net = method.network.toUpperCase();
+                if (net === 'TRC20' || net === 'TRON') return parseFloat(DB.getSetting('crypto_fee_trc20')) || 1;
+                if (net === 'BEP20' || net === 'BSC') return parseFloat(DB.getSetting('crypto_fee_bep20')) || 5;
+                if (net === 'ERC20' || net === 'ETH') return parseFloat(DB.getSetting('crypto_fee_erc20')) || 15;
+            }
+            // BANK or unknown: use exchange_fee
+            return parseFloat(DB.getSetting('exchange_fee')) || 0;
+        }
+
         // ==================== USER: WITHDRAW ====================
         function renderUserWithdraw(C) {
             var user = getUser();
@@ -4130,6 +4143,15 @@
             if(!kycApproved) { return '<div class="'+getThemeColors().card+' rounded-xl p-8 max-w-lg mx-auto border '+getThemeColors().border+' text-center"><p class="text-4xl mb-4">🪪</p><p class="'+getThemeColors().text+' font-bold text-lg mb-2">يجب توثيق الهوية أولاً</p><p class="'+getThemeColors().muted+' mb-4">لا يمكنك إجراء سحب قبل توثيق هويتك</p><button onclick="setView(\'user-kyc\')" class="'+getThemeColors().btn+' px-6 py-3 rounded-lg font-bold btn">🪪 توثيق الهوية</button></div>'; }
             var rate = parseFloat(DB.getSetting('exchange_rate')) || 535;
             var fee = parseFloat(DB.getSetting('exchange_fee')) || 0;
+            // Show network fee info
+            var feeTrc20 = DB.getSetting('crypto_fee_trc20') || '1';
+            var feeBep20 = DB.getSetting('crypto_fee_bep20') || '5';
+            var feeErc20 = DB.getSetting('crypto_fee_erc20') || '15';
+            var feeInfoHtml = '<div class="p-3 rounded-lg bg-info/10 border border-info/30"><p class="text-xs font-bold text-info mb-1">📊 رسوم السحب حسب الشبكة:</p>'+
+                '<div class="grid grid-cols-3 gap-2 mt-1"><div class="text-center"><p class="text-xs '+C.muted+'">TRC20</p><p class="text-sm font-bold text-warning">'+feeTrc20+'%</p></div><'+
+                'div class="text-center"><p class="text-xs '+C.muted+'">BEP20</p><p class="text-sm font-bold text-warning">'+feeBep20+'%</p></div>'+
+                '<div class="text-center"><p class="text-xs '+C.muted+'">ERC20</p><p class="text-sm font-bold text-warning">'+feeErc20+'%</p></div></div>
+                '<p class="text-xs '+C.muted+' mt-1">بنكي: '+fee+'%</p></div>';
             // Calculate daily withdrawal info
             var today = new Date().toISOString().split('T')[0];
             var userWds = DB.get('withdrawals').filter(function(w){return w.userId===user.id && w.status!=='REJECTED' && w.createdAt && w.createdAt.startsWith(today);});
@@ -4156,6 +4178,7 @@
                 '<button onclick="setMaxWdPercent(75)" class="flex-1 px-3 py-2 rounded-xl border '+C.border+' '+C.text+' btn text-xs">75%</button>'+
                 '<button onclick="setMaxWdPercent(50)" class="flex-1 px-3 py-2 rounded-xl border '+C.border+' '+C.text+' btn text-xs">50%</button>'+
                 '<button onclick="setMaxWdPercent(25)" class="flex-1 px-3 py-2 rounded-xl border '+C.border+' '+C.text+' btn text-xs">25%</button></div>'+
+                feeInfoHtml+
                 '<div id="wd-calc" class="'+C.card+' rounded-xl p-4 border '+C.border+' space-y-2">'+
                 '<p class="'+C.muted+' text-sm">💰 المبلغ المطلوب: <span class="'+C.text+' font-bold">0.00 USDT</span></p>'+
                 '<p class="'+C.muted+' text-sm">📊 الرسوم ('+fee+'%): <span class="'+C.text+' font-bold">0.00 USDT</span></p>'+
@@ -4171,7 +4194,6 @@
             if(!calcEl) return;
             var user = getUser();
             var amountInput = parseFloat(document.getElementById('wd-amount').value) || 0;
-            var fee = parseFloat(DB.getSetting('exchange_fee')) || 0;
             var rate = parseFloat(DB.getSetting('exchange_rate')) || 535;
             var rateSar = parseFloat(DB.getSetting('exchange_rate_sar')) || 137.50;
             var sarToUsdtRate = rate / rateSar;
@@ -4182,9 +4204,15 @@
             if(curSel === 'YER') usdtAmount = amountInput / rate;
             else if(curSel === 'SAR') usdtAmount = amountInput * rateSar / rate;
 
-            var feeAmount = usdtAmount * fee / 100;
+            // Get network-specific fee based on selected withdrawal method
+            var methodId = document.getElementById('wd-method').value;
+            var method = DB.get('userWithdrawalMethods').find(function(m){return m.id===methodId;});
+            var feePercent = getWithdrawalFeePercent(method);
+            var feeLabel = (method && method.type === 'CRYPTO' && method.network) ? method.network : 'عام';
+
+            var feeAmount = usdtAmount * feePercent / 100;
             var netUsdt = usdtAmount - feeAmount;
-            var netLocal = amountInput - (amountInput * fee / 100);
+            var netLocal = amountInput - (amountInput * feePercent / 100);
             var canAfford = usdtAmount <= user.usdtBalance;
 
             var C = getThemeColors();
@@ -4196,7 +4224,7 @@
 
             calcEl.innerHTML = '<p class="'+C.muted+' text-sm">💰 المبلغ المطلوب: <span class="'+C.text+' font-bold">'+fmtNum(amountInput)+' '+currencyLabel+'</span></p>'+
                 '<p class="'+C.muted+' text-sm">📊 سيُخصم من رصيدك: <span class="'+C.text+' font-bold">'+fmtNum(usdtAmount)+' USDT</span></p>'+
-                '<p class="'+C.muted+' text-sm">📊 الرسوم ('+fee+'%): <span class="text-danger font-bold">'+fmtNum(feeAmount)+' USDT</span></p>'+
+                '<p class="'+C.muted+' text-sm">📊 الرسوم ('+feeLabel+': '+feePercent+'%): <span class="text-danger font-bold">'+fmtNum(feeAmount)+' USDT</span></p>'+
                 '<div class="border-t '+C.border+' pt-2"><p class="font-bold text-lg '+(canAfford?'text-success':'text-danger')+'">'+(canAfford?'✅':'⚠️')+' الصافي الذي ستستلمه: '+fmtNum(netLocal)+' '+currencyLabel+'</p>'+
                 '<p class="'+C.muted+' text-xs mt-1">المعادل: '+fmtNum(netUsdt)+' USDT</p></div>'+
                 (!canAfford?'<p class="text-danger text-xs mt-1 font-bold">⚠️ رصيدك غير كافٍ! رصيدك: '+fmtNum(user.usdtBalance)+' USDT</p>':'');
@@ -4297,7 +4325,6 @@
             var methodId = document.getElementById('wd-method').value;
             var amountInput = parseFloat(document.getElementById('wd-amount').value);
             var notes = document.getElementById('wd-notes').value.trim();
-            var fee = parseFloat(DB.getSetting('exchange_fee')) || 0;
             var rate = parseFloat(DB.getSetting('exchange_rate')) || 535;
             var rateSar = parseFloat(DB.getSetting('exchange_rate_sar')) || 137.50;
             // Get selected merchant
@@ -4305,43 +4332,88 @@
             var merchantId = merchantSelect ? merchantSelect.value : '';
             if(!methodId) { toast('اختر طريقة السحب','error'); return; }
             if(!amountInput || amountInput <= 0) { toast('أدخل مبلغاً صحيحاً','error'); return; }
-            // Check merchant balance for withdrawal
-            if(merchantId) {
-                var merchantUser = DB.get('users').find(function(u){return u.id===merchantId;});
-                var merchantBal = merchantUser ? (merchantUser.usdtBalance || 0) : 0;
-                if(merchantBal <= 0) { toast('رصيد التاجر فارغ حالياً، لا يمكن السحب عبر هذا التاجر','error'); return; }
-                var tempUsdt = amountInput;
-                if(wdCurrency === 'YER') tempUsdt = amountInput / rate;
-                else if(wdCurrency === 'SAR') tempUsdt = amountInput * rateSar / rate;
-                if(tempUsdt > merchantBal) { toast('المبلغ أكبر من رصيد التاجر المتاح ('+fmtNum(merchantBal)+' USDT)','error'); return; }
-            }
 
-            // Convert entered amount to USDT based on selected currency
             var wdCurrency = document.getElementById('wd-currency') ? document.getElementById('wd-currency').value : 'USDT';
             var usdtAmount = amountInput;
             if(wdCurrency === 'YER') usdtAmount = amountInput / rate;
             else if(wdCurrency === 'SAR') usdtAmount = amountInput * rateSar / rate;
 
-            var feeAmount = usdtAmount * fee / 100;
-            var netUsdt = usdtAmount - feeAmount;
-            if(netUsdt <= 0) { toast('المبلغ بعد الرسوم صفر أو أقل','error'); return; }
-            if(usdtAmount > user.usdtBalance) { toast('رصيدك غير كافٍ! رصيدك: '+fmtNum(user.usdtBalance)+' USDT والمطلوب: '+fmtNum(usdtAmount)+' USDT','error'); return; }
+            // Get method and network-specific fee
             var method = DB.get('userWithdrawalMethods').find(function(m){return m.id===methodId;});
             if(!method) { toast('طريقة السحب غير موجودة','error'); return; }
+            var feePercent = getWithdrawalFeePercent(method);
+            var feeLabel = (method.type === 'CRYPTO' && method.network) ? method.network : 'عام';
+            var feeAmount = usdtAmount * feePercent / 100;
+            var netUsdt = usdtAmount - feeAmount;
+
+            if(netUsdt <= 0) { toast('المبلغ بعد الرسوم صفر أو أقل','error'); return; }
+            if(usdtAmount > user.usdtBalance) { toast('رصيدك غير كافٍ! رصيدك: '+fmtNum(user.usdtBalance)+' USDT والمطلوب: '+fmtNum(usdtAmount)+' USDT','error'); return; }
+            // Check merchant balance for withdrawal
+            if(merchantId) {
+                var merchantUser = DB.get('users').find(function(u){return u.id===merchantId;});
+                var merchantBal = merchantUser ? (merchantUser.usdtBalance || 0) : 0;
+                if(merchantBal <= 0) { toast('رصيد التاجر فارغ حالياً، لا يمكن السحب عبر هذا التاجر','error'); return; }
+                if(usdtAmount > merchantBal) { toast('المبلغ أكبر من رصيد التاجر المتاح ('+fmtNum(merchantBal)+' USDT)','error'); return; }
+            }
             // Daily withdrawal limit check (in USDT)
             var today = new Date().toISOString().split('T')[0];
             var userWds = DB.get('withdrawals').filter(function(w){return w.userId===user.id && w.status!=='REJECTED' && w.createdAt && w.createdAt.startsWith(today);});
             var totalWdToday = userWds.reduce(function(s,w){return s+(w.net||0);},0);
             var dailyWdLimit = parseFloat(DB.getSetting('daily_withdrawal_limit')) || 5000;
             if(totalWdToday + netUsdt > dailyWdLimit) { toast('لقد تجاوزت الحد اليومي للسحب: '+fmtNum(dailyWdLimit)+' USDT','error'); return; }
-            var withdrawals = DB.get('withdrawals');
-            var localAmount = amountInput - (amountInput * fee / 100);
+
+            var localAmount = amountInput - (amountInput * feePercent / 100);
             if(wdCurrency === 'USDT') localAmount = netUsdt;
-            withdrawals.unshift({id:DB.uid(),userId:user.id,withdrawalMethodId:methodId,amount:usdtAmount,fee:feeAmount,net:netUsdt,currency:wdCurrency,localAmount:localAmount,notes:notes,status:'PENDING',assignedMerchantId:merchantId||null,createdAt:new Date().toISOString()});
+
+            // Feature 7: Confirmation dialog showing net amount breakdown
+            var confirmMsg = '💰 المبلغ: '+fmtNum(amountInput)+' '+wdCurrency+'\n📊 الرسوم ('+feeLabel+': '+feePercent+'%): -'+fmtNum(feeAmount)+' USDT\n✅ الصافي: '+fmtNum(localAmount)+' '+wdCurrency+' ('+fmtNum(netUsdt)+' USDT)';
+            if(method.type === 'BANK') {
+                confirmMsg += '\n🏦 البنك: '+(method.bankName||'');
+            } else {
+                confirmMsg += '\n⛓️ الشبكة: '+(method.network||'');
+            }
+
+            // Feature 19: Large withdrawal alert
+            var largeThreshold = parseFloat(DB.getSetting('large_withdrawal_threshold')) || 1000;
+            var isLarge = netUsdt >= largeThreshold;
+
+            var confirmTitle = '🏧 تأكيد طلب السحب';
+            var confirmBtn = '✅ تأكيد السحب';
+            var confirmBtnClass = 'bg-gradient-to-r from-green-500 to-emerald-600 text-white';
+
+            if(isLarge) {
+                confirmTitle = '⚠️ سحب كبير - تأكيد إضافي';
+                confirmBtn = '⚠️ تأكيد السحب الكبير';
+                confirmBtnClass = 'bg-gradient-to-r from-amber-500 to-orange-600 text-white';
+                confirmMsg += '\n\n🚨 تنبيه: هذا سحب كبير (أكثر من '+fmtNum(largeThreshold)+' USDT)!';
+            }
+
+            showConfirm('🏧', confirmTitle, confirmMsg, confirmBtn, confirmBtnClass, function(confirmed) {
+                if(!confirmed) return;
+                _doWithdraw(user, methodId, method, usdtAmount, feeAmount, feePercent, feeLabel, netUsdt, wdCurrency, localAmount, amountInput, notes, merchantId);
+            });
+        }
+
+        function _doWithdraw(user, methodId, method, usdtAmount, feeAmount, feePercent, feeLabel, netUsdt, wdCurrency, localAmount, amountInput, notes, merchantId) {
+            var withdrawals = DB.get('withdrawals');
+            withdrawals.unshift({id:DB.uid(),userId:user.id,withdrawalMethodId:methodId,amount:usdtAmount,fee:feeAmount,feePercent:feePercent,feeLabel:feeLabel,net:netUsdt,currency:wdCurrency,localAmount:localAmount,notes:notes,status:'PENDING',assignedMerchantId:merchantId||null,createdAt:new Date().toISOString()});
             DB.set('withdrawals', withdrawals);
-            addLog(user.id,'WITHDRAW',netUsdt,'USDT','طلب سحب '+fmtNum(localAmount)+' '+(wdCurrency)+' ('+fmtNum(netUsdt)+' USDT)'+(merchantId?' - عبر تاجر':''));
+            addLog(user.id,'WITHDRAW',netUsdt,'USDT','طلب سحب '+fmtNum(localAmount)+' '+(wdCurrency)+' ('+fmtNum(netUsdt)+' USDT - رسوم '+feePercent+'%)'+(merchantId?' - عبر تاجر':''));
             addNotif(user.id,'طلب سحب','تم إرسال طلب سحب '+fmtNum(localAmount)+' '+(wdCurrency)+' ('+fmtNum(netUsdt)+' USDT) بنجاح. سيتم مراجعته.','INFO');
             if(user.email) sendEmailNotification(user.email, 'طلب سحب جديد', 'تم استلام طلب سحب بقيمة '+fmtNum(localAmount)+' '+(wdCurrency)+' ('+fmtNum(netUsdt)+' USDT)');
+
+            // Feature 19: Notify admin for large withdrawals
+            var largeThreshold = parseFloat(DB.getSetting('large_withdrawal_threshold')) || 1000;
+            if(netUsdt >= largeThreshold) {
+                var adminUser = DB.get('users').find(function(u){return u.role==='ADMIN';});
+                if(adminUser) {
+                    addNotif(adminUser.id,'🚨 سحب كبير','سحب جديد بقيمة '+fmtNum(netUsdt)+' USDT من المستخدم '+getShortName(user.name)+' ('+feeLabel+': '+feePercent+'%)','WARNING');
+                }
+                // Send admin email notification
+                var adminEmail = DB.getSetting('admin_email') || '';
+                if(adminEmail) sendEmailNotification(adminEmail, '🚨 سحب كبير - '+fmtNum(netUsdt)+' USDT', 'سحب جديد بقيمة '+fmtNum(netUsdt)+' USDT من '+user.name+' | رسوم: '+feePercent+'%');
+            }
+
             toast('تم إرسال طلب السحب'+(merchantId?' - تم تعيين التاجر':''),'success');
             setView('user-home');
         }
@@ -8493,6 +8565,14 @@
                 '<div onclick="var cb=document.getElementById(\'set-auto-approve-crypto\');cb.checked=!cb.checked;this.className=cb.checked?\'w-12 h-7 rounded-full bg-success relative cursor-pointer transition-colors\':\'w-12 h-7 rounded-full bg-gray-400 relative cursor-pointer transition-colors\';this.children[0].className=cb.checked?\'absolute top-[2px] right-[2px] w-6 h-6 bg-white rounded-full shadow transition-all\':\'absolute top-[2px] left-[2px] w-6 h-6 bg-white rounded-full shadow transition-all\'" class="'+(DB.getSetting('auto_approve_crypto')==='1'?'w-12 h-7 rounded-full bg-success relative cursor-pointer transition-colors':'w-12 h-7 rounded-full bg-gray-400 relative cursor-pointer transition-colors')+'"><div class="'+(DB.getSetting('auto_approve_crypto')==='1'?'absolute top-[2px] right-[2px] w-6 h-6 bg-white rounded-full shadow transition-all':'absolute top-[2px] left-[2px] w-6 h-6 bg-white rounded-full shadow transition-all')+'"></div></div>'+
                 '<input type="checkbox" id="set-auto-approve-crypto" class="hidden" '+(DB.getSetting('auto_approve_crypto')==='1'?'checked':'')+'></div></div>'+
                 '<div><label class="block text-sm '+C.muted+' mb-1">⏰ الحد الأقصى لعمر TXID (دقيقة)</label><input type="number" id="set-txid-max-age" value="'+(DB.getSetting('txid_max_age_minutes')||'120')+'" class="w-full px-4 py-2.5 rounded-xl border '+C.input+' outline-none" min="5" max="1440" placeholder="120"><p class="text-xs '+C.muted+' mt-1">الحد الأقصى لعمر العملية بالدقائق (الافتراضي: 120 دقيقة = ساعتان). TXID الأقدم من هذا سيُرفض لمنع إعادة الاستخدام</p></div>'+
+                '<div class="'+C.card+' rounded-xl p-4 border '+C.border+'"><h3 class="font-bold '+C.text+' mb-3">💸 رسوم السحب الديناميكية حسب الشبكة</h3><div class="space-y-3">'+
+                '<div class="grid grid-cols-3 gap-3">'+
+                '<div><label class="block text-sm '+C.muted+' mb-1">⛓️ TRC20 (%)</label><input type="number" id="set-crypto-fee-trc20" value="'+(DB.getSetting('crypto_fee_trc20')||'1')+'" class="w-full px-4 py-2.5 rounded-xl border '+C.input+' outline-none" min="0" max="100" step="0.1"><p class="text-xs text-info mt-1">الافتراضي: 1%</p></div>'+
+                '<div><label class="block text-sm '+C.muted+' mb-1">⛓️ BEP20 (%)</label><input type="number" id="set-crypto-fee-bep20" value="'+(DB.getSetting('crypto_fee_bep20')||'5')+'" class="w-full px-4 py-2.5 rounded-xl border '+C.input+' outline-none" min="0" max="100" step="0.1"><p class="text-xs text-warning mt-1">الافتراضي: 5%</p></div>'+
+                '<div><label class="block text-sm '+C.muted+' mb-1">⛓️ ERC20 (%)</label><input type="number" id="set-crypto-fee-erc20" value="'+(DB.getSetting('crypto_fee_erc20')||'15')+'" class="w-full px-4 py-2.5 rounded-xl border '+C.input+' outline-none" min="0" max="100" step="0.1"><p class="text-xs text-danger mt-1">الافتراضي: 15%</p></div></div>'+
+                '<p class="text-xs '+C.muted+'">💡 هذه الرسوم تُطبق فقط على السحوبات الكريبتو. السحوبات البنكية تستخدم رسوم عامة.</p></div>'+
+                '<div class="'+C.card+' rounded-xl p-4 border '+C.border+'"><h3 class="font-bold '+C.text+' mb-3">🚨 تنبيه السحوبات الكبيرة</h3><div class="space-y-3">'+
+                '<div><label class="block text-sm '+C.muted+' mb-1">حد السحب الكبير (USDT)</label><input type="number" id="set-large-wd-threshold" value="'+(DB.getSetting('large_withdrawal_threshold')||'1000')+'" class="w-full px-4 py-2.5 rounded-xl border '+C.input+' outline-none" min="0" step="100" placeholder="1000"><p class="text-xs '+C.muted+' mt-1">عند تجاوز السحب هذا المبلغ، سيظهر تنبيه إضافي ويُرسل إشعار للإدارة</p></div></div>'+
                 renderAdminBannerSettings(C)+
                 renderAdminBannerAdSettings(C)+
                 (adminUser ? renderContactManagement(C, adminUser, 'ADMIN') : '')+
@@ -8711,6 +8791,10 @@
             DB.setSetting('admin_trc20_wallet', (document.getElementById('set-trc20-wallet')||{}).value.trim());
             DB.setSetting('auto_approve_crypto', document.getElementById('set-auto-approve-crypto').checked ? '1' : '0');
             DB.setSetting('txid_max_age_minutes', document.getElementById('set-txid-max-age').value || '120');
+            DB.setSetting('crypto_fee_trc20', document.getElementById('set-crypto-fee-trc20').value || '1');
+            DB.setSetting('crypto_fee_bep20', document.getElementById('set-crypto-fee-bep20').value || '5');
+            DB.setSetting('crypto_fee_erc20', document.getElementById('set-crypto-fee-erc20').value || '15');
+            DB.setSetting('large_withdrawal_threshold', document.getElementById('set-large-wd-threshold').value || '1000');
             var adminPass = document.getElementById('set-admin-pass').value;
             if(adminPass) {
                 var users = DB.get('users');
