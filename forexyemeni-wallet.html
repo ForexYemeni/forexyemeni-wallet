@@ -6668,6 +6668,7 @@
                     (assignedMerchantName?'<p class="text-xs '+C.muted+' mb-2">🏪 التاجر المعين: <span class="text-primary font-medium">'+assignedMerchantName+'</span></p>':'')+
                     (w.notes?'<p class="text-xs '+C.muted+' mb-2">ملاحظات: '+escHtml(w.notes)+'</p>':'')+
                     (w.rejectReason?'<div class="mb-2 p-2 rounded-lg bg-danger/10 border border-danger/30"><p class="text-xs text-danger font-bold">❌ سبب الرفض:</p><p class="text-xs text-danger/80">'+escHtml(w.rejectReason)+'</p></div>':'')+
+                    (w.txidVerified ? '<div class="mb-2 p-2 rounded-lg bg-success/10 border border-success/30"><p class="text-success text-xs font-bold">✅ TXID مُحقق من البلوك تشين</p><p class="text-success/70 text-xs">المبلغ: '+fmtNum(w.txidVerifyData?w.txidVerifyData.amount:0)+' USDT | بلوك: #'+(w.txidVerifyData?w.txidVerifyData.block:'—')+'</p><p class="text-success/60 text-xs font-mono break-all">TXID: '+escHtml(w.txid||'')+'</p></div>' : (w.txid ? '<div class="mb-2 p-2 rounded-lg bg-warning/10 border border-warning/30"><p class="text-warning text-xs font-bold">⏳ TXID: '+escHtml(w.txid)+'</p></div>' : ''))+
                     (w.confirmScreenshot?'<div class="mb-2"><p class="text-xs '+C.muted+' mb-1">لقطة تأكيد التنفيذ:</p><img src="'+w.confirmScreenshot+'" class="h-24 rounded-lg border cursor-pointer object-cover" onclick="showImageModal(this.src)"></div>':'')+
                     (w.receiptImage?'<div class="mb-2"><p class="text-xs '+C.muted+' mb-1">📎 صورة الإيصال:</p><img src="'+w.receiptImage+'" class="h-24 rounded-lg border cursor-pointer object-cover" onclick="showImageModal(this.src)"></div>':'')+
                     (w.status==='PENDING'?'<div class="flex gap-2"><button onclick="adminReceiveWithdrawal(\''+w.id+'\')" class="flex-1 py-2 rounded-lg font-bold btn bg-info text-white text-sm">📋 تم استلام الطلب</button><button onclick="adminRejectWithdrawal(\''+w.id+'\')" class="flex-1 py-2 rounded-xl font-bold btn btn-premium bg-gradient-to-r from-red-500 to-rose-500 text-white text-sm">❌ رفض</button></div>':'')+
@@ -6726,9 +6727,86 @@
             });
         }
 
+        var _wdTxidVerifyResult = null;
+        var _wdTxidVerifyWdId = '';
+
+        function verifyWithdrawalTxid(wdId) {
+            var txidInput = document.getElementById('wd-txid-input');
+            var resultDiv = document.getElementById('wd-txid-result');
+            var verifyBtn = document.getElementById('wd-verify-txid-btn');
+            if(!txidInput || !resultDiv || !verifyBtn) return;
+            var txid = txidInput.value.trim();
+            if(!txid || txid.length !== 64) { toast('أدخل TXID صحيح (64 حرف)','error'); return; }
+            var trc20Wallet = DB.getSetting('admin_trc20_wallet');
+            if(!trc20Wallet) { toast('عنوان المحفظة TRC20 غير مضبوط في الإعدادات','error'); return; }
+            // Get the user's wallet address from the withdrawal method
+            var withdrawals = DB.get('withdrawals');
+            var w = withdrawals.find(function(x){return x.id===wdId;});
+            if(!w) return;
+            var wms = DB.get('userWithdrawalMethods');
+            var method = wms.find(function(x){return x.id===w.withdrawalMethodId;});
+            var userWallet = method ? (method.address||'') : '';
+            if(!userWallet) { toast('لا يوجد عنوان محفظة للمستخدم','error'); return; }
+            verifyBtn.disabled = true; verifyBtn.textContent = '⏳ جاري...';
+            resultDiv.classList.remove('hidden');
+            resultDiv.innerHTML = '<p class="text-info text-xs">🔍 جاري التحقق من شبكة TRON...</p>';
+            fetch(window.location.origin + '/api/verify-txid', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({txid: txid, adminWallet: trc20Wallet, direction: 'withdrawal', userWallet: userWallet})
+            }).then(function(r){return r.json();}).then(function(data) {
+                verifyBtn.disabled = false; verifyBtn.textContent = '🔍 تحقق';
+                if(data.success) {
+                    _wdTxidVerifyResult = data;
+                    _wdTxidVerifyWdId = wdId;
+                    resultDiv.innerHTML = '<div class="p-3 rounded-lg bg-success/10 border border-success/30">'+
+                        '<div class="flex items-center gap-2 mb-1"><span class="text-success text-lg">✅</span><p class="text-success font-bold text-xs">تم التحقق بنجاح!</p></div>'+
+                        '<div class="flex justify-between"><span class="text-success/70 text-xs">المبلغ:</span><span class="text-success font-bold text-xs">'+fmtNum(data.amount)+' '+data.token+'</span></div>'+
+                        '<div class="flex justify-between"><span class="text-success/70 text-xs">من (إدارة):</span><span class="font-mono text-xs text-success/70">'+escHtml((data.from||'').substr(0,10))+'...</span></div>'+
+                        '<div class="flex justify-between"><span class="text-success/70 text-xs">إلى (مستخدم):</span><span class="font-mono text-xs text-success/70">'+escHtml((data.to||'').substr(0,10))+'...</span></div>'+
+                        '<div class="flex justify-between"><span class="text-success/70 text-xs">بلوك:</span><span class="text-success/70 text-xs">#'+data.block+'</span></div></div>';
+                    toast('✅ تم التحقق من TXID - المبلغ: '+fmtNum(data.amount)+' USDT','success');
+                } else {
+                    _wdTxidVerifyResult = null;
+                    _wdTxidVerifyWdId = '';
+                    resultDiv.innerHTML = '<div class="p-3 rounded-lg bg-danger/10 border border-danger/30">'+
+                        '<div class="flex items-center gap-2"><span class="text-danger text-lg">❌</span><p class="text-danger font-bold text-xs">فشل التحقق</p></div>'+
+                        '<p class="text-danger/80 text-xs mt-1">'+escHtml(data.error||'لم يتم التحقق')+'</p></div>';
+                    toast('❌ '+escHtml(data.error||'فشل التحقق'),'error');
+                }
+            }).catch(function(err) {
+                verifyBtn.disabled = false; verifyBtn.textContent = '🔍 تحقق';
+                resultDiv.innerHTML = '<p class="text-danger text-xs">❌ خطأ في الاتصال</p>';
+                toast('خطأ في الاتصال بالشبكة','error');
+            });
+        }
+
         function adminApproveWithdrawal(wdId) {
             var C = getThemeColors();
-            showModal('<h3 class="text-lg font-bold '+C.text+' mb-4">📸 رفع لقطة إثبات التنفيذ (اجباري)</h3>'+
+            // Check if this is a crypto withdrawal to show TXID option
+            var withdrawals = DB.get('withdrawals');
+            var w = withdrawals.find(function(x){return x.id===wdId;});
+            var wms = DB.get('userWithdrawalMethods');
+            var method = w ? wms.find(function(x){return x.id===w.withdrawalMethodId;}) : null;
+            var isCrypto = method && method.type === 'CRYPTO';
+
+            _wdTxidVerifyResult = null;
+            _wdTxidVerifyWdId = '';
+
+            var txidSection = '';
+            if(isCrypto) {
+                var userAddr = method.address || 'غير محدد';
+                txidSection = '<div class="p-3 rounded-lg border border-primary/30 bg-primary/5 mb-4">'+
+                    '<p class="text-xs font-bold text-primary mb-2">🔗 تحقق من TXID (اختياري)</p>'+
+                    '<p class="text-xs '+C.muted+' mb-2">أدخل TXID عملية التحويل من محفظة الإدارة إلى محفظة المستخدم للتحقق التلقائي</p>'+
+                    '<p class="text-xs '+C.muted+' mb-1">محفظة المستخدم: <span class="font-mono text-primary">'+escHtml(userAddr)+'</span></p>'+
+                    '<div class="flex gap-2 mb-2"><input type="text" id="wd-txid-input" class="flex-1 min-w-0 px-3 py-2 rounded-lg border '+C.input+' outline-none font-mono text-xs" placeholder="أدخل TXID العملية"></button>'+
+                    '<button type="button" id="wd-verify-txid-btn" onclick="verifyWithdrawalTxid(\''+wdId+'\')" class="shrink-0 px-3 py-2 rounded-lg bg-primary text-white btn text-xs font-bold">🔍 تحقق</button></div>'+
+                    '<div id="wd-txid-result" class="hidden text-xs"></div></div>';
+            }
+
+            showModal('<h3 class="text-lg font-bold '+C.text+' mb-4">📸 إكمال السحب وإثبات التنفيذ</h3>'+
+                txidSection+
                 '<p class="'+C.muted+' text-sm mb-4">ارفع لقطة شاشة تثبت إتمام التحويل إلى حساب المستخدم</p>'+
                 '<div id="admin-wd-proof-preview"></div>'+
                 '<div class="flex gap-2 mb-4">'+
@@ -6757,6 +6835,22 @@
             // Save optional receipt image
             var receiptData = document.getElementById('admin-receipt-img-data');
             if(receiptData && receiptData.value) { w.receiptImage = receiptData.value; }
+            // Save TXID verification data if verified
+            if(_wdTxidVerifyResult && _wdTxidVerifyWdId === wdId) {
+                var txidInput = document.getElementById('wd-txid-input');
+                w.txid = txidInput ? txidInput.value.trim() : '';
+                w.txidVerified = true;
+                w.txidVerifyData = {
+                    amount: _wdTxidVerifyResult.amount,
+                    from: _wdTxidVerifyResult.from,
+                    to: _wdTxidVerifyResult.to,
+                    block: _wdTxidVerifyResult.block,
+                    timestamp: _wdTxidVerifyResult.timestamp,
+                    direction: 'withdrawal'
+                };
+            }
+            _wdTxidVerifyResult = null;
+            _wdTxidVerifyWdId = '';
             var adminUser = getUser();
             w.processedBy = adminUser ? adminUser.id : w.processedBy;
             w.completedAt = new Date().toISOString();
