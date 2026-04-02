@@ -8625,53 +8625,53 @@
             var dailyWdLimit = DB.getSetting('daily_withdrawal_limit') || '5000';
             var users = DB.get('users');
             var adminUser = users.find(function(u){return u.role==='ADMIN';});
-            return '<div class="'+C.card+' rounded-2xl p-6 max-w-2xl mx-auto border '+C.border+'">'+
-                '<h2 class="text-xl font-bold '+C.text+' mb-6 text-center">⚙️ الإعدادات العامة</h2>'+
-                '<div class="space-y-6">'+
+            return '<div class="max-w-2xl mx-auto space-y-4">'+
+                '<div class="'+C.card+' rounded-2xl p-5 border '+C.border+'"><div class="flex items-center gap-3 mb-1"><div class="w-10 h-10 rounded-xl bg-primary/15 flex items-center justify-center text-xl">⚙️</div><div><h2 class="text-lg font-extrabold '+C.text+'">الإعدادات العامة</h2><p class="text-xs '+C.muted+'">إدارة جميع إعدادات التطبيق من مكان واحد</p></div></div></div>'+
+                '<div class="space-y-4">'+
                 (adminUser ? renderNotifSettingsSection(C, adminUser.id) : '')+
-                '<div class="'+C.card+' rounded-xl p-4 border '+C.border+'"><h3 class="font-bold '+C.text+' mb-3">💱 العملات والرسوم</h3><div class="space-y-3">'+
+                '<div class="'+C.card+' rounded-xl p-4 border '+C.border+'"><div class="flex items-center gap-2 mb-4"><div class="w-8 h-8 rounded-lg bg-amber-500/15 flex items-center justify-center text-sm">💱</div><h3 class="font-bold '+C.text+'">العملات والرسوم</h3></div><div class="space-y-3">'+
                 '<div class="grid grid-cols-2 gap-3">'+
-                '<div><label class="block text-sm '+C.muted+' mb-1">🇾🇪 سعر الصرف (1 USDT = ? YER)</label><input type="number" id="set-rate" value="'+rate+'" class="w-full px-4 py-2.5 rounded-xl border '+C.input+' outline-none"></div>'+
-                '<div><label class="block text-sm '+C.muted+' mb-1">🇸🇦 سعر الصرف (1 SAR = ? YER)</label><input type="number" id="set-rate-sar" value="'+(DB.getSetting('exchange_rate_sar')||'137.50')+'" class="w-full px-4 py-2.5 rounded-xl border '+C.input+' outline-none" step="0.01" placeholder="مثال: 137.50"></div></div>'+
+                '<div><label class="block text-xs '+C.muted+' mb-1">🇾🇪 سعر الصرف (1 USDT = ? YER)</label><input type="number" id="set-rate" value="'+rate+'" class="w-full px-3 py-2.5 rounded-xl border '+C.input+' outline-none text-sm"></div>'+
+                '<div><label class="block text-xs '+C.muted+' mb-1">🇸🇦 سعر الصرف (1 SAR = ? YER)</label><input type="number" id="set-rate-sar" value="'+(DB.getSetting('exchange_rate_sar')||'137.50')+'" class="w-full px-3 py-2.5 rounded-xl border '+C.input+' outline-none text-sm" step="0.01" placeholder="137.50"></div></div>'+
                 '<div class="grid grid-cols-2 gap-3">'+
-                '<div><label class="block text-sm '+C.muted+' mb-1">💰 رسوم الإيداع - الإدارة (%)</label><input type="number" id="set-admin-dep-fee" value="'+adminDepFee+'" class="w-full px-4 py-2.5 rounded-xl border '+C.input+' outline-none" min="0" max="100" step="0.1"></div>'+
-                '<div><label class="block text-sm '+C.muted+' mb-1">💸 رسوم السحب - الإدارة (%)</label><input type="number" id="set-admin-wd-fee" value="'+adminWdFee+'" class="w-full px-4 py-2.5 rounded-xl border '+C.input+' outline-none" min="0" max="100" step="0.1"></div></div>'+
+                '<div><label class="block text-xs '+C.muted+' mb-1">💰 رسوم الإيداع - الإدارة (%)</label><input type="number" id="set-admin-dep-fee" value="'+adminDepFee+'" class="w-full px-3 py-2.5 rounded-xl border '+C.input+' outline-none text-sm" min="0" max="100" step="0.1"></div>'+
+                '<div><label class="block text-xs '+C.muted+' mb-1">💸 رسوم السحب - الإدارة (%)</label><input type="number" id="set-admin-wd-fee" value="'+adminWdFee+'" class="w-full px-3 py-2.5 rounded-xl border '+C.input+' outline-none text-sm" min="0" max="100" step="0.1"></div></div>'+
                 '<div class="grid grid-cols-2 gap-3">'+
-                '<div><label class="block text-sm '+C.muted+' mb-1">عمولة التاجر (%)</label><input type="number" id="set-merch-comm" value="'+merchantComm+'" class="w-full px-4 py-2.5 rounded-xl border '+C.input+' outline-none" min="0" max="100" step="0.1"></div>'+
-                '<div><label class="block text-sm '+C.muted+' mb-1">رسوم عامة (%)</label><input type="number" id="set-fee" value="'+fee+'" class="w-full px-4 py-2.5 rounded-xl border '+C.input+' outline-none" min="0" max="100" step="0.1"></div></div></div>'+
-                '<div class="'+C.card+' rounded-xl p-4 border '+C.border+'"><h3 class="font-bold '+C.text+' mb-3">📊 الحدود اليومية</h3><div class="grid grid-cols-2 gap-3">'+
-                '<div><label class="block text-sm '+C.muted+' mb-1">الحد اليومي للايداع (USDT)</label><input type="number" id="set-daily-dep-limit" value="'+dailyDepLimit+'" class="w-full px-4 py-2.5 rounded-xl border '+C.input+' outline-none" min="0"></div>'+
-                '<div><label class="block text-sm '+C.muted+' mb-1">الحد اليومي للسحب (USDT)</label><input type="number" id="set-daily-wd-limit" value="'+dailyWdLimit+'" class="w-full px-4 py-2.5 rounded-xl border '+C.input+' outline-none" min="0"></div></div></div>'+
-                '<div class="'+C.card+' rounded-xl p-4 border '+C.border+'"><h3 class="font-bold '+C.text+' mb-3">🔗 نسب العمولة</h3><div class="grid grid-cols-3 gap-3">'+
-                '<div><label class="block text-sm '+C.muted+' mb-1">المستوى 1 (%)</label><input type="number" id="set-l1" value="'+l1+'" class="w-full px-4 py-2.5 rounded-xl border '+C.input+' outline-none" min="0" max="100"></div>'+
-                '<div><label class="block text-sm '+C.muted+' mb-1">المستوى 2 (%)</label><input type="number" id="set-l2" value="'+l2+'" class="w-full px-4 py-2.5 rounded-xl border '+C.input+' outline-none" min="0" max="100"></div>'+
-                '<div><label class="block text-sm '+C.muted+' mb-1">المستوى 3 (%)</label><input type="number" id="set-l3" value="'+l3+'" class="w-full px-4 py-2.5 rounded-xl border '+C.input+' outline-none" min="0" max="100"></div></div></div>'+
-                '<div class="'+C.card+' rounded-xl p-4 border '+C.border+'"><h3 class="font-bold '+C.text+' mb-3">📞 بيانات التواصل (تظهر للمستخدمين)</h3><div class="space-y-3">'+
-                '<div><label class="block text-sm '+C.muted+' mb-1">رقم الهاتف</label><input type="text" id="set-admin-phone" value="'+escHtml(adminPhone)+'" class="w-full px-4 py-2.5 rounded-xl border '+C.input+' outline-none" placeholder="+967..."></div>'+
-                '<div><label class="block text-sm '+C.muted+' mb-1">رقم واتساب</label><input type="text" id="set-admin-wa" value="'+escHtml(adminWA)+'" class="w-full px-4 py-2.5 rounded-xl border '+C.input+' outline-none" placeholder="+967..."></div></div></div>'+
-                '<div class="'+C.card+' rounded-xl p-4 border '+C.border+'"><h3 class="font-bold '+C.text+' mb-3">🔗 محفظة TRC20 للتحقق التلقائي من الإيداعات</h3><div class="space-y-3">'+
-                '<div><label class="block text-sm '+C.muted+' mb-1">📱 عنوان محفظة TRC20 (USDT)</label><input type="text" id="set-trc20-wallet" value="'+escHtml(DB.getSetting('admin_trc20_wallet')||'')+'" class="w-full px-4 py-2.5 rounded-xl border '+C.input+' outline-none font-mono text-sm" placeholder="T..."><p class="text-xs '+C.muted+' mt-1">عنوان محفظة USDT على شبكة TRON للتحقق التلقائي من TXID</p></div>'+
+                '<div><label class="block text-xs '+C.muted+' mb-1">عمولة التاجر (%)</label><input type="number" id="set-merch-comm" value="'+merchantComm+'" class="w-full px-3 py-2.5 rounded-xl border '+C.input+' outline-none text-sm" min="0" max="100" step="0.1"></div>'+
+                '<div><label class="block text-xs '+C.muted+' mb-1">رسوم عامة (%)</label><input type="number" id="set-fee" value="'+fee+'" class="w-full px-3 py-2.5 rounded-xl border '+C.input+' outline-none text-sm" min="0" max="100" step="0.1"></div></div></div></div>'+
+                '<div class="'+C.card+' rounded-xl p-4 border '+C.border+'"><div class="flex items-center gap-2 mb-4"><div class="w-8 h-8 rounded-lg bg-blue-500/15 flex items-center justify-center text-sm">📊</div><h3 class="font-bold '+C.text+'">الحدود اليومية</h3></div><div class="grid grid-cols-2 gap-3">'+
+                '<div><label class="block text-xs '+C.muted+' mb-1">الحد اليومي للايداع (USDT)</label><input type="number" id="set-daily-dep-limit" value="'+dailyDepLimit+'" class="w-full px-3 py-2.5 rounded-xl border '+C.input+' outline-none text-sm" min="0"></div>'+
+                '<div><label class="block text-xs '+C.muted+' mb-1">الحد اليومي للسحب (USDT)</label><input type="number" id="set-daily-wd-limit" value="'+dailyWdLimit+'" class="w-full px-3 py-2.5 rounded-xl border '+C.input+' outline-none text-sm" min="0"></div></div></div>'+
+                '<div class="'+C.card+' rounded-xl p-4 border '+C.border+'"><div class="flex items-center gap-2 mb-4"><div class="w-8 h-8 rounded-lg bg-purple-500/15 flex items-center justify-center text-sm">🔗</div><h3 class="font-bold '+C.text+'">نسب العمولة</h3></div><div class="grid grid-cols-3 gap-3">'+
+                '<div><label class="block text-xs '+C.muted+' mb-1">المستوى 1 (%)</label><input type="number" id="set-l1" value="'+l1+'" class="w-full px-3 py-2.5 rounded-xl border '+C.input+' outline-none text-sm" min="0" max="100"></div>'+
+                '<div><label class="block text-xs '+C.muted+' mb-1">المستوى 2 (%)</label><input type="number" id="set-l2" value="'+l2+'" class="w-full px-3 py-2.5 rounded-xl border '+C.input+' outline-none text-sm" min="0" max="100"></div>'+
+                '<div><label class="block text-xs '+C.muted+' mb-1">المستوى 3 (%)</label><input type="number" id="set-l3" value="'+l3+'" class="w-full px-3 py-2.5 rounded-xl border '+C.input+' outline-none text-sm" min="0" max="100"></div></div></div>'+
+                '<div class="'+C.card+' rounded-xl p-4 border '+C.border+'"><div class="flex items-center gap-2 mb-4"><div class="w-8 h-8 rounded-lg bg-green-500/15 flex items-center justify-center text-sm">📞</div><h3 class="font-bold '+C.text+'">بيانات التواصل</h3><span class="mr-auto text-xs '+C.muted+'">تظهر للمستخدمين</span></div><div class="grid grid-cols-2 gap-3">'+
+                '<div><label class="block text-xs '+C.muted+' mb-1">رقم الهاتف</label><input type="text" id="set-admin-phone" value="'+escHtml(adminPhone)+'" class="w-full px-3 py-2.5 rounded-xl border '+C.input+' outline-none text-sm" placeholder="+967..."></div>'+
+                '<div><label class="block text-xs '+C.muted+' mb-1">رقم واتساب</label><input type="text" id="set-admin-wa" value="'+escHtml(adminWA)+'" class="w-full px-3 py-2.5 rounded-xl border '+C.input+' outline-none text-sm" placeholder="+967..."></div></div></div>'+
+                '<div class="'+C.card+' rounded-xl p-4 border '+C.border+'"><div class="flex items-center gap-2 mb-4"><div class="w-8 h-8 rounded-lg bg-cyan-500/15 flex items-center justify-center text-sm">⛓️</div><h3 class="font-bold '+C.text+'">محفظة TRC20 للتحقق التلقائي</h3></div><div class="space-y-3">'+
+                '<div><label class="block text-xs '+C.muted+' mb-1">عنوان محفظة TRC20 (USDT)</label><input type="text" id="set-trc20-wallet" value="'+escHtml(DB.getSetting('admin_trc20_wallet')||'')+'" class="w-full px-3 py-2.5 rounded-xl border '+C.input+' outline-none font-mono text-xs" placeholder="T..."><p class="text-xs '+C.muted+' mt-1">عنوان محفظة USDT على شبكة TRON للتحقق التلقائي من TXID</p></div>'+
                 '<div class="flex items-center gap-3 p-3 rounded-lg border '+C.border+'"><div class="flex-1"><p class="text-sm font-medium '+C.text+'">⚡ موافقة تلقائية على الإيداعات المُحققة</p><p class="text-xs '+C.muted+'">عند التحقق من TXID يوافق تلقائياً ويضيف الرصيد</p></div>'+
                 '<div onclick="var cb=document.getElementById(\'set-auto-approve-crypto\');cb.checked=!cb.checked;this.className=cb.checked?\'w-12 h-7 rounded-full bg-success relative cursor-pointer transition-colors\':\'w-12 h-7 rounded-full bg-gray-400 relative cursor-pointer transition-colors\';this.children[0].className=cb.checked?\'absolute top-[2px] right-[2px] w-6 h-6 bg-white rounded-full shadow transition-all\':\'absolute top-[2px] left-[2px] w-6 h-6 bg-white rounded-full shadow transition-all\'" class="'+(DB.getSetting('auto_approve_crypto')==='1'?'w-12 h-7 rounded-full bg-success relative cursor-pointer transition-colors':'w-12 h-7 rounded-full bg-gray-400 relative cursor-pointer transition-colors')+'"><div class="'+(DB.getSetting('auto_approve_crypto')==='1'?'absolute top-[2px] right-[2px] w-6 h-6 bg-white rounded-full shadow transition-all':'absolute top-[2px] left-[2px] w-6 h-6 bg-white rounded-full shadow transition-all')+'"></div></div>'+
                 '<input type="checkbox" id="set-auto-approve-crypto" class="hidden" '+(DB.getSetting('auto_approve_crypto')==='1'?'checked':'')+'></div></div>'+
-                '<div><label class="block text-sm '+C.muted+' mb-1">⏰ الحد الأقصى لعمر TXID (دقيقة)</label><input type="number" id="set-txid-max-age" value="'+(DB.getSetting('txid_max_age_minutes')||'120')+'" class="w-full px-4 py-2.5 rounded-xl border '+C.input+' outline-none" min="5" max="1440" placeholder="120"><p class="text-xs '+C.muted+' mt-1">الحد الأقصى لعمر العملية بالدقائق (الافتراضي: 120 دقيقة = ساعتان). TXID الأقدم من هذا سيُرفض لمنع إعادة الاستخدام</p></div></div>'+
-                '<div class="'+C.card+' rounded-xl p-4 border '+C.border+'"><h3 class="font-bold '+C.text+' mb-3">💸 رسوم السحب الديناميكية حسب الشبكة</h3><div class="space-y-3">'+
+                '<div><label class="block text-xs '+C.muted+' mb-1">⏰ الحد الأقصى لعمر TXID (دقيقة)</label><input type="number" id="set-txid-max-age" value="'+(DB.getSetting('txid_max_age_minutes')||'120')+'" class="w-full px-3 py-2.5 rounded-xl border '+C.input+' outline-none text-sm" min="5" max="1440" placeholder="120"><p class="text-xs '+C.muted+' mt-1">الافتراضي: 120 دقيقة. TXID الأقدم سيُرفض لمنع إعادة الاستخدام</p></div></div></div>'+
+                '<div class="'+C.card+' rounded-xl p-4 border '+C.border+'"><div class="flex items-center gap-2 mb-4"><div class="w-8 h-8 rounded-lg bg-orange-500/15 flex items-center justify-center text-sm">💸</div><h3 class="font-bold '+C.text+'">رسوم السحب الديناميكية حسب الشبكة</h3></div><div class="space-y-3">'+
                 '<div class="grid grid-cols-3 gap-3">'+
-                '<div><label class="block text-sm '+C.muted+' mb-1">⛓️ TRC20 (%)</label><input type="number" id="set-crypto-fee-trc20" value="'+(DB.getSetting('crypto_fee_trc20')||'1')+'" class="w-full px-4 py-2.5 rounded-xl border '+C.input+' outline-none" min="0" max="100" step="0.1"><p class="text-xs text-info mt-1">الافتراضي: 1%</p></div>'+
-                '<div><label class="block text-sm '+C.muted+' mb-1">⛓️ BEP20 (%)</label><input type="number" id="set-crypto-fee-bep20" value="'+(DB.getSetting('crypto_fee_bep20')||'5')+'" class="w-full px-4 py-2.5 rounded-xl border '+C.input+' outline-none" min="0" max="100" step="0.1"><p class="text-xs text-warning mt-1">الافتراضي: 5%</p></div>'+
-                '<div><label class="block text-sm '+C.muted+' mb-1">⛓️ ERC20 (%)</label><input type="number" id="set-crypto-fee-erc20" value="'+(DB.getSetting('crypto_fee_erc20')||'15')+'" class="w-full px-4 py-2.5 rounded-xl border '+C.input+' outline-none" min="0" max="100" step="0.1"><p class="text-xs text-danger mt-1">الافتراضي: 15%</p></div></div>'+
-                '<p class="text-xs '+C.muted+'">💡 هذه الرسوم تُطبق فقط على السحوبات الكريبتو. السحوبات البنكية تستخدم رسوم عامة.</p></div></div>'+
-                '<div class="'+C.card+' rounded-xl p-4 border '+C.border+'"><h3 class="font-bold '+C.text+' mb-3">🚨 تنبيه السحوبات الكبيرة</h3><div class="space-y-3">'+
-                '<div><label class="block text-sm '+C.muted+' mb-1">حد السحب الكبير (USDT)</label><input type="number" id="set-large-wd-threshold" value="'+(DB.getSetting('large_withdrawal_threshold')||'1000')+'" class="w-full px-4 py-2.5 rounded-xl border '+C.input+' outline-none" min="0" step="100" placeholder="1000"><p class="text-xs '+C.muted+' mt-1">عند تجاوز السحب هذا المبلغ، سيظهر تنبيه إضافي ويُرسل إشعار للإدارة</p></div></div></div>'+
+                '<div><label class="block text-xs '+C.muted+' mb-1">TRC20 (%)</label><input type="number" id="set-crypto-fee-trc20" value="'+(DB.getSetting('crypto_fee_trc20')||'1')+'" class="w-full px-3 py-2.5 rounded-xl border '+C.input+' outline-none text-sm" min="0" max="100" step="0.1"><p class="text-xs text-info mt-1">افتراضي: 1%</p></div>'+
+                '<div><label class="block text-xs '+C.muted+' mb-1">BEP20 (%)</label><input type="number" id="set-crypto-fee-bep20" value="'+(DB.getSetting('crypto_fee_bep20')||'5')+'" class="w-full px-3 py-2.5 rounded-xl border '+C.input+' outline-none text-sm" min="0" max="100" step="0.1"><p class="text-xs text-warning mt-1">افتراضي: 5%</p></div>'+
+                '<div><label class="block text-xs '+C.muted+' mb-1">ERC20 (%)</label><input type="number" id="set-crypto-fee-erc20" value="'+(DB.getSetting('crypto_fee_erc20')||'15')+'" class="w-full px-3 py-2.5 rounded-xl border '+C.input+' outline-none text-sm" min="0" max="100" step="0.1"><p class="text-xs text-danger mt-1">افتراضي: 15%</p></div></div>'+
+                '<p class="text-xs '+C.muted+'">💡 تُطبق فقط على السحوبات الكريبتو. البنكية تستخدم الرسوم العامة.</p></div></div>'+
+                '<div class="'+C.card+' rounded-xl p-4 border '+C.border+'"><div class="flex items-center gap-2 mb-4"><div class="w-8 h-8 rounded-lg bg-red-500/15 flex items-center justify-center text-sm">🚨</div><h3 class="font-bold '+C.text+'">تنبيه السحوبات الكبيرة</h3></div><div class="space-y-3">'+
+                '<div><label class="block text-xs '+C.muted+' mb-1">حد السحب الكبير (USDT)</label><input type="number" id="set-large-wd-threshold" value="'+(DB.getSetting('large_withdrawal_threshold')||'1000')+'" class="w-full px-3 py-2.5 rounded-xl border '+C.input+' outline-none text-sm" min="0" step="100" placeholder="1000"><p class="text-xs '+C.muted+' mt-1">عند تجاوز السحب هذا المبلغ، سيظهر تنبيه إضافي ويُرسل إشعار للإدارة</p></div></div></div>'+
                 renderAdminBannerSettings(C)+
                 renderAdminBannerAdSettings(C)+
                 (adminUser ? renderContactManagement(C, adminUser, 'ADMIN') : '')+
-                '<div class="'+C.card+' rounded-xl p-5 border-2 border-danger/40 bg-danger/5"><h3 class="font-bold text-danger mb-3 text-center text-lg">⚠️ إعادة تعيين التطبيق بالكامل</h3>'+
-                '<p class="'+C.muted+' text-sm mb-4 text-center">حذف جميع البيانات: المستخدمين، الإيداعات، السحوبات، التوثيق، الرسائل، الإشعارات، سجل العمليات — وإعادة التطبيق لحالة نظيفة تماماً (مع الإبقاء على حساب الإدارة وإعداداته)</p>'+
-                '<button onclick="resetAppData()" class="w-full py-3 rounded-lg font-bold text-white bg-gradient-to-r from-red-500 to-rose-600 btn text-lg">🗑️ حذف جميع البيانات وإعادة التعيين</button></div>'+
-                '<div class="'+C.card+' rounded-xl p-4 border '+C.border+'"><h3 class="font-bold '+C.text+' mb-3">🔐 كلمة مرور المدير</h3><div class="space-y-3">'+
-                '<div><label class="block text-sm '+C.muted+' mb-1">كلمة المرور الجديدة (اتركها فارغة لعدم التغيير)</label><input type="password" id="set-admin-pass" class="w-full px-4 py-2.5 rounded-xl border '+C.input+' outline-none" placeholder="كلمة المرور الجديدة"></div></div></div>'+
-                '<button onclick="saveAdminSettings()" class="'+C.btn+' w-full py-3 rounded-lg font-bold btn text-lg">💾 حفظ جميع الإعدادات</button></div></div>';
+                '<div class="'+C.card+' rounded-xl p-4 border-2 border-danger/40 bg-danger/5"><div class="flex items-center gap-2 mb-3"><div class="w-8 h-8 rounded-lg bg-red-500/20 flex items-center justify-center text-sm">⚠️</div><h3 class="font-bold text-danger">إعادة تعيين التطبيق بالكامل</h3></div>'+
+                '<p class="'+C.muted+' text-xs mb-4">حذف جميع البيانات وإعادة التطبيق لحالة نظيفة (مع الإبقاء على حساب الإدارة وإعداداته)</p>'+
+                '<button onclick="resetAppData()" class="w-full py-2.5 rounded-lg font-bold text-white bg-gradient-to-r from-red-500 to-rose-600 btn text-sm">🗑️ حذف جميع البيانات وإعادة التعيين</button></div>'+
+                '<div class="'+C.card+' rounded-xl p-4 border '+C.border+'"><div class="flex items-center gap-2 mb-4"><div class="w-8 h-8 rounded-lg bg-gray-500/15 flex items-center justify-center text-sm">🔐</div><h3 class="font-bold '+C.text+'">كلمة مرور المدير</h3></div><div class="space-y-3">'+
+                '<div><label class="block text-xs '+C.muted+' mb-1">كلمة المرور الجديدة (اتركها فارغة لعدم التغيير)</label><input type="password" id="set-admin-pass" class="w-full px-3 py-2.5 rounded-xl border '+C.input+' outline-none text-sm" placeholder="كلمة المرور الجديدة"></div></div></div>'+
+                '<button onclick="saveAdminSettings()" class="w-full py-3.5 rounded-xl font-bold btn text-base shadow-lg '+C.btn+'">💾 حفظ جميع الإعدادات</button></div></div>';
         }
 
         // ==================== RESET ALL APP DATA ====================
@@ -9448,14 +9448,9 @@
                 'SUCCESS': {bg:'bg-success/10', border:'border-success/30', text:'text-success', icon:'✅'}
             };
             var c = colors[bannerType] || colors['INFO'];
-            var countryFlags = bannerCountries.trim() ? ' ' + bannerCountries.split(',').map(function(cc){
-                var co = countries.find(function(x){return x.code===cc.trim();});
-                return co ? co.flag : '';
-            }).join('') : ' 🌍';
             return '<div class="p-3 rounded-lg border '+c.border+' '+c.bg+' flex items-center gap-3">'+
                 '<span class="text-xl shrink-0">'+c.icon+'</span>'+
-                '<p class="text-sm '+c.text+' flex-1">'+escHtml(banner)+'</p>'+
-                '<span class="text-sm shrink-0">'+countryFlags+'</span></div>';
+                '<p class="text-sm '+c.text+' flex-1">'+escHtml(banner)+'</p></div>';
         }
 
         function renderAdminBannerSettings(C) {
@@ -9481,16 +9476,16 @@
                     return co ? co.flag+' '+co.name : cc;
                 }).join(' • ');
             }
-            return '<div class="'+C.card+' rounded-xl p-4 border '+C.border+'"><h3 class="font-bold '+C.text+' mb-3">📢 شعار تنبيه للمستخدمين</h3>'+
+            return '<div class="'+C.card+' rounded-xl p-4 border '+C.border+'"><div class="flex items-center gap-2 mb-3"><span class="text-lg">📢</span><h3 class="font-bold '+C.text+'">شعار تنبيه للمستخدمين</h3>'+(bannerActive?'<span class="ml-auto text-xs bg-success/20 text-success px-2 py-0.5 rounded-full font-medium">مفعّل</span>':'<span class="ml-auto text-xs bg-gray-200 text-gray-500 px-2 py-0.5 rounded-full font-medium">معطّل</span>')+'</div>'+
                 '<p class="text-xs '+C.muted+' mb-3">يظهر هذا التنبيه للمستخدمين في أعلى الصفحة الرئيسية</p>'+
-                '<div class="'+C.card+' rounded-xl p-3 border '+C.border+' mb-3"><p class="text-xs '+C.muted+' mb-2">🎯 استهداف الدول (اختر أعلام الدول):</p>'+
-                '<p class="text-xs font-medium '+C.text+' mb-2">'+selectedLabel+'</p>'+flagsHtml+'</div>'+
-                '<div class="flex gap-2 mb-3">'+
+                '<div class="'+C.card+' rounded-xl p-3 border '+C.border+' mb-3"><p class="text-xs '+C.muted+' mb-2">🎯 استهداف الدول:</p>'+
+                '<p class="text-sm font-medium '+C.text+' mb-2">'+selectedLabel+'</p>'+flagsHtml+'</div>'+
+                '<div class="mb-3"><p class="text-xs '+C.muted+' mb-2">نوع التنبيه:</p><div class="flex gap-2">'+
                 '<button onclick="DB.setSetting(\'admin_banner_type\',\'INFO\');render()" class="flex-1 py-2 rounded-lg text-xs font-bold btn '+(bannerType==='INFO'?'bg-info text-white':'border border-info/30 '+C.text)+'">ℹ️ معلومة</button>'+
                 '<button onclick="DB.setSetting(\'admin_banner_type\',\'WARNING\');render()" class="flex-1 py-2 rounded-lg text-xs font-bold btn '+(bannerType==='WARNING'?'bg-warning text-dark-bg':'border border-warning/30 '+C.text)+'">⚠️ تحذير</button>'+
                 '<button onclick="DB.setSetting(\'admin_banner_type\',\'DANGER\');render()" class="flex-1 py-2 rounded-lg text-xs font-bold btn '+(bannerType==='DANGER'?'bg-danger text-white':'border border-danger/30 '+C.text)+'">🚨 خطر</button>'+
-                '<button onclick="DB.setSetting(\'admin_banner_type\',\'SUCCESS\');render()" class="flex-1 py-2 rounded-lg text-xs font-bold btn '+(bannerType==='SUCCESS'?'bg-success text-dark-bg':'border border-success/30 '+C.text)+'">✅ نجاح</button></div>'+
-                '<textarea id="set-banner-text" class="w-full px-3 py-2.5 rounded-xl border '+C.input+' outline-none text-sm mb-3" rows="2" placeholder="اكتب نص التنبيه هنا...">'+escHtml(banner)+'</textarea>'+
+                '<button onclick="DB.setSetting(\'admin_banner_type\',\'SUCCESS\');render()" class="flex-1 py-2 rounded-lg text-xs font-bold btn '+(bannerType==='SUCCESS'?'bg-success text-dark-bg':'border border-success/30 '+C.text)+'">✅ نجاح</button></div></div>'+
+                '<div class="mb-3"><p class="text-xs '+C.muted+' mb-2">نص التنبيه:</p><textarea id="set-banner-text" class="w-full px-3 py-2.5 rounded-xl border '+C.input+' outline-none text-sm" rows="2" placeholder="اكتب نص التنبيه هنا...">'+escHtml(banner)+'</textarea></div>'+
                 '<button onclick="saveBanner()" class="w-full py-2.5 rounded-lg font-bold btn '+(bannerActive?'bg-danger text-white':'bg-success text-dark-bg')+' text-sm">'+(bannerActive?'🔒 إخفاء التنبيه':'📢 تفعيل وحفظ التنبيه')+'</button></div>';
         }
 
