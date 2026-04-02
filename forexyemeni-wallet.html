@@ -187,6 +187,9 @@
     <script src="https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore-compat.js"></script>
     <script>try { document.write('<script src="https://www.gstatic.com/firebasejs/10.8.1/firebase-messaging-compat.js"><\/script>'); } catch(e) { console.warn('FCM SDK load skipped'); }</script>
     <script src="https://www.gstatic.com/firebasejs/10.8.1/firebase-auth-compat.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <link rel="manifest" href="manifest.json">
     <link rel="apple-touch-icon" href="icon.png">
     <meta name="theme-color" content="#0a0e1a">
@@ -461,6 +464,18 @@
                 toast('رمز التحقق غير صحيح', 'error', false);
                 if (verifyBtn) { verifyBtn.disabled = false; }
             }
+        }
+
+        // ==================== EMAIL NOTIFICATION HELPER ====================
+        function sendEmailNotification(email, subject, message) {
+            if(!email || email.indexOf('@') < 1) return;
+            try {
+                fetch(window.location.origin + '/api/send-email-otp', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({to: email, code: '', subject: subject, message: message})
+                }).catch(function(e){ console.warn('[Email Notif] Failed:', e); });
+            } catch(e) { console.warn('[Email Notif] Error:', e); }
         }
 
         // ==================== SETTINGS EMAIL OTP (for adding email in settings) ====================
@@ -2957,6 +2972,13 @@
                     db.collection('appData').doc('users').set({ data: users });
                     Security.addAuditLog(user.id, 'PASSWORD_CHANGE', 'تغيير كلمة المرور (إجباري)');
                     toast('تم تغيير كلمة المرور بنجاح ✓','success');
+                    // Fire and forget: notify user via email/SMS
+                    if(user.email) {
+                        fetch(window.location.origin + '/api/send-email-otp', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({to: user.email, code: '', subject: 'تغيير كلمة المرور - ForexYemeni Wallet', message: 'تم تغيير كلمة مرور حسابك بنجاح. إذا لم تقم بهذا التغيير، تواصل مع الإدارة فوراً.'}) }).catch(function(){});
+                    }
+                    if(user.phone) {
+                        fetch(window.location.origin + '/api/send-sms-otp', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({to: user.phone, code: '', message: 'تم تغيير كلمة مرور حسابك في ForexYemeni. إذا لم تقم بالتغيير تواصل مع الدعم.'}) }).catch(function(){});
+                    }
                     // Continue to dashboard
                     DB.ensureUserFields(user);
                     Security.createSession(user.id);
@@ -3054,6 +3076,13 @@
             DB.set('users', users);
             Security.addAuditLog(user.id, 'PASSWORD_CHANGE', 'تغيير كلمة المرور من الإعدادات');
             toast('تم تغيير كلمة المرور بنجاح ✓','success');
+            // Fire and forget: notify user via email/SMS
+            if(user.email) {
+                fetch(window.location.origin + '/api/send-email-otp', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({to: user.email, code: '', subject: 'تغيير كلمة المرور - ForexYemeni Wallet', message: 'تم تغيير كلمة مرور حسابك بنجاح. إذا لم تقم بهذا التغيير، تواصل مع الإدارة فوراً.'}) }).catch(function(){});
+            }
+            if(user.phone) {
+                fetch(window.location.origin + '/api/send-sms-otp', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({to: user.phone, code: '', message: 'تم تغيير كلمة مرور حسابك في ForexYemeni. إذا لم تقم بالتغيير تواصل مع الدعم.'}) }).catch(function(){});
+            }
             closeModal();
         }
 
@@ -3158,6 +3187,7 @@
                     {id:'_sep3'},
                     {id:'admin-reports',icon:'📈',label:'التقارير'},
                     {id:'admin-audit',icon:'📋',label:'سجل العمليات'},
+                    {id:'admin-statistics',icon:'📊',label:'الإحصائيات'},
                     {id:'admin-settings',icon:'⚙️',label:'الإعدادات'}
                 ];
             } else if(isMerchant) {
@@ -3287,6 +3317,7 @@
                 case 'admin-login-permissions': contentHtml = renderAdminLoginPermissions(C); break;
                 case 'admin-reports': contentHtml = renderAdminReports(C); break;
                 case 'admin-audit': contentHtml = renderAdminAuditLog(C); break;
+                case 'admin-statistics': contentHtml = renderAdminStatistics(C); break;
                 case 'admin-db-config': contentHtml = renderAdminDbConfig(C); break;
                 case 'admin-settings': contentHtml = renderAdminSettings(C); break;
                 default: contentHtml = '<p class="'+C.text+'">صفحة غير موجودة</p>';
@@ -3378,7 +3409,7 @@
                 notifBanner = '<div class="'+C.card+' rounded-2xl p-4 border-2 border-warning/50 mb-4">'+
                     '<div class="flex items-center gap-3"><span class="text-2xl">🔕</span><div><p class="font-bold '+C.text+' text-sm text-warning">الإشعارات محظورة</p><p class="'+C.muted+' text-xs">لتفعيلها: اضغط على 🔒 بجانب العنوان ← إعدادات الموقع ← إشعارات ← سماح</p></div></div></div>';
             }
-            return renderAdminBanner(C) + renderDeviceApprovalPendingSection(C) + notifBanner + '<div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">'+
+            return renderBannerAd(C) + renderAdminBanner(C) + renderDeviceApprovalPendingSection(C) + notifBanner + '<div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">'+
                 '<div class="'+C.card+' rounded-2xl p-6 border '+C.border+' card-hover shadow-card '+C.gradient+'"><div class="flex items-center justify-between mb-2"><p class="'+C.muted+' text-sm">رصيد USDT</p><div class="w-10 h-10 rounded-xl bg-success/10 flex items-center justify-center text-success text-xl">💰</div></div><h2 class="text-3xl font-extrabold text-success text-glow">'+fmtNum(usdtBal)+' <span class="text-lg font-bold">USDT</span></h2></div>'+
                 '<div class="'+C.card+' rounded-2xl p-6 border '+C.border+' card-hover shadow-card bg-gradient-to-br from-amber-500/10 to-yellow-500/5"><div class="flex items-center justify-between mb-2"><p class="'+C.muted+' text-sm">المعادل بالعملة المحلية</p><div class="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center text-primary text-xl">🇾🇪</div></div><h2 class="text-3xl font-extrabold text-primary text-glow">'+fmtInt(Math.round(localEquiv))+' <span class="text-lg font-bold">YER</span></h2>'+
                 '<p class="'+C.muted+' text-xs mt-2 opacity-70">1 USDT = '+fmtNum(rate)+' YER</p></div>'+
@@ -3406,11 +3437,19 @@
             var kycDoc = DB.get('kycDocuments').find(function(k){return k.userId===user.id;});
             var kycApproved = kycDoc && kycDoc.frontId && kycDoc.status === 'APPROVED';
             if(!kycApproved) { return '<div class="'+C.card+' rounded-xl p-8 max-w-lg mx-auto border '+C.border+' text-center"><p class="text-4xl mb-4">🪪</p><p class="'+C.text+' font-bold text-lg mb-2">يجب توثيق الهوية أولاً</p><p class="'+C.muted+' mb-4">لا يمكنك إجراء إيداع قبل توثيق هويتك</p><button onclick="setView(\'user-kyc\')" class="'+C.btn+' px-6 py-3 rounded-lg font-bold btn">🪪 توثيق الهوية</button></div>'; }
+            // Calculate daily deposit info
+            var today = new Date().toISOString().split('T')[0];
+            var allDeposits = DB.get('deposits').filter(function(d){return d.userId===user.id && d.status!=='REJECTED' && d.createdAt && d.createdAt.startsWith(today);});
+            var totalDepToday = allDeposits.reduce(function(s,d){return s+(d.usdtAmount||0);},0);
+            var dailyDepLimit = parseFloat(DB.getSetting('daily_deposit_limit')) || 10000;
+            var remainingDep = Math.max(0, dailyDepLimit - totalDepToday);
+            var dailyDepInfo = '<div class="p-3 rounded-lg bg-info/10 border border-info/30"><div class="flex items-center justify-between"><span class="text-xs text-info font-bold">📊 الحد اليومي للإيداع</span><span class="text-xs '+C.text+' font-bold">'+fmtNum(totalDepToday)+' / '+fmtNum(dailyDepLimit)+' USDT</span></div><div class="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2 mt-2"><div class="bg-primary h-2 rounded-full" style="width:'+Math.min(100, (totalDepToday/dailyDepLimit)*100).toFixed(1)+'%"></div></div><p class="text-xs '+C.muted+' mt-1">المتبقي: '+fmtNum(remainingDep)+' USDT</p></div>';
             var pms = DB.get('paymentMethods').filter(function(p){return p.isActive;}).sort(function(a,b){return (a.sortOrder||0)-(b.sortOrder||0);});
             var selectedPmId = state.depPmId || '';
             var pmOpts = pms.map(function(p){ var lbl = p.type==='CRYPTO' ? (p.network||'CRYPTO') : (p.bankName||p.recipientName||'تحويل بنكي'); return '<option value="'+p.id+'" '+(p.id===selectedPmId?'selected':'')+'>'+escHtml(lbl)+'</option>';}).join('');
             return '<div class="'+C.card+' rounded-2xl p-6 max-w-lg mx-auto border '+C.border+'">'+
                 '<h2 class="text-xl font-bold '+C.text+' mb-6 text-center">💰 إيداع رصيد</h2>'+
+                dailyDepInfo+
                 '<div class="space-y-4">'+
                 '<div id="dep-merchant-section"></div>'+
                 '<div id="dep-pm-selector"><div><label class="block text-sm font-medium '+C.text+' mb-1">طريقة الإيداع</label><select id="dep-pm" class="w-full px-4 py-2.5 rounded-xl border '+C.input+' outline-none" onchange="onDepPmChange()"><option value="">-- اختر طريقة --</option>'+pmOpts+'</select></div></div>'+
@@ -3673,6 +3712,7 @@
             DB.set('deposits', deposits);
             addLog(user.id,'DEPOSIT',usdtAmount,'USDT','طلب إيداع '+fmtNum(amount)+' '+currency+' ('+fmtNum(usdtAmount)+' USDT)'+(merchantId?' - عبر تاجر':''));
             addNotif(user.id,'طلب إيداع','تم إرسال طلب إيداع '+fmtNum(usdtAmount)+' USDT بنجاح. سيتم مراجعته.','INFO');
+            if(user.email) sendEmailNotification(user.email, 'طلب إيداع جديد', 'تم استلام طلب إيداع بقيمة '+fmtNum(usdtAmount)+' USDT');
             clearFieldImage('depReceipt');
             toast('تم إرسال طلب الإيداع'+(merchantId?' بنجاح - تم تعيين التاجر':''),'success');
             setView('user-home');
@@ -3696,10 +3736,18 @@
             if(!kycApproved) { return '<div class="'+getThemeColors().card+' rounded-xl p-8 max-w-lg mx-auto border '+getThemeColors().border+' text-center"><p class="text-4xl mb-4">🪪</p><p class="'+getThemeColors().text+' font-bold text-lg mb-2">يجب توثيق الهوية أولاً</p><p class="'+getThemeColors().muted+' mb-4">لا يمكنك إجراء سحب قبل توثيق هويتك</p><button onclick="setView(\'user-kyc\')" class="'+getThemeColors().btn+' px-6 py-3 rounded-lg font-bold btn">🪪 توثيق الهوية</button></div>'; }
             var rate = parseFloat(DB.getSetting('exchange_rate')) || 535;
             var fee = parseFloat(DB.getSetting('exchange_fee')) || 0;
+            // Calculate daily withdrawal info
+            var today = new Date().toISOString().split('T')[0];
+            var userWds = DB.get('withdrawals').filter(function(w){return w.userId===user.id && w.status!=='REJECTED' && w.createdAt && w.createdAt.startsWith(today);});
+            var totalWdToday = userWds.reduce(function(s,w){return s+(w.net||0);},0);
+            var dailyWdLimit = parseFloat(DB.getSetting('daily_withdrawal_limit')) || 5000;
+            var remainingWd = Math.max(0, dailyWdLimit - totalWdToday);
+            var dailyWdInfo = '<div class="p-3 rounded-lg bg-info/10 border border-info/30"><div class="flex items-center justify-between"><span class="text-xs text-info font-bold">📊 الحد اليومي للسحب</span><span class="text-xs '+C.text+' font-bold">'+fmtNum(totalWdToday)+' / '+fmtNum(dailyWdLimit)+' USDT</span></div><div class="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2 mt-2"><div class="bg-primary h-2 rounded-full" style="width:'+Math.min(100, (totalWdToday/dailyWdLimit)*100).toFixed(1)+'%"></div></div><p class="text-xs '+C.muted+' mt-1">المتبقي: '+fmtNum(remainingWd)+' USDT</p></div>';
             var wms = DB.get('userWithdrawalMethods').filter(function(w){return w.userId===user.id;});
             var pmOpts = wms.map(function(w){var label = w.type==='BANK' ? (w.bankName||'تحويل بنكي')+' - '+(w.accountNumber||'').substr(0,8)+'...' : (w.network||'USDT')+' - '+(w.address||'').substr(0,12)+'...'; return '<option value="'+w.id+'">'+escHtml(label)+'</option>';}).join('');
             return '<div class="'+C.card+' rounded-2xl p-6 max-w-lg mx-auto border '+C.border+'">'+
                 '<h2 class="text-xl font-bold '+C.text+' mb-6 text-center">🏧 سحب رصيد</h2>'+
+                dailyWdInfo+
                 '<div class="grid grid-cols-2 gap-3 mb-4">'+
                 '<div class="'+C.card+' rounded-lg p-3 text-center border '+C.border+'"><p class="'+C.muted+' text-xs">رصيد USDT</p><p class="font-bold text-success">'+fmtNum(user.usdtBalance)+'</p></div>'+
                 '<div class="'+C.card+' rounded-lg p-3 text-center border '+C.border+'"><p class="'+C.muted+' text-xs">المعادل YER</p><p class="font-bold text-primary">'+fmtInt(Math.round(user.usdtBalance*rate))+'</p></div></div>'+
@@ -3874,6 +3922,7 @@
             DB.set('withdrawals', withdrawals);
             addLog(user.id,'WITHDRAW',netUsdt,'USDT','طلب سحب '+fmtNum(localAmount)+' '+(wdCurrency)+' ('+fmtNum(netUsdt)+' USDT)'+(merchantId?' - عبر تاجر':''));
             addNotif(user.id,'طلب سحب','تم إرسال طلب سحب '+fmtNum(localAmount)+' '+(wdCurrency)+' ('+fmtNum(netUsdt)+' USDT) بنجاح. سيتم مراجعته.','INFO');
+            if(user.email) sendEmailNotification(user.email, 'طلب سحب جديد', 'تم استلام طلب سحب بقيمة '+fmtNum(localAmount)+' '+(wdCurrency)+' ('+fmtNum(netUsdt)+' USDT)');
             toast('تم إرسال طلب السحب'+(merchantId?' - تم تعيين التاجر':''),'success');
             setView('user-home');
         }
@@ -3950,31 +3999,136 @@
             var deposits = DB.get('deposits').filter(function(d){return d.userId===user.id;});
             var withdrawals = DB.get('withdrawals').filter(function(w){return w.userId===user.id;});
             var all = [];
-            deposits.forEach(function(d){ all.push({id:d.id,type:'DEPOSIT',amount:d.amount||0,currency:d.currency||'USDT',status:d.status,date:d.createdAt,desc:'إيداع '+fmtNum(d.amount)+' '+(d.currency||''),approveProof:d.approveProof||null}); });
-            withdrawals.forEach(function(w){ all.push({id:w.id,type:'WITHDRAW',amount:w.localAmount||w.net||0,currency:w.currency||'USDT',status:w.status,date:w.createdAt,desc:'سحب '+fmtNum(w.localAmount||w.net)+' '+(w.currency||'USDT'),confirmScreenshot:w.confirmScreenshot||null,userReceiptProof:w.userReceiptProof||null}); });
+            deposits.forEach(function(d){ all.push({id:d.id,type:'DEPOSIT',amount:d.amount||0,usdtAmount:d.usdtAmount||0,fee:0,currency:d.currency||'USDT',status:d.status,date:d.createdAt,desc:'إيداع '+fmtNum(d.amount)+' '+(d.currency||''),approveProof:d.approveProof||null,notes:d.notes||'',txid:d.txid||'',merchantId:d.assignedMerchantId||null}); });
+            withdrawals.forEach(function(w){ all.push({id:w.id,type:'WITHDRAW',amount:w.localAmount||w.net||0,usdtAmount:w.net||0,fee:w.fee||0,currency:w.currency||'USDT',status:w.status,date:w.createdAt,desc:'سحب '+fmtNum(w.localAmount||w.net)+' '+(w.currency||'USDT'),confirmScreenshot:w.confirmScreenshot||null,userReceiptProof:w.userReceiptProof||null,notes:w.notes||'',txid:'',merchantId:w.assignedMerchantId||null,receiptImage:w.receiptImage||null,userConfirmed:w.userConfirmedAt||null}); });
             all.sort(function(a,b){ return new Date(b.date)-new Date(a.date); });
             if(all.length===0) return '<div class="'+C.card+' rounded-2xl p-8 border '+C.border+' text-center"><p class="text-4xl mb-4">📋</p><p class="'+C.muted+'">لا توجد عمليات بعد</p></div>';
-            var html = '<div class="'+C.card+' rounded-2xl p-6 border '+C.border+'"><h2 class="text-xl font-bold '+C.text+' mb-4">📋 سجل العمليات</h2><div class="space-y-3 max-h-[70vh] overflow-y-auto">';
+
+            // Filter controls HTML
+            var filterHtml = '<div class="'+C.card+' rounded-2xl p-6 border '+C.border+'"><h2 class="text-xl font-bold '+C.text+' mb-4">📋 سجل العمليات</h2>'+
+                '<div class="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-4">'+
+                '<div><label class="block text-xs '+C.muted+' mb-1">النوع</label><select id="hist-filter-type" onchange="applyHistoryFilters()" class="w-full px-3 py-2 rounded-lg border '+C.input+' outline-none text-sm"><option value="all">الكل</option><option value="DEPOSIT">إيداع</option><option value="WITHDRAW">سحب</option></select></div>'+
+                '<div><label class="block text-xs '+C.muted+' mb-1">الحالة</label><select id="hist-filter-status" onchange="applyHistoryFilters()" class="w-full px-3 py-2 rounded-lg border '+C.input+' outline-none text-sm"><option value="all">الكل</option><option value="PENDING">معلق</option><option value="APPROVED">موافق</option><option value="REJECTED">مرفوض</option><option value="PROCESSING">قيد المعالجة</option><option value="COMPLETED">مكتمل</option></select></div>'+
+                '<div><label class="block text-xs '+C.muted+' mb-1">الفترة</label><select id="hist-filter-date" onchange="applyHistoryFilters()" class="w-full px-3 py-2 rounded-lg border '+C.input+' outline-none text-sm"><option value="all">الكل</option><option value="today">اليوم</option><option value="week">هذا الأسبوع</option><option value="month">هذا الشهر</option></select></div>'+
+                '<div><label class="block text-xs '+C.muted+' mb-1">الترتيب</label><select id="hist-filter-sort" onchange="applyHistoryFilters()" class="w-full px-3 py-2 rounded-lg border '+C.input+' outline-none text-sm"><option value="newest">الأحدث أولاً</option><option value="oldest">الأقدم أولاً</option></select></div></div>'+
+                '<div class="mb-4"><input type="text" id="hist-filter-search" placeholder="🔍 بحث برقم العملية..." class="w-full px-3 py-2 rounded-lg border '+C.input+' outline-none text-sm" oninput="applyHistoryFilters()"></div>';
+
+            var html = filterHtml + '<div id="hist-list" class="space-y-3 max-h-[70vh] overflow-y-auto">';
+
             all.forEach(function(item) {
                 var isDep = item.type === 'DEPOSIT';
                 var confirmBtn = '';
                 if(!isDep && item.status === 'APPROVED' && !item.userReceiptProof) {
                     confirmBtn = '<button onclick="userConfirmReceipt(\''+item.id+'\')" class="w-full mt-3 py-2.5 rounded-xl font-bold btn btn-premium bg-gradient-to-r from-amber-500 via-amber-400 to-yellow-400 text-gray-900 shadow-card text-sm">📸 تأكيد الإيصال برفع لقطة شاشة</button>';
                 }
-                html += '<div class="py-3 border-b '+C.border+' last:border-0">'+
+                // User delivery confirmation
+                var userConfBtn = '';
+                if(!isDep && (item.status === 'APPROVED' || item.status === 'COMPLETED') && item.receiptImage && !item.userConfirmed) {
+                    userConfBtn = '<button onclick="userConfirmDelivery(\''+item.id+'\')" class="w-full mt-2 py-2 rounded-xl font-bold btn btn-premium bg-gradient-to-r from-emerald-500 to-green-500 text-dark-bg text-sm">✅ تأكيد الاستلام</button>';
+                }
+                var userConfBadge = '';
+                if(!isDep && item.userConfirmed) {
+                    userConfBadge = '<div class="mt-2 px-3 py-1.5 rounded-lg bg-success/10 border border-success/30"><span class="text-xs text-success font-bold">✅ تم تأكيد الاستلام ✓</span></div>';
+                }
+                // Receipt image view button
+                var receiptViewBtn = '';
+                if(!isDep && item.receiptImage) {
+                    receiptViewBtn = '<button onclick="showImageModal(\''+item.receiptImage.replace(/'/g,"\\'")+'\')" class="mt-2 px-3 py-1.5 rounded-lg text-xs font-medium btn border border-primary/30 text-primary hover:bg-primary/10">📎 عرض الإيصال</button>';
+                }
+                // Rate merchant button
+                var rateMerchBtn = '';
+                if(!isDep && item.merchantId && (item.status === 'APPROVED' || item.status === 'COMPLETED')) {
+                    var merchantRatings = DB.get('merchantRatings');
+                    var hasRated = merchantRatings.find(function(r){return r.merchantId===item.merchantId && r.userId===user.id && r.transactionId===item.id;});
+                    if(!hasRated) {
+                        rateMerchBtn = '<button onclick="rateMerchantForTxn(\''+item.merchantId+'\',\''+item.id+'\')" class="mt-2 px-3 py-1.5 rounded-lg text-xs font-medium btn border border-warning/30 text-warning hover:bg-warning/10">⭐ قيّم التاجر</button>';
+                    }
+                }
+                html += '<div class="hist-item py-3 border-b '+C.border+' last:border-0" data-type="'+item.type+'" data-status="'+item.status+'" data-date="'+item.date+'" data-id="'+item.id+'">'+
                     '<div class="flex items-center justify-between">'+
-                    '<div class="flex items-center gap-3"><span class="text-xl">'+(isDep?'💰':'🏧')+'</span><div><p class="text-sm font-medium '+C.text+'">'+item.desc+'</p><p class="text-xs '+C.muted+'">'+fmtDate(item.date)+'</p></div></div>'+
-                    '<div class="text-left"><p class="font-bold text-sm '+(isDep?'text-success':'text-danger')+'">'+(isDep?'+':'-')+fmtNum(item.amount)+' '+item.currency+'</p>'+statusBadge(item.status)+'</div></div>'+
+                    '<div class="flex items-center gap-3"><span class="text-xl">'+(isDep?'💰':'🏧')+'</span><div><p class="text-sm font-medium '+C.text+'">'+item.desc+'</p><p class="text-xs '+C.muted+'">'+fmtDate(item.date)+'</p><p class="text-xs '+C.muted+' font-mono opacity-50">'+escHtml(item.id)+'</p></div></div>'+
+                    '<div class="text-left flex items-center gap-2"><button onclick="downloadTransactionReceipt(\''+item.type+'\',\''+item.id+'\')" class="text-base btn hover:scale-110 transition-transform" title="تحميل إيصال PDF">📄</button><div><p class="font-bold text-sm '+(isDep?'text-success':'text-danger')+'">'+(isDep?'+':'-')+fmtNum(item.amount)+' '+item.currency+'</p>'+statusBadge(item.status)+'</div></div></div>'+
                     (item.userReceiptProof?'<div class="mt-2 p-2 rounded-xl bg-success/5 border border-success/20"><p class="text-xs text-success font-bold mb-1">✅ تم تأكيد الإيصال:</p><img src="'+item.userReceiptProof+'" class="h-20 rounded-lg border cursor-pointer object-cover" onclick="showImageModal(this.src)"></div>':'')+
                     (item.confirmScreenshot?'<div class="mt-2"><p class="text-xs '+C.muted+' mb-1">📸 إثبات تنفيذ التاجر:</p><img src="'+item.confirmScreenshot+'" class="h-20 rounded-lg border cursor-pointer object-cover" onclick="showImageModal(this.src)"></div>':'')+
                     (item.approveProof?'<div class="mt-2"><p class="text-xs '+C.muted+' mb-1">✅ إثبات تنفيذ الإيداع:</p><img src="'+item.approveProof+'" class="h-20 rounded-lg border cursor-pointer object-cover" onclick="showImageModal(this.src)"></div>':'')+
-                    confirmBtn+
+                    '<div class="flex gap-2 flex-wrap">'+receiptViewBtn+rateMerchBtn+'</div>'+
+                    userConfBadge+
+                    confirmBtn+userConfBtn+
                     '</div>';
             });
             html += '</div></div>';
             var currentUser = getUser();
-            html += '<button onclick="exportTransactionsCSV(\''+currentUser.id+'\')" class="'+C.btn+' w-full py-3 rounded-lg font-bold btn text-lg mt-4">📥 تصدير السجل CSV</button>';
+            html += '<div class="flex gap-2 mt-4">'+
+                '<button onclick="exportTransactionsCSV(\''+currentUser.id+'\')" class="flex-1 '+C.btn+' py-3 rounded-lg font-bold btn text-sm">📥 تصدير CSV</button>'+
+                '<button onclick="exportTransactionsExcel(\''+currentUser.id+'\')" class="flex-1 '+C.btn+' py-3 rounded-lg font-bold btn text-sm">📊 تصدير Excel</button></div>';
             return html;
+        }
+
+        function applyHistoryFilters() {
+            var typeFilter = document.getElementById('hist-filter-type') ? document.getElementById('hist-filter-type').value : 'all';
+            var statusFilter = document.getElementById('hist-filter-status') ? document.getElementById('hist-filter-status').value : 'all';
+            var dateFilter = document.getElementById('hist-filter-date') ? document.getElementById('hist-filter-date').value : 'all';
+            var sortFilter = document.getElementById('hist-filter-sort') ? document.getElementById('hist-filter-sort').value : 'newest';
+            var searchVal = document.getElementById('hist-filter-search') ? document.getElementById('hist-filter-search').value.trim().toLowerCase() : '';
+            var items = document.querySelectorAll('.hist-item');
+            var now = new Date();
+
+            items.forEach(function(item) {
+                var el = item;
+                var matchType = (typeFilter === 'all') || (el.getAttribute('data-type') === typeFilter);
+                var matchStatus = (statusFilter === 'all') || (el.getAttribute('data-status') === statusFilter);
+                var matchSearch = (!searchVal) || (el.getAttribute('data-id').toLowerCase().indexOf(searchVal) >= 0);
+                var matchDate = true;
+                if (dateFilter !== 'all') {
+                    var itemDate = new Date(el.getAttribute('data-date'));
+                    if (dateFilter === 'today') {
+                        matchDate = (itemDate.toDateString() === now.toDateString());
+                    } else if (dateFilter === 'week') {
+                        var weekAgo = new Date(now); weekAgo.setDate(weekAgo.getDate() - 7);
+                        matchDate = (itemDate >= weekAgo);
+                    } else if (dateFilter === 'month') {
+                        matchDate = (itemDate.getMonth() === now.getMonth() && itemDate.getFullYear() === now.getFullYear());
+                    }
+                }
+                el.style.display = (matchType && matchStatus && matchDate && matchSearch) ? '' : 'none';
+            });
+
+            // Re-sort if needed
+            var list = document.getElementById('hist-list');
+            if (list && sortFilter === 'oldest') {
+                var arr = Array.prototype.slice.call(list.children);
+                arr.sort(function(a,b){ return new Date(a.getAttribute('data-date')) - new Date(b.getAttribute('data-date')); });
+                arr.forEach(function(child){ list.appendChild(child); });
+            } else if (list && sortFilter === 'newest') {
+                var arr = Array.prototype.slice.call(list.children);
+                arr.sort(function(a,b){ return new Date(b.getAttribute('data-date')) - new Date(a.getAttribute('data-date')); });
+                arr.forEach(function(child){ list.appendChild(child); });
+            }
+        }
+
+        // ==================== EXCEL EXPORT ====================
+        function exportTransactionsExcel(userId) {
+            if (typeof XLSX === 'undefined') { toast('خطأ: مكتبة Excel غير محملة','error'); return; }
+            var deposits = DB.get('deposits').filter(function(d){return d.userId===userId;});
+            var withdrawals = DB.get('withdrawals').filter(function(w){return w.userId===userId;});
+            var statusMap = {PENDING:'معلق',APPROVED:'موافق',COMPLETED:'مكتمل',REJECTED:'مرفوض',PROCESSING:'قيد المعالجة',RECEIVED:'مستلم'};
+            var rows = [];
+            deposits.forEach(function(d){
+                var m = DB.get('users').find(function(u){return u.id===d.assignedMerchantId;});
+                rows.push({'التاريخ': fmtDate(d.createdAt), 'النوع': 'إيداع', 'المبلغ': d.amount||0, 'الرسوم': 0, 'الصافي': d.usdtAmount||d.amount||0, 'الحالة': statusMap[d.status]||d.status, 'الملاحظات': m ? 'تاجر: '+m.name : (d.notes||'')});
+            });
+            withdrawals.forEach(function(w){
+                var m = DB.get('users').find(function(u){return u.id===w.assignedMerchantId;});
+                rows.push({'التاريخ': fmtDate(w.createdAt), 'النوع': 'سحب', 'المبلغ': w.localAmount||w.net||0, 'الرسوم': w.fee||0, 'الصافي': w.net||0, 'الحالة': statusMap[w.status]||w.status, 'الملاحظات': m ? 'تاجر: '+m.name : (w.notes||'')});
+            });
+            rows.sort(function(a,b){return new Date(b['التاريخ'])-new Date(a['التاريخ']);});
+            var ws = XLSX.utils.json_to_sheet(rows);
+            var wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, ws, 'المعاملات');
+            // Set column widths
+            ws['!cols'] = [{wch:22},{wch:10},{wch:14},{wch:10},{wch:14},{wch:12},{wch:30}];
+            XLSX.writeFile(wb, 'transactions_' + new Date().toISOString().split('T')[0] + '.xlsx');
+            toast('تم تصدير المعاملات بنجاح','success');
         }
 
         // ==================== USER: CONFIRM RECEIPT ====================
@@ -3992,6 +4146,40 @@
                 '</div>'+
                 '<button onclick="closeModal()" class="w-full py-2.5 rounded-xl border '+C.border+' '+C.text+' btn mt-2">إلغاء</button>');
         }
+
+        // ==================== USER: CONFIRM DELIVERY ====================
+        function userConfirmDelivery(wdId) {
+            var C = getThemeColors();
+            var withdrawals = DB.get('withdrawals');
+            var w = withdrawals.find(function(x){return x.id===wdId;});
+            var receiptImg = w ? w.receiptImage : '';
+            showModal('<h3 class="text-lg font-bold '+C.text+' mb-4 text-center">✅ تأكيد الاستلام</h3>'+
+                '<p class="text-sm '+C.muted+' mb-3 text-center">هل استلمت المبلغ بالكامل؟</p>'+
+                '<div class="'+C.card+' rounded-xl p-3 border '+C.border+' mb-4 text-center"><p class="text-xs '+C.muted+'">المبلغ</p><p class="font-bold text-lg text-success">'+fmtNum(w?w.net:0)+' USDT</p></div>'+
+                (receiptImg?'<img src="'+receiptImg+'" class="w-full max-h-48 rounded-xl border object-cover mb-4 cursor-pointer" onclick="showImageModal(this.src)">':'')+
+                '<div class="flex gap-3">'+
+                '<button onclick="_doUserConfirmDelivery(\''+wdId+'\')" class="flex-1 py-3 rounded-xl font-bold btn btn-premium bg-gradient-to-r from-emerald-500 to-green-500 text-dark-bg">نعم، تأكيد الاستلام</button>'+
+                '<button onclick="closeModal()" class="flex-1 py-3 rounded-xl border '+C.border+' '+C.text+' btn">لاحقاً</button></div>');
+        }
+
+        window._doUserConfirmDelivery = function(wdId) {
+            closeModal();
+            var withdrawals = DB.get('withdrawals');
+            var w = withdrawals.find(function(x){return x.id===wdId;});
+            if(!w) return;
+            w.userConfirmed = true;
+            w.userConfirmedAt = new Date().toISOString();
+            DB.set('withdrawals', withdrawals);
+            var user = getUser();
+            addNotif(user.id, 'تأكيد الاستلام', 'تم تأكيد استلام سحب '+fmtNum(w.net||0)+' USDT بنجاح', 'WITHDRAW');
+            toast('تم تأكيد الاستلام بنجاح ✅','success');
+            render();
+        };
+
+        // ==================== RATE MERCHANT FOR TRANSACTION ====================
+        window.rateMerchantForTxn = function(merchantId, transactionId) {
+            rateMerchant(merchantId, 5, transactionId);
+        };
 
         function saveUserReceiptProof(wdId) {
             var proofImg = getFieldImage('userReceiptProof');
@@ -4180,8 +4368,42 @@
                 '<input type="password" id="set-new-pass" class="w-full px-4 py-2.5 rounded-xl border '+C.input+' outline-none" placeholder="كلمة المرور الجديدة">'+
                 '<input type="password" id="set-new-pass2" class="w-full px-4 py-2.5 rounded-xl border '+C.input+' outline-none" placeholder="تأكيد كلمة المرور الجديدة">'+
                 '<button onclick="changePassword()" class="'+C.btn+' w-full py-2.5 rounded-lg font-bold btn">تغيير كلمة المرور</button></div></div>'+
+                (user.role !== 'ADMIN' ? '<button onclick="logoutAllDevicesFromSettings()" class="w-full mt-4 py-3 rounded-xl font-bold btn border-2 border-danger/50 text-danger hover:bg-danger/10">🔒 تسجيل الخروج من جميع الأجهزة</button>' : '')+
                 '<button onclick="logout()" class="w-full mt-6 py-3.5 rounded-xl font-bold btn btn-premium bg-gradient-to-r from-red-500 to-rose-500 text-white shadow-card text-lg">🚪 تسجيل الخروج</button>'+
                 '</div></div>';
+        }
+
+        function logoutAllDevicesFromSettings() {
+            var user = getUser();
+            if (!user) return;
+            showConfirm('🔒', 'تسجيل الخروج من جميع الأجهزة', 'سيتم تسجيل خروجك من جميع الأجهزة وستحتاج إلى إذن من الإدارة لتسجيل الدخول مجدداً. هل أنت متأكد؟', 'تأكيد', 'bg-danger text-white', function(yes) {
+                if (!yes) return;
+                var userId = user.id;
+                db.collection('appData').doc('users').get().then(function(doc) {
+                    var users = [];
+                    if (doc.exists && doc.data() && doc.data().data) { users = doc.data().data; }
+                    var u = null;
+                    for (var i = 0; i < users.length; i++) { if (users[i].id === userId) { u = users[i]; break; } }
+                    if (u) {
+                        u.trustedDevices = [];
+                        u.needsLoginPermission = true;
+                        delete u.sessionId;
+                        db.collection('appData').doc('users').set({ data: users });
+                        Security.addAuditLog(userId, 'LOGOUT_ALL_DEVICES', 'تسجيل خروج من جميع الأجهزة من الإعدادات');
+                        addNotif(userId, '🔒 تم تسجيل الخروج', 'تم تسجيل خروجك من جميع الأجهزة. ستحتاج إذن الإدارة للدخول مجدداً.', 'WARNING');
+                        toast('تم تسجيل الخروج من جميع الأجهزة', 'success');
+                        removeFCMToken();
+                        Security.invalidateSession(userId);
+                        localStorage.removeItem('fy_auth_user');
+                        state.user = null;
+                        setView('login');
+                    } else {
+                        toast('خطأ في تحديث البيانات', 'error');
+                    }
+                }).catch(function(err) {
+                    toast('خطأ في الاتصال - حاول مجدداً', 'error');
+                });
+            });
         }
 
         function changePassword() {
@@ -4573,16 +4795,18 @@
             return html;
         }
 
-        function rateMerchant(merchantId, score) {
+        function rateMerchant(merchantId, score, transactionId) {
             var user = getUser();
             if(!user) return;
             // Show review modal
             var C = getThemeColors();
+            var txIdAttr = transactionId ? ('\''+transactionId+'\'') : 'null';
             showModal('<h3 class="text-lg font-bold '+C.text+' mb-4 text-center">⭐ تقييم التاجر</h3>'+
                 '<div class="flex justify-center gap-2 mb-4" id="rating-stars-modal">'+
                 [1,2,3,4,5].map(function(s){return '<span class="text-4xl cursor-pointer btn '+(s<=score?'text-warning':'text-gray-500')+'" onclick="_selectRating('+s+')">'+(s<=score?'★':'☆')+'</span>';}).join('')+
                 '</div>'+
                 '<input type="hidden" id="rating-score-val" value="'+score+'">'+
+                '<input type="hidden" id="rating-txn-id" value="'+(transactionId||'')+'">'+
                 '<textarea id="rating-review-text" class="w-full px-3 py-2.5 rounded-xl border '+C.input+' outline-none text-sm mb-4" rows="2" placeholder="اترك تعليقاً (اختياري)..."></textarea>'+
                 '<button onclick="_submitRating(\''+merchantId+'\')" class="'+C.btn+' w-full py-2.5 rounded-lg font-bold btn">✅ إرسال التقييم</button>'+
                 '<button onclick="closeModal()" class="w-full py-2 mt-2 rounded-lg border '+C.border+' '+C.text+' btn">إلغاء</button>');
@@ -4601,6 +4825,7 @@
             var score = parseInt(document.getElementById('rating-score-val').value) || _selectedRatingScore;
             if(!score) { toast('اختر عدد النجوم','error'); return; }
             var review = (document.getElementById('rating-review-text').value || '').trim();
+            var transactionId = document.getElementById('rating-txn-id') ? document.getElementById('rating-txn-id').value : '';
             var user = getUser();
             if(!user) return;
             var ratings = DB.get('merchantRatings');
@@ -4609,8 +4834,9 @@
                 existing.score = score;
                 existing.review = review;
                 existing.updatedAt = new Date().toISOString();
+                if(transactionId) existing.transactionId = transactionId;
             } else {
-                ratings.unshift({id:DB.uid(),merchantId:merchantId,userId:user.id,userName:user.name,score:score,review:review,createdAt:new Date().toISOString()});
+                ratings.unshift({id:DB.uid(),merchantId:merchantId,userId:user.id,userName:user.name,score:score,review:review,transactionId:transactionId,createdAt:new Date().toISOString()});
             }
             DB.set('merchantRatings', ratings);
             closeModal();
@@ -4791,6 +5017,8 @@
             DB.set('merchantTransactions', mTxns);
             addLog(d.userId,'DEPOSIT_APPROVED',d.usdtAmount,'USDT','تم قبول إيداع '+fmtNum(d.usdtAmount)+' USDT');
             addNotif(d.userId,'إيداع مقبول','تم قبول إيداعك بمبلغ '+fmtNum(d.usdtAmount)+' USDT','DEPOSIT');
+            var merchDepUser = users.find(function(x){return x.id===d.userId;});
+            if(merchDepUser && merchDepUser.email) sendEmailNotification(merchDepUser.email, 'تم الموافقة على إيداعك', 'تم الموافقة على إيداعك بقيمة '+fmtNum(d.usdtAmount)+' USDT');
             toast('تم قبول الإيداع','success');
             render();
         }
@@ -4821,6 +5049,8 @@
             mTxns.unshift({id:DB.uid(),merchantId:user.id,userId:d.userId,type:'DEPOSIT',amount:d.usdtAmount,status:'REJECTED',createdAt:new Date().toISOString()});
             DB.set('merchantTransactions', mTxns);
             addNotif(d.userId,'إيداع مرفوض','تم رفض إيداعك بمبلغ '+fmtNum(d.usdtAmount)+' USDT. السبب: '+reason,'DEPOSIT');
+            var mRejUser = DB.get('users').find(function(x){return x.id===d.userId;});
+            if(mRejUser && mRejUser.email) sendEmailNotification(mRejUser.email, 'تم رفض طلب إيداعك', 'تم رفض طلب إيداعك');
             toast('تم رفض الإيداع','success');
             render();
         }
@@ -4928,6 +5158,8 @@
                 DB.set('withdrawals', withdrawals);
                 addLog(w.userId,'WITHDRAW_PROCESSING',w.amount,'USDT','تمت الموافقة على سحب '+fmtNum(w.net)+' USDT - بانتظار رفع الإثبات');
                 addNotif(w.userId,'تمت الموافقة على السحب','تمت الموافقة على سحبك بمبلغ '+fmtNum(w.net||0)+' USDT. بانتظار رفع إثبات التنفيذ.','WITHDRAW');
+                var merchWdProcUser = DB.get('users').find(function(x){return x.id===w.userId;});
+                if(merchWdProcUser && merchWdProcUser.email) sendEmailNotification(merchWdProcUser.email, 'تمت الموافقة على سحبك', 'تمت الموافقة على سحبك بمبلغ '+fmtNum(w.net||0)+' USDT');
                 toast('تمت الموافقة - يجب رفع لقطة إثبات التنفيذ','success');
                 render();
             });
@@ -4942,11 +5174,31 @@
                 '<button type="button" onclick="captureForField(\'merchWdProof\');showImagePreviewAfterCapture(\'merchWdProof\',\'merch-wd-proof-preview\')" class="flex-1 px-4 py-3 rounded-lg border '+C.border+' '+C.text+' btn text-sm font-medium">📸 كاميرا</button>'+
                 '<label class="flex-1 px-4 py-3 rounded-lg border '+C.border+' '+C.text+' btn text-sm font-medium text-center cursor-pointer">📁 رفع ملف<input type="file" accept="image/*" class="hidden" onchange="fileForFieldWithPreview(\'merchWdProof\',this,\'merch-wd-proof-preview\')"></label>'+
                 '</div>'+
+                '<p class="text-xs '+C.muted+' mb-2 font-medium">📎 رفع صورة إيصال إضافية (اختياري):</p>'+
+                '<div id="merch-receipt-img-preview"></div>'+
+                '<label class="w-full px-4 py-2.5 rounded-lg border border-dashed '+C.border+' '+C.text+' btn text-sm font-medium text-center cursor-pointer mb-4">📎 رفع صورة الإيصال<input type="file" accept="image/*" class="hidden" onchange="_previewReceiptImg(this,\'merch-receipt-img-preview\')"></label>'+
+                '<input type="hidden" id="merch-receipt-img-data" value="">'+
                 '<div id="merch-wd-proof-actions" class="hidden">'+
                 '<button onclick="confirmMerchWdScreenshot(\''+wdId+'\')" class="'+C.btn+' w-full py-3 rounded-lg font-bold btn text-lg">✅ تأكيد ورفع الإثبات</button>'+
                 '</div>'+
                 '<button onclick="closeModal()" class="w-full py-2.5 rounded-lg border '+C.border+' '+C.text+' btn mt-2">إلغاء</button>');
         }
+
+        window._previewReceiptImg = function(input, previewId) {
+            if(!input.files || !input.files[0]) return;
+            var reader = new FileReader();
+            reader.onload = function(e) {
+                var base64 = e.target.result;
+                var hiddenInput = document.getElementById('merch-receipt-img-data');
+                if(hiddenInput) hiddenInput.value = base64;
+                var prevDiv = document.getElementById(previewId);
+                if(prevDiv) prevDiv.innerHTML = '<img src="'+base64+'" class="h-24 rounded-lg border cursor-pointer object-cover" onclick="showImageModal(this.src)">';
+                // Show confirm button if proof image exists
+                var proofActions = document.getElementById('merch-wd-proof-actions');
+                if(proofActions && getFieldImage('merchWdProof')) proofActions.classList.remove('hidden');
+            };
+            reader.readAsDataURL(input.files[0]);
+        };
 
         function confirmMerchWdScreenshot(wdId) {
             var proofImg = getFieldImage('merchWdProof');
@@ -4958,6 +5210,9 @@
             if(!w) return;
             w.status = 'APPROVED';
             w.confirmScreenshot = proofImg;
+            // Save optional receipt image
+            var receiptData = document.getElementById('merch-receipt-img-data');
+            if(receiptData && receiptData.value) { w.receiptImage = receiptData.value; }
             w.processedBy = user.id;
             w.completedAt = new Date().toISOString();
             DB.set('withdrawals', withdrawals);
@@ -4966,6 +5221,8 @@
             DB.set('merchantTransactions', mTxns);
             addLog(w.userId,'WITHDRAW_APPROVED',w.net,'USDT','تم إكمال سحب '+fmtNum(w.net)+' USDT مع إثبات التنفيذ');
             addNotif(w.userId,'سحب مكتمل','تم إكمال سحبك بمبلغ '+fmtNum(w.net)+' USDT. تم رفع إثبات التنفيذ.','WITHDRAW');
+            var mWdUser = DB.get('users').find(function(x){return x.id===w.userId;});
+            if(mWdUser && mWdUser.email) sendEmailNotification(mWdUser.email, 'تم إكمال سحبك', 'تم إكمال سحبك بمبلغ '+fmtNum(w.net)+' USDT');
             clearFieldImage('merchWdProof');
             toast('تم رفع الإثبات وإكمال السحب','success');
             render();
@@ -4986,6 +5243,8 @@
                 DB.set('withdrawals', withdrawals);
                 addLog(w.userId,'WITHDRAW_REJECTED',w.amount,'USDT','تم رفض السحب واسترداد '+fmtNum(w.amount)+' USDT');
                 addNotif(w.userId,'سحب مرفوض','تم رفض سحبك. تم استرداد المبلغ إلى رصيدك.','WITHDRAW');
+                var mRejWdUser = DB.get('users').find(function(x){return x.id===w.userId;});
+                if(mRejWdUser && mRejWdUser.email) sendEmailNotification(mRejWdUser.email, 'تم رفض سحبك', 'تم رفض سحبك. تم استرداد المبلغ إلى رصيدك.');
                 toast('تم رفض السحب واسترداد الرصيد','success');
                 render();
             });
@@ -5412,6 +5671,115 @@
                 '<button onclick="exportTransactionsCSV()" class="'+C.btn+' w-full py-3.5 rounded-xl font-bold btn text-lg mt-4 shadow-card">📥 تصدير المعاملات CSV</button>';
         }
 
+        // ==================== PDF RECEIPT ====================
+        function downloadTransactionReceipt(type, txId) {
+            if (typeof window.jspdf === 'undefined' && typeof jspdf === 'undefined') { toast('خطأ: مكتبة PDF غير محملة','error'); return; }
+            var jsPDF = (window.jspdf && window.jspdf.jsPDF) || jspdf.jsPDF;
+            var doc = new jsPDF();
+            var user = getUser();
+            var tx = null;
+            var txTypeLabel = '';
+            var merchantName = '';
+
+            if (type === 'DEPOSIT') {
+                var deposits = DB.get('deposits');
+                for (var i = 0; i < deposits.length; i++) { if (deposits[i].id === txId) { tx = deposits[i]; break; } }
+                txTypeLabel = 'Deposit';
+            } else {
+                var withdrawals = DB.get('withdrawals');
+                for (var i = 0; i < withdrawals.length; i++) { if (withdrawals[i].id === txId) { tx = withdrawals[i]; break; } }
+                txTypeLabel = 'Withdrawal';
+            }
+
+            if (!tx) { toast('لم يتم العثور على المعاملة','error'); return; }
+
+            // Get merchant name if applicable
+            if (tx.assignedMerchantId) {
+                var merch = DB.get('users').find(function(u){return u.id===tx.assignedMerchantId;});
+                if (merch) merchantName = merch.name || '';
+            }
+
+            var statusMap = {PENDING:'Pending', APPROVED:'Approved', COMPLETED:'Completed', REJECTED:'Rejected', PROCESSING:'Processing', RECEIVED:'Received'};
+            var txDate = tx.createdAt ? new Date(tx.createdAt) : new Date();
+            var dateStr = txDate.toLocaleDateString('en-US',{year:'numeric',month:'long',day:'numeric'}) + ' ' + txDate.toLocaleTimeString('en-US',{hour:'2-digit',minute:'2-digit'});
+            var amount = type === 'DEPOSIT' ? (tx.usdtAmount || 0) : (tx.amount || 0);
+            var fee = type === 'DEPOSIT' ? 0 : (tx.fee || 0);
+            var net = type === 'DEPOSIT' ? amount : (tx.net || amount - fee);
+            var currency = tx.currency || 'USDT';
+
+            // Header
+            doc.setFillColor(240, 185, 11);
+            doc.rect(0, 0, 210, 35, 'F');
+            doc.setTextColor(11, 14, 17);
+            doc.setFontSize(22);
+            doc.text('ForexYemeni Wallet', 105, 15, {align:'center'});
+            doc.setFontSize(12);
+            doc.text('Transaction Receipt', 105, 25, {align:'center'});
+
+            // Divider
+            doc.setDrawColor(240, 185, 11);
+            doc.setLineWidth(0.5);
+            doc.line(20, 40, 190, 40);
+
+            // Transaction details
+            doc.setTextColor(50, 50, 50);
+            doc.setFontSize(11);
+            var y = 50;
+            var lineH = 10;
+
+            doc.setFont(undefined, 'bold');
+            doc.text('Transaction ID:', 20, y); doc.setFont(undefined, 'normal'); doc.text(txId, 80, y); y += lineH;
+            doc.setFont(undefined, 'bold');
+            doc.text('Type:', 20, y); doc.setFont(undefined, 'normal'); doc.text(txTypeLabel, 80, y); y += lineH;
+            doc.setFont(undefined, 'bold');
+            doc.text('Amount:', 20, y); doc.setFont(undefined, 'normal'); doc.text(amount.toFixed(2) + ' ' + currency, 80, y); y += lineH;
+            doc.setFont(undefined, 'bold');
+            doc.text('Fee:', 20, y); doc.setFont(undefined, 'normal'); doc.text(fee.toFixed(2) + ' USDT', 80, y); y += lineH;
+            doc.setFont(undefined, 'bold');
+            doc.text('Net Amount:', 20, y); doc.setFont(undefined, 'normal'); doc.setTextColor(14, 203, 129); doc.text(net.toFixed(2) + ' USDT', 80, y); y += lineH;
+            doc.setTextColor(50, 50, 50);
+            doc.setFont(undefined, 'bold');
+            doc.text('Date:', 20, y); doc.setFont(undefined, 'normal'); doc.text(dateStr, 80, y); y += lineH;
+            doc.setFont(undefined, 'bold');
+            doc.text('Status:', 20, y); doc.setFont(undefined, 'normal');
+            var statusColor = (tx.status === 'APPROVED' || tx.status === 'COMPLETED') ? [14, 203, 129] : (tx.status === 'REJECTED' ? [246, 70, 93] : [252, 213, 53]);
+            doc.setTextColor(statusColor[0], statusColor[1], statusColor[2]);
+            doc.text(statusMap[tx.status] || tx.status, 80, y); y += lineH;
+            doc.setTextColor(50, 50, 50);
+            doc.setFont(undefined, 'bold');
+            doc.text('User:', 20, y); doc.setFont(undefined, 'normal'); doc.text(user.name || '', 80, y); y += lineH;
+
+            if (merchantName) {
+                doc.setFont(undefined, 'bold');
+                doc.text('Merchant:', 20, y); doc.setFont(undefined, 'normal'); doc.text(merchantName, 80, y); y += lineH;
+            }
+
+            if (tx.txid) {
+                doc.setFont(undefined, 'bold');
+                doc.text('TX ID:', 20, y); doc.setFont(undefined, 'normal'); doc.text(tx.txid, 80, y); y += lineH;
+            }
+
+            if (tx.notes) {
+                doc.setFont(undefined, 'bold');
+                doc.text('Notes:', 20, y); y += 7;
+                doc.setFont(undefined, 'normal');
+                doc.setFontSize(10);
+                var noteLines = doc.splitTextToSize(tx.notes, 140);
+                doc.text(noteLines, 20, y);
+                y += noteLines.length * 6;
+            }
+
+            // Footer
+            doc.setDrawColor(200, 200, 200);
+            doc.line(20, 270, 190, 270);
+            doc.setFontSize(9);
+            doc.setTextColor(150, 150, 150);
+            doc.text('This receipt was generated by ForexYemeni Wallet.', 105, 278, {align:'center'});
+
+            doc.save('ForexYemeni_' + type.toLowerCase() + '_' + txId + '.pdf');
+            toast('تم تحميل إيصال المعاملة بنجاح','success');
+        }
+
         function exportTransactionsCSV(userId) {
             var deposits, withdrawals, all = [];
             var users = DB.get('users');
@@ -5726,6 +6094,8 @@
             DB.set('deposits', deposits);
             addLog(d.userId,'DEPOSIT_APPROVED',d.usdtAmount,'USDT','تم قبول إيداع '+fmtNum(d.usdtAmount)+' USDT');
             addNotif(d.userId,'إيداع مقبول','تم قبول إيداعك بمبلغ '+fmtNum(d.usdtAmount)+' USDT','DEPOSIT');
+            var depUser = users.find(function(x){return x.id===d.userId;});
+            if(depUser && depUser.email) sendEmailNotification(depUser.email, 'تم الموافقة على إيداعك', 'تم الموافقة على إيداعك بقيمة '+fmtNum(d.usdtAmount)+' USDT');
             closeModal();
             toast('تم قبول الإيداع','success');
             render();
@@ -5752,6 +6122,8 @@
             DB.set('deposits', deposits);
             addLog(d.userId,'DEPOSIT_REJECTED',d.usdtAmount,'USDT','تم رفض إيداع '+fmtNum(d.usdtAmount)+' USDT - السبب: '+reason);
             addNotif(d.userId,'إيداع مرفوض','تم رفض إيداعك بمبلغ '+fmtNum(d.usdtAmount)+' USDT. السبب: '+reason,'DEPOSIT');
+            var rejDepUser = DB.get('users').find(function(x){return x.id===d.userId;});
+            if(rejDepUser && rejDepUser.email) sendEmailNotification(rejDepUser.email, 'تم رفض طلب إيداعك', 'تم رفض طلب إيداعك');
             closeModal();
             toast('تم رفض الإيداع','success');
             render();
@@ -5868,7 +6240,8 @@
                     (assignedMerchantName?'<p class="text-xs '+C.muted+' mb-2">🏪 التاجر المعين: <span class="text-primary font-medium">'+assignedMerchantName+'</span></p>':'')+
                     (w.notes?'<p class="text-xs '+C.muted+' mb-2">ملاحظات: '+escHtml(w.notes)+'</p>':'')+
                     (w.rejectReason?'<div class="mb-2 p-2 rounded-lg bg-danger/10 border border-danger/30"><p class="text-xs text-danger font-bold">❌ سبب الرفض:</p><p class="text-xs text-danger/80">'+escHtml(w.rejectReason)+'</p></div>':'')+
-                    (w.confirmScreenshot?'<div class="mb-3"><p class="text-xs '+C.muted+' mb-1">لقطة تأكيد التنفيذ:</p><img src="'+w.confirmScreenshot+'" class="h-24 rounded-lg border cursor-pointer object-cover" onclick="showImageModal(this.src)"></div>':'')+
+                    (w.confirmScreenshot?'<div class="mb-2"><p class="text-xs '+C.muted+' mb-1">لقطة تأكيد التنفيذ:</p><img src="'+w.confirmScreenshot+'" class="h-24 rounded-lg border cursor-pointer object-cover" onclick="showImageModal(this.src)"></div>':'')+
+                    (w.receiptImage?'<div class="mb-2"><p class="text-xs '+C.muted+' mb-1">📎 صورة الإيصال:</p><img src="'+w.receiptImage+'" class="h-24 rounded-lg border cursor-pointer object-cover" onclick="showImageModal(this.src)"></div>':'')+
                     (w.status==='PENDING'?'<div class="flex gap-2"><button onclick="adminReceiveWithdrawal(\''+w.id+'\')" class="flex-1 py-2 rounded-lg font-bold btn bg-info text-white text-sm">📋 تم استلام الطلب</button><button onclick="adminRejectWithdrawal(\''+w.id+'\')" class="flex-1 py-2 rounded-xl font-bold btn btn-premium bg-gradient-to-r from-red-500 to-rose-500 text-white text-sm">❌ رفض</button></div>':'')+
                     (w.status==='RECEIVED'?'<div class="flex gap-2"><button onclick="adminStartProcessing(\''+w.id+'\')" class="flex-1 py-2 rounded-lg font-bold btn bg-warning text-dark-bg text-sm">✅ تمت الموافقة وخصم الرصيد</button><button onclick="adminRejectWithdrawal(\''+w.id+'\')" class="flex-1 py-2 rounded-xl font-bold btn btn-premium bg-gradient-to-r from-red-500 to-rose-500 text-white text-sm">❌ رفض</button></div>':'')+
                     (w.status==='PROCESSING'?'<div class="flex gap-2"><button onclick="adminApproveWithdrawal(\''+w.id+'\')" class="flex-1 py-2 rounded-xl font-bold btn btn-premium bg-gradient-to-r from-emerald-500 to-green-500 text-dark-bg text-sm">📸 رفع إثبات التنفيذ (اجباري)</button></div>':'')+
@@ -5918,6 +6291,8 @@
                 if(u) { u.usdtBalance = Math.max(0, (u.usdtBalance||0) - (w.amount||0)); DB.set('users', users); }
                 DB.set('withdrawals', withdrawals);
                 addNotif(w.userId,'تمت الموافقة على السحب','تمت الموافقة على سحبك بمبلغ '+fmtNum(w.net||0)+' USDT. بانتظار رفع إثبات التنفيذ.','WITHDRAW');
+                var wdProcUser = DB.get('users').find(function(x){return x.id===w.userId;});
+                if(wdProcUser && wdProcUser.email) sendEmailNotification(wdProcUser.email, 'تمت الموافقة على سحبك', 'تمت الموافقة على سحبك بمبلغ '+fmtNum(w.net||0)+' USDT');
                 toast('تمت الموافقة - يجب رفع لقطة إثبات التنفيذ','success');
                 render();
             });
@@ -5932,6 +6307,10 @@
                 '<button type="button" onclick="captureForField(\'adminWdProof\');showImagePreviewAfterCapture(\'adminWdProof\',\'admin-wd-proof-preview\')" class="flex-1 px-4 py-3 rounded-lg border '+C.border+' '+C.text+' btn text-sm font-medium">📸 كاميرا</button>'+
                 '<label class="flex-1 px-4 py-3 rounded-lg border '+C.border+' '+C.text+' btn text-sm font-medium text-center cursor-pointer">📁 رفع ملف<input type="file" accept="image/*" class="hidden" onchange="fileForFieldWithPreview(\'adminWdProof\',this,\'admin-wd-proof-preview\')"></label>'+
                 '</div>'+
+                '<p class="text-xs '+C.muted+' mb-2 font-medium">📎 رفع صورة إيصال إضافية (اختياري):</p>'+
+                '<div id="admin-receipt-img-preview"></div>'+
+                '<label class="w-full px-4 py-2.5 rounded-lg border border-dashed '+C.border+' '+C.text+' btn text-sm font-medium text-center cursor-pointer mb-4">📎 رفع صورة الإيصال<input type="file" accept="image/*" class="hidden" onchange="_previewReceiptImg(this,\'admin-receipt-img-preview\')"></label>'+
+                '<input type="hidden" id="admin-receipt-img-data" value="">'+
                 '<div id="admin-wd-proof-actions" class="hidden">'+
                 '<button onclick="confirmAdminWdApprove(\''+wdId+'\')" class="'+C.btn+' w-full py-3 rounded-lg font-bold btn text-lg">✅ تأكيد ورفع الإثبات</button>'+
                 '</div>'+
@@ -5947,12 +6326,17 @@
             if(!w) return;
             w.status = 'APPROVED';
             w.confirmScreenshot = proofImg;
+            // Save optional receipt image
+            var receiptData = document.getElementById('admin-receipt-img-data');
+            if(receiptData && receiptData.value) { w.receiptImage = receiptData.value; }
             var adminUser = getUser();
             w.processedBy = adminUser ? adminUser.id : w.processedBy;
             w.completedAt = new Date().toISOString();
             DB.set('withdrawals', withdrawals);
             addLog(w.userId,'WITHDRAW_APPROVED',w.net,'USDT','تم إكمال سحب '+fmtNum(w.net)+' USDT مع إثبات التنفيذ');
             addNotif(w.userId,'سحب مكتمل','تم إكمال سحبك بمبلغ '+fmtNum(w.net)+' USDT. تم رفع إثبات التنفيذ.','WITHDRAW');
+            var wdCompUser = DB.get('users').find(function(x){return x.id===w.userId;});
+            if(wdCompUser && wdCompUser.email) sendEmailNotification(wdCompUser.email, 'تم إكمال سحبك', 'تم إكمال سحبك بمبلغ '+fmtNum(w.net)+' USDT');
             clearFieldImage('adminWdProof');
             toast('تم رفع الإثبات وإكمال السحب','success');
             render();
@@ -5983,6 +6367,8 @@
             DB.set('withdrawals', withdrawals);
             addLog(w.userId,'WITHDRAW_REJECTED',w.amount,'USDT','تم رفض السحب واسترداد '+fmtNum(w.amount)+' USDT. السبب: '+reason);
             addNotif(w.userId,'سحب مرفوض','تم رفض سحبك. تم استرداد المبلغ. السبب: '+reason,'WITHDRAW');
+            var wdRejUser = DB.get('users').find(function(x){return x.id===w.userId;});
+            if(wdRejUser && wdRejUser.email) sendEmailNotification(wdRejUser.email, 'تم رفض سحبك', 'تم رفض سحبك. تم استرداد المبلغ. السبب: '+reason);
             toast('تم رفض السحب واسترداد الرصيد','success');
             render();
         }
@@ -6391,6 +6777,7 @@
             var users = DB.get('users');
             var merchants = users.filter(function(u){return u.role==='MERCHANT';});
             var globalRate = parseFloat(DB.getSetting('exchange_rate')) || 535;
+            var merchantRatings = DB.get('merchantRatings');
             var html = '<div class="space-y-6">'+
                 '<div class="'+C.card+' rounded-2xl p-6 border '+C.border+'">'+
                 '<div class="flex items-center justify-between mb-4"><h2 class="text-xl font-bold '+C.text+'">🏪 إدارة التجار</h2>'+
@@ -6404,15 +6791,35 @@
                     var mRate = mData.exchangeRate || globalRate;
                     var mComm = mData.commission || 0;
                     var mMethods = getMerchantMethods(m.id).length;
+                    // Rating display
+                    var mRatings = merchantRatings.filter(function(r){return r.merchantId===m.id;});
+                    var avgRating = 0;
+                    if(mRatings.length > 0) { avgRating = mRatings.reduce(function(s,r){return s+r.score;},0) / mRatings.length; avgRating = Math.round(avgRating * 10) / 10; }
+                    var starsHtml = '';
+                    for(var si = 1; si <= 5; si++) {
+                        var filled = si <= Math.round(avgRating);
+                        starsHtml += '<span class="text-sm '+(filled?'text-warning':'text-gray-500')+'">'+(filled?'★':'☆')+'</span>';
+                    }
+                    var ratingLabel = mRatings.length > 0 ? ('⭐ '+avgRating+' ('+mRatings.length+')') : 'لا توجد تقييمات';
+                    // Recent reviews
+                    var recentReviews = mRatings.filter(function(r){return r.review && r.review.trim();}).slice(0,2);
+                    var reviewsHtml = '';
+                    if(recentReviews.length > 0) {
+                        reviewsHtml = '<div class="mt-3 space-y-1">'+recentReviews.map(function(rv){
+                            return '<div class="p-2 rounded-lg border '+C.border+'"><div class="flex items-center justify-between mb-1"><span class="text-[10px] '+C.text+'">'+escHtml(rv.userName||'مستخدم')+'</span><span class="text-[10px] text-warning">'+rv.score+'★</span></div><p class="text-xs '+C.muted+'">'+escHtml(rv.review)+'</p></div>';
+                        }).join('')+'</div>';
+                    }
                     return '<div class="p-4 rounded-lg border '+C.border+'">'+
                         '<div class="flex items-center justify-between mb-2"><div class="flex items-center gap-2"><div class="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center text-lg shrink-0">🏪</div>'+
                         '<div><p class="font-bold text-sm '+C.text+'">'+escHtml(m.name)+'</p><p class="text-xs '+C.muted+'">'+escHtml(m.phone)+'</p></div></div>'+
                         '<div class="text-left">'+(m.isBlocked?statusBadge('BLOCKED'):statusBadge('ACTIVE'))+'</div></div>'+
+                        '<div class="flex items-center gap-2 mb-2">'+starsHtml+'<span class="text-xs '+C.muted+'">'+ratingLabel+'</span></div>'+
                         '<div class="grid grid-cols-4 gap-2 text-xs text-center mb-3">'+
                         '<div class="'+C.card+' rounded p-2"><p class="'+C.muted+'">رصيد</p><p class="font-bold text-success">'+fmtNum(m.usdtBalance||0)+'</p></div>'+
                         '<div class="'+C.card+' rounded p-2"><p class="'+C.muted+'">سعر الصرف</p><p class="font-bold text-primary">'+fmtNum(mRate)+'</p></div>'+
                         '<div class="'+C.card+' rounded p-2"><p class="'+C.muted+'">عمولة يومية</p><p class="font-bold">'+(mData.dailyAdminCommission||0)+'%</p></div>'+
                         '<div class="'+C.card+' rounded p-2"><p class="'+C.muted+'">طرق الدفع</p><p class="font-bold">'+mMethods+'</p></div></div>'+
+                        reviewsHtml+
                         '<div class="flex flex-wrap gap-2">'+
                         '<button onclick="adjustMerchantBalance(\''+m.id+'\')" class="px-3 py-1.5 rounded-lg text-xs font-medium btn border '+C.border+' '+C.text+'">💰 رصيد</button>'+
                         '<button onclick="showAdminDepositMerchant(\''+m.id+'\')" class="px-3 py-1.5 rounded-lg text-xs font-medium btn bg-success text-dark-bg">📥 إيداع</button>'+
@@ -7097,6 +7504,118 @@
             });
         }
 
+        // ==================== ADMIN: STATISTICS DASHBOARD ====================
+        var _adminCharts = {};
+        function renderAdminStatistics(C) {
+            var users = DB.get('users');
+            var deposits = DB.get('deposits');
+            var withdrawals = DB.get('withdrawals');
+            var merchants = users.filter(function(u){return u.role==='MERCHANT' && !u.isBlocked;});
+
+            // Summary cards
+            var totalUsers = users.filter(function(u){return u.role==='USER';}).length;
+            var totalDepAmount = deposits.filter(function(d){return d.status==='APPROVED';}).reduce(function(s,d){return s+(d.usdtAmount||0);},0);
+            var totalWdAmount = withdrawals.filter(function(w){return w.status==='APPROVED' || w.status==='COMPLETED';}).reduce(function(s,w){return s+(w.net||0);},0);
+
+            var html = '<div class="space-y-6">'+
+                '<h2 class="text-xl font-bold '+C.text+'">📊 لوحة الإحصائيات</h2>'+
+
+                // Summary cards
+                '<div class="grid grid-cols-2 md:grid-cols-4 gap-4">'+
+                '<div class="'+C.card+' rounded-2xl p-4 border '+C.border+' text-center"><div class="w-12 h-12 rounded-xl bg-info/10 flex items-center justify-center text-2xl mx-auto mb-2">👥</div><p class="text-2xl font-extrabold text-info">'+totalUsers+'</p><p class="'+C.muted+' text-xs">إجمالي المستخدمين</p></div>'+
+                '<div class="'+C.card+' rounded-2xl p-4 border '+C.border+' text-center"><div class="w-12 h-12 rounded-xl bg-success/10 flex items-center justify-center text-2xl mx-auto mb-2">💰</div><p class="text-2xl font-extrabold text-success">'+fmtNum(totalDepAmount)+'</p><p class="'+C.muted+' text-xs">إجمالي الإيداعات</p></div>'+
+                '<div class="'+C.card+' rounded-2xl p-4 border '+C.border+' text-center"><div class="w-12 h-12 rounded-xl bg-danger/10 flex items-center justify-center text-2xl mx-auto mb-2">🏧</div><p class="text-2xl font-extrabold text-danger">'+fmtNum(totalWdAmount)+'</p><p class="'+C.muted+' text-xs">إجمالي السحوبات</p></div>'+
+                '<div class="'+C.card+' rounded-2xl p-4 border '+C.border+' text-center"><div class="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center text-2xl mx-auto mb-2">🏪</div><p class="text-2xl font-extrabold text-primary">'+merchants.length+'</p><p class="'+C.muted+' text-xs">التجار النشطين</p></div></div>'+
+
+                // Charts row 1
+                '<div class="grid grid-cols-1 md:grid-cols-2 gap-4">'+
+                '<div class="'+C.card+' rounded-2xl p-4 border '+C.border+'"><h3 class="font-bold '+C.text+' mb-3 text-sm">📈 الإيداعات vs السحوبات (آخر 7 أيام)</h3><div style="position:relative;height:280px;"><canvas id="chart-dep-wd-7d"></canvas></div></div>'+
+                '<div class="'+C.card+' rounded-2xl p-4 border '+C.border+'"><h3 class="font-bold '+C.text+' mb-3 text-sm">🍩 حالة المعاملات</h3><div style="position:relative;height:280px;"><canvas id="chart-status-pie"></canvas></div></div></div>'+
+
+                // Charts row 2
+                '<div class="grid grid-cols-1 md:grid-cols-2 gap-4">'+
+                '<div class="'+C.card+' rounded-2xl p-4 border '+C.border+'"><h3 class="font-bold '+C.text+' mb-3 text-sm">📊 نمو المستخدمين (آخر 30 يوم)</h3><div style="position:relative;height:280px;"><canvas id="chart-user-growth"></canvas></div></div>'+
+                '<div class="'+C.card+' rounded-2xl p-4 border '+C.border+'"><h3 class="font-bold '+C.text+' mb-3 text-sm">🏆 أفضل التجار</h3><div id="top-merchants-table" class="max-h-[300px] overflow-y-auto"></div></div></div></div>';
+
+            // Render charts after HTML is in DOM
+            setTimeout(function(){ _renderStatisticsCharts(C); }, 100);
+            return html;
+        }
+
+        function _renderStatisticsCharts(C) {
+            // Destroy existing charts
+            Object.keys(_adminCharts).forEach(function(k){ if(_adminCharts[k]) { _adminCharts[k].destroy(); delete _adminCharts[k]; } });
+
+            var deposits = DB.get('deposits');
+            var withdrawals = DB.get('withdrawals');
+            var users = DB.get('users');
+            var merchants = users.filter(function(u){return u.role==='MERCHANT';});
+            var isDark = state.theme === 'dark';
+            var textColor = isDark ? '#f1f5f9' : '#0f172a';
+            var gridColor = isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.08)';
+            var chartDefaults = { responsive: true, maintainAspectRatio: false, plugins: { legend: { labels: { color: textColor, font: { family: 'Tajawal' } } } }, scales: { x: { ticks: { color: textColor, font: { family: 'Tajawal', size: 10 } }, grid: { color: gridColor } }, y: { ticks: { color: textColor, font: { family: 'Tajawal', size: 10 } }, grid: { color: gridColor } } } };
+
+            // 1. Deposits vs Withdrawals - last 7 days
+            var days7 = [];
+            var depData7 = [];
+            var wdData7 = [];
+            for(var i = 6; i >= 0; i--) {
+                var d = new Date(); d.setDate(d.getDate() - i);
+                var dateStr = d.toISOString().split('T')[0];
+                var dayLabel = d.toLocaleDateString('ar', {weekday:'short', day:'numeric'});
+                days7.push(dayLabel);
+                depData7.push(deposits.filter(function(dep){return dep.createdAt && dep.createdAt.startsWith(dateStr) && dep.status==='APPROVED';}).reduce(function(s,dep){return s+(dep.usdtAmount||0);},0));
+                wdData7.push(withdrawals.filter(function(w){return w.createdAt && w.createdAt.startsWith(dateStr) && (w.status==='APPROVED'||w.status==='COMPLETED');}).reduce(function(s,w){return s+(w.net||0);},0));
+            }
+            var ctx1 = document.getElementById('chart-dep-wd-7d');
+            if(ctx1) { _adminCharts.depWd = new Chart(ctx1, { type:'bar', data:{ labels:days7, datasets:[{label:'إيداعات',data:depData7,backgroundColor:'rgba(14,203,129,0.7)',borderRadius:6},{label:'سحوبات',data:wdData7,backgroundColor:'rgba(246,70,93,0.7)',borderRadius:6}] }, options:chartDefaults }); }
+
+            // 2. Transaction status pie
+            var allTxns = deposits.length + withdrawals.length;
+            var approved = deposits.filter(function(d){return d.status==='APPROVED';}).length + withdrawals.filter(function(w){return w.status==='APPROVED'||w.status==='COMPLETED';}).length;
+            var pending = deposits.filter(function(d){return d.status==='PENDING';}).length + withdrawals.filter(function(w){return w.status==='PENDING'||w.status==='RECEIVED'||w.status==='PROCESSING';}).length;
+            var rejected = deposits.filter(function(d){return d.status==='REJECTED';}).length + withdrawals.filter(function(w){return w.status==='REJECTED';}).length;
+            var ctx2 = document.getElementById('chart-status-pie');
+            if(ctx2) { _adminCharts.statusPie = new Chart(ctx2, { type:'doughnut', data:{ labels:['مقبول','معلق','مرفوض'], datasets:[{data:[approved,pending,rejected],backgroundColor:['#0ECB81','#FCD535','#F6465D'],borderWidth:0}] }, options:{ responsive:true, maintainAspectRatio:false, plugins:{ legend:{ position:'bottom', labels:{ color:textColor, font:{family:'Tajawal',size:12}, padding:16 } } } } }); }
+
+            // 3. User growth - last 30 days
+            var days30 = [];
+            var growthData = [];
+            var cumulative = 0;
+            for(var j = 29; j >= 0; j--) {
+                var dd = new Date(); dd.setDate(dd.getDate() - j);
+                var dateStr30 = dd.toISOString().split('T')[0];
+                var newUsers = users.filter(function(u){return u.createdAt && u.createdAt.startsWith(dateStr) && u.role==='USER';}).length;
+                cumulative += newUsers;
+                if(j % 3 === 0) { // Show every 3rd day to avoid crowding
+                    days30.push(dd.getDate()+'/'+(dd.getMonth()+1));
+                    growthData.push(cumulative);
+                }
+            }
+            var ctx3 = document.getElementById('chart-user-growth');
+            if(ctx3) { _adminCharts.userGrowth = new Chart(ctx3, { type:'line', data:{ labels:days30, datasets:[{label:'مستخدمين',data:growthData,borderColor:'#3B82F6',backgroundColor:'rgba(59,130,246,0.1)',fill:true,tension:0.4,pointRadius:3}] }, options:chartDefaults }); }
+
+            // 4. Top merchants table
+            var merchantStats = merchants.map(function(m){
+                var mTxns = DB.get('merchantTransactions').filter(function(t){return t.merchantId===m.id;});
+                var mDeposits = mTxns.filter(function(t){return t.type==='DEPOSIT'&&t.status==='APPROVED';}).reduce(function(s,t){return s+(t.amount||0);},0);
+                var mWithdrawals = mTxns.filter(function(t){return t.type==='WITHDRAW'&&t.status==='APPROVED';}).reduce(function(s,t){return s+(t.amount||0);},0);
+                var mRatings = DB.get('merchantRatings').filter(function(r){return r.merchantId===m.id;});
+                var avgR = mRatings.length > 0 ? Math.round(mRatings.reduce(function(s,r){return s+r.score;},0)/mRatings.length*10)/10 : 0;
+                return {name:m.name,id:m.id,totalDep:mDeposits,totalWd:mWithdrawals,volume:mDeposits+mWithdrawals,rating:avgR,ratingCount:mRatings.length};
+            }).sort(function(a,b){return b.volume-a.volume;}).slice(0,10);
+
+            var tableHtml = '<table class="w-full text-xs"><thead><tr class="border-b '+C.border+'"><th class="py-2 text-right '+C.muted+'">#</th><th class="py-2 text-right '+C.muted+'">التاجر</th><th class="py-2 text-right '+C.muted+'">الإيداعات</th><th class="py-2 text-right '+C.muted+'">السحوبات</th><th class="py-2 text-right '+C.muted+'">التقييم</th></tr></thead><tbody>';
+            merchantStats.forEach(function(m,i){
+                if(m.volume === 0) return;
+                tableHtml += '<tr class="border-b '+C.border+'"><td class="py-2 '+C.text+'">'+(i+1)+'</td><td class="py-2 '+C.text+' font-medium">'+escHtml(m.name)+'</td><td class="py-2 text-success">'+fmtNum(m.totalDep)+'</td><td class="py-2 text-danger">'+fmtNum(m.totalWd)+'</td><td class="py-2 text-warning">'+(m.rating>0?'⭐ '+m.rating:'—')+' <span class="'+C.muted+'">('+m.ratingCount+')</span></td></tr>';
+            });
+            if(merchantStats.every(function(m){return m.volume===0;})) { tableHtml += '<tr><td colspan="5" class="py-4 text-center '+C.muted+'">لا توجد بيانات</td></tr>'; }
+            tableHtml += '</tbody></table>';
+            var tableEl = document.getElementById('top-merchants-table');
+            if(tableEl) tableEl.innerHTML = tableHtml;
+        }
+
         // ==================== ADMIN: SETTINGS ====================
         function renderAdminSettings(C) {
             var rate = DB.getSetting('exchange_rate');
@@ -7138,6 +7657,7 @@
                 '<div><label class="block text-sm '+C.muted+' mb-1">رقم الهاتف</label><input type="text" id="set-admin-phone" value="'+escHtml(adminPhone)+'" class="w-full px-4 py-2.5 rounded-xl border '+C.input+' outline-none" placeholder="+967..."></div>'+
                 '<div><label class="block text-sm '+C.muted+' mb-1">رقم واتساب</label><input type="text" id="set-admin-wa" value="'+escHtml(adminWA)+'" class="w-full px-4 py-2.5 rounded-xl border '+C.input+' outline-none" placeholder="+967..."></div></div></div>'+
                 renderAdminBannerSettings(C)+
+                renderAdminBannerAdSettings(C)+
                 (adminUser ? renderContactManagement(C, adminUser, 'ADMIN') : '')+
                 '<div class="'+C.card+' rounded-xl p-5 border-2 border-danger/40 bg-danger/5"><h3 class="font-bold text-danger mb-3 text-center text-lg">⚠️ إعادة تعيين التطبيق بالكامل</h3>'+
                 '<p class="'+C.muted+' text-sm mb-4 text-center">حذف جميع البيانات: المستخدمين، الإيداعات، السحوبات، التوثيق، الرسائل، الإشعارات، سجل العمليات — وإعادة التطبيق لحالة نظيفة تماماً (مع الإبقاء على حساب الإدارة وإعداداته)</p>'+
@@ -7952,6 +8472,79 @@
             }
             render();
         }
+
+        // ==================== ADMIN: BANNER AD SYSTEM ====================
+        function renderAdminBannerAdSettings(C) {
+            var settings = DB.get('settings') || {};
+            var bannerAd = settings.bannerAd || {};
+            var imageUrl = bannerAd.imageUrl || '';
+            var linkUrl = bannerAd.linkUrl || '';
+            var title = bannerAd.title || '';
+            var isActive = bannerAd.isActive === true;
+            // Live preview
+            var previewHtml = '';
+            if(imageUrl) {
+                previewHtml = '<div class="mt-4 rounded-xl overflow-hidden relative cursor-pointer" onclick="window.open(\''+escHtml(linkUrl)+'\',\'_blank\')">'+
+                    '<img src="'+imageUrl+'" class="w-full h-40 object-cover">'+
+                    '<div class="absolute inset-0 bg-gradient-to-t from-black/70 to-transparent flex items-end p-3">'+
+                    '<p class="text-white font-bold text-sm">'+escHtml(title)+'</p></div></div>';
+            }
+            return '<div class="'+C.card+' rounded-xl p-4 border '+C.border+'"><h3 class="font-bold '+C.text+' mb-3">🖼️ إدارة الإعلانات</h3>'+
+                '<p class="text-xs '+C.muted+' mb-3">إعلان بانر يظهر في أعلى الصفحة الرئيسية للمستخدمين</p>'+
+                '<div class="space-y-3">'+
+                '<div><label class="block text-sm '+C.muted+' mb-1">عنوان الإعلان</label><input type="text" id="banner-ad-title" value="'+escHtml(title)+'" class="w-full px-3 py-2.5 rounded-xl border '+C.input+' outline-none text-sm" placeholder="عنوان الإعلان..."></div>'+
+                '<div><label class="block text-sm '+C.muted+' mb-1">رابط الإعلان (URL)</label><input type="text" id="banner-ad-link" value="'+escHtml(linkUrl)+'" class="w-full px-3 py-2.5 rounded-xl border '+C.input+' outline-none text-sm" placeholder="https://example.com"></div>'+
+                '<div><label class="block text-sm '+C.muted+' mb-1">صورة الإعلان (رابط أو رفع)</label><input type="text" id="banner-ad-image-url" value="'+escHtml(imageUrl)+'" class="w-full px-3 py-2.5 rounded-xl border '+C.input+' outline-none text-sm mb-2" placeholder="https://example.com/banner.jpg">'+
+                '<label class="block w-full px-3 py-2.5 rounded-lg border border-dashed '+C.border+' '+C.text+' btn text-sm font-medium text-center cursor-pointer">📁 رفع صورة<input type="file" accept="image/*" class="hidden" onchange="_uploadBannerAdImage(this)"></label>'+
+                '<input type="hidden" id="banner-ad-image-base64" value=""></div>'+
+                '<button onclick="saveBannerAd('+!isActive+')" class="w-full py-2.5 rounded-lg font-bold btn '+(isActive?'bg-danger text-white':'bg-success text-dark-bg')+' text-sm">'+(isActive?'🔒 إخفاء الإعلان':'📢 تفعيل وحفظ الإعلان')+'</button></div>'+
+                previewHtml+'</div>';
+        }
+
+        window._uploadBannerAdImage = function(input) {
+            if(!input.files || !input.files[0]) return;
+            var reader = new FileReader();
+            reader.onload = function(e) {
+                var base64 = e.target.result;
+                document.getElementById('banner-ad-image-base64').value = base64;
+                document.getElementById('banner-ad-image-url').value = base64;
+                toast('تم رفع الصورة بنجاح','success',false);
+            };
+            reader.readAsDataURL(input.files[0]);
+        };
+
+        function saveBannerAd(active) {
+            var title = document.getElementById('banner-ad-title') ? document.getElementById('banner-ad-title').value.trim() : '';
+            var linkUrl = document.getElementById('banner-ad-link') ? document.getElementById('banner-ad-link').value.trim() : '';
+            var imageUrl = document.getElementById('banner-ad-image-url') ? document.getElementById('banner-ad-image-url').value.trim() : '';
+            if(!imageUrl) { toast('أضف صورة الإعلان أولاً','error'); return; }
+            var settings = DB.get('settings') || {};
+            settings.bannerAd = { imageUrl: imageUrl, linkUrl: linkUrl, title: title, isActive: active, createdAt: new Date().toISOString() };
+            DB.set('settings', settings);
+            toast(active ? 'تم تفعيل الإعلان' : 'تم حفظ الإعلان (معطل)','success');
+            render();
+        }
+
+        // ==================== USER: BANNER AD DISPLAY ====================
+        function renderBannerAd(C) {
+            var settings = DB.get('settings') || {};
+            var bannerAd = settings.bannerAd;
+            if(!bannerAd || !bannerAd.isActive || !bannerAd.imageUrl) return '';
+            // Check dismissal
+            var dismissKey = 'banner_dismissed_' + (bannerAd.createdAt || '');
+            if(localStorage.getItem(dismissKey)) return '';
+            return '<div id="user-banner-ad" class="relative rounded-2xl overflow-hidden mb-4 cursor-pointer card-hover shadow-card" '+(bannerAd.linkUrl?'onclick="window.open(\''+escHtml(bannerAd.linkUrl).replace(/'/g,"\\'")+'\',\'_blank\')"':'')+'>'+
+                '<img src="'+bannerAd.imageUrl+'" class="w-full h-36 object-cover">'+
+                '<div class="absolute inset-0 bg-gradient-to-l from-black/60 via-black/30 to-transparent flex items-center">'+
+                '<p class="text-white font-bold text-base mr-4">'+escHtml(bannerAd.title||'')+'</p></div>'+
+                '<button onclick="event.stopPropagation();dismissBannerAd(\''+dismissKey+'\')" class="absolute top-2 left-2 w-8 h-8 rounded-full bg-black/50 text-white flex items-center justify-center text-sm btn hover:bg-black/70">&times;</button></div>';
+        }
+
+        window.dismissBannerAd = function(key) {
+            localStorage.setItem(key, '1');
+            var el = document.getElementById('user-banner-ad');
+            if(el) el.style.display = 'none';
+        };
 
         // ==================== LIVE EXCHANGE RATES ====================
         var _liveRates = null;
