@@ -184,6 +184,22 @@
         @supports (padding-bottom: env(safe-area-inset-bottom)) {
             .sidebar-safe { padding-bottom: env(safe-area-inset-bottom); }
         }
+
+        /* Chatbot Widget */
+        @keyframes chatbotSlideUp { from { opacity: 0; transform: translateY(20px) scale(0.95); } to { opacity: 1; transform: translateY(0) scale(1); } }
+        @keyframes chatbotBounce { 0%,100% { transform: scale(1); } 50% { transform: scale(1.08); } }
+        @keyframes typingDot { 0%,60%,100% { opacity: 0.3; transform: translateY(0); } 30% { opacity: 1; transform: translateY(-4px); } }
+        .chatbot-window { animation: chatbotSlideUp 0.3s ease-out; }
+        .chatbot-fab { animation: chatbotBounce 2s ease-in-out infinite; }
+        .chatbot-fab:hover { animation: none; }
+        .chatbot-typing span { display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: #94a3b8; margin: 0 2px; }
+        .chatbot-typing span:nth-child(1) { animation: typingDot 1.4s infinite 0s; }
+        .chatbot-typing span:nth-child(2) { animation: typingDot 1.4s infinite 0.2s; }
+        .chatbot-typing span:nth-child(3) { animation: typingDot 1.4s infinite 0.4s; }
+        .chatbot-msgs { scrollbar-width: thin; scrollbar-color: rgba(240,185,11,0.3) transparent; }
+        .chatbot-quick-btn { transition: all 0.2s ease; }
+        .chatbot-quick-btn:hover { transform: translateY(-1px); box-shadow: 0 4px 12px rgba(240,185,11,0.2); }
+        .chatbot-quick-btn:active { transform: scale(0.96); }
     </style>
     <script src="https://www.gstatic.com/firebasejs/10.8.1/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore-compat.js"></script>
@@ -1379,7 +1395,7 @@
                 { id: 'pm1', title: 'USDT TRC20', type: 'CRYPTO', subtype: '', network: 'TRC20', address: 'TXxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx', recipientName: '', accountNumber: '', bankName: '', isActive: true, sortOrder: 0, minDeposit: 10, minWithdraw: 5 },
                 { id: 'pm2', title: 'حساب بنك اليمن والكويت', type: 'BANK', subtype: 'wallet', network: '', address: '', recipientName: 'ForexYemeni', accountNumber: '1234567890', bankName: 'بنك اليمن والكويت', isActive: true, sortOrder: 1, minDeposit: 1000, minWithdraw: 500 }
             ];
-            if (key === 'settings') return { exchange_rate: '535', exchange_rate_sar: '137.50', exchange_fee: '0', admin_deposit_fee: '0', admin_withdrawal_fee: '0', aff_l1: '5', aff_l2: '3', aff_l3: '1', admin_phone: '', admin_whatsapp: '', merchant_commission: '2', admin_trc20_wallet: 'TSJJodihEAbgqLENZvMzh62rEDaM5QxoLn', auto_approve_crypto: '0', txid_max_age_minutes: '120', crypto_fee_trc20: '1', crypto_fee_bep20: '5', crypto_fee_erc20: '15', large_withdrawal_threshold: '1000' };
+            if (key === 'settings') return { exchange_rate: '535', exchange_rate_sar: '137.50', exchange_fee: '0', admin_deposit_fee: '0', admin_withdrawal_fee: '0', aff_l1: '5', aff_l2: '3', aff_l3: '1', admin_phone: '', admin_whatsapp: '', merchant_commission: '2', admin_trc20_wallet: 'TSJJodihEAbgqLENZvMzh62rEDaM5QxoLn', auto_approve_crypto: '0', txid_max_age_minutes: '120', crypto_fee_trc20: '1', crypto_fee_bep20: '5', crypto_fee_erc20: '15', large_withdrawal_threshold: '1000', chatbot_active: '0' };
             if (key === 'merchantRequests') return [];
             if (key === 'merchantTransactions') return [];
             if (key === 'profileChangeRequests') return [];
@@ -1392,7 +1408,7 @@
         }
 
         // ==================== STATE ====================
-        var state = { view: 'loading', user: null, theme: 'dark', sidebarOpen: false, confirmCb: null, editId: null, settingsEditMode: false, activeChatUserId: null, affTab: 'requests', dbConfigEditMode: false, depPmId: '', wdMethodType: '', chatWithMerchantId: null };
+        var state = { view: 'loading', user: null, theme: 'dark', sidebarOpen: false, confirmCb: null, editId: null, settingsEditMode: false, activeChatUserId: null, affTab: 'requests', dbConfigEditMode: false, depPmId: '', wdMethodType: '', chatWithMerchantId: null, chatbotOpen: false };
 
         // ==================== NOTIFICATION SETTINGS ====================
         function getUserNotifSettings(userId) {
@@ -3441,7 +3457,9 @@
                 '<div class="page-enter">'+contentHtml+'</div></main>'+
                 // Mobile bottom navigation bar
                 '<nav class="fixed bottom-0 left-0 right-0 lg:hidden z-40 glass border-t '+C.border+' sidebar-safe">'+_renderMobileNavBar(C,role)+'</nav>'+
-                floatingContactHtml;
+                floatingContactHtml+
+                // Chatbot widget (only if admin enabled)
+                (DB.getSetting('chatbot_active') === 'true' ? _chatbotRenderWidget(C) : '');
         }
 
         function _renderMobileNavBar(C, role) {
@@ -8713,6 +8731,10 @@
                 '<p class="text-xs '+C.muted+'">💡 تُطبق فقط على السحوبات الكريبتو. البنكية تستخدم الرسوم العامة.</p></div></div>'+
                 '<div class="'+C.card+' rounded-xl p-4 border '+C.border+'"><div class="flex items-center gap-2 mb-4"><div class="w-8 h-8 rounded-lg bg-red-500/15 flex items-center justify-center text-sm">🚨</div><h3 class="font-bold '+C.text+'">تنبيه السحوبات الكبيرة</h3></div><div class="space-y-3">'+
                 '<div><label class="block text-xs '+C.muted+' mb-1">حد السحب الكبير (USDT)</label><input type="number" id="set-large-wd-threshold" value="'+(DB.getSetting('large_withdrawal_threshold')||'1000')+'" class="w-full px-3 py-2.5 rounded-xl border '+C.input+' outline-none text-sm" min="0" step="100" placeholder="1000"><p class="text-xs '+C.muted+' mt-1">عند تجاوز السحب هذا المبلغ، سيظهر تنبيه إضافي ويُرسل إشعار للإدارة</p></div></div></div>'+
+                '<div class="'+C.card+' rounded-xl p-4 border '+C.border+'"><div class="flex items-center gap-2 mb-4"><div class="w-8 h-8 rounded-lg bg-violet-500/15 flex items-center justify-center text-sm">\uD83E\uDD16</div><h3 class="font-bold '+C.text+'">المساعد الذكي (روبوت المحادثة)</h3></div><div class="space-y-3">'+
+                '<div class="flex items-center gap-3 p-3 rounded-lg border '+C.border+'"><div class="flex-1"><p class="text-sm font-medium '+C.text+'">\uD83E\uDD16 تفعيل المساعد الذكي</p><p class="text-xs '+C.muted+'">زر عائم يظهر للمستخدمين يجاوب على الأسئلة الشائعة تلقائياً</p></div>'+
+                '<div onclick="var cb=document.getElementById(\'set-chatbot-active\');cb.checked=!cb.checked;this.className=cb.checked?\'w-12 h-7 rounded-full bg-success relative cursor-pointer transition-colors\':\'w-12 h-7 rounded-full bg-gray-400 relative cursor-pointer transition-colors\';this.children[0].className=cb.checked?\'absolute top-[2px] right-[2px] w-6 h-6 bg-white rounded-full shadow transition-all\':\'absolute top-[2px] left-[2px] w-6 h-6 bg-white rounded-full shadow transition-all\'" class="'+(DB.getSetting('chatbot_active')==='true'?'w-12 h-7 rounded-full bg-success relative cursor-pointer transition-colors':'w-12 h-7 rounded-full bg-gray-400 relative cursor-pointer transition-colors')+'"><div class="'+(DB.getSetting('chatbot_active')==='true'?'absolute top-[2px] right-[2px] w-6 h-6 bg-white rounded-full shadow transition-all':'absolute top-[2px] left-[2px] w-6 h-6 bg-white rounded-full shadow transition-all')+'"></div></div>'+
+                '<input type="checkbox" id="set-chatbot-active" class="hidden" '+(DB.getSetting('chatbot_active')==='true'?'checked':'')+'></div></div></div>'+
                 renderAdminBannerSettings(C)+
                 renderAdminBannerAdSettings(C)+
                 (adminUser ? renderContactManagement(C, adminUser, 'ADMIN') : '')+
@@ -8959,6 +8981,7 @@
             DB.setSetting('crypto_fee_bep20', document.getElementById('set-crypto-fee-bep20').value || '5');
             DB.setSetting('crypto_fee_erc20', document.getElementById('set-crypto-fee-erc20').value || '15');
             DB.setSetting('large_withdrawal_threshold', document.getElementById('set-large-wd-threshold').value || '1000');
+            DB.setSetting('chatbot_active', document.getElementById('set-chatbot-active').checked ? 'true' : '0');
             var adminPass = document.getElementById('set-admin-pass').value;
             if(adminPass) {
                 var users = DB.get('users');
@@ -9687,6 +9710,164 @@
             reader.readAsDataURL(input.files[0]);
         };
 
+        // ==================== CHATBOT: FAQ DATABASE ====================
+        var _chatbotFAQ = [
+            { kw: ['اودع','إيداع','ايداع','deposit','تحويل داخل','إرسال فلوس','ابي اودع','ودع','ادع'], a: '\uD83D\uDCB0 <b>\u0643\u064A\u0641\u064A\u0629 \u0627\u0644\u0625\u064A\u062F\u0627\u0639:</b><br><br>1\uFE0F\u20E3 \u0627\u0630\u0647\u0628 \u0625\u0644\u0649 \u0635\u0641\u062D\u0629 <b>\u0627\u0644\u0625\u064A\u062F\u0627\u0639</b><br>2\uFE0F\u20E3 \u0627\u062E\u062A\u0631 \u0637\u0631\u064A\u0642\u0629 \u0627\u0644\u062F\u0641\u0639<br>3\uFE0F\u20E3 \u0623\u062F\u062E\u0644 \u0627\u0644\u0645\u0628\u0644\u063A<br>4\uFE0F\u20E3 \u0627\u062A\u0628\u0639 \u0627\u0644\u062A\u0639\u0644\u064A\u0645\u0627\u062A<br>5\uFE0F\u20E3 \u0627\u0646\u062A\u0638\u0631 \u062A\u0623\u0643\u064A\u062F \u0627\u0644\u0625\u062F\u0627\u0631\u0629<br><br>\u23F1\uFE0F \u0639\u0627\u062F\u0629\u064B \u064A\u062A\u0645 \u062E\u0644\u0627\u0644 \u062F\u0642\u0627\u0626\u0642.' },
+            { kw: ['ايداع كريبتو','إيداع كريبتو','usdt','تيثر','deposit crypto','TRC20','BEP20','ERC20','ايداع عملات','ايداع رقمي'], a: '\uD83E\uDD9B <b>\u0625\u064A\u062F\u0627\u0639 USDT:</b><br><br>1\uFE0F\u20E3 \u0627\u0630\u0647\u0628 \u0625\u0644\u0649 \u0635\u0641\u062D\u0629 \u0627\u0644\u0625\u064A\u062F\u0627\u0639<br>2\uFE0F\u20E3 \u0627\u062E\u062A\u0631 <b>\u0625\u064A\u062F\u0627\u0639 USDT</b><br>3\uFE0F\u20E3 \u0627\u062E\u062A\u0631 \u0627\u0644\u0634\u0628\u0643\u0629: <b>TRC20</b> (\u0627\u0644\u0623\u0631\u062E\u0635)<br>4\uFE0F\u20E3 \u0627\u0646\u0633\u062E \u0639\u0646\u0648\u0627\u0646 \u0627\u0644\u0645\u062D\u0641\u0638\u0629<br>5\uFE0F\u20E3 \u0623\u062F\u062E\u0644 TXID \u0644\u0644\u062A\u062D\u0642\u0642 \u0627\u0644\u062A\u0644\u0642\u0627\u0626\u064A<br><br>\u26A0\uFE0F \u062A\u0623\u0643\u062F \u0645\u0646 \u0627\u0644\u0634\u0628\u0643\u0629 \u0627\u0644\u0635\u062D\u064A\u062D\u0629!' },
+            { kw: ['تحويل محلي','بنك','تحويل بنكي','صراف','نقد','كاش','مندوب'], a: '\uD83C\uDFE6 <b>\u0627\u0644\u0625\u064A\u062F\u0627\u0639 \u0627\u0644\u0645\u062D\u0644\u064A:</b><br><br>\u0641\u0648\u062C\u0631 <b>\u062A\u062D\u0648\u064A\u0644 \u0628\u0646\u0643\u064A</b><br>\u0627\u062A\u0635\u0627\u0644 <b>\u0645\u0646\u062F\u0648\u0628</b><br>\u0625\u064A\u062F\u0627\u0639 <b>\u0646\u0642\u062F\u064A</b>' },
+            { kw: ['اسحب','سحب','withdraw','اريد سحب','ابي سحب','صرف','سحب فلوس','اريد اصرف'], a: '\uD83C\uDFE7 <b>\u0643\u064A\u0641\u064A\u0629 \u0627\u0644\u0633\u062D\u0628:</b><br><br>1\uFE0F\u20E3 \u0627\u0630\u0647\u0628 \u0625\u0644\u0649 <b>\u0627\u0644\u0633\u062D\u0628</b><br>2\uFE0F\u20E3 \u0627\u062E\u062A\u0631 \u0637\u0631\u064A\u0642\u0629 \u0627\u0644\u0633\u062D\u0628<br>3\uFE0F\u20E3 \u0623\u062F\u062E\u0644 \u0627\u0644\u0645\u0628\u0644\u063A<br>4\uFE0F\u20E3 \u0631\u0627\u062C\u0639 \u0627\u0644\u062A\u0641\u0627\u0635\u064A\u0644<br>5\uFE0F\u20E3 \u0627\u0636\u063A\u0637 <b>\u062A\u0623\u0643\u064A\u062F</b>' },
+            { kw: ['رسوم','عمولة','كومشن','commission','fee','خصم','مبلغ يخصم'], a: '\uD83D\uDCCA <b>\u0631\u0633\u0648\u0645 \u0627\u0644\u0633\u062D\u0628:</b><br><br>\uD83E\uDD9B TRC20: <b>1%</b><br>\uD83E\uDD9B BEP20: <b>5%</b><br>\uD83E\uDD9B ERC20: <b>15%</b><br><br>\uD83D\uDCA1 \u0627\u0633\u062A\u062E\u062F\u0645 TRC20 \u0644\u0623\u0642\u0644 \u0631\u0633\u0648\u0645.' },
+            { kw: ['كم يستغرق','متى يصل','وصل المبلغ','متى بتوصل','تأخر','delay','waiting','انتظر'], a: '\u23F1\uFE0F <b>\u0645\u062F\u0629 \u0627\u0644\u0645\u0639\u0627\u0644\u062C\u0629:</b><br><br>\u2705 \u0627\u0644\u0625\u064A\u062F\u0627\u0639 \u0627\u0644\u0641\u0648\u0631\u064A: \u062F\u0642\u0627\u0626\u0642<br>\u23F3 \u0627\u0644\u0625\u064A\u062F\u0627\u0639 \u0627\u0644\u064A\u062F\u0648\u064A: 15-30 \u062F\u0642\u064A\u0642\u0629<br>\u23F3 \u0627\u0644\u0633\u062D\u0628: \u062F\u0642\u0627\u0626\u0642 \u0625\u0644\u0649 \u0633\u0627\u0639\u0627\u062A' },
+            { kw: ['kyc','توثيق','هوية','وثيقة','توثيق الهوية','تصديق','تفعيل','limit','الحد'], a: '\uD83E\uDDAA <b>توثيق الهوية (KYC):</b><br><br>1\uFE0F\u20E3 اذهب لصفحة <b>KYC</b><br>2\uFE0F\u20E3 ارفع صورة الهوية أو الجواز<br>3\uFE0F\u20E3 ارفع صورة شخصية<br>4\uFE0F\u20E3 انتظر موافقة الإدارة<br><br>\u26A0\uFE0F صالح لمدة سنة ويجب تجديده.' },
+            { kw: ['تسجيل','حساب جديد','register','اشتراك','فتح حساب'], a: '\uD83D\uDCDD <b>فتح حساب جديد:</b><br><br>1\uFE0F\u20E3 اضغط <b>تسجيل</b><br>2\uFE0F\u20E3 أدخل اسمك الكامل<br>3\uFE0F\u20E3 أدخل رقم الهاتف<br>4\uFE0F\u20E3 أدخل كلمة المرور<br>5\uFE0F\u20E3 أدخل رمز OTP<br>6\uFE0F\u20E3 تم! \uD83C\uDF89' },
+            { kw: ['نسيت كلمة','كلمة مرور','باسورد','password','دخول','login','تسجيل دخول','ماقدرت ادخل'], a: '\uD83D\uDD11 <b>تسجيل الدخول:</b><br><br>أدخل رقم هاتفك + كلمة المرور.<br><br><b>نسيت كلمة المرور؟</b><br>1\uFE0F\u20E3 اضغط <b>نسيت كلمة المرور</b><br>2\uFE0F\u20E3 أدخل رقم هاتفك<br>3\uFE0F\u20E3 أدخل رمز OTP<br>4\uFE0F\u20E3 أنشئ كلمة مرور جديدة' },
+            { kw: ['جهاز','مسح جهاز','جهاز جديد','تسجيل دخول من جهاز'], a: '\uD83D\uDCF1 <b>إدارة الأجهزة:</b><br><br>الحساب مقفل على جهاز واحد.<br>عند الدخول من جهاز جديد يجب موافقة الجهاز الحالي.<br><br>\u2139\uFE0F إدارة الأجهزة من <b>الإعدادات \u2190 الأجهزة</b>' },
+            { kw: ['امن','حماية','اختراق','security','safe'], a: '\uD83D\uDD12 <b>أمان حسابك:</b><br><br>\u2705 قفل الجهاز الواحد<br>\u2705 OTP للتحقق<br>\u2705 كلمة مرور مشفرة<br>\u2705 توثيق الهوية KYC' },
+            { kw: ['تاجر','merchant','تجار','وكيل'], a: '\uD83C\uDFEA <b>التجار:</b><br><br>\u2705 إيداع وسحب عبر التجار<br>\u2705 حد يومي لكل تاجر<br>\u2705 تقييم (برونزي \u2190 فضي \u2190 ذهبي \u2190 ماسي)<br><br>للتسجيل كتاجر تواصل مع الإدارة.' },
+            { kw: ['إحالة','affiliate','عمولة','ربح','دعوة','صديق','refer','كسب'], a: '\uD83D\uDD17 <b>نظام الإحالة:</b><br><br>ادعُ أصدقاءك واكسب عمولة!<br><br>\uD83C\uDF45 المستوى 1: مباشرة<br>\uD83C\uDF46 المستوى 2<br>\uD83C\uDF49 المستوى 3<br><br>\uD83D\uDD17 انسخ الرابط من صفحة <b>الإحالة</b>!' },
+            { kw: ['سعر','صرف','exchange','ريال','دولار','يرمن','YER','USD','SAR','عملة','سعر الصرف'], a: '\uD83D\uDCB1 <b>أسعار الصرف:</b><br><br>تتحدث تلقائياً كل 5 دقائق.<br>الأسعار ظاهرة في الصفحة الرئيسية.' },
+            { kw: ['مرحبا','سلام','هلا','هاي','hello','hi','السلام عليكم','مسا','صباح','مساء','اهلا','أهلا'], a: '\uD83D\uDC4B <b>أهلاً وسهلاً بك!</b><br><br>أنا المساعد الذكي لـ <b>ForexYemeni Wallet</b> \uD83C\uDFE6<br><br>كيف أقدر أساعدك؟ اختر من الأزرار السريعة أو اكتب سؤالك! \uD83D\uDE0A' },
+            { kw: ['شكرا','شكراً','thanks','ممتاز','تمام','nice','عظيم','مشكور'], a: '\uD83D\uDE0A <b>العفو!</b><br><br>سعيد إني قدرت أساعدك. إذا عندك سؤال ثاني لا تتردد!' },
+            { kw: ['شكوى','مشكلة','خطأ','error','bug','عطل','مساعدة','help','دعم','support','تواصل'], a: '\uD83D\uDCDE <b>تواصل مع الإدارة:</b><br><br>\uD83D\uDCAC <b>الدعم المباشر</b>: من تبويب الدعم<br>\uD83D\uDCF1 <b>واتساب</b>: من زر الاتصال<br>\uD83D\uDCDE <b>الهاتف</b>: من زر الاتصال<br><br>\u23F1\uFE0F نرد خلال دقائق.' },
+            { kw: ['ما هو','ماذا','تطبيق','برنامج','forexyemeni','forex','محفظة'], a: '\uD83C\uDFE6 <b>ForexYemeni Wallet:</b><br><br>محفظة رقمية يمنية متكاملة.<br><br>\u2705 إيداع وسحب USDT<br>\u2705 تحويل محلي<br>\u2705 توثيق الهوية<br>\u2705 نظام تجار<br>\u2705 إحالة وعمولات<br><br>\uD83D\uDD12 آمنة وسريعة \uD83C\uDDFE\uD83C\uDDEA' }
+        ];
+
+        function _chatbotFindAnswer(question) {
+            if (!question || !question.trim()) return null;
+            var q = question.trim().toLowerCase();
+            var bestMatch = null;
+            var bestScore = 0;
+            for (var i = 0; i < _chatbotFAQ.length; i++) {
+                var item = _chatbotFAQ[i];
+                var score = 0;
+                for (var j = 0; j < item.kw.length; j++) {
+                    var kw = item.kw[j].toLowerCase();
+                    if (q === kw) { score += 100; }
+                    else if (q.indexOf(kw) >= 0 || kw.indexOf(q) >= 0) { score += 50; }
+                    else {
+                        var qWords = q.split(/[\s]+/);
+                        for (var w = 0; w < qWords.length; w++) {
+                            if (qWords[w].length > 1 && (kw.indexOf(qWords[w]) >= 0 || qWords[w].indexOf(kw) >= 0)) { score += 15; }
+                        }
+                    }
+                }
+                if (score > bestScore) { bestScore = score; bestMatch = item; }
+            }
+            if (bestScore >= 15) return bestMatch.a;
+            return null;
+        }
+
+        function _chatbotGetHistory() {
+            try { return JSON.parse(localStorage.getItem('fy_chatbot_history') || '[]'); } catch(e) { return []; }
+        }
+        function _chatbotSaveHistory(history) {
+            try { if (history.length > 50) history = history.slice(history.length - 50); localStorage.setItem('fy_chatbot_history', JSON.stringify(history)); } catch(e) {}
+        }
+        function _chatbotClearHistory() { localStorage.removeItem('fy_chatbot_history'); }
+
+        function _chatbotToggle() {
+            state.chatbotOpen = !state.chatbotOpen;
+            var container = document.getElementById('chatbot-container');
+            if (!container) return;
+            if (state.chatbotOpen) {
+                container.classList.remove('hidden');
+                container.classList.add('flex');
+                setTimeout(function() { var msgs = document.getElementById('chatbot-messages'); if (msgs) msgs.scrollTop = msgs.scrollHeight; }, 50);
+            } else {
+                container.classList.add('hidden');
+                container.classList.remove('flex');
+            }
+            var fabIcon = document.getElementById('chatbot-fab-icon');
+            if (fabIcon) fabIcon.textContent = state.chatbotOpen ? '\u2715' : '\uD83E\uDD16';
+        }
+
+        function _chatbotSend(text) {
+            if (!text || !text.trim()) return;
+            text = text.trim();
+            var history = _chatbotGetHistory();
+            history.push({ t: text, bot: false, time: new Date().toISOString() });
+            _chatbotSaveHistory(history);
+            _chatbotShowTyping(true);
+            var delay = 600 + Math.random() * 800;
+            setTimeout(function() {
+                _chatbotShowTyping(false);
+                var answer = _chatbotFindAnswer(text);
+                var botMsg = answer || ('\uD83E\uDD14 <b>لم أجد إجابة مناسبة.</b><br><br>تواصل مع الإدارة عبر تبويب <b>الدعم</b>.');
+                history.push({ t: botMsg, bot: true, time: new Date().toISOString() });
+                _chatbotSaveHistory(history);
+                _chatbotRenderMessages();
+            }, delay);
+        }
+
+        function _chatbotSendQuick(text) { _chatbotSend(text); var input = document.getElementById('chatbot-input'); if (input) input.value = ''; }
+
+        function _chatbotShowTyping(show) {
+            var el = document.getElementById('chatbot-typing-indicator');
+            if (el) {
+                if (show) { el.classList.remove('hidden'); el.classList.add('flex'); var msgs = document.getElementById('chatbot-messages'); if (msgs) msgs.scrollTop = msgs.scrollHeight; }
+                else { el.classList.add('hidden'); el.classList.remove('flex'); }
+            }
+        }
+
+        function _chatbotRenderMessages() {
+            var container = document.getElementById('chatbot-messages');
+            if (!container) return;
+            var history = _chatbotGetHistory();
+            var html = '';
+            for (var i = 0; i < history.length; i++) {
+                var msg = history[i];
+                if (msg.bot) { html += '<div class="flex justify-start mb-2"><div class="chat-bubble-other max-w-[85%] px-3 py-2"><p>' + msg.t.replace(/\n/g, '<br>') + '</p></div></div>'; }
+                else { html += '<div class="flex justify-end mb-2"><div class="chat-bubble-me max-w-[85%] px-3 py-2"><p>' + escHtml(msg.t) + '</p></div></div>'; }
+            }
+            container.innerHTML = html;
+            setTimeout(function() { container.scrollTop = container.scrollHeight; }, 50);
+        }
+
+        function _chatbotReset() {
+            _chatbotClearHistory();
+            var h = _chatbotGetHistory();
+            h.push({ t: '\uD83D\uDC4B <b>أهلاً بك!</b><br><br>أنا المساعد الذكي لـ <b>ForexYemeni Wallet</b> \uD83C\uDFE6<br><br>كيف أقدر أساعدك؟ اختر من الأزرار السريعة أو اكتب سؤالك! \uD83D\uDE0A', bot: true, time: new Date().toISOString() });
+            _chatbotSaveHistory(h);
+            _chatbotRenderMessages();
+        }
+
+        function _chatbotInit() {
+            var h = _chatbotGetHistory();
+            if (h.length === 0) {
+                h.push({ t: '\uD83D\uDC4B <b>أهلاً بك!</b><br><br>أنا المساعد الذكي لـ <b>ForexYemeni Wallet</b> \uD83C\uDFE6<br><br>كيف أقدر أساعدك؟ اختر من الأزرار السريعة أو اكتب سؤالك! \uD83D\uDE0A', bot: true, time: new Date().toISOString() });
+                _chatbotSaveHistory(h);
+            }
+            setTimeout(function() { _chatbotRenderMessages(); }, 100);
+        }
+
+        function _chatbotRenderWidget(C) {
+            var html = '';
+            html += '<button onclick="_chatbotToggle()" class="chatbot-fab fixed bottom-20 lg:bottom-8 right-6 z-[60] w-14 h-14 rounded-full bg-gradient-to-br from-primary to-primary-dark text-dark-bg flex items-center justify-center shadow-glow btn text-2xl"><span id="chatbot-fab-icon">\uD83E\uDD16</span></button>';
+            html += '<div id="chatbot-container" class="hidden fixed bottom-36 lg:bottom-24 right-4 left-4 sm:left-auto sm:w-[380px] z-[60] flex-col rounded-2xl overflow-hidden shadow-premium border ' + C.border + ' chatbot-window" style="height: min(520px, 75vh);">';
+            // header
+            html += '<div class="flex items-center justify-between px-4 py-3 bg-gradient-to-l from-primary/20 to-primary/5 border-b ' + C.border + '"><div class="flex items-center gap-2"><div class="w-9 h-9 rounded-full bg-gradient-to-br from-primary to-primary-dark flex items-center justify-center text-lg">\uD83E\uDD16</div><div><p class="font-bold text-sm ' + C.text + '">المساعد الذكي</p><div class="flex items-center gap-1"><div class="w-2 h-2 rounded-full bg-success"></div><span class="text-[10px] ' + C.muted + '">متصل الآن</span></div></div></div><div class="flex items-center gap-1"><button onclick="_chatbotReset()" class="w-8 h-8 rounded-lg flex items-center justify-center text-sm btn hover:bg-white/10">\uD83D\uDD04</button><button onclick="_chatbotToggle()" class="w-8 h-8 rounded-lg flex items-center justify-center text-sm btn hover:bg-white/10">\u2715</button></div></div>';
+            // messages
+            html += '<div id="chatbot-messages" class="chatbot-msgs flex-1 overflow-y-auto p-3 ' + C.bg + '"></div>';
+            // typing
+            html += '<div id="chatbot-typing-indicator" class="hidden px-4 py-2 ' + C.bg + '"><div class="flex items-center gap-2"><div class="chatbot-typing"><span></span><span></span><span></span></div><span class="text-xs ' + C.muted + '">يكتب...</span></div></div>';
+            // quick buttons
+            html += '<div class="px-3 py-2 border-t ' + C.border + ' ' + (state.theme === 'dark' ? 'bg-gray-900/50' : 'bg-gray-50') + '"><div class="flex gap-1.5 overflow-x-auto pb-1" style="scrollbar-width:none">';
+            html += '<button onclick="_chatbotSendQuick(\'كيف أودع?\')" class="chatbot-quick-btn whitespace-nowrap px-3 py-1.5 rounded-full text-xs font-medium bg-primary/10 text-primary border border-primary/20 btn">\uD83D\uDCB0 إيداع</button>';
+            html += '<button onclick="_chatbotSendQuick(\'كيف أسحب?\')" class="chatbot-quick-btn whitespace-nowrap px-3 py-1.5 rounded-full text-xs font-medium bg-success/10 text-success border border-success/20 btn">\uD83C\uDFE7 سحب</button>';
+            html += '<button onclick="_chatbotSendQuick(\'توثيق الهوية\')" class="chatbot-quick-btn whitespace-nowrap px-3 py-1.5 rounded-full text-xs font-medium bg-info/10 text-info border border-info/20 btn">\uD83E\uDDAA KYC</button>';
+            html += '<button onclick="_chatbotSendQuick(\'كم الرسوم?\')" class="chatbot-quick-btn whitespace-nowrap px-3 py-1.5 rounded-full text-xs font-medium bg-warning/10 text-warning border border-warning/20 btn">\uD83D\uDCCA رسوم</button>';
+            html += '<button onclick="state.chatbotOpen=false;_chatbotToggle();setView(\'user-chat\')" class="chatbot-quick-btn whitespace-nowrap px-3 py-1.5 rounded-full text-xs font-medium bg-danger/10 text-danger border border-danger/20 btn">\uD83D\uDCAC الدعم</button>';
+            html += '</div></div>';
+            // input
+            html += '<div class="flex items-center gap-2 px-3 py-2.5 border-t ' + C.border + ' ' + (state.theme === 'dark' ? 'bg-gray-900/80' : 'bg-white') + '">';
+            html += '<input id="chatbot-input" type="text" placeholder="اكتب سؤالك هنا..." class="flex-1 px-3 py-2 rounded-xl text-sm ' + C.bg + ' ' + C.text + ' border ' + C.border + ' input-modern outline-none" onkeydown="if(event.key===\'Enter\')_chatbotSend(this.value);">';
+            html += '<button onclick="var i=document.getElementById(\'chatbot-input\');_chatbotSend(i.value);i.value=\'\'" class="w-9 h-9 rounded-xl bg-gradient-to-br from-primary to-primary-dark text-dark-bg flex items-center justify-center btn text-sm font-bold">\u27A4</button>';
+            html += '</div></div>';
+            // Init script
+            html += '<scr' + 'ipt>setTimeout(_chatbotInit, 100);</scr' + 'ipt>';
+            return html;
+        }
+
         function saveBannerAd(active) {
             var title = document.getElementById('banner-ad-title') ? document.getElementById('banner-ad-title').value.trim() : '';
             var linkUrl = document.getElementById('banner-ad-link') ? document.getElementById('banner-ad-link').value.trim() : '';
@@ -9794,7 +9975,7 @@
                 '<span class="text-xs ' + C.text + '">🇸🇦 1 SAR = <b>' + sarToYER + '</b> YER</span></div></div>';
         }
 
-        console.log('%c ForexYemeni Wallet v5.1 (Stable - All bug fixes applied) ', 'background: #F0B90B; color: #0B0E11; font-size: 16px; font-weight: bold; padding: 8px 16px; border-radius: 4px;');
+        console.log('%c ForexYemeni Wallet v14.0 - Phase 4: Chatbot Support (Feature #22) ', 'background: #F0B90B; color: #0B0E11; font-size: 16px; font-weight: bold; padding: 8px 16px; border-radius: 4px;');
     </script>
 </body>
 </html>
