@@ -1370,6 +1370,53 @@
             }
         };
 
+        // ==================== SECURE API (Server-Side Validation) ====================
+        // All critical operations (deposit, withdraw) go through Vercel serverless functions
+        // The SERVER validates balances, fees, rates - NOT the browser
+        var SecureAPI = {
+            // Get current session info for API calls
+            _getAuth: function() {
+                return {
+                    userId: (state.user && state.user.id) || '',
+                    sessionId: localStorage.getItem('fy_session_id') || ''
+                };
+            },
+            // Validate balance server-side
+            validateBalance: function() {
+                var auth = this._getAuth();
+                if (!auth.userId) return Promise.resolve(null);
+                return fetch('/api/secure-validate', {
+                    method: 'POST', headers: {'Content-Type':'application/json'},
+                    body: JSON.stringify(auth)
+                }).then(function(r){ return r.json(); }).catch(function(e){
+                    console.error('[SecureAPI] validateBalance error:', e);
+                    return null;
+                });
+            },
+            // Submit deposit through server
+            submitDeposit: function(params) {
+                var auth = this._getAuth();
+                return fetch('/api/secure-deposit', {
+                    method: 'POST', headers: {'Content-Type':'application/json'},
+                    body: JSON.stringify(Object.assign({}, auth, params))
+                }).then(function(r){ return r.json(); }).catch(function(e){
+                    console.error('[SecureAPI] submitDeposit error:', e);
+                    return { success: false, error: 'خطأ في الاتصال بالسيرفر - حاول مرة أخرى' };
+                });
+            },
+            // Submit withdrawal through server
+            submitWithdraw: function(params) {
+                var auth = this._getAuth();
+                return fetch('/api/secure-withdraw', {
+                    method: 'POST', headers: {'Content-Type':'application/json'},
+                    body: JSON.stringify(Object.assign({}, auth, params))
+                }).then(function(r){ return r.json(); }).catch(function(e){
+                    console.error('[SecureAPI] submitWithdraw error:', e);
+                    return { success: false, error: 'خطأ في الاتصال بالسيرفر - حاول مرة أخرى' };
+                });
+            }
+        };
+
         function getDefaultData(key) {
             if (key === 'users') return [{ id: 'admin1', email: '', name: 'مدير ForexYemeni', password: 'admin123', phone: '+967773178684', countryCode: '+967', role: 'ADMIN', usdtBalance: 0, localBalance: 0, affiliateBalance: 0, isBlocked: false, kycStatus: 'NOT_SUBMITTED', pendingEmail: null, affiliateStatus: 'NONE', affiliateCode: null, referredBy: null, merchantStatus: 'NONE', createdAt: new Date().toISOString() }];
             if (key === 'paymentMethods') return [
@@ -3842,13 +3889,9 @@
 
         function submitDeposit() {
             var user = getUser();
-            // Check for existing pending deposit - prevent duplicate
-            var existingDeposits = DB.get('deposits').filter(function(d){return d.userId===user.id && d.status==='PENDING';});
-            if(existingDeposits.length > 0) { toast('لديك إيداع معلق بالفعل، لا يمكنك إجراء إيداع آخر حتى يكتمل الأول','error'); return; }
             var pmId = document.getElementById('dep-pm').value;
             var merchantSelect = document.getElementById('dep-merchant');
             var merchantId = merchantSelect ? merchantSelect.value : '';
-            // Get PM from either merchant or admin
             var pm = getCurrentDepPm();
             var isCrypto = pm && pm.type === 'CRYPTO';
             var amount = isCrypto ? parseFloat(document.getElementById('dep-amount-crypto').value) : parseFloat(document.getElementById('dep-amount').value);
@@ -3856,99 +3899,61 @@
             var receipt = getFieldImage('depReceipt');
             var notes = document.getElementById('dep-notes').value.trim();
             var currencySel = document.getElementById('dep-currency').value;
-            var rate;
-            if(currencySel === 'SAR') {
-                var yerRate = parseFloat(DB.getSetting('exchange_rate')) || 535;
-                var sarCrossRate = parseFloat(DB.getSetting('exchange_rate_sar')) || 137.50;
-                rate = yerRate / sarCrossRate;
-            } else {
-                rate = parseFloat(DB.getSetting('exchange_rate')) || 535;
-            }
+
+            // Client-side basic validation only (server does full validation)
             if(!pmId) { toast('اختر طريقة الإيداع','error'); return; }
             if(!amount || amount <= 0) { toast('أدخل مبلغاً صحيحاً','error'); return; }
-            // Calculate deposit fee
-            var depFeePercent = parseFloat(DB.getSetting('admin_deposit_fee')) || 0;
-            // Check merchant commission
-            var merchantCommPercent = 0;
-            if(merchantId) {
-                var mData = getMerchantPaymentData(merchantId);
-                merchantCommPercent = mData ? (mData.commission || 0) : 0;
-            }
-            var grossUsdt = isCrypto ? amount : amount / rate;
-            var depositFeeUsdt = grossUsdt * (depFeePercent / 100);
-            var merchantCommUsdt = grossUsdt * (merchantCommPercent / 100);
-            var netUsdt = grossUsdt - depositFeeUsdt - merchantCommUsdt;
-            // Check merchant balance limit for deposit (use gross since merchant receives gross equivalent)
-            if(merchantId) {
-                var merchantUser = DB.get('users').find(function(u){return u.id===merchantId;});
-                var merchantBal = merchantUser ? (merchantUser.usdtBalance || 0) : 0;
-                if(merchantBal <= 0) { toast('رصيد التاجر فارغ حالياً، لا يمكن الإيداع عبر هذا التاجر','error'); return; }
-                if(netUsdt > merchantBal) { toast('المبلغ الصافي أكبر من رصيد التاجر المتاح ('+fmtNum(merchantBal)+' USDT)','error'); return; }
-            }
             if(!receipt) { toast('يجب إرفاق صورة الإيصال','error'); return; }
-            if(pm && amount < (pm.minDeposit||0)) { toast('الحد الأدنى للإيداع: '+pm.minDeposit,'error'); return; }
-            // Check TXID for CRYPTO deposits
             if(isCrypto && !txid) { toast('يجب إدخال TXID لعمليات USDT','error'); return; }
-            // Check duplicate TXID
-            if(txid) {
-                var dupTxid = DB.get('deposits').find(function(d){return d.txid && d.txid.toLowerCase()===txid.toLowerCase() && d.userId!==user.id;});
-                if(dupTxid) { toast('TXID مستخدم في إيداع سابق','error'); return; }
-            }
-            var currency = isCrypto ? 'USDT' : currencySel;
-            var usdtAmount = netUsdt; // User receives net after fees
-            // Daily deposit limit check
-            var today = new Date().toISOString().split('T')[0];
-            var allDeposits = DB.get('deposits').filter(function(d){return d.userId===user.id && d.status!=='REJECTED' && d.createdAt && d.createdAt.startsWith(today);});
-            var totalDepToday = allDeposits.reduce(function(s,d){return s+(d.usdtAmount||0);},0);
-            var dailyDepLimit = parseFloat(DB.getSetting('daily_deposit_limit')) || 10000;
-            if(totalDepToday + usdtAmount > dailyDepLimit) { toast('لقد تجاوزت الحد اليومي للايداع: '+fmtNum(dailyDepLimit)+' USDT','error'); return; }
 
-            // Build deposit record with TXID verification data
-            var depRecord = {
-                id:DB.uid(),userId:user.id,paymentMethodId:pmId,currency:currency,
-                amount:amount,usdtAmount:netUsdt,grossUsdt:grossUsdt,
-                depositFee:depositFeeUsdt,merchantComm:merchantCommUsdt,
-                localAmount:isCrypto?amount*rate:amount,txid:txid,receipt:receipt,notes:notes,
-                status:'PENDING',assignedMerchantId:merchantId||null,
-                txidVerified:!!_txidVerifyResult,
-                txidVerifyData:_txidVerifyResult?{amount:_txidVerifyResult.amount,from:_txidVerifyResult.from,block:_txidVerifyResult.block,timestamp:_txidVerifyResult.timestamp}:null,
-                createdAt:new Date().toISOString()
-            };
+            // Show loading
+            toast('جاري التحقق والإرسال...','info');
 
-            // Auto-approve if CRYPTO deposit is verified and auto-approve is enabled
-            var autoApprove = isCrypto && _txidVerifyResult && DB.getSetting('auto_approve_crypto') === '1';
-            if(autoApprove) {
-                // Verify amount matches (within 5% tolerance)
-                var verifyAmount = _txidVerifyResult.amount;
-                var tolerance = grossUsdt * 0.05;
-                if(Math.abs(verifyAmount - grossUsdt) <= tolerance) {
-                    depRecord.status = 'APPROVED';
+            // Send to server for SECURE validation
+            SecureAPI.submitDeposit({
+                pmId: pmId,
+                merchantId: merchantId,
+                amount: amount,
+                txid: txid,
+                receipt: receipt,
+                notes: notes,
+                currency: currencySel,
+                txidVerified: !!_txidVerifyResult,
+                txidVerifyData: _txidVerifyResult ? {amount:_txidVerifyResult.amount,from:_txidVerifyResult.from,block:_txidVerifyResult.block,timestamp:_txidVerifyResult.timestamp} : null
+            }).then(function(result) {
+                if (!result.success) {
+                    toast(result.error || 'خطأ في الإيداع','error');
+                    // Handle session invalid
+                    if (result.code === 'SESSION_INVALID') {
+                        state.user = null;
+                        localStorage.removeItem('fy_auth_user');
+                        localStorage.removeItem('fy_session_id');
+                        setView('login');
+                    }
+                    return;
+                }
+                // Deposit created successfully by server
+                var dep = result.deposit;
+                // If auto-approved, server already updated balances - sync local state
+                if (dep.status === 'APPROVED') {
                     var users = DB.get('users');
                     var u = users.find(function(x){return x.id===user.id;});
-                    if(u) { u.usdtBalance = (u.usdtBalance||0) + netUsdt; }
-                    if(merchantId) {
+                    if (u) { u.usdtBalance = (u.usdtBalance||0) + dep.usdtAmount; }
+                    if (merchantId) {
                         var merch = users.find(function(x){return x.id===merchantId;});
-                        if(merch) { merch.usdtBalance = Math.max(0, (merch.usdtBalance||0) - netUsdt); }
+                        if (merch) { merch.usdtBalance = Math.max(0, (merch.usdtBalance||0) - dep.usdtAmount); }
                     }
                     DB.set('users', users);
-                    calculateAffiliateCommission(user.id, netUsdt);
+                    addLog(user.id,'DEPOSIT',dep.usdtAmount,'USDT','إيداع '+fmtNum(dep.usdtAmount)+' USDT (تلقائي)');
+                    toast('تم إيداع '+fmtNum(dep.usdtAmount)+' USDT بنجاح ✓','success');
                 } else {
-                    // Amount mismatch - keep pending with warning
-                    depRecord.txidAmountMismatch = true;
-                    depRecord.status = 'PENDING';
+                    addLog(user.id,'DEPOSIT_REQ',dep.usdtAmount,'USDT','طلب إيداع '+fmtNum(dep.usdtAmount)+' USDT');
+                    toast('تم إرسال طلب الإيداع بنجاح ✓','success');
                 }
-            }
-
-            var deposits = DB.get('deposits');
-            deposits.unshift(depRecord);
-            DB.set('deposits', deposits);
-            addLog(user.id,'DEPOSIT',netUsdt,'USDT','طلب إيداع '+fmtNum(grossUsdt)+' USDT (رسوم: '+fmtNum(depositFeeUsdt)+', عمولة: '+fmtNum(merchantCommUsdt)+', صافي: '+fmtNum(netUsdt)+')'+(merchantId?' - عبر تاجر':''));
-            addNotif(user.id,'طلب إيداع', autoApprove ? '✅ تم إيداع '+fmtNum(netUsdt)+' USDT تلقائياً بعد التحقق من TXID' : 'تم إرسال طلب إيداع '+fmtNum(grossUsdt)+' USDT. سيتم مراجعته.','INFO');
-            if(user.email) sendEmailNotification(user.email, autoApprove ? 'تم إيداع USDT تلقائياً' : 'طلب إيداع جديد', autoApprove ? 'تم إيداع '+fmtNum(netUsdt)+' USDT في حسابك تلقائياً بعد التحقق من TXID' : 'تم استلام طلب إيداع بقيمة '+fmtNum(grossUsdt)+' USDT');
-            clearFieldImage('depReceipt');
-            _txidVerifyResult = null;
-            toast(autoApprove ? '✅ تم الإيداع تلقائياً '+fmtNum(netUsdt)+' USDT بعد التحقق!' : 'تم إرسال طلب الإيداع'+(merchantId?' بنجاح - تم تعيين التاجر':''),'success');
-            setView('user-home');
+                addNotif(user.id,'إيداع','تم إرسال طلب إيداع بقيمة '+fmtNum(dep.usdtAmount)+' USDT بنجاح','INFO');
+                _txidVerifyResult = null;
+                setView('user-home');
+            });
         }
 
         // Initialize deposit/withdraw merchant sections after render
@@ -4136,53 +4141,54 @@
             var methodId = document.getElementById('wd-method').value;
             var amountInput = parseFloat(document.getElementById('wd-amount').value);
             var notes = document.getElementById('wd-notes').value.trim();
-            var fee = parseFloat(DB.getSetting('exchange_fee')) || 0;
-            var rate = parseFloat(DB.getSetting('exchange_rate')) || 535;
-            var rateSar = parseFloat(DB.getSetting('exchange_rate_sar')) || 137.50;
-            // Get selected merchant
+            var wdCurrency = document.getElementById('wd-currency') ? document.getElementById('wd-currency').value : 'USDT';
             var merchantSelect = document.getElementById('wd-merchant');
             var merchantId = merchantSelect ? merchantSelect.value : '';
+
+            // Client-side basic validation only (server does full validation)
             if(!methodId) { toast('اختر طريقة السحب','error'); return; }
             if(!amountInput || amountInput <= 0) { toast('أدخل مبلغاً صحيحاً','error'); return; }
-            // Check merchant balance for withdrawal
-            if(merchantId) {
-                var merchantUser = DB.get('users').find(function(u){return u.id===merchantId;});
-                var merchantBal = merchantUser ? (merchantUser.usdtBalance || 0) : 0;
-                if(merchantBal <= 0) { toast('رصيد التاجر فارغ حالياً، لا يمكن السحب عبر هذا التاجر','error'); return; }
-                var tempUsdt = amountInput;
-                if(wdCurrency === 'YER') tempUsdt = amountInput / rate;
-                else if(wdCurrency === 'SAR') tempUsdt = amountInput * rateSar / rate;
-                if(tempUsdt > merchantBal) { toast('المبلغ أكبر من رصيد التاجر المتاح ('+fmtNum(merchantBal)+' USDT)','error'); return; }
-            }
 
-            // Convert entered amount to USDT based on selected currency
-            var wdCurrency = document.getElementById('wd-currency') ? document.getElementById('wd-currency').value : 'USDT';
-            var usdtAmount = amountInput;
-            if(wdCurrency === 'YER') usdtAmount = amountInput / rate;
-            else if(wdCurrency === 'SAR') usdtAmount = amountInput * rateSar / rate;
+            // Show loading
+            toast('جاري التحقق والإرسال...','info');
 
-            var feeAmount = usdtAmount * fee / 100;
-            var netUsdt = usdtAmount - feeAmount;
-            if(netUsdt <= 0) { toast('المبلغ بعد الرسوم صفر أو أقل','error'); return; }
-            if(usdtAmount > user.usdtBalance) { toast('رصيدك غير كافٍ! رصيدك: '+fmtNum(user.usdtBalance)+' USDT والمطلوب: '+fmtNum(usdtAmount)+' USDT','error'); return; }
-            var method = DB.get('userWithdrawalMethods').find(function(m){return m.id===methodId;});
-            if(!method) { toast('طريقة السحب غير موجودة','error'); return; }
-            // Daily withdrawal limit check (in USDT)
-            var today = new Date().toISOString().split('T')[0];
-            var userWds = DB.get('withdrawals').filter(function(w){return w.userId===user.id && w.status!=='REJECTED' && w.createdAt && w.createdAt.startsWith(today);});
-            var totalWdToday = userWds.reduce(function(s,w){return s+(w.net||0);},0);
-            var dailyWdLimit = parseFloat(DB.getSetting('daily_withdrawal_limit')) || 5000;
-            if(totalWdToday + netUsdt > dailyWdLimit) { toast('لقد تجاوزت الحد اليومي للسحب: '+fmtNum(dailyWdLimit)+' USDT','error'); return; }
-            var withdrawals = DB.get('withdrawals');
-            var localAmount = amountInput - (amountInput * fee / 100);
-            if(wdCurrency === 'USDT') localAmount = netUsdt;
-            withdrawals.unshift({id:DB.uid(),userId:user.id,withdrawalMethodId:methodId,amount:usdtAmount,fee:feeAmount,net:netUsdt,currency:wdCurrency,localAmount:localAmount,notes:notes,status:'PENDING',assignedMerchantId:merchantId||null,createdAt:new Date().toISOString()});
-            DB.set('withdrawals', withdrawals);
-            addLog(user.id,'WITHDRAW',netUsdt,'USDT','طلب سحب '+fmtNum(localAmount)+' '+(wdCurrency)+' ('+fmtNum(netUsdt)+' USDT)'+(merchantId?' - عبر تاجر':''));
-            addNotif(user.id,'طلب سحب','تم إرسال طلب سحب '+fmtNum(localAmount)+' '+(wdCurrency)+' ('+fmtNum(netUsdt)+' USDT) بنجاح. سيتم مراجعته.','INFO');
-            if(user.email) sendEmailNotification(user.email, 'طلب سحب جديد', 'تم استلام طلب سحب بقيمة '+fmtNum(localAmount)+' '+(wdCurrency)+' ('+fmtNum(netUsdt)+' USDT)');
-            toast('تم إرسال طلب السحب'+(merchantId?' - تم تعيين التاجر':''),'success');
-            setView('user-home');
+            // Send to server for SECURE validation
+            SecureAPI.submitWithdraw({
+                methodId: methodId,
+                amount: amountInput,
+                currency: wdCurrency,
+                notes: notes,
+                merchantId: merchantId
+            }).then(function(result) {
+                if (!result.success) {
+                    toast(result.error || 'خطأ في السحب','error');
+                    // Handle session invalid
+                    if (result.code === 'SESSION_INVALID') {
+                        state.user = null;
+                        localStorage.removeItem('fy_auth_user');
+                        localStorage.removeItem('fy_session_id');
+                        setView('login');
+                    }
+                    // Handle insufficient balance - show real balance from server
+                    if (result.code === 'INSUFFICIENT_BALANCE' && result.realBalance !== undefined) {
+                        setTimeout(function() {
+                            toast('رصيدك الحقيقي: ' + fmtNum(result.realBalance) + ' USDT','info');
+                        }, 3000);
+                    }
+                    return;
+                }
+
+                // Withdrawal created successfully by server
+                var wd = result.withdrawal;
+                var withdrawals = DB.get('withdrawals');
+                var users = DB.get('users');
+
+                addLog(user.id,'WITHDRAW',wd.net,'USDT','طلب سحب '+fmtNum(wd.localAmount)+' '+(wd.currency)+' ('+fmtNum(wd.net)+' USDT)'+(merchantId?' - عبر تاجر':''));
+                addNotif(user.id,'طلب سحب','تم إرسال طلب سحب '+fmtNum(wd.localAmount)+' '+(wd.currency)+' ('+fmtNum(wd.net)+' USDT) بنجاح. سيتم مراجعته.','INFO');
+                if(user.email) sendEmailNotification(user.email, 'طلب سحب جديد', 'تم استلام طلب سحب بقيمة '+fmtNum(wd.localAmount)+' '+(wd.currency)+' ('+fmtNum(wd.net)+' USDT)');
+                toast('تم إرسال طلب السحب'+(merchantId?' - تم تعيين التاجر':''),'success');
+                setView('user-home');
+            });
         }
         // ==================== USER: KYC ====================
         function renderUserKYC(C) {
