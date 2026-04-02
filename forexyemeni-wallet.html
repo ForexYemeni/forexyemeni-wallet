@@ -8755,6 +8755,29 @@
             for (var i = 0; i < users.length; i++) {
                 if (users[i].role === 'ADMIN') { adminUser = users[i]; break; }
             }
+            var totalUsers = users.filter(function(u){return u.role==='USER';}).length;
+            var totalMerchants = users.filter(function(u){return u.role==='MERCHANT';}).length;
+            var totalDeposits = (DB.get('deposits')||[]).length;
+            var totalWithdrawals = (DB.get('withdrawals')||[]).length;
+
+            // Protection: show final confirmation with affected counts
+            var warningMsg = '⚠️ هذا الإجراء لا يمكن التراجع عنه!\n\n'+
+                '📊 سيتم حذف:\n'+
+                '👥 '+totalUsers+' مستخدم\n'+
+                '🏪 '+totalMerchants+' تاجر\n'+
+                '💰 '+totalDeposits+' إيداع\n'+
+                '🏧 '+totalWithdrawals+' سحب\n'+
+                '💬 جميع الرسائل والإشعارات\n'+
+                '🪪 جميع بيانات التوثيق\n\n'+
+                '🔐 سيتم الاحتفاظ بحساب الإدارة فقط';
+
+            showConfirm('🗑️', 'تأكيد الحذف النهائي', warningMsg, '🗑️ حذف الكل نهائياً', 'bg-gradient-to-r from-red-600 to-rose-600 text-white', function(confirmed) {
+                if(!confirmed) { toast('تم إلغاء العملية','info'); return; }
+                _doExecuteReset(adminUser);
+            });
+        }
+
+        function _doExecuteReset(adminUser) {
             var cleanAdmin = null;
             if (adminUser) {
                 cleanAdmin = { id: adminUser.id, email: adminUser.email || '', name: 'مدير ForexYemeni', password: adminUser.password, phone: adminUser.phone, countryCode: adminUser.countryCode || '', role: 'ADMIN', usdtBalance: 0, localBalance: 0, affiliateBalance: 0, isBlocked: false, kycStatus: 'NOT_SUBMITTED', pendingEmail: null, affiliateStatus: 'NONE', affiliateCode: null, referredBy: null, merchantStatus: 'NONE', passwordMustChange: false, createdAt: adminUser.createdAt || new Date().toISOString() };
@@ -8903,16 +8926,32 @@
             keys.forEach(function(key) {
                 db.collection('appData').doc(key).get().then(function(doc) {
                         if(doc.exists && doc.data() && doc.data().data) {
-                            window.appData[key] = doc.data().data;
+                            var newData = doc.data().data;
+                            // Protection: never replace users with fewer users (prevents accidental data loss)
+                            if(key === 'users' && Array.isArray(newData) && Array.isArray(window.appData.users) && window.appData.users.length > 1 && newData.length < window.appData.users.length) {
+                                console.warn('[Protection] Blocked users overwrite: DB has '+newData.length+', local has '+window.appData.users.length);
+                            } else {
+                                window.appData[key] = newData;
+                            }
                         } else {
-                            window.appData[key] = getDefaultData(key);
-                            db.collection('appData').doc(key).set({ data: window.appData[key] }).catch(function(){});
+                            // Protection: never reset users to default (admin only) if local has real users
+                            if(key === 'users' && Array.isArray(window.appData.users) && window.appData.users.length > 1) {
+                                console.warn('[Protection] Blocked getDefaultData for users - local has '+window.appData.users.length+' users');
+                            } else {
+                                window.appData[key] = getDefaultData(key);
+                                db.collection('appData').doc(key).set({ data: window.appData[key] }).catch(function(){});
+                            }
                         }
                         pending--;
                         if(pending <= 0) finishInit();
                     }).catch(function(err) {
                         console.error('Load ' + key + ' error:', err);
-                        window.appData[key] = getDefaultData(key);
+                        // Protection: never reset users on error if local has real users
+                        if(key === 'users' && Array.isArray(window.appData.users) && window.appData.users.length > 1) {
+                            console.warn('[Protection] Blocked getDefaultData on error for users - keeping local data');
+                        } else {
+                            window.appData[key] = getDefaultData(key);
+                        }
                         pending--;
                         if(pending <= 0) finishInit();
                     });
@@ -8925,6 +8964,11 @@
                         var oldData = window.appData[k];
                         var newData = change.doc.data().data;
                         if(window.appData.hasOwnProperty(k)) {
+                            // Protection: never replace users with fewer users via onSnapshot
+                            if(k === 'users' && Array.isArray(oldData) && Array.isArray(newData) && oldData.length > 1 && newData.length < oldData.length) {
+                                console.warn('[Protection] Blocked onSnapshot users overwrite: remote='+newData.length+', local='+oldData.length);
+                                return;
+                            }
                             window.appData[k] = newData;
                         }
                         // Re-render when user data changes (e.g. KYC approval) so checks update live
