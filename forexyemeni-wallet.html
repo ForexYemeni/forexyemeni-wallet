@@ -3531,8 +3531,33 @@
             return DB.get('paymentMethods').find(function(p){return p.id===pmId;});
         }
 
-        // Add listener for currency change
-        document.addEventListener('change', function(e) { if(e.target && e.target.id === 'dep-currency') { renderDepPmDetails(); updateDepRateInfo(); } });
+        // Add listener for currency change → filter payment methods
+        document.addEventListener('change', function(e) { if(e.target && e.target.id === 'dep-currency') { _filterDepPaymentMethods(); renderDepPmDetails(); updateDepRateInfo(); } });
+
+        function _filterDepPaymentMethods() {
+            var sel = document.getElementById('dep-currency');
+            var pmSel = document.getElementById('dep-pm');
+            if(!sel || !pmSel) return;
+            var cur = sel.value;
+            var merchantSelect = document.getElementById('dep-merchant');
+            var merchantId = merchantSelect ? merchantSelect.value : '';
+            var pms;
+            if(merchantId) {
+                pms = getMerchantMethods(merchantId);
+            } else {
+                pms = DB.get('paymentMethods').filter(function(p){return p.isActive;});
+            }
+            // Filter: only show methods matching selected currency (or CRYPTO which has no currency)
+            var filtered = pms.filter(function(p){ return p.type === 'CRYPTO' || p.currency === cur || !p.currency; });
+            filtered = filtered.sort(function(a,b){return (a.sortOrder||0)-(b.sortOrder||0);});
+            var selectedPmId = state.depPmId || '';
+            // If current selection doesn't match filtered list, clear it
+            var match = filtered.find(function(p){return p.id === selectedPmId;});
+            if(!match) { state.depPmId = ''; selectedPmId = ''; }
+            var opts = filtered.map(function(p){ var lbl = p.type==='CRYPTO' ? (p.network||'CRYPTO') : (p.bankName||p.recipientName||'تحويل بنكي'); var tag = p.type==='BANK' && p.currency ? (p.currency==='SAR'?'🇸🇦':'🇾🇪') : ''; return '<option value="'+p.id+'" '+(p.id===selectedPmId?'selected':'')+'>'+tag+' '+escHtml(lbl)+'</option>'; }).join('');
+            pmSel.innerHTML = '<option value="">-- اختر طريقة --</option>' + opts;
+            if(!match) { state.depPmId = ''; document.getElementById('dep-pm-details').innerHTML = ''; }
+        }
 
         function renderDepMerchantSection() {
             var el = document.getElementById('dep-merchant-section');
@@ -3752,7 +3777,7 @@
                 '<div class="'+C.card+' rounded-lg p-3 text-center border '+C.border+'"><p class="'+C.muted+' text-xs">رصيد USDT</p><p class="font-bold text-success">'+fmtNum(user.usdtBalance)+'</p></div>'+
                 '<div class="'+C.card+' rounded-lg p-3 text-center border '+C.border+'"><p class="'+C.muted+' text-xs">المعادل YER</p><p class="font-bold text-primary">'+fmtInt(Math.round(user.usdtBalance*rate))+'</p></div></div>'+
                 '<div class="space-y-4">'+
-                '<div><label class="block text-sm font-medium '+C.text+' mb-1">عملة السحب</label><select id="wd-currency" class="w-full px-4 py-2.5 rounded-xl border '+C.input+' outline-none" onchange="updateWdCalc();setMaxWdAmount()"><option value="USDT">USDT</option><option value="YER">🇾🇪 YER ريال يمني</option><option value="SAR">🇸🇦 SAR ريال سعودي</option></select></div>'+
+                '<div><label class="block text-sm font-medium '+C.text+' mb-1">عملة السحب</label><select id="wd-currency" class="w-full px-4 py-2.5 rounded-xl border '+C.input+' outline-none" onchange="_filterWdPaymentMethods();updateWdCalc();setMaxWdAmount()"><option value="USDT">USDT</option><option value="YER">🇾🇪 YER ريال يمني</option><option value="SAR">🇸🇦 SAR ريال سعودي</option></select></div>'+
                 '<div><label class="block text-sm font-medium '+C.text+' mb-1">طريقة السحب</label><select id="wd-method" class="w-full px-4 py-2.5 rounded-xl border '+C.input+' outline-none" onchange="updateWdCalc()"><option value="">-- اختر طريقة سحب --</option>'+pmOpts+'</select></div>'+
                 '<div id="wd-merchant-section"></div>'+
                 '<div id="wd-method-details"></div>'+
@@ -3840,6 +3865,29 @@
             else if(curSel === 'SAR') maxAmount = usdtPart * rate / rateSar;
             var inp = document.getElementById('wd-amount');
             if(inp) { inp.value = Math.floor(maxAmount * 100) / 100; updateWdCalc(); }
+        }
+
+        function _filterWdPaymentMethods() {
+            var curSel = document.getElementById('wd-currency');
+            var methodSel = document.getElementById('wd-method');
+            if(!curSel || !methodSel) return;
+            var cur = curSel.value;
+            var userId = getUser().id;
+            var wms = DB.get('userWithdrawalMethods').filter(function(w){return w.userId === userId;});
+            // Filter: show methods matching selected currency
+            var filtered = wms.filter(function(w){
+                if(cur === 'USDT') return w.type === 'CRYPTO' || !w.currency;
+                return (w.currency === cur) || !w.currency;
+            });
+            var selectedId = methodSel.value;
+            var match = filtered.find(function(w){return w.id === selectedId;});
+            if(!match) selectedId = '';
+            var opts = filtered.map(function(w){
+                var label = w.type==='BANK' ? (w.bankName||'تحويل بنكي')+' - '+(w.accountNumber||'').substr(0,8)+'...' : (w.network||'USDT')+' - '+(w.address||'').substr(0,12)+'...';
+                return '<option value="'+w.id+'" '+(w.id===selectedId?'selected':'')+'>'+escHtml(label)+'</option>';
+            }).join('');
+            methodSel.innerHTML = '<option value="">-- اختر طريقة سحب --</option>' + opts;
+            if(!match) { methodSel.value = ''; document.getElementById('wd-method-details').innerHTML = ''; }
         }
 
         function renderWdMerchantSection() {
