@@ -2954,9 +2954,11 @@
                         }
                     } catch(err) {}
                 };
-                navigator.serviceWorker.ready.then(function(reg) {
-                    if (reg.active) reg.active.postMessage({ type: 'LOGOUT' });
-                });
+                try {
+                    navigator.serviceWorker.ready.then(function(reg) {
+                        if (reg.active) reg.active.postMessage({ type: 'LOGOUT' });
+                    });
+                } catch(swErr) {}
             } catch(e) {}
             state.user = null;
             localStorage.removeItem('fy_auth_user');
@@ -8771,9 +8773,11 @@
                                 }
                             } catch(err) {}
                         };
-                        navigator.serviceWorker.ready.then(function(reg) {
-                            if (reg.active) reg.active.postMessage({ type: 'LOGIN', userId: user.id });
-                        });
+                        try {
+                            navigator.serviceWorker.ready.then(function(reg) {
+                                if (reg.active) reg.active.postMessage({ type: 'LOGIN', userId: user.id });
+                            });
+                        } catch(swErr) {}
                     } catch(e) {}
                     if(user.role === 'ADMIN') setView('admin-home');
                     else if(user.merchantStatus === 'APPROVED') setView('merchant-dashboard');
@@ -8901,7 +8905,7 @@
         document.addEventListener('keydown', function(e) { if(e.key === 'Escape') { closeModal(); document.getElementById('confirm-container').classList.add('hidden'); } });
 
         // Service Worker Registration for PWA (firebase-messaging-sw.js handles everything)
-        if('serviceWorker' in navigator) { window.addEventListener('load', function() { navigator.serviceWorker.register('firebase-messaging-sw.js').catch(function(){}); }); }
+        try { if('serviceWorker' in navigator) { window.addEventListener('load', function() { try { navigator.serviceWorker.register('firebase-messaging-sw.js').catch(function(){}); } catch(e) {} }); } } catch(e) {}
 
         // Online/Offline detection
         window.addEventListener('online', function() { toast('تم استعادة الاتصال بالإنترنت','success',false); });
