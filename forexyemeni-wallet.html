@@ -1414,6 +1414,37 @@
                     console.error('[SecureAPI] submitWithdraw error:', e);
                     return { success: false, error: 'خطأ في الاتصال بالسيرفر - حاول مرة أخرى' };
                 });
+            },
+            // Secure login
+            login: function(inputVal, pass) {
+                return fetch('/api/secure-login', {
+                    method: 'POST', headers: {'Content-Type':'application/json'},
+                    body: JSON.stringify({ inputVal: inputVal, pass: pass })
+                }).then(function(r){ return r.json(); }).catch(function(e){
+                    console.error('[SecureAPI] login error:', e);
+                    return { success: false, error: 'خطأ في الاتصال بالسيرفر' };
+                });
+            },
+            // Secure register
+            register: function(params) {
+                return fetch('/api/secure-register', {
+                    method: 'POST', headers: {'Content-Type':'application/json'},
+                    body: JSON.stringify(params)
+                }).then(function(r){ return r.json(); }).catch(function(e){
+                    console.error('[SecureAPI] register error:', e);
+                    return { success: false, error: 'خطأ في الاتصال بالسيرفر' };
+                });
+            },
+            // Admin actions (secure)
+            adminAction: function(action, params) {
+                var auth = this._getAuth();
+                return fetch('/api/secure-admin', {
+                    method: 'POST', headers: {'Content-Type':'application/json'},
+                    body: JSON.stringify(Object.assign({}, auth, { action: action }, params))
+                }).then(function(r){ return r.json(); }).catch(function(e){
+                    console.error('[SecureAPI] adminAction error:', e);
+                    return { success: false, error: 'خطأ في الاتصال بالسيرفر' };
+                });
             }
         };
 
@@ -6490,42 +6521,40 @@
         }
 
         function confirmApproveDeposit(depId) {
-            var deposits = DB.get('deposits');
-            var d = deposits.find(function(x){return x.id===depId;});
-            if(!d) return;
-            // If assigned to merchant, check merchant balance
-            var merchantId = d.assignedMerchantId;
-            if(merchantId) {
-                var users = DB.get('users');
-                var merch = users.find(function(x){return x.id===merchantId;});
-                if(merch && (merch.usdtBalance||0) < (d.usdtAmount||0)) {
-                    toast('رصيد التاجر غير كافٍ لتنفيذ هذا الإيداع (مطلوب: '+fmtNum(d.usdtAmount)+' USDT، متاح: '+fmtNum(merch.usdtBalance||0)+' USDT)','error');
+            closeModal();
+            toast('جاري الموافقة على الإيداع...','info');
+            SecureAPI.adminAction('approve_deposit', { depositId: depId }).then(function(result) {
+                if (!result.success) {
+                    toast(result.error || 'خطأ في الموافقة','error');
+                    if (result.code === 'ADMIN_REQUIRED') {
+                        toast('صلاحيات المدير مطلوبة','error');
+                    }
                     return;
                 }
-            }
-            d.status = 'APPROVED';
-            var adminUser = getUser();
-            d.processedBy = adminUser ? adminUser.id : null;
-            var users = DB.get('users');
-            var u = users.find(function(x){return x.id===d.userId;});
-            if(u) {
-                u.usdtBalance = (u.usdtBalance||0) + (d.usdtAmount||0);
-            }
-            // Deduct from merchant balance (not admin)
-            if(merchantId) {
-                var merch2 = users.find(function(x){return x.id===merchantId;});
-                if(merch2) { merch2.usdtBalance = Math.max(0, (merch2.usdtBalance||0) - (d.usdtAmount||0)); }
-            }
-            DB.set('users', users);
-            calculateAffiliateCommission(d.userId, d.usdtAmount || 0);
-            DB.set('deposits', deposits);
-            addLog(d.userId,'DEPOSIT_APPROVED',d.usdtAmount,'USDT','تم قبول إيداع '+fmtNum(d.usdtAmount)+' USDT'+(merchantId?' - تم الخصم من التاجر':''));
-            addNotif(d.userId,'إيداع مقبول','تم قبول إيداعك بمبلغ '+fmtNum(d.usdtAmount)+' USDT','DEPOSIT');
-            var depUser = users.find(function(x){return x.id===d.userId;});
-            if(depUser && depUser.email) sendEmailNotification(depUser.email, 'تم الموافقة على إيداعك', 'تم الموافقة على إيداعك بقيمة '+fmtNum(d.usdtAmount)+' USDT');
-            closeModal();
-            toast('تم قبول الإيداع'+(merchantId?' - تم خصم '+fmtNum(d.usdtAmount)+' USDT من رصيد التاجر':''),'success');
-            render();
+                // Sync local state with server response
+                var deposits = DB.get('deposits');
+                var d = deposits.find(function(x){return x.id===depId;});
+                if (d) {
+                    d.status = 'APPROVED';
+                    var users = DB.get('users');
+                    var u = users.find(function(x){return x.id===d.userId;});
+                    if (u) { u.usdtBalance = (u.usdtBalance||0) + (d.usdtAmount||0); }
+                    var merchantId = d.assignedMerchantId;
+                    if (merchantId) {
+                        var merch = users.find(function(x){return x.id===merchantId;});
+                        if (merch) { merch.usdtBalance = Math.max(0, (merch.usdtBalance||0) - (d.usdtAmount||0)); }
+                    }
+                    DB.set('users', users);
+                    addLog(d.userId,'DEPOSIT_APPROVED',d.usdtAmount,'USDT','تم قبول إيداع '+fmtNum(d.usdtAmount)+' USDT'+(merchantId?' - تم الخصم من التاجر':''));
+                    addNotif(d.userId,'إيداع مقبول','تم قبول إيداعك بمبلغ '+fmtNum(d.usdtAmount)+' USDT','DEPOSIT');
+                    var depUser = users.find(function(x){return x.id===d.userId;});
+                    if(depUser && depUser.email) sendEmailNotification(depUser.email, 'تم الموافقة على إيداعك', 'تم الموافقة على إيداعك بقيمة '+fmtNum(d.usdtAmount)+' USDT');
+                    calculateAffiliateCommission(d.userId, d.usdtAmount || 0);
+                }
+                DB.set('deposits', deposits);
+                toast('تم قبول الإيداع بنجاح ✓','success');
+                render();
+            });
         }
 
         function rejectDeposit(depId) {
@@ -6541,19 +6570,19 @@
         function confirmRejectDeposit(depId) {
             var reason = document.getElementById('reject-reason-input').value.trim();
             if(!reason) { toast('يجب كتابة سبب الرفض','error'); return; }
-            var deposits = DB.get('deposits');
-            var d = deposits.find(function(x){return x.id===depId;});
-            if(!d) return;
-            d.status = 'REJECTED';
-            d.rejectReason = reason;
-            DB.set('deposits', deposits);
-            addLog(d.userId,'DEPOSIT_REJECTED',d.usdtAmount,'USDT','تم رفض إيداع '+fmtNum(d.usdtAmount)+' USDT - السبب: '+reason);
-            addNotif(d.userId,'إيداع مرفوض','تم رفض إيداعك بمبلغ '+fmtNum(d.usdtAmount)+' USDT. السبب: '+reason,'DEPOSIT');
-            var rejDepUser = DB.get('users').find(function(x){return x.id===d.userId;});
-            if(rejDepUser && rejDepUser.email) sendEmailNotification(rejDepUser.email, 'تم رفض طلب إيداعك', 'تم رفض طلب إيداعك');
             closeModal();
-            toast('تم رفض الإيداع','success');
-            render();
+            toast('جاري رفض الإيداع...','info');
+            SecureAPI.adminAction('reject_deposit', { depositId: depId, reason: reason }).then(function(result) {
+                if (!result.success) { toast(result.error || 'خطأ','error'); return; }
+                var deposits = DB.get('deposits');
+                var d = deposits.find(function(x){return x.id===depId;});
+                if (d) { d.status = 'REJECTED'; d.rejectReason = reason; }
+                DB.set('deposits', deposits);
+                addLog(d.userId,'DEPOSIT_REJECTED',d.usdtAmount,'USDT','تم رفض إيداع '+fmtNum(d.usdtAmount)+' USDT - السبب: '+reason);
+                addNotif(d.userId,'إيداع مرفوض','تم رفض إيداعك بمبلغ '+fmtNum(d.usdtAmount)+' USDT. السبب: '+reason,'DEPOSIT');
+                toast('تم رفض الإيداع بنجاح','success');
+                render();
+            });
         }
 
         function calculateAffiliateCommission(userId, amount) {
@@ -6714,22 +6743,30 @@
             if(!w) return;
             showConfirm('✅','موافقة على السحب وخصم الرصيد','سيتم خصم '+fmtNum(w.amount||0)+' USDT من رصيد المستخدم وإرسال إشعار له. متابعة؟','نعم، موافقة','bg-success text-dark-bg',function(yes){
                 if(!yes) return;
-                var withdrawals = DB.get('withdrawals');
-                var w = withdrawals.find(function(x){return x.id===wdId;});
-                if(!w) return;
-                w.status = 'PROCESSING';
-                var adminUser = getUser();
-                w.processedBy = adminUser ? adminUser.id : w.processedBy;
-                w.approvedAt = new Date().toISOString();
-                var users = DB.get('users');
-                var u = users.find(function(x){return x.id===w.userId;});
-                if(u) { u.usdtBalance = Math.max(0, (u.usdtBalance||0) - (w.amount||0)); DB.set('users', users); }
-                DB.set('withdrawals', withdrawals);
-                addNotif(w.userId,'تمت الموافقة على السحب','تمت الموافقة على سحبك بمبلغ '+fmtNum(w.net||0)+' USDT. بانتظار رفع إثبات التنفيذ.','WITHDRAW');
-                var wdProcUser = DB.get('users').find(function(x){return x.id===w.userId;});
-                if(wdProcUser && wdProcUser.email) sendEmailNotification(wdProcUser.email, 'تمت الموافقة على سحبك', 'تمت الموافقة على سحبك بمبلغ '+fmtNum(w.net||0)+' USDT');
-                toast('تمت الموافقة - يجب رفع لقطة إثبات التنفيذ','success');
-                render();
+                toast('جاري الموافقة وخصم الرصيد...','info');
+                SecureAPI.adminAction('start_processing_withdrawal', { withdrawalId: wdId }).then(function(result) {
+                    if (!result.success) {
+                        toast(result.error || 'خطأ في الموافقة','error');
+                        return;
+                    }
+                    // Sync local state
+                    var withdrawals = DB.get('withdrawals');
+                    var w = withdrawals.find(function(x){return x.id===wdId;});
+                    if (w) {
+                        w.status = 'PROCESSING';
+                        var adminUser = getUser();
+                        w.processedBy = adminUser ? adminUser.id : w.processedBy;
+                        w.approvedAt = new Date().toISOString();
+                        var users = DB.get('users');
+                        var u = users.find(function(x){return x.id===w.userId;});
+                        if (u) { u.usdtBalance = Math.max(0, (u.usdtBalance||0) - (w.amount||0)); }
+                        DB.set('users', users);
+                    }
+                    DB.set('withdrawals', withdrawals);
+                    addNotif(w.userId,'تمت الموافقة على السحب','تمت الموافقة على سحبك بمبلغ '+fmtNum(w.net||0)+' USDT. بانتظار رفع إثبات التنفيذ.','WITHDRAW');
+                    toast('تمت الموافقة - يجب رفع لقطة إثبات التنفيذ ✓','success');
+                    render();
+                });
             });
         }
 
@@ -6884,21 +6921,28 @@
             var reason = document.getElementById('admin-wd-reject-reason').value.trim();
             if(!reason) { toast('يجب كتابة سبب الرفض','error'); return; }
             closeModal();
-            var withdrawals = DB.get('withdrawals');
-            var w = withdrawals.find(function(x){return x.id===wdId;});
-            if(!w) return;
-            w.status = 'REJECTED';
-            w.rejectReason = reason;
-            var users = DB.get('users');
-            var u = users.find(function(x){return x.id===w.userId;});
-            if(u) { u.usdtBalance = (u.usdtBalance||0) + (w.amount||0); DB.set('users', users); }
-            DB.set('withdrawals', withdrawals);
-            addLog(w.userId,'WITHDRAW_REJECTED',w.amount,'USDT','تم رفض السحب واسترداد '+fmtNum(w.amount)+' USDT. السبب: '+reason);
-            addNotif(w.userId,'سحب مرفوض','تم رفض سحبك. تم استرداد المبلغ. السبب: '+reason,'WITHDRAW');
-            var wdRejUser = DB.get('users').find(function(x){return x.id===w.userId;});
-            if(wdRejUser && wdRejUser.email) sendEmailNotification(wdRejUser.email, 'تم رفض سحبك', 'تم رفض سحبك. تم استرداد المبلغ. السبب: '+reason);
-            toast('تم رفض السحب واسترداد الرصيد','success');
-            render();
+            toast('جاري رفض السحب واسترداد الرصيد...','info');
+            SecureAPI.adminAction('reject_withdrawal', { withdrawalId: wdId, reason: reason }).then(function(result) {
+                if (!result.success) { toast(result.error || 'خطأ','error'); return; }
+                var withdrawals = DB.get('withdrawals');
+                var w = withdrawals.find(function(x){return x.id===wdId;});
+                if (w) {
+                    w.status = 'REJECTED';
+                    w.rejectReason = reason;
+                    // Sync local balance if server refunded
+                    if (result.refunded) {
+                        var users = DB.get('users');
+                        var u = users.find(function(x){return x.id===w.userId;});
+                        if (u) { u.usdtBalance = (u.usdtBalance||0) + (w.amount||0); }
+                        DB.set('users', users);
+                    }
+                }
+                DB.set('withdrawals', withdrawals);
+                addLog(w.userId,'WITHDRAW_REJECTED',w.amount,'USDT','تم رفض السحب واسترداد '+fmtNum(w.amount)+' USDT. السبب: '+reason);
+                addNotif(w.userId,'سحب مرفوض','تم رفض سحبك. تم استرداد المبلغ. السبب: '+reason,'WITHDRAW');
+                toast('تم رفض السحب واسترداد الرصيد ✓','success');
+                render();
+            });
         }
 
         // ==================== DYNAMIC IMAGE MODAL ====================
