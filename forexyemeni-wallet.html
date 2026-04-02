@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ForexYemeni Wallet v5.0 - محفظة العملات الرقمية</title>
+    <title>ForexYemeni Wallet v10.1 - محفظة العملات الرقمية</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
         tailwind.config = {
@@ -2970,6 +2970,14 @@
                     user.password = Security.hashPassword(newPass);
                     user.passwordMustChange = false;
                     db.collection('appData').doc('users').set({ data: users });
+                    // CRITICAL: Update local cache immediately so Security.createSession reads correct data
+                    var _localUsers = DB.get('users');
+                    var _localUser = _localUsers.find(function(u){ return u.id === state.user.id; });
+                    if (_localUser) {
+                        _localUser.password = user.password;
+                        _localUser.passwordMustChange = false;
+                        window.appData['users'] = _localUsers;
+                    }
                     Security.addAuditLog(user.id, 'PASSWORD_CHANGE', 'تغيير كلمة المرور (إجباري)');
                     toast('تم تغيير كلمة المرور بنجاح ✓','success');
                     // Fire and forget: notify user via email/SMS
@@ -3547,8 +3555,12 @@
             } else {
                 pms = DB.get('paymentMethods').filter(function(p){return p.isActive;});
             }
-            // Filter: only show methods matching selected currency (or CRYPTO which has no currency)
-            var filtered = pms.filter(function(p){ return p.type === 'CRYPTO' || p.currency === cur || !p.currency; });
+            // Filter: only show methods matching selected currency (CRYPTO always shown for USDT, BANK must match currency)
+            var filtered = pms.filter(function(p){
+                if(p.type === 'CRYPTO') return true; // CRYPTO (USDT) always shown
+                if(!p.currency) return false; // BANK methods without currency are hidden (must set currency)
+                return p.currency === cur; // BANK methods must match selected currency
+            });
             filtered = filtered.sort(function(a,b){return (a.sortOrder||0)-(b.sortOrder||0);});
             var selectedPmId = state.depPmId || '';
             // If current selection doesn't match filtered list, clear it
@@ -3615,8 +3627,10 @@
                 var balEl = document.getElementById('dep-merchant-balance');
                 if(balEl) balEl.innerHTML = '';
             }
-            // Now update currency row and details
+            // Now update currency row and details, then apply currency filter
             onDepPmChange();
+            // Apply currency filter to payment methods (for merchant methods too)
+            setTimeout(function(){ _filterDepPaymentMethods(); renderDepPmDetails(); updateDepRateInfo(); }, 50);
         }
 
         function renderDepMerchantBalance() {
@@ -3874,10 +3888,12 @@
             var cur = curSel.value;
             var userId = getUser().id;
             var wms = DB.get('userWithdrawalMethods').filter(function(w){return w.userId === userId;});
-            // Filter: show methods matching selected currency
+            // Filter: show methods matching selected currency (CRYPTO for USDT, BANK must match currency)
             var filtered = wms.filter(function(w){
-                if(cur === 'USDT') return w.type === 'CRYPTO' || !w.currency;
-                return (w.currency === cur) || !w.currency;
+                if(cur === 'USDT') return w.type === 'CRYPTO' || (!w.currency && w.type === 'CRYPTO');
+                if(w.type === 'CRYPTO') return false; // CRYPTO only for USDT
+                if(!w.currency) return false; // BANK methods without currency are hidden
+                return w.currency === cur; // BANK methods must match selected currency
             });
             var selectedId = methodSel.value;
             var match = filtered.find(function(w){return w.id === selectedId;});
@@ -5700,8 +5716,10 @@
             var currentUser = getUser();
             var unreadMsgs = DB.get('messages').filter(function(m){return m.toId===(currentUser && currentUser.id) && !m.isRead;}).length;
             var totalUsers = users.length;
-            var totalDep = deposits.reduce(function(s,d){return s+(d.usdtAmount||0);},0);
-            var totalWd = withdrawals.reduce(function(s,w){return s+(w.net||0);},0);
+            var approvedDeposits = deposits.filter(function(d){return d.status==='APPROVED';});
+            var approvedWithdrawals = withdrawals.filter(function(w){return w.status==='APPROVED';});
+            var totalDep = approvedDeposits.reduce(function(s,d){return s+(d.usdtAmount||0);},0);
+            var totalWd = approvedWithdrawals.reduce(function(s,w){return s+(w.net||0);},0);
             var merchantCur = getDisplayCurrency();
             var pendingDep = deposits.filter(function(d){return d.status==='PENDING';}).length;
             var pendingWd = withdrawals.filter(function(w){return w.status==='PENDING';}).length;
@@ -6066,14 +6084,16 @@
             var deposits = DB.get('deposits');
             deposits.sort(function(a,b){return new Date(b.createdAt)-new Date(a.createdAt);});
             var pendingCount = deposits.filter(function(d){return d.status==='PENDING';}).length;
+            var approvedCount = deposits.filter(function(d){return d.status==='APPROVED';}).length;
+            // Default: show only APPROVED deposits
             return '<div class="'+C.card+' rounded-2xl p-6 border '+C.border+'">'+
                 '<h2 class="text-xl font-bold '+C.text+' mb-4">💰 الإيداعات ('+deposits.length+')</h2>'+
                 '<div class="flex gap-2 mb-4 flex-wrap">'+
                 '<button onclick="filterAdminDeposits(\'ALL\')" class="px-3 py-1.5 rounded-lg text-sm btn '+C.btn+'">الكل</button>'+
                 '<button onclick="filterAdminDeposits(\'PENDING\')" class="px-3 py-1.5 rounded-lg text-sm btn bg-warning text-dark-bg">معلق ('+pendingCount+')</button>'+
-                '<button onclick="filterAdminDeposits(\'APPROVED\')" class="px-3 py-1.5 rounded-lg text-sm btn bg-success text-dark-bg">مقبول</button>'+
+                '<button onclick="filterAdminDeposits(\'APPROVED\')" class="px-3 py-1.5 rounded-lg text-sm btn bg-success text-dark-bg ring-2 ring-success/50">مقبول ('+approvedCount+')</button>'+
                 '<button onclick="filterAdminDeposits(\'REJECTED\')" class="px-3 py-1.5 rounded-lg text-sm btn bg-danger text-white">مرفوض</button></div>'+
-                '<div id="admin-deposits-list" class="space-y-3 max-h-[70vh] overflow-y-auto">'+renderAdminDepositsList(deposits, C)+'</div></div>';
+                '<div id="admin-deposits-list" class="space-y-3 max-h-[70vh] overflow-y-auto">'+renderAdminDepositsList(deposits, C, 'APPROVED')+'</div></div>';
         }
 
         function renderAdminDepositsList(deposits, C, filterStatus) {
@@ -6219,6 +6239,8 @@
             withdrawals.sort(function(a,b){return new Date(b.createdAt)-new Date(a.createdAt);});
             var pendingCount = withdrawals.filter(function(w){return w.status==='PENDING';}).length;
             var processingCount = withdrawals.filter(function(w){return w.status==='PROCESSING';}).length;
+            var approvedCount = withdrawals.filter(function(w){return w.status==='APPROVED';}).length;
+            // Default: show only APPROVED withdrawals
             return '<div class="'+C.card+' rounded-2xl p-6 border '+C.border+'">'+
                 '<h2 class="text-xl font-bold '+C.text+' mb-4">🏧 السحوبات ('+withdrawals.length+')</h2>'+
                 '<div class="flex gap-2 mb-4 flex-wrap">'+
@@ -6226,9 +6248,9 @@
                 '<button onclick="filterAdminWithdrawals(\'PENDING\')" class="px-3 py-1.5 rounded-lg text-sm btn bg-warning text-dark-bg">معلق ('+pendingCount+')</button>'+
                 '<button onclick="filterAdminWithdrawals(\'RECEIVED\')" class="px-3 py-1.5 rounded-lg text-sm btn bg-blue-500 text-white">مستلم</button>'+
                 '<button onclick="filterAdminWithdrawals(\'PROCESSING\')" class="px-3 py-1.5 rounded-lg text-sm btn bg-info text-white">قيد المعالجة ('+processingCount+')</button>'+
-                '<button onclick="filterAdminWithdrawals(\'APPROVED\')" class="px-3 py-1.5 rounded-lg text-sm btn bg-success text-dark-bg">مقبول</button>'+
+                '<button onclick="filterAdminWithdrawals(\'APPROVED\')" class="px-3 py-1.5 rounded-lg text-sm btn bg-success text-dark-bg ring-2 ring-success/50">مقبول ('+approvedCount+')</button>'+
                 '<button onclick="filterAdminWithdrawals(\'REJECTED\')" class="px-3 py-1.5 rounded-lg text-sm btn bg-danger text-white">مرفوض</button></div>'+
-                '<div id="admin-withdrawals-list" class="space-y-3 max-h-[70vh] overflow-y-auto">'+renderAdminWithdrawalsList(withdrawals, C)+'</div></div>';
+                '<div id="admin-withdrawals-list" class="space-y-3 max-h-[70vh] overflow-y-auto">'+renderAdminWithdrawalsList(withdrawals, C, 'APPROVED')+'</div></div>';
         }
 
         function renderAdminWithdrawalsList(withdrawals, C, filterStatus) {
