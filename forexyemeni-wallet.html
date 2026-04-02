@@ -1369,7 +1369,7 @@
                 { id: 'pm1', title: 'USDT TRC20', type: 'CRYPTO', subtype: '', network: 'TRC20', address: 'TXxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx', recipientName: '', accountNumber: '', bankName: '', isActive: true, sortOrder: 0, minDeposit: 10, minWithdraw: 5 },
                 { id: 'pm2', title: 'حساب بنك اليمن والكويت', type: 'BANK', subtype: 'wallet', network: '', address: '', recipientName: 'ForexYemeni', accountNumber: '1234567890', bankName: 'بنك اليمن والكويت', isActive: true, sortOrder: 1, minDeposit: 1000, minWithdraw: 500 }
             ];
-            if (key === 'settings') return { exchange_rate: '535', exchange_rate_sar: '137.50', exchange_fee: '0', admin_deposit_fee: '0', admin_withdrawal_fee: '0', aff_l1: '5', aff_l2: '3', aff_l3: '1', admin_phone: '', admin_whatsapp: '', merchant_commission: '2' };
+            if (key === 'settings') return { exchange_rate: '535', exchange_rate_sar: '137.50', exchange_fee: '0', admin_deposit_fee: '0', admin_withdrawal_fee: '0', aff_l1: '5', aff_l2: '3', aff_l3: '1', admin_phone: '', admin_whatsapp: '', merchant_commission: '2', admin_trc20_wallet: 'TSJJodihEAbgqLENZvMzh62rEDaM5QxoLn', auto_approve_crypto: '0' };
             if (key === 'merchantRequests') return [];
             if (key === 'merchantTransactions') return [];
             if (key === 'profileChangeRequests') return [];
@@ -3491,7 +3491,7 @@
                 '<div id="dep-customer-receives" class="hidden '+C.card+' rounded-xl p-3 border border-success/30 bg-success/5 space-y-1"></div>'+
                 '<div id="dep-amount-crypto-row" class="hidden"><label class="block text-sm font-medium '+C.text+' mb-1">المبلغ (USDT) <span class="text-danger">*</span></label><input type="number" id="dep-amount-crypto" class="w-full px-4 py-2.5 rounded-xl border '+C.input+' outline-none" placeholder="أدخل المبلغ" min="1" step="0.01" oninput="updateDepCustomerReceives()"></div>'+
                 '<div id="dep-rate-info"></div>'+
-                '<div><label class="block text-sm font-medium '+C.text+' mb-1">رقم العملية</label><input type="text" id="dep-txid" class="w-full px-4 py-2.5 rounded-xl border '+C.input+' outline-none" placeholder="اختياري - رقم العملية أو TXID"></div>'+
+                '<div><label class="block text-sm font-medium '+C.text+' mb-1">رقم العملية (TXID) <span class="text-danger">*</span></label><div class="flex gap-2"><input type="text" id="dep-txid" class="flex-1 min-w-0 px-4 py-2.5 rounded-xl border '+C.input+' outline-none font-mono text-sm" placeholder="أدخل TXID العملية"></button><button type="button" id="btn-verify-txid" onclick="verifyDepositTxid()" class="shrink-0 px-4 py-2.5 rounded-xl bg-primary text-white btn text-sm font-bold">🔍 تحقق</button></div><div id="dep-txid-result" class="hidden mt-2 text-xs"></div></div>'+
                 '<div><label class="block text-sm font-medium '+C.text+' mb-1">صورة الإيصال <span class="text-danger">*</span></label>'+
                 previewDiv('depReceipt')+
                 '<div class="flex gap-2 mt-2">'+camBtn('depReceipt',C)+fileBtn('depReceipt',C)+'</div></div>'+
@@ -3783,6 +3783,56 @@
             el.innerHTML = h;
         }
 
+        // ==================== TXID VERIFICATION ====================
+        var _txidVerifyResult = null;
+
+        function verifyDepositTxid() {
+            var txidInput = document.getElementById('dep-txid');
+            var resultDiv = document.getElementById('dep-txid-result');
+            var verifyBtn = document.getElementById('btn-verify-txid');
+            if(!txidInput || !resultDiv || !verifyBtn) return;
+            var txid = txidInput.value.trim();
+            if(!txid || txid.length !== 64) { toast('أدخل TXID صحيح (64 حرف)','error'); return; }
+            var trc20Wallet = DB.getSetting('admin_trc20_wallet');
+            if(!trc20Wallet) { toast('عنوان المحفظة TRC20 غير مضبوط في الإعدادات','error'); return; }
+            verifyBtn.disabled = true; verifyBtn.textContent = '⏳ جاري...';
+            resultDiv.classList.remove('hidden');
+            resultDiv.innerHTML = '<p class="text-info">🔍 جاري التحقق من شبكة TRON...</p>';
+            fetch(window.location.origin + '/api/verify-txid', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({txid: txid, adminWallet: trc20Wallet})
+            }).then(function(r){return r.json();}).then(function(data) {
+                verifyBtn.disabled = false; verifyBtn.textContent = '🔍 تحقق';
+                if(data.success) {
+                    _txidVerifyResult = data;
+                    resultDiv.innerHTML = '<div class="p-3 rounded-lg bg-success/10 border border-success/30">'+
+                        '<div class="flex items-center gap-2 mb-1"><span class="text-success text-lg">✅</span><p class="text-success font-bold text-xs">تم التحقق بنجاح!</p></div>'+
+                        '<div class="flex justify-between"><span class="text-success/70 text-xs">المبلغ:</span><span class="text-success font-bold text-xs">'+fmtNum(data.amount)+' '+data.token+'</span></div>'+
+                        '<div class="flex justify-between"><span class="text-success/70 text-xs">من:</span><span class="font-mono text-xs text-success/70">'+escHtml((data.from||'').substr(0,10))+'...</span></div>'+
+                        '<div class="flex justify-between"><span class="text-success/70 text-xs">بلوك:</span><span class="text-success/70 text-xs">#'+data.block+'</span></div></div>';
+                    // Auto-fill USDT amount if CRYPTO
+                    var cryptoRow = document.getElementById('dep-amount-crypto-row');
+                    var cryptoInput = document.getElementById('dep-amount-crypto');
+                    if(cryptoRow && cryptoInput && !cryptoInput.value) {
+                        cryptoInput.value = data.amount;
+                        updateDepCustomerReceives();
+                    }
+                    toast('✅ تم التحقق من TXID بنجاح - المبلغ: '+fmtNum(data.amount)+' USDT','success');
+                } else {
+                    _txidVerifyResult = null;
+                    resultDiv.innerHTML = '<div class="p-3 rounded-lg bg-danger/10 border border-danger/30">'+
+                        '<div class="flex items-center gap-2"><span class="text-danger text-lg">❌</span><p class="text-danger font-bold text-xs">فشل التحقق</p></div>'+
+                        '<p class="text-danger/80 text-xs mt-1">'+escHtml(data.error||'لم يتم التحقق')+'</p></div>';
+                    toast('❌ '+escHtml(data.error||'فشل التحقق'),'error');
+                }
+            }).catch(function(err) {
+                verifyBtn.disabled = false; verifyBtn.textContent = '🔍 تحقق';
+                resultDiv.innerHTML = '<p class="text-danger">❌ خطأ في الاتصال</p>';
+                toast('خطأ في الاتصال بالشبكة','error');
+            });
+        }
+
         function submitDeposit() {
             var user = getUser();
             // Check for existing pending deposit - prevent duplicate
@@ -3830,6 +3880,13 @@
             }
             if(!receipt) { toast('يجب إرفاق صورة الإيصال','error'); return; }
             if(pm && amount < (pm.minDeposit||0)) { toast('الحد الأدنى للإيداع: '+pm.minDeposit,'error'); return; }
+            // Check TXID for CRYPTO deposits
+            if(isCrypto && !txid) { toast('يجب إدخال TXID لعمليات USDT','error'); return; }
+            // Check duplicate TXID
+            if(txid) {
+                var dupTxid = DB.get('deposits').find(function(d){return d.txid && d.txid.toLowerCase()===txid.toLowerCase() && d.userId!==user.id;});
+                if(dupTxid) { toast('TXID مستخدم في إيداع سابق','error'); return; }
+            }
             var currency = isCrypto ? 'USDT' : currencySel;
             var usdtAmount = netUsdt; // User receives net after fees
             // Daily deposit limit check
@@ -3838,14 +3895,52 @@
             var totalDepToday = allDeposits.reduce(function(s,d){return s+(d.usdtAmount||0);},0);
             var dailyDepLimit = parseFloat(DB.getSetting('daily_deposit_limit')) || 10000;
             if(totalDepToday + usdtAmount > dailyDepLimit) { toast('لقد تجاوزت الحد اليومي للايداع: '+fmtNum(dailyDepLimit)+' USDT','error'); return; }
+
+            // Build deposit record with TXID verification data
+            var depRecord = {
+                id:DB.uid(),userId:user.id,paymentMethodId:pmId,currency:currency,
+                amount:amount,usdtAmount:netUsdt,grossUsdt:grossUsdt,
+                depositFee:depositFeeUsdt,merchantComm:merchantCommUsdt,
+                localAmount:isCrypto?amount*rate:amount,txid:txid,receipt:receipt,notes:notes,
+                status:'PENDING',assignedMerchantId:merchantId||null,
+                txidVerified:!!_txidVerifyResult,
+                txidVerifyData:_txidVerifyResult?{amount:_txidVerifyResult.amount,from:_txidVerifyResult.from,block:_txidVerifyResult.block,timestamp:_txidVerifyResult.timestamp}:null,
+                createdAt:new Date().toISOString()
+            };
+
+            // Auto-approve if CRYPTO deposit is verified and auto-approve is enabled
+            var autoApprove = isCrypto && _txidVerifyResult && DB.getSetting('auto_approve_crypto') === '1';
+            if(autoApprove) {
+                // Verify amount matches (within 5% tolerance)
+                var verifyAmount = _txidVerifyResult.amount;
+                var tolerance = grossUsdt * 0.05;
+                if(Math.abs(verifyAmount - grossUsdt) <= tolerance) {
+                    depRecord.status = 'APPROVED';
+                    var users = DB.get('users');
+                    var u = users.find(function(x){return x.id===user.id;});
+                    if(u) { u.usdtBalance = (u.usdtBalance||0) + netUsdt; }
+                    if(merchantId) {
+                        var merch = users.find(function(x){return x.id===merchantId;});
+                        if(merch) { merch.usdtBalance = Math.max(0, (merch.usdtBalance||0) - netUsdt); }
+                    }
+                    DB.set('users', users);
+                    calculateAffiliateCommission(user.id, netUsdt);
+                } else {
+                    // Amount mismatch - keep pending with warning
+                    depRecord.txidAmountMismatch = true;
+                    depRecord.status = 'PENDING';
+                }
+            }
+
             var deposits = DB.get('deposits');
-            deposits.unshift({id:DB.uid(),userId:user.id,paymentMethodId:pmId,currency:currency,amount:amount,usdtAmount:netUsdt,grossUsdt:grossUsdt,depositFee:depositFeeUsdt,merchantComm:merchantCommUsdt,localAmount:isCrypto?amount*rate:amount,txid:txid,receipt:receipt,notes:notes,status:'PENDING',assignedMerchantId:merchantId||null,createdAt:new Date().toISOString()});
+            deposits.unshift(depRecord);
             DB.set('deposits', deposits);
             addLog(user.id,'DEPOSIT',netUsdt,'USDT','طلب إيداع '+fmtNum(grossUsdt)+' USDT (رسوم: '+fmtNum(depositFeeUsdt)+', عمولة: '+fmtNum(merchantCommUsdt)+', صافي: '+fmtNum(netUsdt)+')'+(merchantId?' - عبر تاجر':''));
-            addNotif(user.id,'طلب إيداع','تم إرسال طلب إيداع '+fmtNum(grossUsdt)+' USDT (صافي: '+fmtNum(netUsdt)+' بعد الرسوم). سيتم مراجعته.','INFO');
-            if(user.email) sendEmailNotification(user.email, 'طلب إيداع جديد', 'تم استلام طلب إيداع بقيمة '+fmtNum(grossUsdt)+' USDT (صافي: '+fmtNum(netUsdt)+' بعد خصم الرسوم)');
+            addNotif(user.id,'طلب إيداع', autoApprove ? '✅ تم إيداع '+fmtNum(netUsdt)+' USDT تلقائياً بعد التحقق من TXID' : 'تم إرسال طلب إيداع '+fmtNum(grossUsdt)+' USDT. سيتم مراجعته.','INFO');
+            if(user.email) sendEmailNotification(user.email, autoApprove ? 'تم إيداع USDT تلقائياً' : 'طلب إيداع جديد', autoApprove ? 'تم إيداع '+fmtNum(netUsdt)+' USDT في حسابك تلقائياً بعد التحقق من TXID' : 'تم استلام طلب إيداع بقيمة '+fmtNum(grossUsdt)+' USDT');
             clearFieldImage('depReceipt');
-            toast('تم إرسال طلب الإيداع'+(merchantId?' بنجاح - تم تعيين التاجر':''),'success');
+            _txidVerifyResult = null;
+            toast(autoApprove ? '✅ تم الإيداع تلقائياً '+fmtNum(netUsdt)+' USDT بعد التحقق!' : 'تم إرسال طلب الإيداع'+(merchantId?' بنجاح - تم تعيين التاجر':''),'success');
             setView('user-home');
         }
 
@@ -6337,6 +6432,15 @@
                     '<div class="'+C.card+' rounded p-2"><p class="'+C.muted+'">الإجمالي</p><p class="font-bold">'+fmtNum(d.grossUsdt||d.usdtAmount||0)+' USDT</p></div>'+
                     '<div class="'+C.card+' rounded p-2"><p class="'+C.muted+'">الرسوم</p><p class="font-bold text-danger">-'+fmtNum(d.depositFee||0)+' USDT</p></div>'+
                     '<div class="'+C.card+' rounded p-2"><p class="'+C.muted+'">صافي العميل</p><p class="font-bold text-success">'+fmtNum(d.usdtAmount||0)+' USDT</p></div></div>' : '';
+                // TXID verification badge
+                var txidBadge = '';
+                if(d.txid && d.txidVerified) {
+                    txidBadge = '<div class="p-2 rounded-lg bg-success/10 border border-success/30 mb-2"><p class="text-success text-xs font-bold">✅ TXID مُحقق من البلوك تشين</p><p class="text-success/70 text-xs">المبلغ الفعلي: '+fmtNum(d.txidVerifyData?d.txidVerifyData.amount:0)+' USDT | بلوك: #'+(d.txidVerifyData?d.txVerifyData.block:'—')+'</p></div>';
+                } else if(d.txid && !d.txidVerified) {
+                    txidBadge = '<div class="p-2 rounded-lg bg-warning/10 border border-warning/30 mb-2"><p class="text-warning text-xs font-bold">⏳ TXID لم يُتحقق بعد</p></div>';
+                } else if(d.txid) {
+                    txidBadge = '';
+                }
                 return '<div class="p-4 rounded-lg border '+C.border+'">'+
                     '<div class="flex items-center justify-between mb-2">'+
                     '<div><p class="font-medium text-sm '+C.text+'">'+escHtml(u?u.name:'مستخدم محذوف')+'</p><p class="text-xs '+C.muted+'">'+fmtDate(d.createdAt)+'</p></div>'+
@@ -6347,6 +6451,7 @@
                     '<div class="'+C.card+' rounded p-2"><p class="'+C.muted+'">الطريقة</p><p class="font-bold">'+escHtml(pm?(pm.type==='CRYPTO'?(pm.network||'CRYPTO'):(pm.bankName||pm.recipientName||'تحويل بنكي')):'—')+'</p></div>'+
                     '<div class="'+C.card+' rounded p-2"><p class="'+C.muted+'">TXID</p><p class="font-mono">'+escHtml(d.txid||'—')+'</p></div></div>'+
                     feeInfo+
+                    txidBadge+
                     (assignedMerchantName?'<p class="text-xs '+C.muted+' mb-2">🏪 التاجر المعين: <span class="text-primary font-medium">'+assignedMerchantName+'</span></p>':'')+
                     (d.receipt?'<div class="mb-3"><p class="text-xs '+C.muted+' mb-1">📄 صورة الإيصال:</p><img src="'+d.receipt+'" class="h-32 rounded-lg border cursor-pointer object-cover" onclick="showImageModal(this.src)"></div>':'')+
                     (d.rejectReason?'<div class="mb-2 p-2 rounded-lg bg-danger/10 border border-danger/30"><p class="text-xs text-danger font-bold">❌ سبب الرفض:</p><p class="text-xs text-danger/80">'+escHtml(d.rejectReason)+'</p></div>':'')+
@@ -8120,6 +8225,11 @@
                 '<div class="'+C.card+' rounded-xl p-4 border '+C.border+'"><h3 class="font-bold '+C.text+' mb-3">📞 بيانات التواصل (تظهر للمستخدمين)</h3><div class="space-y-3">'+
                 '<div><label class="block text-sm '+C.muted+' mb-1">رقم الهاتف</label><input type="text" id="set-admin-phone" value="'+escHtml(adminPhone)+'" class="w-full px-4 py-2.5 rounded-xl border '+C.input+' outline-none" placeholder="+967..."></div>'+
                 '<div><label class="block text-sm '+C.muted+' mb-1">رقم واتساب</label><input type="text" id="set-admin-wa" value="'+escHtml(adminWA)+'" class="w-full px-4 py-2.5 rounded-xl border '+C.input+' outline-none" placeholder="+967..."></div></div></div>'+
+                '<div class="'+C.card+' rounded-xl p-4 border '+C.border+'"><h3 class="font-bold '+C.text+' mb-3">🔗 محفظة TRC20 للتحقق التلقائي من الإيداعات</h3><div class="space-y-3">'+
+                '<div><label class="block text-sm '+C.muted+' mb-1">📱 عنوان محفظة TRC20 (USDT)</label><input type="text" id="set-trc20-wallet" value="'+escHtml(DB.getSetting('admin_trc20_wallet')||'')+'" class="w-full px-4 py-2.5 rounded-xl border '+C.input+' outline-none font-mono text-sm" placeholder="T..."><p class="text-xs '+C.muted+' mt-1">عنوان محفظة USDT على شبكة TRON للتحقق التلقائي من TXID</p></div>'+
+                '<div class="flex items-center justify-between p-3 rounded-lg border '+C.border+'"><div><p class="text-sm font-medium '+C.text+'">⚡ موافقة تلقائية على الإيداعات المُحققة</p><p class="text-xs '+C.muted+'">عند التحقق من TXID يوافق تلقائياً ويضيف الرصيد</p></div>'+
+                '<label class="relative inline-flex items-center cursor-pointer"><input type="checkbox" id="set-auto-approve-crypto" class="sr-only peer" '+(DB.getSetting('auto_approve_crypto')==='1'?'checked':'')+'>'+
+                '<div class="w-11 h-6 bg-gray-300 peer-checked:bg-success rounded-full peer-focus:ring-2 peer-focus:ring-primary/50 after:content-[\\'\'] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:after:translate-x-full"></div></label></div></div>'+
                 renderAdminBannerSettings(C)+
                 renderAdminBannerAdSettings(C)+
                 (adminUser ? renderContactManagement(C, adminUser, 'ADMIN') : '')+
@@ -8335,6 +8445,8 @@
             DB.setSetting('merchant_commission', document.getElementById('set-merch-comm').value);
             DB.setSetting('daily_deposit_limit', document.getElementById('set-daily-dep-limit').value);
             DB.setSetting('daily_withdrawal_limit', document.getElementById('set-daily-wd-limit').value);
+            DB.setSetting('admin_trc20_wallet', (document.getElementById('set-trc20-wallet')||{}).value.trim());
+            DB.setSetting('auto_approve_crypto', document.getElementById('set-auto-approve-crypto').checked ? '1' : '0');
             var adminPass = document.getElementById('set-admin-pass').value;
             if(adminPass) {
                 var users = DB.get('users');
