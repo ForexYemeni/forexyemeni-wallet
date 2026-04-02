@@ -6499,7 +6499,10 @@
         function renderAdminWithdrawalsList(withdrawals, C, filterStatus) {
             if(!C) C = getThemeColors();
             var filtered = withdrawals;
-            if(filterStatus && filterStatus !== 'ALL') filtered = withdrawals.filter(function(w){return w.status===filterStatus;});
+            if(filterStatus && filterStatus !== 'ALL') {
+                if(filterStatus === 'APPROVED') filtered = withdrawals.filter(function(w){return w.status==='APPROVED'||w.status==='COMPLETED';});
+                else filtered = withdrawals.filter(function(w){return w.status===filterStatus;});
+            }
             if(filtered.length===0) return '<p class="'+C.muted+' text-center py-4">لا توجد سحوبات</p>';
             var users = DB.get('users');
             var wms = DB.get('userWithdrawalMethods');
