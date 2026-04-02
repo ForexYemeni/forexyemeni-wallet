@@ -4234,17 +4234,28 @@
             var C = getThemeColors();
             var withdrawals = DB.get('withdrawals');
             var w = withdrawals.find(function(x){return x.id===wdId;});
-            var receiptImg = w ? w.receiptImage : '';
-            showModal('<h3 class="text-lg font-bold '+C.text+' mb-4 text-center">✅ تأكيد الاستلام</h3>'+
-                '<p class="text-sm '+C.muted+' mb-3 text-center">هل استلمت المبلغ بالكامل؟</p>'+
-                '<div class="'+C.card+' rounded-xl p-3 border '+C.border+' mb-4 text-center"><p class="text-xs '+C.muted+'">المبلغ</p><p class="font-bold text-lg text-success">'+fmtNum(w?w.net:0)+' USDT</p></div>'+
-                (receiptImg?'<img src="'+receiptImg+'" class="w-full max-h-48 rounded-xl border object-cover mb-4 cursor-pointer" onclick="showImageModal(this.src)">':'')+
-                '<div class="flex gap-3">'+
-                '<button onclick="_doUserConfirmDelivery(\''+wdId+'\')" class="flex-1 py-3 rounded-xl font-bold btn btn-premium bg-gradient-to-r from-emerald-500 to-green-500 text-dark-bg">نعم، تأكيد الاستلام</button>'+
-                '<button onclick="closeModal()" class="flex-1 py-3 rounded-xl border '+C.border+' '+C.text+' btn">لاحقاً</button></div>');
+            var receiptImg = w ? (w.receiptImage || w.confirmScreenshot) : '';
+            var localAmt = w ? (w.localAmount || w.net || 0) : 0;
+            var curLabel = w ? (w.currency || 'USDT') : 'USDT';
+            var displayAmt = w && w.currency === 'USDT' ? fmtNum(localAmt)+' USDT' : fmtNum(localAmt)+' '+curLabel;
+            showModal('<div class="p-6 text-center space-y-4">'+
+                '<div class="inline-flex items-center justify-center w-16 h-16 rounded-full bg-gradient-to-br from-emerald-500 to-green-500 shadow-lg mb-2"><span class="text-4xl">✅</span></div>'+
+                '<h3 class="text-xl font-extrabold '+C.text+'">تأكيد استلام السحب</h3>'+
+                '<div class="'+C.card+' rounded-xl p-4 border border-success/30 bg-success/5 space-y-2"><p class="text-sm '+C.muted+'">تم الاستلام مبلغ</p><p class="text-2xl font-extrabold text-success">'+displayAmt+'</p></div>'+
+                (receiptImg?'<img src="'+receiptImg+'" class="w-full max-h-48 rounded-xl border object-cover cursor-pointer" onclick="showImageModal(this.src)">':'')+
+                '<div class="text-right"><label class="block text-sm font-bold '+C.text+' mb-1">أدخل كلمة المرور <span class="text-danger">*</span></label>'+
+                '<input type="password" id="delivery-confirm-pass" class="w-full px-4 py-3 rounded-xl border '+C.input+' outline-none text-center text-lg" placeholder="كلمة المرور"></div>'+
+                '<button onclick="_doUserConfirmDelivery(\''+wdId+'\')" class="w-full py-3 rounded-xl font-bold btn btn-premium bg-gradient-to-r from-emerald-500 to-green-500 text-dark-bg text-lg">✅ تأكيد الاستلام</button>'+
+                '<button onclick="closeModal()" class="w-full py-2.5 rounded-xl border '+C.border+' '+C.text+' btn">لاحقاً</button></div>');
         }
 
         window._doUserConfirmDelivery = function(wdId) {
+            var passInput = document.getElementById('delivery-confirm-pass');
+            var pass = passInput ? passInput.value : '';
+            if(!pass) { toast('أدخل كلمة المرور','error'); shakeField(passInput); return; }
+            var user = getUser();
+            if(!user) return;
+            if(!Security.checkPassword(pass, user.password)) { toast('كلمة المرور غير صحيحة','error'); passInput.value=''; return; }
             closeModal();
             var withdrawals = DB.get('withdrawals');
             var w = withdrawals.find(function(x){return x.id===wdId;});
@@ -4252,7 +4263,6 @@
             w.userConfirmed = true;
             w.userConfirmedAt = new Date().toISOString();
             DB.set('withdrawals', withdrawals);
-            var user = getUser();
             addNotif(user.id, 'تأكيد الاستلام', 'تم تأكيد استلام سحب '+fmtNum(w.net||0)+' USDT بنجاح', 'WITHDRAW');
             toast('تم تأكيد الاستلام بنجاح ✅','success');
             render();
@@ -5256,7 +5266,7 @@
                 '<button type="button" onclick="captureForField(\'merchWdProof\');showImagePreviewAfterCapture(\'merchWdProof\',\'merch-wd-proof-preview\')" class="flex-1 px-4 py-3 rounded-lg border '+C.border+' '+C.text+' btn text-sm font-medium">📸 كاميرا</button>'+
                 '<label class="flex-1 px-4 py-3 rounded-lg border '+C.border+' '+C.text+' btn text-sm font-medium text-center cursor-pointer">📁 رفع ملف<input type="file" accept="image/*" class="hidden" onchange="fileForFieldWithPreview(\'merchWdProof\',this,\'merch-wd-proof-preview\')"></label>'+
                 '</div>'+
-                '<p class="text-xs '+C.muted+' mb-2 font-medium">📎 رفع صورة إيصال إضافية (اختياري):</p>'+
+                '<p class="text-xs '+C.muted+' mb-2 font-medium">📎 إيصال إضافي:</p>'+
                 '<div id="merch-receipt-img-preview"></div>'+
                 '<label class="w-full px-4 py-2.5 rounded-lg border border-dashed '+C.border+' '+C.text+' btn text-sm font-medium text-center cursor-pointer mb-4">📎 رفع صورة الإيصال<input type="file" accept="image/*" class="hidden" onchange="_previewReceiptImg(this,\'merch-receipt-img-preview\')"></label>'+
                 '<input type="hidden" id="merch-receipt-img-data" value="">'+
@@ -5735,9 +5745,9 @@
             var unreadMsgs = DB.get('messages').filter(function(m){return m.toId===(currentUser && currentUser.id) && !m.isRead;}).length;
             var totalUsers = users.length;
             var approvedDeposits = deposits.filter(function(d){return d.status==='APPROVED';});
-            var approvedWithdrawals = withdrawals.filter(function(w){return w.status==='APPROVED';});
+            var approvedWithdrawals = withdrawals.filter(function(w){return w.status==='APPROVED'||w.status==='COMPLETED';});
             var totalDep = approvedDeposits.reduce(function(s,d){return s+(d.usdtAmount||0);},0);
-            var totalWd = approvedWithdrawals.reduce(function(s,w){return s+(w.net||0);},0);
+            var totalWd = approvedWithdrawals.reduce(function(s,w){return s+(w.net||w.amount||0);},0);
             var merchantCur = getDisplayCurrency();
             var pendingDep = deposits.filter(function(d){return d.status==='PENDING';}).length;
             var pendingWd = withdrawals.filter(function(w){return w.status==='PENDING';}).length;
@@ -6395,7 +6405,7 @@
                 '<button type="button" onclick="captureForField(\'adminWdProof\');showImagePreviewAfterCapture(\'adminWdProof\',\'admin-wd-proof-preview\')" class="flex-1 px-4 py-3 rounded-lg border '+C.border+' '+C.text+' btn text-sm font-medium">📸 كاميرا</button>'+
                 '<label class="flex-1 px-4 py-3 rounded-lg border '+C.border+' '+C.text+' btn text-sm font-medium text-center cursor-pointer">📁 رفع ملف<input type="file" accept="image/*" class="hidden" onchange="fileForFieldWithPreview(\'adminWdProof\',this,\'admin-wd-proof-preview\')"></label>'+
                 '</div>'+
-                '<p class="text-xs '+C.muted+' mb-2 font-medium">📎 رفع صورة إيصال إضافية (اختياري):</p>'+
+                '<p class="text-xs '+C.muted+' mb-2 font-medium">📎 إيصال إضافي:</p>'+
                 '<div id="admin-receipt-img-preview"></div>'+
                 '<label class="w-full px-4 py-2.5 rounded-lg border border-dashed '+C.border+' '+C.text+' btn text-sm font-medium text-center cursor-pointer mb-4">📎 رفع صورة الإيصال<input type="file" accept="image/*" class="hidden" onchange="_previewReceiptImg(this,\'admin-receipt-img-preview\')"></label>'+
                 '<input type="hidden" id="admin-receipt-img-data" value="">'+
