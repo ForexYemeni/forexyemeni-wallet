@@ -1376,7 +1376,7 @@
                 { id: 'pm1', title: 'USDT TRC20', type: 'CRYPTO', subtype: '', network: 'TRC20', address: 'TXxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx', recipientName: '', accountNumber: '', bankName: '', isActive: true, sortOrder: 0, minDeposit: 10, minWithdraw: 5 },
                 { id: 'pm2', title: 'حساب بنك اليمن والكويت', type: 'BANK', subtype: 'wallet', network: '', address: '', recipientName: 'ForexYemeni', accountNumber: '1234567890', bankName: 'بنك اليمن والكويت', isActive: true, sortOrder: 1, minDeposit: 1000, minWithdraw: 500 }
             ];
-            if (key === 'settings') return { exchange_rate: '535', exchange_rate_sar: '137.50', exchange_fee: '0', admin_deposit_fee: '0', admin_withdrawal_fee: '0', aff_l1: '5', aff_l2: '3', aff_l3: '1', admin_phone: '', admin_whatsapp: '', merchant_commission: '2', admin_trc20_wallet: 'TSJJodihEAbgqLENZvMzh62rEDaM5QxoLn', auto_approve_crypto: '0' };
+            if (key === 'settings') return { exchange_rate: '535', exchange_rate_sar: '137.50', exchange_fee: '0', admin_deposit_fee: '0', admin_withdrawal_fee: '0', aff_l1: '5', aff_l2: '3', aff_l3: '1', admin_phone: '', admin_whatsapp: '', merchant_commission: '2', admin_trc20_wallet: 'TSJJodihEAbgqLENZvMzh62rEDaM5QxoLn', auto_approve_crypto: '0', txid_max_age_minutes: '120' };
             if (key === 'merchantRequests') return [];
             if (key === 'merchantTransactions') return [];
             if (key === 'profileChangeRequests') return [];
@@ -3869,12 +3869,41 @@
             }).then(function(r){return r.json();}).then(function(data) {
                 verifyBtn.disabled = false; verifyBtn.textContent = '🔍 تحقق';
                 if(data.success) {
+                    // === TIME CHECK: Reject old TXIDs to prevent reuse ===
+                    var txMaxAgeMinutes = parseInt(DB.getSetting('txid_max_age_minutes')) || 120; // default 2 hours
+                    if(data.timestamp) {
+                        var txTime = data.timestamp; // milliseconds from TronGrid
+                        var nowTime = Date.now();
+                        var ageMinutes = (nowTime - txTime) / 60000;
+                        if(ageMinutes > txMaxAgeMinutes) {
+                            _txidVerifyResult = null;
+                            var ageStr = ageMinutes < 60 ? Math.round(ageMinutes) + ' دقيقة' : (ageMinutes / 60).toFixed(1) + ' ساعة';
+                            resultDiv.innerHTML = '<div class="p-3 rounded-lg bg-danger/10 border border-danger/30">'+
+                                '<div class="flex items-center gap-2"><span class="text-danger text-lg">⏰</span><p class="text-danger font-bold text-xs">TXID منتهي الصلاحية</p></div>'+
+                                '<p class="text-danger/80 text-xs mt-1">هذه العملية عمرها '+ageStr+'. الحد المسموح: '+txMaxAgeMinutes+' دقيقة</p></div>';
+                            toast('⏰ TXID قديم جداً ('+ageStr+') - الحد الأقصى '+txMaxAgeMinutes+' دقيقة','error');
+                            return;
+                        }
+                    }
+                    // === DUPLICATE CHECK: Prevent TXID reuse ===
+                    var dupTxid = DB.get('deposits').find(function(d){return d.txid && d.txid.toLowerCase()===txid.toLowerCase();});
+                    if(dupTxid) {
+                        _txidVerifyResult = null;
+                        resultDiv.innerHTML = '<div class="p-3 rounded-lg bg-danger/10 border border-danger/30">'+
+                            '<div class="flex items-center gap-2"><span class="text-danger text-lg">🔁</span><p class="text-danger font-bold text-xs">TXID مستخدم مسبقاً</p></div>'+
+                            '<p class="text-danger/80 text-xs mt-1">هذا الرمز تم استخدامه في إيداع سابق</p></div>';
+                        toast('🔁 هذا TXID تم استخدامه في إيداع سابق','error');
+                        return;
+                    }
                     _txidVerifyResult = data;
+                    var ageShow = data.timestamp ? ((Date.now() - data.timestamp) / 60000).toFixed(0) : '';
                     resultDiv.innerHTML = '<div class="p-3 rounded-lg bg-success/10 border border-success/30">'+
                         '<div class="flex items-center gap-2 mb-1"><span class="text-success text-lg">✅</span><p class="text-success font-bold text-xs">تم التحقق بنجاح!</p></div>'+
                         '<div class="flex justify-between"><span class="text-success/70 text-xs">المبلغ:</span><span class="text-success font-bold text-xs">'+fmtNum(data.amount)+' '+data.token+'</span></div>'+
                         '<div class="flex justify-between"><span class="text-success/70 text-xs">من:</span><span class="font-mono text-xs text-success/70">'+escHtml((data.from||'').substr(0,10))+'...</span></div>'+
-                        '<div class="flex justify-between"><span class="text-success/70 text-xs">بلوك:</span><span class="text-success/70 text-xs">#'+data.block+'</span></div></div>';
+                        '<div class="flex justify-between"><span class="text-success/70 text-xs">بلوك:</span><span class="text-success/70 text-xs">#'+data.block+'</span></div>'+
+                        (ageShow ? '<div class="flex justify-between"><span class="text-success/70 text-xs">منذ:</span><span class="text-success/70 text-xs">'+ageShow+' دقيقة</span></div>' : '')+
+                        '</div>';
                     // Auto-fill USDT amount if CRYPTO
                     var cryptoRow = document.getElementById('dep-amount-crypto-row');
                     var cryptoInput = document.getElementById('dep-amount-crypto');
@@ -8452,6 +8481,7 @@
                 '<div class="flex items-center gap-3 p-3 rounded-lg border '+C.border+'"><div class="flex-1"><p class="text-sm font-medium '+C.text+'">⚡ موافقة تلقائية على الإيداعات المُحققة</p><p class="text-xs '+C.muted+'">عند التحقق من TXID يوافق تلقائياً ويضيف الرصيد</p></div>'+
                 '<div onclick="var cb=document.getElementById(\'set-auto-approve-crypto\');cb.checked=!cb.checked;this.className=cb.checked?\'w-12 h-7 rounded-full bg-success relative cursor-pointer transition-colors\':\'w-12 h-7 rounded-full bg-gray-400 relative cursor-pointer transition-colors\';this.children[0].className=cb.checked?\'absolute top-[2px] right-[2px] w-6 h-6 bg-white rounded-full shadow transition-all\':\'absolute top-[2px] left-[2px] w-6 h-6 bg-white rounded-full shadow transition-all\'" class="'+(DB.getSetting('auto_approve_crypto')==='1'?'w-12 h-7 rounded-full bg-success relative cursor-pointer transition-colors':'w-12 h-7 rounded-full bg-gray-400 relative cursor-pointer transition-colors')+'"><div class="'+(DB.getSetting('auto_approve_crypto')==='1'?'absolute top-[2px] right-[2px] w-6 h-6 bg-white rounded-full shadow transition-all':'absolute top-[2px] left-[2px] w-6 h-6 bg-white rounded-full shadow transition-all')+'"></div></div>'+
                 '<input type="checkbox" id="set-auto-approve-crypto" class="hidden" '+(DB.getSetting('auto_approve_crypto')==='1'?'checked':'')+'></div></div>'+
+                '<div><label class="block text-sm '+C.muted+' mb-1">⏰ الحد الأقصى لعمر TXID (دقيقة)</label><input type="number" id="set-txid-max-age" value="'+(DB.getSetting('txid_max_age_minutes')||'120')+'" class="w-full px-4 py-2.5 rounded-xl border '+C.input+' outline-none" min="5" max="1440" placeholder="120"><p class="text-xs '+C.muted+' mt-1">الحد الأقصى لعمر العملية بالدقائق (الافتراضي: 120 دقيقة = ساعتان). TXID الأقدم من هذا سيُرفض لمنع إعادة الاستخدام</p></div>'+
                 renderAdminBannerSettings(C)+
                 renderAdminBannerAdSettings(C)+
                 (adminUser ? renderContactManagement(C, adminUser, 'ADMIN') : '')+
@@ -8669,6 +8699,7 @@
             DB.setSetting('daily_withdrawal_limit', document.getElementById('set-daily-wd-limit').value);
             DB.setSetting('admin_trc20_wallet', (document.getElementById('set-trc20-wallet')||{}).value.trim());
             DB.setSetting('auto_approve_crypto', document.getElementById('set-auto-approve-crypto').checked ? '1' : '0');
+            DB.setSetting('txid_max_age_minutes', document.getElementById('set-txid-max-age').value || '120');
             var adminPass = document.getElementById('set-admin-pass').value;
             if(adminPass) {
                 var users = DB.get('users');
