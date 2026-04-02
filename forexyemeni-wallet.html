@@ -3650,8 +3650,8 @@
             } else {
                 rate = parseFloat(DB.getSetting('exchange_rate')) || 535;
             }
-            var flag = cur === 'SAR' ? '🇸🇦' : '🇾🇪';
-            el.innerHTML = '<div class="'+C.card+' rounded-xl p-3 border '+C.border+' flex items-center justify-between"><span class="text-xs '+C.muted+'">'+flag+' سعر الصرف: 1 USDT = '+fmtNum(rate,2)+' '+cur+'</span></div>';
+            // currency label removed
+            el.innerHTML = '<div class="'+C.card+' rounded-xl p-3 border '+C.border+' flex items-center justify-between"><span class="text-xs '+C.muted+'">سعر الصرف: 1 USDT = '+fmtNum(rate,2)+' '+cur+'</span></div>';
         }
 
         function updateDepCustomerReceives() {
@@ -3687,7 +3687,7 @@
             var totalFeePercent = depFeePercent + merchantComm;
             var feeUsdt = usdtAmount * (totalFeePercent / 100);
             var netUsdt = usdtAmount - feeUsdt;
-            var flag = cur === 'SAR' ? '🇸🇦' : (isCrypto ? '💵' : '🇾🇪');
+            // currency label removed
             el.classList.remove('hidden');
             var h = '<div class="flex justify-between items-center"><span class="text-xs '+C.muted+'">💵 المبلغ بـ USDT</span><span class="text-sm font-bold text-primary">'+fmtNum(usdtAmount,4)+' USDT</span></div>';
             if(totalFeePercent > 0) {
@@ -3748,7 +3748,7 @@
             // If current selection doesn't match filtered list, clear it
             var match = filtered.find(function(p){return p.id === selectedPmId;});
             if(!match) { state.depPmId = ''; selectedPmId = ''; }
-            var opts = filtered.map(function(p){ var lbl = p.type==='CRYPTO' ? (p.network||'CRYPTO') : (p.bankName||p.recipientName||'تحويل بنكي'); var tag = p.type==='BANK' && p.currency ? (p.currency==='SAR'?'🇸🇦':'🇾🇪') : ''; return '<option value="'+p.id+'" '+(p.id===selectedPmId?'selected':'')+'>'+tag+' '+escHtml(lbl)+'</option>'; }).join('');
+            var opts = filtered.map(function(p){ var lbl = p.type==='CRYPTO' ? (p.network||'CRYPTO') : (p.bankName||p.recipientName||'تحويل بنكي'); var tag = p.type==='BANK' && p.currency ? (p.currency==='SAR'?'SAR':'YER') : ''; return '<option value="'+p.id+'" '+(p.id===selectedPmId?'selected':'')+'>'+tag+' '+escHtml(lbl)+'</option>'; }).join('');
             pmSel.innerHTML = '<option value="">-- اختر طريقة --</option>' + opts;
             if(!match) { state.depPmId = ''; document.getElementById('dep-pm-details').innerHTML = ''; }
         }
@@ -3795,7 +3795,7 @@
                     renderDepMerchantBalance();
                     pmOpts = mMethods.map(function(p){
                         var lbl = p.type==='CRYPTO' ? (p.network||'CRYPTO') : (p.bankName||p.recipientName||'تحويل بنكي');
-                        var currTag = p.type==='BANK' && p.currency ? (p.currency==='SAR'?'🇸🇦':'🇾🇪') : '';
+                        var currTag = p.type==='BANK' && p.currency ? (p.currency==='SAR'?'SAR':'YER') : '';
                         return '<option value="'+p.id+'">'+escHtml(lbl)+(currTag?' '+currTag:'')+'</option>';
                     }).join('');
                     pmSelectorEl.innerHTML = '<div><label class="block text-sm font-medium '+C.text+' mb-1">طريقة الإيداع (طرق التاجر)</label><select id="dep-pm" class="w-full px-4 py-2.5 rounded-xl border '+C.input+' outline-none" onchange="onDepPmChange()"><option value="">-- اختر طريقة --</option>'+pmOpts+'</select></div>';
@@ -3861,7 +3861,7 @@
             }
             h += '<div class="flex justify-between py-1 border-b '+C.border+'"><span class="'+C.muted+' text-sm">طريقة الإيداع</span><span class="font-medium text-sm '+C.text+'">'+(isCrypto ? escHtml(pm.network||'CRYPTO') : escHtml(pm.bankName||pm.recipientName||'تحويل بنكي'))+'</span></div>';
             if(!isCrypto) {
-                h += '<div class="flex justify-between py-1 border-b '+C.border+'"><span class="'+C.muted+' text-sm">العملة</span><span class="font-medium text-sm text-primary">'+(pm.currency==='SAR'?'🇸🇦 SAR ريال سعودي':'🇾🇪 YER ريال يمني')+'</span></div>';
+                h += '<div class="flex justify-between py-1 border-b '+C.border+'"><span class="'+C.muted+' text-sm">العملة</span><span class="font-medium text-sm text-primary">'+(pm.currency==='SAR'?'SAR - ريال سعودي':'YER - ريال يمني')+'</span></div>';
                 var subLabel = pm.subtype==='transfer'?'تحويل':(pm.subtype==='wallet'?'إيداع لمحفظة':'');
                 if(subLabel) h += '<div class="flex justify-between py-1 border-b '+C.border+'"><span class="'+C.muted+' text-sm">نوع التحويل</span><span class="font-medium text-sm '+C.text+'">'+subLabel+'</span></div>';
             }
@@ -9169,21 +9169,8 @@
             var banner = DB.getSetting('admin_banner') || '';
             var bannerType = DB.getSetting('admin_banner_type') || 'INFO';
             var bannerActive = DB.getSetting('admin_banner_active') === 'true';
-            var bannerCountries = DB.getSetting('admin_banner_countries') || '';
-            var selectedCountries = bannerCountries ? bannerCountries.split(',').map(function(c){return c.trim();}) : [];
-            // Build clean dropdown HTML instead of flags
-            var isAll = selectedCountries.length === 0 || selectedCountries.indexOf('ALL') >= 0;
-            var selectOpts = '<option value="ALL" '+(isAll?'selected':'')+'>جميع الدول</option>';
-            countries.forEach(function(co) {
-                var sel = selectedCountries.indexOf(co.code) >= 0 ? 'selected' : '';
-                selectOpts += '<option value="'+co.code+'" '+sel+'>'+escHtml(co.name)+' ('+co.code+')</option>';
-            });
-            return '<div class="'+C.card+' rounded-xl p-4 border '+C.border+'"><h3 class="font-bold '+C.text+' mb-3">📢 شعار تنبيه للمستخدمين</h3>'+
+            return '<div class="'+C.card+' rounded-xl p-4 border '+C.border+'"><h3 class="font-bold '+C.text+' mb-3">شعار تنبيه للمستخدمين</h3>'+
                 '<p class="text-xs '+C.muted+' mb-3">يظهر هذا التنبيه للمستخدمين في أعلى الصفحة الرئيسية</p>'+
-                '<div class="space-y-3 mb-3">'+
-                '<div><label class="block text-sm '+C.muted+' mb-1">استهداف الدول</label>'+
-                '<select id="set-banner-country" onchange="setBannerCountry(this.value)" class="w-full px-4 py-2.5 rounded-xl border '+C.input+' outline-none text-sm">'+selectOpts+'</select>'+
-                '<p class="text-xs '+C.muted+' mt-1">اختر الدولة المستهدفة أو "جميع الدول"</p></div></div>'+
                 '<div class="flex gap-2 mb-3">'+
                 '<button onclick="DB.setSetting(\'admin_banner_type\',\'INFO\');render()" class="flex-1 py-2 rounded-lg text-xs font-bold btn '+(bannerType==='INFO'?'bg-info text-white':'border border-info/30 '+C.text)+'">معلومة</button>'+
                 '<button onclick="DB.setSetting(\'admin_banner_type\',\'WARNING\');render()" class="flex-1 py-2 rounded-lg text-xs font-bold btn '+(bannerType==='WARNING'?'bg-warning text-dark-bg':'border border-warning/30 '+C.text)+'">تحذير</button>'+
@@ -9191,11 +9178,6 @@
                 '<button onclick="DB.setSetting(\'admin_banner_type\',\'SUCCESS\');render()" class="flex-1 py-2 rounded-lg text-xs font-bold btn '+(bannerType==='SUCCESS'?'bg-success text-dark-bg':'border border-success/30 '+C.text)+'">نجاح</button></div>'+
                 '<textarea id="set-banner-text" class="w-full px-3 py-2.5 rounded-xl border '+C.input+' outline-none text-sm mb-3" rows="2" placeholder="اكتب نص التنبيه هنا...">'+escHtml(banner)+'</textarea>'+
                 '<button onclick="saveBanner()" class="w-full py-2.5 rounded-lg font-bold btn '+(bannerActive?'bg-danger text-white':'bg-success text-dark-bg')+' text-sm">'+(bannerActive?'إخفاء التنبيه':'تفعيل وحفظ التنبيه')+'</button></div>';
-        }
-
-        function setBannerCountry(code) {
-            // Single selection from dropdown
-            DB.setSetting('admin_banner_countries', code);
         }
 
         function saveBanner() {
