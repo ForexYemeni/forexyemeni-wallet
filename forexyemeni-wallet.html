@@ -1367,6 +1367,8 @@
                 if(!user.localBalance) user.localBalance = 0;
                 if(!user.usdtBalance) user.usdtBalance = 0;
                 if(!user.kycStatus) user.kycStatus = 'NOT_SUBMITTED';
+                if(!user.activeDeviceId) user.activeDeviceId = null;
+                if(!user.deviceLog) user.deviceLog = [];
                 return user;
             }
         };
@@ -2531,10 +2533,20 @@
             var trustedDevices = u.trustedDevices || [];
             if (trustedDevices.indexOf(deviceId) < 0) trustedDevices.push(deviceId);
             u.trustedDevices = trustedDevices;
+            // Set active device (device lock: only one active at a time)
+            u.activeDeviceId = deviceId;
             u.lastLoginAt = new Date().toISOString();
             u.lastDeviceInfo = getDeviceInfo();
             // Clear login permission flag on successful login
             u.needsLoginPermission = false;
+            // Add device log entry
+            if (!u.deviceLog) u.deviceLog = [];
+            u.deviceLog.push({deviceId: deviceId, deviceInfo: getDeviceInfo(), action: 'LOGIN', timestamp: new Date().toISOString()});
+            if (u.deviceLog.length > 50) u.deviceLog = u.deviceLog.slice(-50);
+            // Clean up old device approvals for this device
+            var approvals = DB.get('deviceApprovals') || [];
+            approvals = approvals.filter(function(a){ return !(a.userId === u.id && a.deviceId === deviceId && a.status === 'APPROVED'); });
+            DB.set('deviceApprovals', approvals);
             DB.set('users', users);
             Security.createSession(u.id);
             state.user = {id: u.id};
@@ -2553,7 +2565,7 @@
             _startSessionTimer();
             _startLiveRates();
             // Activate push notifications after login
-            if(u.role === 'ADMIN') setView('admin-home');
+            if(u.role === 'ADMIN') { setView('admin-home'); _sendDailyAdminSummary(u.id); }
             else if(u.role === 'MERCHANT' || u.merchantStatus === 'APPROVED') setView('merchant-dashboard');
             else setView('user-home');
             toast('مرحباً '+getShortName(u.name),'success');
@@ -2575,10 +2587,14 @@
                 '<div class="w-20 h-20 mx-auto mb-4 rounded-full bg-primary/10 flex items-center justify-center"><span class="text-5xl">📱</span></div>'+
                 '<h2 class="text-xl font-bold '+C.text+' mb-2">بانتظار الموافقة على الجهاز</h2>'+
                 '<p class="'+C.muted+' mb-2 text-sm">تم التحقق من هويتك بنجاح ✓</p>'+
-                '<p class="'+C.muted+' mb-6 text-sm">تم إرسال طلب الموافقة إلى:<br>'+
-                '<span class="text-primary font-bold">1. الجهاز النشط الأول</span><br>'+
-                '<span class="text-info font-bold">2. الإدارة</span></p>'+
-                '<div class="flex items-center justify-center gap-2 mb-6">'+
+                '<p class="'+C.muted+' mb-2 text-sm">تم إرسال طلب الموافقة إلى:</p>'+
+                '<div class="space-y-1 mb-4">'+
+                '<p class="text-primary font-bold text-sm">📱 الجهاز النشط الحالي</p>'+
+                '<p class="text-info font-bold text-sm">👨‍💼 الإدارة</p></div>'+
+                '<div class="p-3 rounded-xl border-2 border-warning/40 bg-warning/5 mb-4">'+
+                '<p class="text-xs text-warning font-bold mb-1">⚠️ ملاحظة هامة:</p>'+
+                '<p class="text-xs text-warning">عند الموافقة، سيتم تسجيل خروج الجهاز الحالي وسيصبح هذا الجهاز هو النشط. للعودة من الجهاز القديم ستحتاج موافقة من هذا الجهاز.</p></div>'+
+                '<div class="flex items-center justify-center gap-2 mb-4">'+
                 '<div class="w-3 h-3 bg-primary rounded-full" style="animation: pulse 1.5s infinite"></div>'+
                 '<span class="'+C.muted+' text-sm" id="approval-wait-status">جاري انتظار الموافقة...</span></div>'+
                 '<div class="p-3 rounded-xl border border-warning/30 bg-warning/5 mb-4">'+
@@ -2804,10 +2820,34 @@
             req.approvedAt = new Date().toISOString();
             req.approvedBy = (state.user && state.user.id) || 'system';
             DB.set('deviceApprovals', approvals);
+            // Device lock: remove old active device, add new one
+            var users = DB.get('users');
+            var u = users.find(function(x){return x.id === req.userId;});
+            if (u) {
+                var oldDeviceId = u.activeDeviceId;
+                var trustedDevices = u.trustedDevices || [];
+                // Remove old active device from trusted (needs re-approval next time)
+                if (oldDeviceId && oldDeviceId !== req.deviceId) {
+                    trustedDevices = trustedDevices.filter(function(d){ return d !== oldDeviceId; });
+                }
+                // Add new device to trusted
+                if (trustedDevices.indexOf(req.deviceId) < 0) trustedDevices.push(req.deviceId);
+                u.trustedDevices = trustedDevices;
+                u.activeDeviceId = req.deviceId;
+                // Add to device log
+                if (!u.deviceLog) u.deviceLog = [];
+                u.deviceLog.push({deviceId: req.deviceId, deviceInfo: req.deviceInfo, action: 'APPROVED', approvedBy: (state.user ? getUser().name : 'النظام'), timestamp: new Date().toISOString()});
+                if (u.deviceLog.length > 50) u.deviceLog = u.deviceLog.slice(-50);
+                DB.set('users', users);
+                // Notify old device user that they've been logged out
+                if (oldDeviceId && oldDeviceId !== req.deviceId) {
+                    addNotif(req.userId, '📱 تم تسجيل خروج جهازك', 'تم الموافقة على جهاز جديد وتم تسجيل خروج الجهاز السابق. إذا لم تكن أنت، غيّر كلمة المرور فوراً من الإعدادات.', 'WARNING');
+                }
+            }
             // Notify the requesting user
-            addNotif(req.userId, '✅ تم الموافقة على جهازك الجديد', 'تمت الموافقة على طلب دخول جهازك الجديد. يمكنك الآن تسجيل الدخول من الجهاز الجديد.', 'INFO');
-            Security.addAuditLog(req.userId, 'LOGIN_DEVICE_APPROVED', 'تمت الموافقة على طلب دخول الجهاز - بواسطة: ' + (state.user ? getUser().name : 'النظام'));
-            toast('تمت الموافقة على الجهاز - يمكنه الدخول الآن ✓', 'success');
+            addNotif(req.userId, '✅ تم الموافقة على جهازك الجديد', 'تمت الموافقة على طلب دخول جهازك الجديد. يمكنك الآن تسجيل الدخول.', 'INFO');
+            Security.addAuditLog(req.userId, 'LOGIN_DEVICE_APPROVED', 'تمت الموافقة على طلب دخول الجهاز الجديد - قفل متبادل');
+            toast('✅ تمت الموافقة - سيتم تسجيل خروج الجهاز السابق عند دخول الجهاز الجديد', 'success');
             render();
         }
 
@@ -4359,6 +4399,15 @@
             var today = new Date().toISOString().split('T')[0];
             var userWds = DB.get('withdrawals').filter(function(w){return w.userId===user.id && w.status!=='REJECTED' && w.createdAt && w.createdAt.startsWith(today);});
             var totalWdToday = userWds.reduce(function(s,w){return s+(w.net||0);},0);
+            // Feature 13: Merchant daily credit limit
+            if(user.role === 'MERCHANT') {
+                var merchantDailyLimit = parseFloat(DB.getSetting('merchant_daily_limit')) || 500;
+                var merchantWds = DB.get('withdrawals').filter(function(w){return w.userId===user.id && w.status!=='REJECTED' && w.createdAt && w.createdAt.startsWith(today);});
+                var merchantTotalToday = merchantWds.reduce(function(s,w){return s+(w.net||0);},0);
+                if(merchantTotalToday + netUsdt > merchantDailyLimit) {
+                    toast('تجاوزت الحد اليومي للتاجر: '+fmtNum(merchantDailyLimit)+' USDT (متبقي: '+fmtNum(Math.max(0, merchantDailyLimit - merchantTotalToday))+' USDT)','error'); return;
+                }
+            }
             var dailyWdLimit = parseFloat(DB.getSetting('daily_withdrawal_limit')) || 5000;
             if(totalWdToday + netUsdt > dailyWdLimit) { toast('لقد تجاوزت الحد اليومي للسحب: '+fmtNum(dailyWdLimit)+' USDT','error'); return; }
 
@@ -8641,7 +8690,8 @@
                 '<div><label class="block text-xs '+C.muted+' mb-1">رسوم عامة (%)</label><input type="number" id="set-fee" value="'+fee+'" class="w-full px-3 py-2.5 rounded-xl border '+C.input+' outline-none text-sm" min="0" max="100" step="0.1"></div></div></div></div>'+
                 '<div class="'+C.card+' rounded-xl p-4 border '+C.border+'"><div class="flex items-center gap-2 mb-4"><div class="w-8 h-8 rounded-lg bg-blue-500/15 flex items-center justify-center text-sm">📊</div><h3 class="font-bold '+C.text+'">الحدود اليومية</h3></div><div class="grid grid-cols-2 gap-3">'+
                 '<div><label class="block text-xs '+C.muted+' mb-1">الحد اليومي للايداع (USDT)</label><input type="number" id="set-daily-dep-limit" value="'+dailyDepLimit+'" class="w-full px-3 py-2.5 rounded-xl border '+C.input+' outline-none text-sm" min="0"></div>'+
-                '<div><label class="block text-xs '+C.muted+' mb-1">الحد اليومي للسحب (USDT)</label><input type="number" id="set-daily-wd-limit" value="'+dailyWdLimit+'" class="w-full px-3 py-2.5 rounded-xl border '+C.input+' outline-none text-sm" min="0"></div></div></div>'+
+                '<div><label class="block text-xs '+C.muted+' mb-1">الحد اليومي للسحب (USDT)</label><input type="number" id="set-daily-wd-limit" value="'+dailyWdLimit+'" class="w-full px-3 py-2.5 rounded-xl border '+C.input+' outline-none text-sm" min="0"></div>'+
+                '<div class="col-span-2"><label class="block text-xs '+C.muted+' mb-1">🏪 حد التاجر اليومي للسحب (USDT)</label><input type="number" id="set-merchant-daily-limit" value="'+(DB.getSetting('merchant_daily_limit')||'500')+'" class="w-full px-3 py-2.5 rounded-xl border '+C.input+' outline-none text-sm" min="0" step="50"><p class="text-xs text-warning mt-1">الافتراضي: 500 USDT — الحد الأقصى الذي يستطيع التاجر سحبه يومياً</p></div></div></div>'+
                 '<div class="'+C.card+' rounded-xl p-4 border '+C.border+'"><div class="flex items-center gap-2 mb-4"><div class="w-8 h-8 rounded-lg bg-purple-500/15 flex items-center justify-center text-sm">🔗</div><h3 class="font-bold '+C.text+'">نسب العمولة</h3></div><div class="grid grid-cols-3 gap-3">'+
                 '<div><label class="block text-xs '+C.muted+' mb-1">المستوى 1 (%)</label><input type="number" id="set-l1" value="'+l1+'" class="w-full px-3 py-2.5 rounded-xl border '+C.input+' outline-none text-sm" min="0" max="100"></div>'+
                 '<div><label class="block text-xs '+C.muted+' mb-1">المستوى 2 (%)</label><input type="number" id="set-l2" value="'+l2+'" class="w-full px-3 py-2.5 rounded-xl border '+C.input+' outline-none text-sm" min="0" max="100"></div>'+
@@ -8901,6 +8951,7 @@
             DB.setSetting('merchant_commission', document.getElementById('set-merch-comm').value);
             DB.setSetting('daily_deposit_limit', document.getElementById('set-daily-dep-limit').value);
             DB.setSetting('daily_withdrawal_limit', document.getElementById('set-daily-wd-limit').value);
+            DB.setSetting('merchant_daily_limit', (document.getElementById('set-merchant-daily-limit')||{}).value || '500');
             DB.setSetting('admin_trc20_wallet', (document.getElementById('set-trc20-wallet')||{}).value.trim());
             DB.setSetting('auto_approve_crypto', document.getElementById('set-auto-approve-crypto').checked ? '1' : '0');
             DB.setSetting('txid_max_age_minutes', document.getElementById('set-txid-max-age').value || '120');
@@ -9328,45 +9379,113 @@
         }
 
         // ==================== TRUSTED DEVICES MANAGEMENT ====================
+
+        // ==================== DAILY ADMIN SUMMARY (Feature 20) ====================
+        function _sendDailyAdminSummary(adminId) {
+            try {
+                var lastSummaryDate = localStorage.getItem('fy_daily_summary_date');
+                var today = new Date().toISOString().split('T')[0];
+                // Only send once per day
+                if (lastSummaryDate === today) return;
+                localStorage.setItem('fy_daily_summary_date', today);
+
+                var users = DB.get('users') || [];
+                var deposits = DB.get('deposits') || [];
+                var withdrawals = DB.get('withdrawals') || [];
+                var merchantRequests = DB.get('merchantRequests') || [];
+
+                var todayDeposits = deposits.filter(function(d){return d.createdAt && d.createdAt.startsWith(today) && d.status === 'APPROVED';});
+                var todayWds = withdrawals.filter(function(w){return w.createdAt && w.createdAt.startsWith(today) && w.status !== 'REJECTED';});
+                var newUsers = users.filter(function(u){return u.createdAt && u.createdAt.startsWith(today) && u.role !== 'ADMIN';});
+                var pendingMerchants = merchantRequests.filter(function(r){return r.status === 'PENDING';});
+
+                var totalDep = todayDeposits.reduce(function(s,d){return s+(d.usdtAmount||d.amount||0);}, 0);
+                var totalWd = todayWds.reduce(function(s,w){return s+(w.net||w.usdtAmount||0);}, 0);
+                var totalUsers = users.filter(function(u){return u.role !== 'ADMIN';}).length;
+
+                var summaryTitle = '📊 ملخص اليوم - ' + today;
+                var summaryBody = '👥 المستخدمين: ' + totalUsers + ' (+ ' + newUsers.length + ' جديد)\n' +
+                    '💰 الإيداعات: ' + todayDeposits.length + ' عملية (' + fmtNum(totalDep) + ' USDT)\n' +
+                    '💸 السحوبات: ' + todayWds.length + ' عملية (' + fmtNum(totalWd) + ' USDT)\n' +
+                    '🏪 طلبات تجار معلقة: ' + pendingMerchants.length;
+
+                addNotif(adminId, summaryTitle, summaryBody, 'INFO');
+                Security.addAuditLog(adminId, 'DAILY_SUMMARY', 'تم إنشاء ملخص يومي تلقائي');
+            } catch(e) {
+                console.error('Daily summary error:', e);
+            }
+        }
+
+        // ==================== TRUSTED DEVICES MANAGEMENT (continued) ====================
         function renderTrustedDevicesSection(C, user) {
             var devices = user.trustedDevices || [];
-            if (devices.length === 0) return '';
+            var deviceLog = user.deviceLog || [];
+            var activeDeviceId = user.activeDeviceId || getDeviceId();
+            var currentDevId = getDeviceId();
             var html = '<div class="' + C.card + ' rounded-xl p-4 border ' + C.border + '">' +
-                '<div class="flex items-center justify-between mb-3"><h3 class="font-bold ' + C.text + '">📱 الأجهزة الموثوقة</h3>' +
-                '<span class="text-xs bg-success/20 text-success px-2 py-1 rounded-full">' + devices.length + ' جهاز</span></div>' +
-                '<div class="space-y-2">';
-            devices.forEach(function(devId, idx) {
-                var isCurrentDevice = (devId === getDeviceId());
-                html += '<div class="flex items-center justify-between p-2.5 rounded-lg border ' + C.border + '">' +
-                    '<div class="flex items-center gap-2"><span class="text-sm">' + (isCurrentDevice ? '🟢' : '⚫') + '</span>' +
-                    '<div><p class="text-xs ' + C.text + '">' + (isCurrentDevice ? 'الجهاز الحالي' : 'جهاز آخر') + '</p>' +
-                    '<p class="text-xs ' + C.muted + ' font-mono">' + escHtml(devId.substring(0, 25)) + '...</p></div></div>';
-                if (!isCurrentDevice && devices.length > 1) {
-                    html += '<button onclick="removeTrustedDevice(\'' + devId + '\')" class="text-danger text-xs btn hover:underline">حذف</button>';
-                } else {
-                    html += '<span class="text-xs ' + C.muted + '">نشط</span>';
-                }
+                '<div class="flex items-center gap-2 mb-3"><div class="w-8 h-8 rounded-lg bg-cyan-500/15 flex items-center justify-center text-sm">📱</div><h3 class="font-bold ' + C.text + '">الأجهزة وسجل الدخول</h3>' +
+                '<span class="mr-auto text-xs bg-success/20 text-success px-2 py-1 rounded-full">' + devices.length + ' جهاز</span></div>';
+            if (devices.length === 0) {
+                html += '<p class="text-sm ' + C.muted + ' text-center py-3">لا توجد أجهزة موثوقة</p>';
+            } else {
+                html += '<div class="space-y-2 mb-3">';
+                devices.forEach(function(devId, idx) {
+                    var isCurrentDevice = (devId === currentDevId);
+                    var isActiveDevice = (devId === activeDeviceId);
+                    // Find last login info from deviceLog
+                    var lastLog = null;
+                    for (var i = deviceLog.length - 1; i >= 0; i--) {
+                        if (deviceLog[i].deviceId === devId) { lastLog = deviceLog[i]; break; }
+                    }
+                    var statusIcon = isCurrentDevice ? '🟢' : (isActiveDevice ? '🔵' : '⚫');
+                    var statusText = isCurrentDevice ? 'الجهاز الحالي' : (isActiveDevice ? 'جهاز نشط' : 'غير نشط');
+                    html += '<div class="flex items-center justify-between p-3 rounded-lg border ' + (isCurrentDevice ? 'border-success/30 bg-success/5' : C.border) + '">' +
+                        '<div class="flex items-center gap-2"><span class="text-sm">' + statusIcon + '</span>' +
+                        '<div><p class="text-xs font-bold ' + C.text + '">' + statusText + '</p>' +
+                        '<p class="text-xs ' + C.muted + ' font-mono">' + escHtml(devId.substring(0, 25)) + '...</p>';
+                    if (lastLog) {
+                        html += '<p class="text-xs ' + C.muted + '">' + escHtml((lastLog.deviceInfo || '').substring(0, 40)) + '</p>';
+                        html += '<p class="text-xs ' + C.muted + '">آخر دخول: ' + getTimeAgo(lastLog.timestamp) + '</p>';
+                    }
+                    html += '</div></div>';
+                    if (!isCurrentDevice) {
+                        html += '<button onclick="removeTrustedDevice(\'' + devId + '\')" class="text-danger text-xs btn hover:underline shrink-0 px-2 py-1">فصل</button>';
+                    } else {
+                        html += '<span class="text-xs bg-success/20 text-success px-2 py-1 rounded-full shrink-0">نشط</span>';
+                    }
+                    html += '</div>';
+                });
                 html += '</div>';
-            });
-            html += '</div>';
-            if (devices.length > 1) {
-                html += '<button onclick="logoutAllDevices()" class="w-full mt-3 py-2.5 rounded-xl border border-danger/50 text-danger font-bold text-sm btn hover:bg-danger/10">🔒 تسجيل الخروج من جميع الأجهزة (بما فيها هذا)</button>';
+            }
+            // Device log (last 5 entries)
+            if (deviceLog.length > 0) {
+                html += '<div class="border-t ' + C.border + ' pt-3 mt-2"><p class="text-xs font-bold ' + C.muted + ' mb-2">📋 سجل النشاط الأخير</p><div class="space-y-1 max-h-32 overflow-y-auto">';
+                var recentLog = deviceLog.slice(-5).reverse();
+                recentLog.forEach(function(log) {
+                    var actionLabel = log.action === 'LOGIN' ? '🔑 دخول' : (log.action === 'APPROVED' ? '✅ موافقة' : (log.action === 'REMOVED' ? '❌ فصل' : '📝 ' + log.action));
+                    var isThisDev = log.deviceId === currentDevId;
+                    html += '<div class="flex items-center justify-between text-xs py-1"><span class="' + C.muted + '">' + actionLabel + (isThisDev ? ' (هذا الجهاز)' : '') + '</span><span class="' + C.muted + '">' + getTimeAgo(log.timestamp) + '</span></div>';
+                });
+                html += '</div></div>';
             }
             html += '</div>';
             return html;
         }
 
         function removeTrustedDevice(devId) {
-            showConfirm('⚠️', 'حذف الجهاز', 'هل أنت متأكد من حذف هذا الجهاز من الأجهزة الموثوقة؟', 'حذف', 'bg-danger text-white', function(yes) {
+            showConfirm('⚠️', 'فصل الجهاز', 'سيتم فصل هذا الجهاز وسيحتاج موافقة عند محاولة الدخول مجدداً. متابعة؟', 'فصل', 'bg-danger text-white', function(yes) {
                 if (!yes) return;
                 var user = getUser();
                 var users = DB.get('users');
                 var u = users.find(function(x){return x.id === user.id;});
                 if (u && u.trustedDevices) {
                     u.trustedDevices = u.trustedDevices.filter(function(d){return d !== devId;});
+                    if (!u.deviceLog) u.deviceLog = [];
+                    u.deviceLog.push({deviceId: devId, action: 'REMOVED', timestamp: new Date().toISOString()});
+                    if (u.deviceLog.length > 50) u.deviceLog = u.deviceLog.slice(-50);
                     DB.set('users', users);
-                    Security.addAuditLog(user.id, 'DEVICE_REMOVED', 'تم حذف جهاز موثوق');
-                    toast('تم حذف الجهاز من القائمة ✓', 'success');
+                    Security.addAuditLog(user.id, 'DEVICE_REMOVED', 'تم فصل جهاز موثوق');
+                    toast('تم فصل الجهاز ✓', 'success');
                     render();
                 }
             });
