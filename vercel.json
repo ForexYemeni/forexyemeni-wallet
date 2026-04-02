@@ -1,12 +1,15 @@
 {
-  "headers": [
-    {
-      "source": "/(.*)",
-      "headers": [
-        { "key": "Cache-Control", "value": "no-cache, no-store, must-revalidate" },
-        { "key": "Pragma", "value": "no-cache" },
-        { "key": "Expires", "value": "0" }
-      ]
-    }
+  "builds": [
+    { "src": "api/**/*.js", "use": "@vercel/node" },
+    { "src": "**/*.html", "use": "@vercel/static" },
+    { "src": "**/*.json", "use": "@vercel/static" },
+    { "src": "**/*.png", "use": "@vercel/static" },
+    { "src": "**/*.js", "use": "@vercel/static" }
+  ],
+  "routes": [
+    { "src": "/api/(.*)", "dest": "/api/$1" },
+    { "src": "/(.*)", "headers": { "Cache-Control": "no-cache, no-store, must-revalidate", "Pragma": "no-cache", "Expires": "0" } },
+    { "src": "/", "dest": "/index.html" },
+    { "src": "/forexyemeni-wallet.html", "dest": "/forexyemeni-wallet.html" }
   ]
 }
