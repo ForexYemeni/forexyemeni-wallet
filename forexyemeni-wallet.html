@@ -7098,21 +7098,45 @@
         function renderAdminPaymentMethods(C) {
             var pms = DB.get('paymentMethods');
             return '<div class="'+C.card+' rounded-2xl p-5 border '+C.border+'">'+
-                '<div class="flex items-center justify-between mb-4"><h2 class="text-lg font-bold '+C.text+'">طرق الدفع</h2>'+
-                '<button onclick="showAddPmModal()" class="'+C.btn+' px-3 py-1.5 rounded-lg font-bold btn text-xs">+ إضافة طريقة</button></div>'+
-                (pms.length===0 ? '<p class="'+C.muted+' text-center py-4 text-sm">لا توجد طرق دفع</p>' :
+                '<div class="flex items-center justify-between mb-4"><h2 class="text-lg font-bold '+C.text+'">💳 طرق الدفع</h2>'+
+                '<button onclick="showAddPmModal()" class="'+C.btn+' px-3 py-1.5 rounded-lg font-bold btn text-sm">+ إضافة طريقة</button></div>'+
+                (pms.length===0 ? '<div class="text-center py-10"><p class="text-4xl mb-3">💳</p><p class="'+C.muted+' text-sm">لا توجد طرق دفع</p><p class="'+C.muted+' text-xs mt-1">أضف طريقة دفع ليتمكن المستخدمون من الإيداع</p></div>' :
                 '<div class="space-y-3">'+pms.map(function(pm) {
-                    var typeLabel = pm.type==='CRYPTO'?'عملات رقمية':'تحويل بنكي';
-                    var currLabel = pm.type==='BANK' ? (pm.currency==='SAR'?'SAR':(pm.currency==='YER'?'YER':'')) : '';
-                    var subLabel = pm.subtype==='transfer'?'تحويل':(pm.subtype==='wallet'?'إيداع لمحفظة':'');
+                    var typeIcon = pm.type==='CRYPTO' ? '💰' : '🏦';
+                    var typeBg = pm.type==='CRYPTO' ? 'bg-primary/10' : 'bg-info/10';
+                    var typeLabel = pm.type==='CRYPTO' ? 'عملات رقمية' : 'تحويل بنكي';
                     var pmLabel = pm.type==='CRYPTO' ? escHtml(pm.network||'CRYPTO') : escHtml(pm.bankName||pm.recipientName||'تحويل بنكي');
-                    return '<div class="p-4 rounded-lg border '+C.border+' '+(pm.isActive?'':'opacity-50')+'">'+
-                        '<div class="flex items-center justify-between mb-2">'+
-                        '<div><p class="font-medium text-sm '+C.text+'">'+pmLabel+'</p><p class="text-xs '+C.muted+'">'+typeLabel+(pm.network?' ('+escHtml(pm.network)+')':'')+(currLabel?' | '+currLabel:'')+(subLabel?' | '+subLabel:'')+'</p></div>'+
-                        '<div class="flex items-center gap-2">'+statusBadge(pm.isActive?'ACTIVE':'BLOCKED')+
-                        '<button onclick="togglePmActive(\''+pm.id+'\')" class="text-xs px-2 py-1 rounded border '+C.border+' '+C.text+' btn">'+(pm.isActive?'تعطيل':'تفعيل')+'</button></div></div>'+
-                        '<div class="flex gap-2"><button onclick="showEditPmModal(\''+pm.id+'\')" class="px-3 py-1.5 rounded-lg border '+C.border+' '+C.text+' btn text-xs">✏️ تعديل</button>'+
-                        '<button onclick="deletePm(\''+pm.id+'\')" class="px-3 py-1.5 rounded-lg btn text-xs bg-danger text-white">🗑️ حذف</button></div></div>';
+                    var info = '';
+                    if(pm.type==='CRYPTO') {
+                        var netBadge = '<span class="px-2 py-0.5 rounded bg-primary/20 text-primary text-[10px] font-bold">'+escHtml(pm.network||'CRYPTO')+'</span>';
+                        var minDepBadge = (pm.minDeposit||0) > 0 ? '<span class="px-2 py-0.5 rounded bg-warning/20 text-warning text-[10px] font-bold">حد أدنى: '+fmtNum(pm.minDeposit)+' USDT</span>' : '';
+                        var minWdBadge = (pm.minWithdraw||0) > 0 ? '<span class="px-2 py-0.5 rounded bg-danger/20 text-danger text-[10px] font-bold">حد سحب: '+fmtNum(pm.minWithdraw)+' USDT</span>' : '';
+                        info = '<div class="flex items-center gap-2 mb-2">'+netBadge+minDepBadge+minWdBadge+'</div>'+
+                            '<p class="text-sm font-bold '+C.text+' mb-1">USDT ('+escHtml(pm.network||'') +')</p>'+
+                            '<div class="py-1"><p class="'+C.muted+' text-xs mb-1">عنوان المحفظة</p>'+
+                            '<div class="flex items-center gap-2"><p class="font-mono text-xs '+C.text+' break-all flex-1">'+escHtml(pm.address||'')+'</p>'+
+                            '<button onclick="copyText(\''+escHtml((pm.address||'').replace(/'/g,"\\'")).replace(/\\/g,'\\\\')+'\')" class="copy-btn shrink-0 text-xs px-2 py-1 rounded border '+C.border+' btn">📋</button></div></div>';
+                    } else {
+                        var currBadge = pm.currency==='SAR' ? '<span class="px-2 py-0.5 rounded bg-warning/20 text-warning text-[10px] font-bold">SAR</span>' : (pm.currency==='YER' ? '<span class="px-2 py-0.5 rounded bg-success/20 text-success text-[10px] font-bold">YER</span>' : '');
+                        var subBadge = pm.subtype==='transfer' ? '<span class="px-2 py-0.5 rounded bg-accent-violet/20 text-accent-violet text-[10px] font-bold">تحويل</span>' : (pm.subtype==='wallet' ? '<span class="px-2 py-0.5 rounded bg-info/20 text-info text-[10px] font-bold">إيداع لمحفظة</span>' : '');
+                        info = '<div class="flex items-center gap-2 mb-2">'+currBadge+subBadge+'</div>'+
+                            '<p class="text-sm font-bold '+C.text+' mb-1">'+escHtml(pm.bankName||'تحويل بنكي')+'</p>'+
+                            '<div class="space-y-1">'+
+                            '<div class="flex justify-between py-1 border-b '+C.border+'"><span class="'+C.muted+' text-xs">رقم الحساب</span><span class="font-mono text-xs font-bold '+C.text+'">'+escHtml(pm.accountNumber||'')+'</span></div>'+
+                            '<div class="flex justify-between py-1"><span class="'+C.muted+' text-xs">اسم صاحب الحساب</span><span class="text-xs font-medium '+C.text+'">'+escHtml(pm.recipientName||'')+'</span></div></div>';
+                    }
+                    var activeBtn = pm.isActive ?
+                        '<button onclick="togglePmActive(\''+pm.id+'\')" class="flex-1 py-2 rounded-xl font-bold btn text-xs bg-warning text-dark-bg">🔒 تعطيل</button>' :
+                        '<button onclick="togglePmActive(\''+pm.id+'\')" class="flex-1 py-2 rounded-xl font-bold btn text-xs bg-success text-dark-bg">🔓 تفعيل</button>';
+                    return '<div class="'+C.card+' rounded-xl p-4 border '+C.border+' '+(pm.isActive?'':'opacity-50')+' card-hover shadow-card">'+
+                        '<div class="flex items-start justify-between gap-3 mb-3">'+
+                        '<div class="flex items-start gap-3 flex-1 min-w-0">'+
+                        '<div class="w-10 h-10 rounded-xl '+typeBg+' flex items-center justify-center text-lg shrink-0">'+typeIcon+'</div>'+
+                        '<div class="flex-1 min-w-0">'+info+'</div></div>'+
+                        '<div class="shrink-0">'+statusBadge(pm.isActive?'ACTIVE':'BLOCKED')+'</div></div>'+
+                        '<div class="flex gap-2">'+activeBtn+
+                        '<button onclick="showEditPmModal(\''+pm.id+'\')" class="flex-1 py-2 rounded-xl font-bold btn text-xs border '+C.border+' '+C.text+'">✏️ تعديل</button>'+
+                        '<button onclick="deletePm(\''+pm.id+'\')" class="flex-1 py-2 rounded-xl font-bold btn text-xs bg-danger text-white">🗑️ حذف</button></div></div>';
                 }).join('')+'</div>')+'</div>';
         }
 
