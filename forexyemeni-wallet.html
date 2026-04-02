@@ -1456,6 +1456,12 @@
             if(c.label === 'SAR') return c.symbol + ' ' + fmtNum(c.amount, 2);
             return fmtNum(c.amount);
         }
+        // Get first name only (before first space)
+        function getFirstName(fullName) {
+            if (!fullName) return '';
+            var parts = fullName.trim().split(/\s+/);
+            return parts[0] || '';
+        }
         function getUser() { return DB.ensureUserFields(DB.get('users').find(function(u) { return u.id === (state.user && state.user.id); })); }
 
         // ==================== TOAST ====================
@@ -1934,8 +1940,11 @@
             '<div id="reg-role-MERCHANT" onclick="selectRegRole(\'MERCHANT\')" style="cursor:pointer;padding:12px;border-radius:12px;border:2px solid '+brdC+';display:flex;align-items:center;gap:8px;">'+
             '<input type="radio" name="reg-role" value="MERCHANT" style="accent-color:#f59e0b;width:18px;height:18px;"><span style="font-size:14px;color:'+txtC+'">🏪 تاجر</span></div></div></div>'+
 
-            '<div><label style="'+labelStyle+'">الاسم الكامل</label>'+
-            '<input type="text" id="reg-name" required autocomplete="name" style="'+inputStyle+'" placeholder="محمد أحمد"></div>'+
+            '<div><label style="'+labelStyle+'">الاسم الأول <span style="color:#ef4444">*</span></label>'+
+            '<input type="text" id="reg-name" required autocomplete="given-name" style="'+inputStyle+'" placeholder="محمد"></div>'+
+
+            '<div><label style="'+labelStyle+'">اللقب <span style="color:#ef4444">*</span></label>'+
+            '<input type="text" id="reg-lastname" required autocomplete="family-name" style="'+inputStyle+'" placeholder="أحمد"></div>'+
 
             '<div><label style="'+labelStyle+'">طريقة التسجيل</label>'+
             '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">'+
@@ -2524,7 +2533,7 @@
             if(u.role === 'ADMIN') setView('admin-home');
             else if(u.role === 'MERCHANT' || u.merchantStatus === 'APPROVED') setView('merchant-dashboard');
             else setView('user-home');
-            toast('مرحباً '+u.name,'success');
+            toast('مرحباً '+getFirstName(u.name),'success');
             // Auto-request notification permission on first login
             if('Notification' in window && Notification.permission === 'default') {
                 setTimeout(function(){ requestNotifPermission(); }, 3000);
@@ -3105,7 +3114,10 @@
             var refCode = document.getElementById('reg-ref') ? document.getElementById('reg-ref').value.trim() : '';
             var roleRadio = document.querySelector('input[name="reg-role"]:checked');
             var selectedRole = roleRadio ? roleRadio.value : 'USER';
-            if(!name) { toast('أدخل الاسم','error'); return; }
+            var lastname = document.getElementById('reg-lastname') ? document.getElementById('reg-lastname').value.trim() : '';
+            if(!name) { toast('أدخل الاسم الأول','error'); return; }
+            if(!lastname) { toast('أدخل اللقب','error'); return; }
+            name = name + ' ' + lastname;
             if(pass.length < 6) { toast('كلمة المرور 6 أحرف على الأقل','error'); return; }
             // === OTP Verification Check (based on reg method) ===
             if (_regMethod === 'email') {
@@ -3282,7 +3294,7 @@
                 '<div class="p-4 border-b '+C.border+' flex items-center justify-between">'+
                 '<div class="flex items-center gap-3"><div class="w-9 h-9 rounded-xl bg-gradient-to-br from-amber-400 to-yellow-500 flex items-center justify-center text-gray-900 font-extrabold text-sm shadow-glow-sm">FX</div><span class="font-extrabold text-sm '+C.text+' text-glow">ForexYemeni</span></div>'+
                 '<button onclick="state.sidebarOpen=false;render()" class="lg:hidden '+C.muted+' text-xl hover:text-primary transition-colors">&times;</button></div>'+
-                '<div class="p-4 border-b '+C.border+'"><div class="flex items-center gap-3"><div class="w-10 h-10 rounded-full bg-gradient-to-br from-amber-500/20 to-violet-500/20 border border-primary/30 flex items-center justify-center text-sm">'+(isMerchant?'🏪':'👤')+'</div><div><p class="text-sm font-bold '+C.text+'">'+escHtml(user.name)+'</p><p class="text-xs '+C.muted+'">'+escHtml(roleLabel)+'</p></div></div></div>'+
+                '<div class="p-4 border-b '+C.border+'"><div class="flex items-center gap-3"><div class="w-10 h-10 rounded-full bg-gradient-to-br from-amber-500/20 to-violet-500/20 border border-primary/30 flex items-center justify-center text-sm">'+(isMerchant?'🏪':'👤')+'</div><div><p class="text-sm font-bold '+C.text+'">'+escHtml(getFirstName(user.name))+'</p><p class="text-xs '+C.muted+'">'+escHtml(roleLabel)+'</p></div></div></div>'+
                 '<nav class="p-3 space-y-1 flex-1">'+navHtml+'</nav>'+
                 '<div class="p-3 border-t '+C.border+'"><button onclick="logout()" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm text-danger hover:bg-danger/10 btn"><span>🚪</span><span>تسجيل الخروج</span></button></div>'+
                 '</aside>';
@@ -4995,7 +5007,7 @@
                     '<div class="flex items-center gap-3"><span class="text-2xl">🔕</span><div><p class="font-bold '+C.text+' text-sm text-warning">الإشعارات محظورة</p><p class="'+C.muted+' text-xs">لتفعيلها: اضغط على 🔒 بجانب العنوان ← إعدادات الموقع ← إشعارات ← سماح</p></div></div></div>';
             }
             return renderAdminBanner(C) + renderDeviceApprovalPendingSection(C) + notifBanner + '<div class="space-y-4">'+
-                '<div class="'+C.card+' rounded-2xl p-4 border '+C.border+' text-center"><p class="'+C.muted+' text-sm">مرحباً، التاجر</p><h2 class="text-xl font-bold '+C.text+'">'+escHtml(user.name)+'</h2><p class="text-xs '+C.muted+'">سعر الصرف: 1 USDT = '+fmtNum(myRate)+' YER'+(myCommission>0?' | عمولة: '+myCommission+'%':'')+'</p></div>'+
+                '<div class="'+C.card+' rounded-2xl p-4 border '+C.border+' text-center"><p class="'+C.muted+' text-sm">مرحباً، التاجر</p><h2 class="text-xl font-bold '+C.text+'">'+escHtml(getFirstName(user.name))+'</h2><p class="text-xs '+C.muted+'">سعر الصرف: 1 USDT = '+fmtNum(myRate)+' YER'+(myCommission>0?' | عمولة: '+myCommission+'%':'')+'</p></div>'+
                 '<div class="grid grid-cols-2 md:grid-cols-4 gap-3">'+
                 '<div class="'+C.card+' rounded-2xl p-4 border '+C.border+' text-center"><p class="text-3xl mb-1">💰</p><p class="text-2xl font-bold text-warning">'+pendingDepCount+'</p><p class="'+C.muted+' text-xs">إيداعات معلقة</p></div>'+
                 '<div class="'+C.card+' rounded-2xl p-4 border '+C.border+' text-center"><p class="text-3xl mb-1">🏧</p><p class="text-2xl font-bold text-warning">'+pendingWdCount+'</p><p class="'+C.muted+' text-xs">سحوبات معلقة</p></div>'+
