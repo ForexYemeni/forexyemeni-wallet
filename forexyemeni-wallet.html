@@ -198,8 +198,8 @@
     <div id="app"></div>
     <div id="recaptcha-container"></div>
     <div id="toast-container" class="fixed top-4 left-1/2 -translate-x-1/2 z-[9999] flex flex-col gap-2 pointer-events-none"></div>
-    <div id="modal-container" class="hidden fixed inset-0 z-[9998] overlay flex items-center justify-center p-4" onclick="if(event.target===this)closeModal()">
-        <div id="modal-content" class="glass rounded-2xl shadow-premium max-w-lg w-full max-h-[90vh] overflow-y-auto p-6 modal-premium"></div>
+    <div id="modal-container" class="hidden fixed inset-0 z-[9998] overlay flex items-center justify-center p-4" onclick="if(event.target===this)closeModal()" style="touch-action:none;">
+        <div id="modal-content" class="glass rounded-2xl shadow-premium max-w-lg w-full max-h-[90vh] overflow-y-auto p-6 modal-premium" style="touch-action:pan-y;"></div>
     </div>
     <div id="confirm-container" class="hidden fixed inset-0 z-[9998] overlay flex items-center justify-center p-4">
         <div class="glass rounded-2xl shadow-premium max-w-sm w-full p-6 text-center modal-premium">
@@ -2973,17 +2973,26 @@
 
         // ==================== ADMIN RECOVERY PASSWORD POPUP ====================
         function _showAdminRecoveryPopup() {
+            var isDark = document.documentElement.classList.contains('dark');
+            var txtColor = isDark ? 'text-white' : 'text-gray-900';
+            var subColor = isDark ? 'text-gray-300' : 'text-gray-600';
+            var inputCls = isDark
+                ? 'w-full px-4 py-3 rounded-xl border border-gray-600 bg-gray-800/50 text-white outline-none text-center text-lg placeholder-gray-500'
+                : 'w-full px-4 py-3 rounded-xl border border-gray-300 bg-white text-gray-900 outline-none text-center text-lg placeholder-gray-400';
+            var cancelCls = isDark
+                ? 'w-full py-2.5 rounded-xl text-gray-400 btn border border-gray-600/50 hover:bg-gray-700/30'
+                : 'w-full py-2.5 rounded-xl text-gray-600 btn border border-gray-300 hover:bg-gray-100';
             showModal(
-                '<div class="p-6 text-center space-y-4" style="min-width:320px;">' +
+                '<div class="p-6 text-center space-y-4">' +
                 '<div class="inline-flex items-center justify-center w-20 h-20 rounded-full bg-gradient-to-br from-red-500 to-rose-600 shadow-lg mb-2"><span class="text-5xl">🔐</span></div>' +
-                '<h2 class="text-xl font-extrabold text-white">استعادة كلمة مرور الإدارة</h2>' +
-                '<p class="text-gray-300 text-sm">كلمة المرور التي أدخلتها غير صحيحة. أدخل كلمة مرور الاستعادة لإعادة تعيين كلمة المرور.</p>' +
+                '<h2 class="text-xl font-extrabold ' + txtColor + '">استعادة كلمة مرور الإدارة</h2>' +
+                '<p class="' + subColor + ' text-sm">كلمة المرور التي أدخلتها غير صحيحة. أدخل كلمة مرور الاستعادة لإعادة تعيين كلمة المرور.</p>' +
                 '<div class="bg-red-500/10 border border-red-500/30 rounded-xl p-3"><p class="text-red-400 text-xs">⚠️ سيتم إجبارك على تغيير كلمة المرور فوراً بعد الاستعادة</p></div>' +
                 '<form onsubmit="handleAdminRecoveryPassword(event)" class="space-y-3">' +
-                '<input type="password" id="admin-recovery-pass" required class="w-full px-4 py-3 rounded-xl border border-gray-600 bg-gray-800/50 text-white outline-none text-center text-lg placeholder-gray-500" placeholder="أدخل كلمة مرور الاستعادة" autocomplete="off">' +
+                '<input type="password" id="admin-recovery-pass" required class="' + inputCls + '" placeholder="أدخل كلمة مرور الاستعادة" autocomplete="off">' +
                 '<p id="admin-recovery-error" class="text-red-400 text-sm text-center min-h-[20px]"></p>' +
                 '<button type="submit" class="w-full py-3 rounded-xl font-bold text-lg bg-gradient-to-r from-primary to-blue-600 text-white btn">تأكيد الاستعادة</button>' +
-                '<button type="button" onclick="closeModal()" class="w-full py-2.5 rounded-xl text-gray-400 btn border border-gray-600/50 hover:bg-gray-700/30">إلغاء</button>' +
+                '<button type="button" onclick="closeModal()" class="' + cancelCls + '">إلغاء</button>' +
                 '</form></div>'
             );
         }
