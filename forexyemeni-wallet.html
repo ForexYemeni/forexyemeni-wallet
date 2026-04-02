@@ -2284,6 +2284,11 @@
             var pass = document.getElementById('login-pass').value;
             hideLoginError();
             if(!inputVal || !pass) { showLoginError('أدخل رقم الهاتف أو البريد الإلكتروني وكلمة المرور'); return; }
+            // Check if input looks like a name (Arabic or English letters without @ or digits)
+            if(!/[@\d]/.test(inputVal) && /[a-zA-Z\u0600-\u06FF]/.test(inputVal)) {
+                showLoginError('⚠️ الرجاء كتابة رقم هاتفك أو بريدك الإلكتروني، وليس الاسم');
+                return;
+            }
             var isEmail = inputVal.indexOf('@') > 0;
             // === Brute Force Protection ===
             var bfCheck = Security.checkBruteForce(inputVal);
