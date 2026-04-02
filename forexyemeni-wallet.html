@@ -745,23 +745,24 @@
         }
 
         // Register service worker for FCM
-        if ('serviceWorker' in navigator) {
-            navigator.serviceWorker.register('firebase-messaging-sw.js').then(function(reg) {
-                console.log('[FCM] Service Worker registered:', reg.scope);
-                try { messaging.useServiceWorker(reg); } catch(e) {}
-                // Listen for updates
-                reg.addEventListener('updatefound', function() {
-                    var newWorker = reg.installing;
-                    newWorker.addEventListener('statechange', function() {
-                        if (newWorker.state === 'activated') {
-                            toast('تم تحديث التطبيق - أعد تحميل الصفحة','success',false);
-                        }
+        try {
+            if ('serviceWorker' in navigator) {
+                navigator.serviceWorker.register('firebase-messaging-sw.js').then(function(reg) {
+                    console.log('[FCM] Service Worker registered:', reg.scope);
+                    try { messaging.useServiceWorker(reg); } catch(e) {}
+                    reg.addEventListener('updatefound', function() {
+                        var newWorker = reg.installing;
+                        newWorker.addEventListener('statechange', function() {
+                            if (newWorker.state === 'activated') {
+                                toast('تم تحديث التطبيق - أعد تحميل الصفحة','success',false);
+                            }
+                        });
                     });
+                }).catch(function(err) {
+                    console.warn('[FCM] SW registration failed:', err);
                 });
-            }).catch(function(err) {
-                console.warn('[FCM] SW registration failed:', err);
-            });
-        }
+            }
+        } catch(e) { console.warn('[FCM] Service Worker not available:', e); }
 
         // ==================== PWA INSTALL ====================
         var _deferredPrompt = null;
