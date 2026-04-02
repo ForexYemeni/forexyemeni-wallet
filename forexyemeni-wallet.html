@@ -3588,7 +3588,7 @@
                 '<div id="dep-merchant-section"></div>'+
                 '<div id="dep-pm-selector"><div><label class="block text-sm font-medium '+C.text+' mb-1">طريقة الإيداع</label><select id="dep-pm" class="w-full px-4 py-2.5 rounded-xl border '+C.input+' outline-none" onchange="onDepPmChange()"><option value="">-- اختر طريقة --</option>'+pmOpts+'</select></div></div>'+
                 '<div id="dep-pm-details"></div>'+
-                '<div id="dep-currency-row" class="grid grid-cols-2 gap-3"><div><label class="block text-sm font-medium '+C.text+' mb-1">العملة</label><select id="dep-currency" class="w-full px-4 py-2.5 rounded-xl border '+C.input+' outline-none"><option value="YER">🇾🇪 YER ريال يمني</option><option value="SAR">🇸🇦 SAR ريال سعودي</option></select></div><div><label class="block text-sm font-medium '+C.text+' mb-1">المبلغ <span class="text-danger">*</span></label><input type="number" id="dep-amount" class="w-full px-4 py-2.5 rounded-xl border '+C.input+' outline-none" placeholder="أدخل المبلغ" min="1" step="0.01" oninput="updateDepCustomerReceives()"></div></div>'+
+                '<div id="dep-currency-row" class="grid grid-cols-2 gap-3"><div><label class="block text-sm font-medium '+C.text+' mb-1">العملة</label><select id="dep-currency" class="w-full px-4 py-2.5 rounded-xl border '+C.input+' outline-none"><option value="YER">YER - ريال يمني</option><option value="SAR">SAR - ريال سعودي</option></select></div><div><label class="block text-sm font-medium '+C.text+' mb-1">المبلغ <span class="text-danger">*</span></label><input type="number" id="dep-amount" class="w-full px-4 py-2.5 rounded-xl border '+C.input+' outline-none" placeholder="أدخل المبلغ" min="1" step="0.01" oninput="updateDepCustomerReceives()"></div></div>'+
                 '<div id="dep-customer-receives" class="hidden '+C.card+' rounded-xl p-3 border border-success/30 bg-success/5 space-y-1"></div>'+
                 '<div id="dep-amount-crypto-row" class="hidden"><label class="block text-sm font-medium '+C.text+' mb-1">المبلغ (USDT) <span class="text-danger">*</span></label><input type="number" id="dep-amount-crypto" class="w-full px-4 py-2.5 rounded-xl border '+C.input+' outline-none" placeholder="أدخل المبلغ" min="1" step="0.01" oninput="updateDepCustomerReceives()"></div>'+
                 '<div id="dep-rate-info"></div>'+
@@ -4037,7 +4037,7 @@
                 '<div class="'+C.card+' rounded-lg p-3 text-center border '+C.border+'"><p class="'+C.muted+' text-xs">رصيد USDT</p><p class="font-bold text-success">'+fmtNum(user.usdtBalance)+'</p></div>'+
                 '<div class="'+C.card+' rounded-lg p-3 text-center border '+C.border+'"><p class="'+C.muted+' text-xs">المعادل YER</p><p class="font-bold text-primary">'+fmtInt(Math.round(user.usdtBalance*rate))+'</p></div></div>'+
                 '<div class="space-y-4">'+
-                '<div><label class="block text-sm font-medium '+C.text+' mb-1">عملة السحب</label><select id="wd-currency" class="w-full px-4 py-2.5 rounded-xl border '+C.input+' outline-none" onchange="_filterWdPaymentMethods();updateWdCalc();setMaxWdAmount()"><option value="USDT">USDT</option><option value="YER">🇾🇪 YER ريال يمني</option><option value="SAR">🇸🇦 SAR ريال سعودي</option></select></div>'+
+                '<div><label class="block text-sm font-medium '+C.text+' mb-1">عملة السحب</label><select id="wd-currency" class="w-full px-4 py-2.5 rounded-xl border '+C.input+' outline-none" onchange="_filterWdPaymentMethods();updateWdCalc();setMaxWdAmount()"><option value="USDT">USDT</option><option value="YER">YER - ريال يمني</option><option value="SAR">SAR - ريال سعودي</option></select></div>'+
                 '<div><label class="block text-sm font-medium '+C.text+' mb-1">طريقة السحب</label><select id="wd-method" class="w-full px-4 py-2.5 rounded-xl border '+C.input+' outline-none" onchange="updateWdCalc()"><option value="">-- اختر طريقة سحب --</option>'+pmOpts+'</select></div>'+
                 '<div id="wd-merchant-section"></div>'+
                 '<div id="wd-method-details"></div>'+
@@ -4926,7 +4926,7 @@
                 html += '<div class="space-y-3">';
                 wms.forEach(function(w) {
                     var info = '';
-                    var currLabel = w.currency === 'SAR' ? '🇸🇦 SAR' : (w.currency === 'YER' ? '🇾🇪 YER' : '');
+                    var currLabel = w.currency === 'SAR' ? 'SAR' : (w.currency === 'YER' ? 'YER' : '');
                     var subLabel = w.subtype === 'transfer' ? 'تحويل' : 'إيداع لمحفظة';
                     if(w.type==='BANK') info = '<p class="text-sm font-medium '+C.text+'">'+escHtml(w.bankName||'تحويل بنكي')+'</p><p class="text-xs '+C.muted+'">'+currLabel+' | '+subLabel+'</p><p class="text-xs '+C.muted+'">رقم الحساب: '+escHtml(w.accountNumber||'')+'</p><p class="text-xs '+C.muted+'">الاسم: '+escHtml(w.recipientName||'')+'</p>';
                     else info = '<p class="text-sm font-medium '+C.text+'">'+escHtml(w.currencyName||'USDT')+' ('+escHtml(w.network||'') +')</p><p class="text-xs '+C.muted+' font-mono">'+escHtml((w.address||'').substr(0,24))+'...</p>';
@@ -4946,7 +4946,7 @@
                 '<div><label class="block text-sm font-medium '+C.text+' mb-1">نوع الطريقة</label><select id="wm-type" class="w-full px-4 py-2.5 rounded-xl border '+C.input+' outline-none" onchange="toggleWmFields()"><option value="BANK">تحويل بنكي</option><option value="CRYPTO">عملات رقمية</option></select></div>'+
                 '<div id="wm-bank-fields"><div class="space-y-3">'+
                 '<div><label class="block text-sm font-medium '+C.text+' mb-1">نوع التحويل</label><select id="wm-subtype" class="w-full px-4 py-2.5 rounded-xl border '+C.input+' outline-none" onchange="toggleWmBankSubFields()"><option value="wallet">إيداع لمحفظة</option><option value="transfer">تحويل</option></select></div>'+
-                '<div><label class="block text-sm font-medium '+C.text+' mb-1">نوع العملة</label><select id="wm-currency" class="w-full px-4 py-2.5 rounded-xl border '+C.input+' outline-none"><option value="YER">🇾🇪 YER ريال يمني</option><option value="SAR">🇸🇦 SAR ريال سعودي</option></select></div>'+
+                '<div><label class="block text-sm font-medium '+C.text+' mb-1">نوع العملة</label><select id="wm-currency" class="w-full px-4 py-2.5 rounded-xl border '+C.input+' outline-none"><option value="YER">YER - ريال يمني</option><option value="SAR">SAR - ريال سعودي</option></select></div>'+
                 '<input type="text" id="wm-bank-name" class="w-full px-4 py-2.5 rounded-xl border '+C.input+' outline-none" placeholder="اسم المحفظة / الشبكة"><input type="text" id="wm-account" class="w-full px-4 py-2.5 rounded-xl border '+C.input+' outline-none" placeholder="رقم الحساب"><input type="text" id="wm-recipient" class="w-full px-4 py-2.5 rounded-xl border '+C.input+' outline-none" placeholder="اسم صاحب الحساب"></div></div>'+
                 '<div id="wm-crypto-fields" class="hidden"><div class="space-y-3"><input type="text" id="wm-currency-name" value="USDT" readonly class="w-full px-4 py-2.5 rounded-xl border '+C.input+' outline-none opacity-70"><select id="wm-network" class="w-full px-4 py-2.5 rounded-xl border '+C.input+' outline-none"><option value="TRC20">TRC20</option><option value="BEP20">BEP20</option><option value="ERC20">ERC20</option></select><input type="text" id="wm-address" class="w-full px-4 py-2.5 rounded-xl border '+C.input+' outline-none" placeholder="عنوان المحفظة"></div></div>'+
                 '<button onclick="submitWm()" class="'+C.btn+' w-full py-3 rounded-lg font-bold btn">إضافة</button>'+
@@ -5791,7 +5791,7 @@
                     if(m.type === 'CRYPTO') {
                         info = '<div class="flex items-center gap-2"><span class="px-2 py-0.5 rounded bg-primary/20 text-primary text-[10px] font-bold">'+escHtml(m.network||'TRC20')+'</span><span class="text-xs font-mono '+C.text+' break-all">'+escHtml(m.address||'')+'</span></div>';
                     } else {
-                        var currLabel = m.currency === 'SAR' ? '🇸🇦 SAR' : (m.currency === 'YER' ? '🇾🇪 YER' : '');
+                        var currLabel = m.currency === 'SAR' ? 'SAR' : (m.currency === 'YER' ? 'YER' : '');
                         var subLabel = m.subtype === 'transfer' ? 'تحويل' : (m.subtype === 'wallet' ? 'إيداع لمحفظة' : '');
                         info = '<div class="text-xs space-y-0.5"><p class="'+C.text+'">'+escHtml(m.bankName||'')+' '+(currLabel?'('+currLabel+')':'')+'</p><p class="'+C.muted+'">حساب: <span class="font-mono font-bold '+C.text+'">'+escHtml(m.accountNumber||'')+'</span> | '+escHtml(m.recipientName||'')+'</p>'+(subLabel?'<p class="text-primary text-[10px]">'+subLabel+'</p>':'')+'</div>';
                     }
@@ -5857,7 +5857,7 @@
                 '<div id="mm-crypto-fields"><div class="space-y-3"><div><label class="block text-sm font-medium '+C.text+' mb-1">اسم العملة</label><input type="text" id="mm-currency-name" value="USDT" class="w-full px-4 py-2.5 rounded-xl border '+C.input+' outline-none"></div><div><label class="block text-sm font-medium '+C.text+' mb-1">الشبكة</label><select id="mm-network" class="w-full px-4 py-2.5 rounded-xl border '+C.input+' outline-none"><option value="TRC20">TRC20 (Tron)</option><option value="BEP20">BEP20 (BSC)</option><option value="ERC20">ERC20 (Ethereum)</option></select></div><div><label class="block text-sm font-medium '+C.text+' mb-1">عنوان المحفظة</label><input type="text" id="mm-address" class="w-full px-4 py-2.5 rounded-xl border '+C.input+' outline-none font-mono text-sm" placeholder="عنوان المحفظة"></div></div></div>'+
                 '<div id="mm-bank-fields" class="hidden"><div class="space-y-3">'+
                 '<div><label class="block text-sm font-medium '+C.text+' mb-1">نوع التحويل</label><select id="mm-subtype" class="w-full px-4 py-2.5 rounded-xl border '+C.input+' outline-none" onchange="toggleMmBankSubFields()"><option value="wallet">إيداع لمحفظة</option><option value="transfer">تحويل</option></select></div>'+
-                '<div><label class="block text-sm font-medium '+C.text+' mb-1">نوع العملة</label><select id="mm-currency" class="w-full px-4 py-2.5 rounded-xl border '+C.input+' outline-none"><option value="YER">🇾🇪 YER ريال يمني</option><option value="SAR">🇸🇦 SAR ريال سعودي</option></select></div>'+
+                '<div><label class="block text-sm font-medium '+C.text+' mb-1">نوع العملة</label><select id="mm-currency" class="w-full px-4 py-2.5 rounded-xl border '+C.input+' outline-none"><option value="YER">YER - ريال يمني</option><option value="SAR">SAR - ريال سعودي</option></select></div>'+
                 '<div id="mm-wallet-fields"><div class="space-y-3"><input type="text" id="mm-bank-name" class="w-full px-4 py-2.5 rounded-xl border '+C.input+' outline-none" placeholder="اسم المحفظة / الشبكة"><input type="text" id="mm-bank-account" class="w-full px-4 py-2.5 rounded-xl border '+C.input+' outline-none font-mono" placeholder="رقم الحساب"><input type="text" id="mm-bank-recipient" class="w-full px-4 py-2.5 rounded-xl border '+C.input+' outline-none" placeholder="اسم صاحب الحساب"></div></div>'+
                 '<div id="mm-transfer-fields" class="hidden"><div class="space-y-3"><input type="text" id="mm-beneficiary" class="w-full px-4 py-2.5 rounded-xl border '+C.input+' outline-none" placeholder="اسم المستفيد"><input type="text" id="mm-tel" class="w-full px-4 py-2.5 rounded-xl border '+C.input+' outline-none" placeholder="رقم الهاتف"><input type="text" id="mm-net-name" class="w-full px-4 py-2.5 rounded-xl border '+C.input+' outline-none" placeholder="اسم الشبكة"></div></div>'+
                 '</div></div>'+
@@ -6460,15 +6460,14 @@
             deposits.sort(function(a,b){return new Date(b.createdAt)-new Date(a.createdAt);});
             var pendingCount = deposits.filter(function(d){return d.status==='PENDING';}).length;
             var approvedCount = deposits.filter(function(d){return d.status==='APPROVED';}).length;
-            // Default: show only APPROVED deposits
-            return '<div class="'+C.card+' rounded-2xl p-6 border '+C.border+'">'+
-                '<h2 class="text-xl font-bold '+C.text+' mb-4">💰 الإيداعات ('+deposits.length+')</h2>'+
+            return '<div class="'+C.card+' rounded-2xl p-5 border '+C.border+'">'+
+                '<h2 class="text-lg font-bold '+C.text+' mb-4">الإيداعات ('+deposits.length+')</h2>'+
                 '<div class="flex gap-2 mb-4 flex-wrap">'+
-                '<button onclick="filterAdminDeposits(\'ALL\')" class="px-3 py-1.5 rounded-lg text-sm btn '+C.btn+'">الكل</button>'+
-                '<button onclick="filterAdminDeposits(\'PENDING\')" class="px-3 py-1.5 rounded-lg text-sm btn bg-warning text-dark-bg">معلق ('+pendingCount+')</button>'+
-                '<button onclick="filterAdminDeposits(\'APPROVED\')" class="px-3 py-1.5 rounded-lg text-sm btn bg-success text-dark-bg ring-2 ring-success/50">مقبول ('+approvedCount+')</button>'+
-                '<button onclick="filterAdminDeposits(\'REJECTED\')" class="px-3 py-1.5 rounded-lg text-sm btn bg-danger text-white">مرفوض</button></div>'+
-                '<div id="admin-deposits-list" class="space-y-3 max-h-[70vh] overflow-y-auto">'+renderAdminDepositsList(deposits, C, 'APPROVED')+'</div></div>';
+                '<button onclick="filterAdminDeposits(\'ALL\')" class="px-3 py-1.5 rounded-lg text-xs font-bold btn '+C.btn+'">الكل</button>'+
+                '<button onclick="filterAdminDeposits(\'PENDING\')" class="px-3 py-1.5 rounded-lg text-xs font-bold btn bg-warning text-dark-bg">معلق ('+pendingCount+')</button>'+
+                '<button onclick="filterAdminDeposits(\'APPROVED\')" class="px-3 py-1.5 rounded-lg text-xs font-bold btn bg-success text-dark-bg">مقبول ('+approvedCount+')</button>'+
+                '<button onclick="filterAdminDeposits(\'REJECTED\')" class="px-3 py-1.5 rounded-lg text-xs font-bold btn bg-danger text-white">مرفوض</button></div>'+
+                '<div id="admin-deposits-list" class="space-y-3 max-h-[70vh] overflow-y-auto">'+renderAdminDepositsList(deposits, C, 'ALL')+'</div></div>';
         }
 
         function renderAdminDepositsList(deposits, C, filterStatus) {
@@ -6646,16 +6645,15 @@
             var approvedCount = withdrawals.filter(function(w){return w.status==='APPROVED'||w.status==='COMPLETED';}).length;
             var receivedCount = withdrawals.filter(function(w){return w.status==='RECEIVED';}).length;
             var rejectedCount = withdrawals.filter(function(w){return w.status==='REJECTED';}).length;
-            // Default: show ALL withdrawals
-            return '<div class="'+C.card+' rounded-2xl p-6 border '+C.border+'">'+
-                '<h2 class="text-xl font-bold '+C.text+' mb-4">🏧 السحوبات ('+withdrawals.length+')</h2>'+
+            return '<div class="'+C.card+' rounded-2xl p-5 border '+C.border+'">'+
+                '<h2 class="text-lg font-bold '+C.text+' mb-4">السحوبات ('+withdrawals.length+')</h2>'+
                 '<div class="flex gap-2 mb-4 flex-wrap">'+
-                '<button onclick="filterAdminWithdrawals(\'ALL\')" class="px-3 py-1.5 rounded-lg text-sm btn '+C.btn+' ring-2 ring-primary/50">الكل ('+withdrawals.length+')</button>'+
-                '<button onclick="filterAdminWithdrawals(\'PENDING\')" class="px-3 py-1.5 rounded-lg text-sm btn bg-warning text-dark-bg">معلق ('+pendingCount+')</button>'+
-                '<button onclick="filterAdminWithdrawals(\'RECEIVED\')" class="px-3 py-1.5 rounded-lg text-sm btn bg-blue-500 text-white">مستلم ('+receivedCount+')</button>'+
-                '<button onclick="filterAdminWithdrawals(\'PROCESSING\')" class="px-3 py-1.5 rounded-lg text-sm btn bg-info text-white">قيد المعالجة ('+processingCount+')</button>'+
-                '<button onclick="filterAdminWithdrawals(\'APPROVED\')" class="px-3 py-1.5 rounded-lg text-sm btn bg-success text-dark-bg ring-2 ring-success/50">مقبول ('+approvedCount+')</button>'+
-                '<button onclick="filterAdminWithdrawals(\'REJECTED\')" class="px-3 py-1.5 rounded-lg text-sm btn bg-danger text-white">مرفوض ('+rejectedCount+')</button></div>'+
+                '<button onclick="filterAdminWithdrawals(\'ALL\')" class="px-3 py-1.5 rounded-lg text-xs font-bold btn '+C.btn+'">الكل ('+withdrawals.length+')</button>'+
+                '<button onclick="filterAdminWithdrawals(\'PENDING\')" class="px-3 py-1.5 rounded-lg text-xs font-bold btn bg-warning text-dark-bg">معلق ('+pendingCount+')</button>'+
+                '<button onclick="filterAdminWithdrawals(\'RECEIVED\')" class="px-3 py-1.5 rounded-lg text-xs font-bold btn bg-blue-500 text-white">مستلم ('+receivedCount+')</button>'+
+                '<button onclick="filterAdminWithdrawals(\'PROCESSING\')" class="px-3 py-1.5 rounded-lg text-xs font-bold btn bg-info text-white">قيد المعالجة ('+processingCount+')</button>'+
+                '<button onclick="filterAdminWithdrawals(\'APPROVED\')" class="px-3 py-1.5 rounded-lg text-xs font-bold btn bg-success text-dark-bg">مقبول ('+approvedCount+')</button>'+
+                '<button onclick="filterAdminWithdrawals(\'REJECTED\')" class="px-3 py-1.5 rounded-lg text-xs font-bold btn bg-danger text-white">مرفوض ('+rejectedCount+')</button></div>'+
                 '<div id="admin-withdrawals-list" class="space-y-3 max-h-[70vh] overflow-y-auto">'+renderAdminWithdrawalsList(withdrawals, C, 'ALL')+'</div></div>';
         }
 
@@ -7080,13 +7078,13 @@
         // ==================== ADMIN: PAYMENT METHODS ====================
         function renderAdminPaymentMethods(C) {
             var pms = DB.get('paymentMethods');
-            return '<div class="'+C.card+' rounded-2xl p-6 border '+C.border+'">'+
-                '<div class="flex items-center justify-between mb-4"><h2 class="text-xl font-bold '+C.text+'">💳 طرق الدفع</h2>'+
-                '<button onclick="showAddPmModal()" class="'+C.btn+' px-4 py-2 rounded-lg font-bold btn text-sm">+ إضافة طريقة</button></div>'+
-                (pms.length===0 ? '<p class="'+C.muted+' text-center py-4">لا توجد طرق دفع</p>' :
+            return '<div class="'+C.card+' rounded-2xl p-5 border '+C.border+'">'+
+                '<div class="flex items-center justify-between mb-4"><h2 class="text-lg font-bold '+C.text+'">طرق الدفع</h2>'+
+                '<button onclick="showAddPmModal()" class="'+C.btn+' px-3 py-1.5 rounded-lg font-bold btn text-xs">+ إضافة طريقة</button></div>'+
+                (pms.length===0 ? '<p class="'+C.muted+' text-center py-4 text-sm">لا توجد طرق دفع</p>' :
                 '<div class="space-y-3">'+pms.map(function(pm) {
                     var typeLabel = pm.type==='CRYPTO'?'عملات رقمية':'تحويل بنكي';
-                    var currLabel = pm.type==='BANK' ? (pm.currency==='SAR'?'🇸🇦 SAR':(pm.currency==='YER'?'🇾🇪 YER':'')) : '';
+                    var currLabel = pm.type==='BANK' ? (pm.currency==='SAR'?'SAR':(pm.currency==='YER'?'YER':'')) : '';
                     var subLabel = pm.subtype==='transfer'?'تحويل':(pm.subtype==='wallet'?'إيداع لمحفظة':'');
                     var pmLabel = pm.type==='CRYPTO' ? escHtml(pm.network||'CRYPTO') : escHtml(pm.bankName||pm.recipientName||'تحويل بنكي');
                     return '<div class="p-4 rounded-lg border '+C.border+' '+(pm.isActive?'':'opacity-50')+'">'+
@@ -7110,7 +7108,7 @@
                 '<div><label class="block text-sm font-medium '+C.text+' mb-1">عنوان الشبكة</label><input type="text" id="pm-add-address" class="w-full px-4 py-2.5 rounded-xl border '+C.input+' outline-none" placeholder="عنوان المحفظة"></div></div></div>'+
                 '<div id="pm-add-bank-fields" class="hidden"><div class="space-y-3">'+
                 '<div><label class="block text-sm font-medium '+C.text+' mb-1">نوع التحويل</label><select id="pm-add-subtype" class="w-full px-4 py-2.5 rounded-xl border '+C.input+' outline-none" onchange="toggleAddPmSubFields()"><option value="wallet">إيداع لمحفظة</option><option value="transfer">تحويل</option></select></div>'+
-                '<div><label class="block text-sm font-medium '+C.text+' mb-1">نوع العملة</label><select id="pm-add-currency" class="w-full px-4 py-2.5 rounded-xl border '+C.input+' outline-none"><option value="YER">🇾🇪 YER ريال يمني</option><option value="SAR">🇸🇦 SAR ريال سعودي</option></select></div>'+
+                '<div><label class="block text-sm font-medium '+C.text+' mb-1">نوع العملة</label><select id="pm-add-currency" class="w-full px-4 py-2.5 rounded-xl border '+C.input+' outline-none"><option value="YER">YER - ريال يمني</option><option value="SAR">SAR - ريال سعودي</option></select></div>'+
                 '<div id="pm-add-wallet-fields"><div class="space-y-3">'+
                 '<input type="text" id="pm-add-bank-name" class="w-full px-4 py-2.5 rounded-xl border '+C.input+' outline-none" placeholder="اسم المحفظة">'+
                 '<input type="text" id="pm-add-account" class="w-full px-4 py-2.5 rounded-xl border '+C.input+' outline-none" placeholder="رقم الحساب">'+
@@ -7179,7 +7177,7 @@
                 '<div class="space-y-3">'+
                 '<p class="text-sm '+C.muted+'">النوع: '+(pm.type==='CRYPTO'?'عملات رقمية':'تحويل بنكي')+'</p>'+
                 (pm.type==='CRYPTO'?'<div><label class="block text-sm font-medium '+C.text+' mb-1">عنوان الشبكة</label><input type="text" id="pm-edit-address" value="'+escHtml(pm.address)+'" class="w-full px-4 py-2.5 rounded-xl border '+C.input+' outline-none"></div>':'')+
-                (pm.type==='BANK'?'<div class="space-y-2"><div><label class="block text-sm font-medium '+C.text+' mb-1">نوع العملة</label><select id="pm-edit-currency" class="w-full px-4 py-2.5 rounded-xl border '+C.input+' outline-none"><option value="YER"'+(currVal==='YER'?' selected':'')+'>🇾🇪 YER ريال يمني</option><option value="SAR"'+(currVal==='SAR'?' selected':'')+'>🇸🇦 SAR ريال سعودي</option></select></div><input type="text" id="pm-edit-bank-name" value="'+escHtml(pm.bankName)+'" class="w-full px-4 py-2.5 rounded-xl border '+C.input+' outline-none" placeholder="البنك/المحفظة"><input type="text" id="pm-edit-account" value="'+escHtml(pm.accountNumber)+'" class="w-full px-4 py-2.5 rounded-xl border '+C.input+' outline-none" placeholder="رقم الحساب"><input type="text" id="pm-edit-recipient" value="'+escHtml(pm.recipientName)+'" class="w-full px-4 py-2.5 rounded-xl border '+C.input+' outline-none" placeholder="اسم صاحب الحساب"></div>':'')+
+                (pm.type==='BANK'?'<div class="space-y-2"><div><label class="block text-sm font-medium '+C.text+' mb-1">نوع العملة</label><select id="pm-edit-currency" class="w-full px-4 py-2.5 rounded-xl border '+C.input+' outline-none"><option value="YER"'+(currVal==='YER'?' selected':'')+'>YER - ريال يمني</option><option value="SAR"'+(currVal==='SAR'?' selected':'')+'>SAR - ريال سعودي</option></select></div><input type="text" id="pm-edit-bank-name" value="'+escHtml(pm.bankName)+'" class="w-full px-4 py-2.5 rounded-xl border '+C.input+' outline-none" placeholder="البنك/المحفظة"><input type="text" id="pm-edit-account" value="'+escHtml(pm.accountNumber)+'" class="w-full px-4 py-2.5 rounded-xl border '+C.input+' outline-none" placeholder="رقم الحساب"><input type="text" id="pm-edit-recipient" value="'+escHtml(pm.recipientName)+'" class="w-full px-4 py-2.5 rounded-xl border '+C.input+' outline-none" placeholder="اسم صاحب الحساب"></div>':'')+
                 '<div class="grid grid-cols-2 gap-3"><div><label class="block text-sm font-medium '+C.text+' mb-1">حد أدنى للإيداع</label><input type="number" id="pm-edit-min-dep" value="'+(pm.minDeposit||0)+'" class="w-full px-4 py-2.5 rounded-xl border '+C.input+' outline-none"></div><div><label class="block text-sm font-medium '+C.text+' mb-1">حد أدنى للسحب</label><input type="number" id="pm-edit-min-wd" value="'+(pm.minWithdraw||0)+'" class="w-full px-4 py-2.5 rounded-xl border '+C.input+' outline-none"></div></div>'+
                 '<button onclick="saveEditPm(\''+pmId+'\')" class="'+C.btn+' w-full py-3 rounded-lg font-bold btn">حفظ</button>'+
                 '<button onclick="closeModal()" class="w-full py-2.5 rounded-lg border '+C.border+' '+C.text+' btn">إلغاء</button></div>');
