@@ -27,6 +27,12 @@ import {
   ChevronUp,
   Star,
   Ban,
+  CreditCard,
+  Plus,
+  Wallet,
+  Building,
+  Trash2,
+  Power,
 } from 'lucide-react'
 
 // ===================== TYPES =====================
@@ -112,11 +118,12 @@ const ROLE_DESCRIPTIONS: Record<string, string> = {
 
 export default function AdminPanel() {
   const { user, setScreen } = useAuthStore()
-  const [activeTab, setActiveTab] = useState<'users' | 'deposits' | 'withdrawals' | 'kyc'>('users')
+  const [activeTab, setActiveTab] = useState<'users' | 'deposits' | 'withdrawals' | 'kyc' | 'payment-methods'>('users')
   const [users, setUsers] = useState<AdminUser[]>([])
   const [deposits, setDeposits] = useState<AdminDeposit[]>([])
   const [withdrawals, setWithdrawals] = useState<AdminWithdrawal[]>([])
   const [kycRecords, setKycRecords] = useState<KYCRecordItem[]>([])
+  const [paymentMethods, setPaymentMethods] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [searchQuery, setSearchQuery] = useState('')
   const [expandedUserId, setExpandedUserId] = useState<string | null>(null)
@@ -146,6 +153,10 @@ export default function AdminPanel() {
       if (depositsData.success) setDeposits(depositsData.deposits || [])
       if (withdrawalsData.success) setWithdrawals(withdrawalsData.withdrawals || [])
       if (kycData.success) setKycRecords(kycData.kycRecords || [])
+    // Fetch payment methods separately
+    const pmRes = await fetch('/api/admin/payment-methods')
+    const pmData = await pmRes.json()
+    if (pmData.success) setPaymentMethods(pmData.methods || [])
     } catch {
       toast.error('خطأ في تحميل البيانات')
     } finally {
@@ -275,6 +286,7 @@ export default function AdminPanel() {
     { key: 'deposits' as const, label: 'الإيداعات', icon: ArrowDownLeft, count: deposits.filter(d => d.status === 'pending').length },
     { key: 'withdrawals' as const, label: 'السحوبات', icon: ArrowUpRight, count: withdrawals.filter(w => w.status === 'pending').length },
     { key: 'kyc' as const, label: 'التحقق', icon: Shield, count: kycRecords.filter(k => k.status === 'pending').length },
+    { key: 'payment-methods' as const, label: 'طرق الدفع', icon: CreditCard, count: paymentMethods.filter(p => p.isActive).length },
   ]
 
   const filteredUsers = users.filter(u =>
@@ -319,7 +331,7 @@ export default function AdminPanel() {
       </div>
 
       {/* Tabs */}
-      <div className="grid grid-cols-4 gap-2">
+      <div className="grid grid-cols-5 gap-2">
         {tabs.map((tab) => (
           <button
             key={tab.key}
@@ -591,6 +603,11 @@ export default function AdminPanel() {
             </div>
           )}
 
+          {/* ===================== PAYMENT METHODS TAB ===================== */}
+          {activeTab === 'payment-methods' && (
+            <PaymentMethodsManager methods={paymentMethods} onRefresh={() => fetchAll()} />
+          )}
+
           {/* ===================== KYC TAB ===================== */}
           {activeTab === 'kyc' && (
             <div className="space-y-2 max-h-[500px] overflow-y-auto">
@@ -690,6 +707,213 @@ export default function AdminPanel() {
               >
                 إلغاء
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ===================== PAYMENT METHODS MANAGER =====================
+
+function PaymentMethodsManager({ methods, onRefresh }: { methods: any[]; onRefresh: () => void }) {
+  const [showAdd, setShowAdd] = useState(false)
+  const [editMethod, setEditMethod] = useState<any>(null)
+  const [loading, setLoading] = useState(false)
+  const [form, setForm] = useState({
+    name: '', type: 'bank_deposit', category: 'bank',
+    network: '', walletAddress: '', accountName: '', accountNumber: '',
+    beneficiaryName: '', phone: '', recipientName: '', recipientPhone: '',
+    instructions: '', minAmount: '', maxAmount: '',
+  })
+
+  const resetForm = () => {
+    setForm({ name: '', type: 'bank_deposit', category: 'bank', network: '', walletAddress: '', accountName: '', accountNumber: '', beneficiaryName: '', phone: '', recipientName: '', recipientPhone: '', instructions: '', minAmount: '', maxAmount: '' })
+    setEditMethod(null)
+    setShowAdd(false)
+  }
+
+  const handleEdit = (m: any) => {
+    setEditMethod(m)
+    setForm({ name: m.name || '', type: m.type || 'bank_deposit', category: m.category || 'bank', network: m.network || '', walletAddress: m.walletAddress || '', accountName: m.accountName || '', accountNumber: m.accountNumber || '', beneficiaryName: m.beneficiaryName || '', phone: m.phone || '', recipientName: m.recipientName || '', recipientPhone: m.recipientPhone || '', instructions: m.instructions || '', minAmount: m.minAmount?.toString() || '', maxAmount: m.maxAmount?.toString() || '' })
+    setShowAdd(true)
+  }
+
+  const handleSave = async () => {
+    if (!form.name) { toast.error('اسم الطريقة مطلوب'); return }
+    setLoading(true)
+    try {
+      const body: any = { ...form, isActive: true }
+      if (editMethod) {
+        body.action = 'update'; body.id = editMethod.id; body.isActive = editMethod.isActive
+      } else {
+        body.action = 'create'
+      }
+      const res = await fetch('/api/admin/payment-methods', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
+      })
+      const data = await res.json()
+      if (data.success) { toast.success(data.message); resetForm(); onRefresh() }
+      else { toast.error(data.message) }
+    } catch { toast.error('خطأ') }
+    finally { setLoading(false) }
+  }
+
+  const handleDelete = async (id: string) => {
+    if (!confirm('هل أنت متأكد من حذف هذه الطريقة؟')) return
+    setLoading(true)
+    try {
+      const res = await fetch('/api/admin/payment-methods', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'delete', id }),
+      })
+      const data = await res.json()
+      if (data.success) { toast.success(data.message); onRefresh() }
+      else { toast.error(data.message) }
+    } catch { toast.error('خطأ') }
+    finally { setLoading(false) }
+  }
+
+  const handleToggle = async (m: any) => {
+    try {
+      const res = await fetch('/api/admin/payment-methods', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'update', id: m.id, isActive: !m.isActive }),
+      })
+      const data = await res.json()
+      if (data.success) onRefresh()
+      else toast.error(data.message)
+    } catch { toast.error('خطأ') }
+  }
+
+  const TYPE_LABELS: Record<string, string> = { bank_deposit: 'إيداع بنكي', atm_transfer: 'تحويل صراف', bank_transfer: 'تحويل بنكي', crypto: 'عملات رقمية' }
+  const CATEGORY_LABELS: Record<string, string> = { bank: '🏦 بنكي', crypto: '₿ عملات رقمية' }
+
+  return (
+    <div className="space-y-4">
+      <button onClick={() => { resetForm(); setShowAdd(true) }} className="w-full flex items-center justify-center gap-2 py-3 rounded-xl bg-gold/10 border border-gold/20 text-gold hover:bg-gold/20 transition-all text-sm font-medium">
+        <Plus className="w-4 h-4" /> إضافة طريقة دفع جديدة
+      </button>
+
+      {methods.length === 0 ? (
+        <div className="glass-card p-8 text-center text-muted-foreground text-sm">لا توجد طرق دفع. أضف طريقة جديدة.</div>
+      ) : (
+        <div className="space-y-2 max-h-[500px] overflow-y-auto">
+          {methods.map((m) => (
+            <div key={m.id} className={`glass-card p-4 rounded-xl space-y-2 ${!m.isActive ? 'opacity-50' : ''}`}>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${m.category === 'crypto' ? 'bg-orange-500/10 text-orange-400' : 'bg-blue-500/10 text-blue-400'}`}>
+                    {m.category === 'crypto' ? <Wallet className="w-5 h-5" /> : <Building className="w-5 h-5" />}
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium">{m.name}</p>
+                    <p className="text-[10px] text-muted-foreground">{CATEGORY_LABELS[m.category] || m.category} | {TYPE_LABELS[m.type] || m.type}</p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-1">
+                  <button onClick={() => handleToggle(m)} className={`w-8 h-8 rounded-lg flex items-center justify-center transition-colors ${m.isActive ? 'bg-green-500/10 text-green-400' : 'bg-red-500/10 text-red-400'}`}>
+                    <Power className="w-4 h-4" />
+                  </button>
+                  <button onClick={() => handleEdit(m)} className="w-8 h-8 rounded-lg bg-gold/10 text-gold flex items-center justify-center hover:bg-gold/20">
+                    <Ban className="w-4 h-4" />
+                  </button>
+                  <button onClick={() => handleDelete(m.id)} className="w-8 h-8 rounded-lg bg-red-500/10 text-red-400 flex items-center justify-center hover:bg-red-500/20">
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+                </div>
+              </div>
+              {/* Details */}
+              <div className="text-xs text-muted-foreground space-y-1 border-t border-white/5 pt-2">
+                {m.accountName && <p>اسم المحفظة: <span className="text-foreground">{m.accountName}</span></p>}
+                {m.accountNumber && <p>رقم الحساب: <span className="text-foreground" dir="ltr">{m.accountNumber}</span></p>}
+                {m.beneficiaryName && <p>اسم المستفيد: <span className="text-foreground">{m.beneficiaryName}</span></p>}
+                {m.recipientName && <p>اسم المستلم: <span className="text-foreground">{m.recipientName}</span></p>}
+                {m.recipientPhone && <p>رقم الجوال: <span className="text-foreground" dir="ltr">{m.recipientPhone}</span></p>}
+                {m.network && <p>الشبكة: <span className="text-foreground">{m.network}</span></p>}
+                {m.walletAddress && <p>العنوان: <span className="text-foreground" dir="ltr">{m.walletAddress.substring(0, 20)}...</span></p>}
+                {m.instructions && <p>ملاحظات: <span className="text-foreground">{m.instructions}</span></p>}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Add/Edit Dialog */}
+      {showAdd && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={resetForm}>
+          <div className="glass-card bg-background/95 backdrop-blur-xl border-gold/20 w-full max-w-md rounded-2xl p-6 space-y-4 animate-scale-in max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+            <h3 className="text-lg font-bold gold-text">{editMethod ? 'تعديل طريقة الدفع' : 'إضافة طريقة دفع جديدة'}</h3>
+
+            <div className="space-y-3">
+              <div className="space-y-1">
+                <label className="text-xs text-muted-foreground">اسم الطريقة (مثلاً: تحويل بنك الأهلي)</label>
+                <Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} className="glass-input h-10 text-sm" placeholder="اسم الطريقة" />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <label className="text-xs text-muted-foreground">التصنيف</label>
+                  <select value={form.category} onChange={(e) => { const cat = e.target.value; setForm({ ...form, category: cat, type: cat === 'crypto' ? 'crypto' : 'bank_deposit' }) }} className="w-full h-10 rounded-lg bg-white/5 border border-white/10 px-3 text-sm text-foreground">
+                    <option value="bank">🏦 بنكي</option>
+                    <option value="crypto">₿ عملات رقمية</option>
+                  </select>
+                </div>
+                <div className="space-y-1">
+                  <label className="text-xs text-muted-foreground">النوع</label>
+                  <select value={form.type} onChange={(e) => setForm({ ...form, type: e.target.value })} className="w-full h-10 rounded-lg bg-white/5 border border-white/10 px-3 text-sm text-foreground">
+                    {form.category === 'bank' ? (
+                      <><option value="bank_deposit">إيداع بنكي</option><option value="atm_transfer">تحويل عبر صراف</option><option value="bank_transfer">تحويل بنكي</option></>
+                    ) : (
+                      <option value="crypto">عملات رقمية</option>
+                    )}
+                  </select>
+                </div>
+              </div>
+
+              {form.category === 'bank' && form.type === 'bank_deposit' && (
+                <div className="space-y-2 p-3 rounded-lg bg-blue-500/5 border border-blue-500/10">
+                  <p className="text-xs text-blue-400 font-medium">بيانات الإيداع البنكي:</p>
+                  <div className="space-y-1">
+                    <Input value={form.accountName} onChange={(e) => setForm({ ...form, accountName: e.target.value })} className="glass-input h-9 text-sm" placeholder="اسم المحفظة" />
+                    <Input value={form.accountNumber} onChange={(e) => setForm({ ...form, accountNumber: e.target.value })} className="glass-input h-9 text-sm" placeholder="رقم الحساب" dir="ltr" />
+                    <Input value={form.beneficiaryName} onChange={(e) => setForm({ ...form, beneficiaryName: e.target.value })} className="glass-input h-9 text-sm" placeholder="اسم المستفيد" />
+                  </div>
+                </div>
+              )}
+
+              {form.category === 'bank' && (form.type === 'atm_transfer' || form.type === 'bank_transfer') && (
+                <div className="space-y-2 p-3 rounded-lg bg-green-500/5 border border-green-500/10">
+                  <p className="text-xs text-green-400 font-medium">بيانات التحويل:</p>
+                  <div className="space-y-1">
+                    <Input value={form.recipientName} onChange={(e) => setForm({ ...form, recipientName: e.target.value })} className="glass-input h-9 text-sm" placeholder="اسم المستلم" />
+                    <Input value={form.recipientPhone} onChange={(e) => setForm({ ...form, recipientPhone: e.target.value })} className="glass-input h-9 text-sm" placeholder="رقم الجوال" dir="ltr" />
+                    <Input value={form.network} onChange={(e) => setForm({ ...form, network: e.target.value })} className="glass-input h-9 text-sm" placeholder="الشبكة / اسم البنك" />
+                  </div>
+                </div>
+              )}
+
+              {form.category === 'crypto' && (
+                <div className="space-y-2 p-3 rounded-lg bg-orange-500/5 border border-orange-500/10">
+                  <p className="text-xs text-orange-400 font-medium">بيانات المحفظة الرقمية:</p>
+                  <div className="space-y-1">
+                    <Input value={form.network} onChange={(e) => setForm({ ...form, network: e.target.value })} className="glass-input h-9 text-sm" placeholder="الشبكة (مثلاً: TRC20, BEP20)" />
+                    <Input value={form.walletAddress} onChange={(e) => setForm({ ...form, walletAddress: e.target.value })} className="glass-input h-9 text-sm" placeholder="عنوان المحفظة" dir="ltr" />
+                  </div>
+                </div>
+              )}
+
+              <div className="space-y-1">
+                <label className="text-xs text-muted-foreground">تعليمات إضافية (اختياري)</label>
+                <textarea value={form.instructions} onChange={(e) => setForm({ ...form, instructions: e.target.value })} className="w-full h-20 rounded-lg bg-white/5 border border-white/10 px-3 py-2 text-sm text-foreground resize-none" placeholder="ملاحظات أو تعليمات للمستخدم..." />
+              </div>
+            </div>
+
+            <div className="flex gap-3">
+              <button onClick={handleSave} disabled={loading} className="flex-1 h-11 gold-gradient text-gray-900 font-bold rounded-xl hover:opacity-90 transition-all">
+                {loading ? <Loader2 className="w-4 h-4 animate-spin mx-auto" /> : editMethod ? 'حفظ التعديلات' : 'إضافة'}
+              </button>
+              <button onClick={resetForm} className="flex-1 h-11 bg-white/10 hover:bg-white/20 text-foreground font-medium rounded-xl transition-all">إلغاء</button>
             </div>
           </div>
         </div>

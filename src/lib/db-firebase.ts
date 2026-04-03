@@ -111,6 +111,27 @@ export interface Notification {
   createdAt: string
 }
 
+export interface PaymentMethod {
+  id: string
+  name: string
+  type: string // 'bank_transfer' | 'bank_deposit' | 'atm_transfer' | 'crypto'
+  category: string // 'bank' | 'crypto'
+  isActive: boolean
+  network?: string | null
+  walletAddress?: string | null
+  accountName?: string | null
+  accountNumber?: string | null
+  beneficiaryName?: string | null
+  phone?: string | null
+  recipientName?: string | null
+  recipientPhone?: string | null
+  minAmount?: number | null
+  maxAmount?: number | null
+  instructions?: string | null
+  createdAt: string
+  updatedAt: string
+}
+
 // ===================== USER OPERATIONS =====================
 
 export const userOperations = {
@@ -458,6 +479,48 @@ export const notificationOperations = {
     // Sort by createdAt desc in JS to avoid composite index
     results.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
     return results
+  },
+}
+
+// ===================== PAYMENT METHOD OPERATIONS =====================
+
+export const paymentMethodOperations = {
+  async create(data: Omit<PaymentMethod, 'id' | 'createdAt' | 'updatedAt'>): Promise<PaymentMethod> {
+    const db = getDb()
+    const id = generateId()
+    const now = nowTimestamp()
+    const method: PaymentMethod = { ...data, id, createdAt: now, updatedAt: now }
+    await db.collection('paymentMethods').doc(id).set(method)
+    return method
+  },
+
+  async findMany(): Promise<PaymentMethod[]> {
+    const db = getDb()
+    const snapshot = await db.collection('paymentMethods').limit(50).get()
+    const results = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() } as PaymentMethod))
+    results.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+    return results
+  },
+
+  async findActive(): Promise<PaymentMethod[]> {
+    const db = getDb()
+    const snapshot = await db.collection('paymentMethods')
+      .where('isActive', '==', true)
+      .limit(50)
+      .get()
+    const results = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() } as PaymentMethod))
+    results.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+    return results
+  },
+
+  async update(id: string, data: Partial<PaymentMethod>): Promise<void> {
+    const db = getDb()
+    await db.collection('paymentMethods').doc(id).update({ ...data, updatedAt: nowTimestamp() })
+  },
+
+  async delete(id: string): Promise<void> {
+    const db = getDb()
+    await db.collection('paymentMethods').doc(id).delete()
   },
 }
 
