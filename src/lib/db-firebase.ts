@@ -411,7 +411,7 @@ export const withdrawalOperations = {
     return withdrawal
   },
 
-  async findMany(options?: { status?: string }): Promise<(Withdrawal & { user?: { id: string; email: string; fullName: string | null } })[]> {
+  async findMany(options?: { status?: string }): Promise<(Withdrawal & { user?: { id: string; email: string; fullName: string | null; phone: string | null } })[]> {
     const db = getDb()
     let query: Query<DocumentData> = db.collection('withdrawals')
     
@@ -422,15 +422,15 @@ export const withdrawalOperations = {
     query = query.limit(100)
     const snapshot = await query.get()
     
-    const results: (Withdrawal & { user?: { id: string; email: string; fullName: string | null } })[] = []
+    const results: (Withdrawal & { user?: { id: string; email: string; fullName: string | null; phone: string | null } })[] = []
     
     for (const doc of snapshot.docs) {
       const data = doc.data() as Withdrawal
       const userDoc = await db.collection('users').doc(data.userId).get()
-      let user: { id: string; email: string; fullName: string | null } | undefined
+      let user: { id: string; email: string; fullName: string | null; phone: string | null } | undefined
       if (userDoc.exists) {
         const ud = userDoc.data()
-        user = { id: userDoc.id, email: ud.email, fullName: ud.fullName || null }
+        user = { id: userDoc.id, email: ud.email, fullName: ud.fullName || null, phone: ud.phone || null }
       }
       results.push({ id: doc.id, ...data, user })
     }

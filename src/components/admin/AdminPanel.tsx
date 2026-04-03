@@ -77,7 +77,7 @@ interface AdminWithdrawal {
   network: string
   status: string
   createdAt: string
-  user: { id: string; email: string; fullName: string | null }
+  user: { id: string; email: string; fullName: string | null; phone: string | null }
 }
 
 interface KYCRecordItem {
@@ -145,6 +145,7 @@ export default function AdminPanel() {
   const [deletePassword, setDeletePassword] = useState('')
   const [deleteLoading, setDeleteLoading] = useState(false)
   const [copiedWithdrawalId, setCopiedWithdrawalId] = useState<string | null>(null)
+  const [copiedField, setCopiedField] = useState<string | null>(null)
 
   useEffect(() => {
     if (user?.role === 'admin') {
@@ -390,6 +391,13 @@ export default function AdminPanel() {
     setCopiedWithdrawalId(w.id)
     toast.success('تم النسخ')
     setTimeout(() => setCopiedWithdrawalId(null), 2000)
+  }
+
+  const copyField = (key: string, text: string) => {
+    navigator.clipboard.writeText(text)
+    setCopiedField(key)
+    toast.success('تم النسخ')
+    setTimeout(() => setCopiedField(null), 2000)
   }
 
   const tabs = [
@@ -688,17 +696,22 @@ export default function AdminPanel() {
 
           {/* ===================== WITHDRAWALS TAB ===================== */}
           {activeTab === 'withdrawals' && (
-            <div className="space-y-2 max-h-[500px] overflow-y-auto">
+            <div className="space-y-2 max-h-[600px] overflow-y-auto">
               {withdrawals.length === 0 ? (
                 <div className="glass-card p-8 text-center text-muted-foreground text-sm">لا توجد سحوبات</div>
               ) : (
                 withdrawals.map((w) => (
-                  <div key={w.id} className="glass-card p-4 rounded-xl space-y-3">
+                  <div key={w.id} className="glass-card rounded-xl overflow-hidden">
                     {/* Header Row */}
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <p className="text-sm font-medium">{w.user.fullName || w.user.email}</p>
-                        <p className="text-[10px] text-muted-foreground" dir="ltr">{w.id.substring(0, 16)}</p>
+                    <div className="p-4 flex items-center justify-between border-b border-white/5">
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-xl bg-gold/10 flex items-center justify-center text-sm font-bold gold-text">
+                          {(w.user.fullName || w.user.email).charAt(0).toUpperCase()}
+                        </div>
+                        <div>
+                          <p className="text-sm font-medium">{w.user.fullName || 'بدون اسم'}</p>
+                          <p className="text-xs text-muted-foreground" dir="ltr">{w.user.email}</p>
+                        </div>
                       </div>
                       <div className="text-left">
                         <p className="text-sm font-bold gold-text">{w.amount.toFixed(2)} USDT</p>
@@ -708,61 +721,104 @@ export default function AdminPanel() {
                       </div>
                     </div>
 
-                    {/* Withdrawal Details - Copyable */}
-                    <div className="border-t border-white/5 pt-2 space-y-2">
-                      {/* Method + Network */}
-                      <div className="flex items-center gap-2 text-xs">
-                        <span className="text-muted-foreground">الطريقة:</span>
-                        <span className="text-foreground font-medium">
-                          {w.method === 'crypto' || w.method === 'blockchain' ? 'عملات رقمية' :
-                           w.method === 'bank_deposit' ? 'إيداع بنكي' :
-                           w.method === 'atm_transfer' ? 'تحويل صراف' :
-                           w.method === 'bank_transfer' ? 'تحويل بنكي' : w.method}
-                        </span>
-                        {w.network && w.network !== 'TRC20' && (
-                          <>
-                            <span className="text-muted-foreground">|</span>
-                            <span className="text-foreground">{w.network}</span>
-                          </>
+                    {/* Withdrawer Details - Organized & Copyable */}
+                    <div className="p-4 space-y-2">
+                      <p className="text-xs text-muted-foreground font-medium mb-2">بيانات الساحب:</p>
+                      <div className="grid grid-cols-1 gap-1.5">
+                        {/* Name */}
+                        {w.user.fullName && (
+                          <div className="flex items-center justify-between p-2 rounded-lg bg-white/5 group">
+                            <div className="flex items-center gap-2 min-w-0">
+                              <span className="text-[10px] text-muted-foreground flex-shrink-0">الاسم</span>
+                              <span className="text-xs font-medium truncate">{w.user.fullName}</span>
+                            </div>
+                            <button onClick={() => copyField(`${w.id}-name`, w.user.fullName!)} className="text-muted-foreground hover:text-gold transition-colors flex-shrink-0 opacity-0 group-hover:opacity-100">
+                              {copiedField === `${w.id}-name` ? <CheckIcon className="w-3.5 h-3.5 text-green-400" /> : <Copy className="w-3.5 h-3.5" />}
+                            </button>
+                          </div>
                         )}
-                      </div>
-
-                      {/* To Address - Copyable */}
-                      <div className="flex items-center justify-between p-2.5 rounded-lg bg-white/5">
-                        <div className="flex-1 min-w-0">
-                          <p className="text-[10px] text-muted-foreground mb-0.5">
-                            {w.method === 'crypto' || w.method === 'blockchain' ? 'عنوان المحفظة' : 'بيانات الاستلام'}
-                          </p>
-                          <p className={`text-xs font-medium truncate ${w.method === 'crypto' || w.method === 'blockchain' ? 'font-mono' : ''}`}
-                             dir={w.method === 'crypto' || w.method === 'blockchain' ? 'ltr' : 'rtl'}>
-                            {w.toAddress}
-                          </p>
+                        {/* Phone */}
+                        {w.user.phone && (
+                          <div className="flex items-center justify-between p-2 rounded-lg bg-white/5 group">
+                            <div className="flex items-center gap-2 min-w-0">
+                              <span className="text-[10px] text-muted-foreground flex-shrink-0">الهاتف</span>
+                              <span className="text-xs font-medium truncate" dir="ltr">{w.user.phone}</span>
+                            </div>
+                            <button onClick={() => copyField(`${w.id}-phone`, w.user.phone!)} className="text-muted-foreground hover:text-gold transition-colors flex-shrink-0 opacity-0 group-hover:opacity-100">
+                              {copiedField === `${w.id}-phone` ? <CheckIcon className="w-3.5 h-3.5 text-green-400" /> : <Copy className="w-3.5 h-3.5" />}
+                            </button>
+                          </div>
+                        )}
+                        {/* Email */}
+                        <div className="flex items-center justify-between p-2 rounded-lg bg-white/5 group">
+                          <div className="flex items-center gap-2 min-w-0">
+                            <span className="text-[10px] text-muted-foreground flex-shrink-0">البريد</span>
+                            <span className="text-xs font-medium truncate" dir="ltr">{w.user.email}</span>
+                          </div>
+                          <button onClick={() => copyField(`${w.id}-email`, w.user.email)} className="text-muted-foreground hover:text-gold transition-colors flex-shrink-0 opacity-0 group-hover:opacity-100">
+                            {copiedField === `${w.id}-email` ? <CheckIcon className="w-3.5 h-3.5 text-green-400" /> : <Copy className="w-3.5 h-3.5" />}
+                          </button>
                         </div>
-                        <button
-                          onClick={() => copyWithdrawalAddress(w)}
-                          className="text-gold hover:text-gold-light transition-colors flex-shrink-0 mr-3"
-                        >
-                          {copiedWithdrawalId === w.id
-                            ? <CheckIcon className="w-4 h-4" />
-                            : <Copy className="w-4 h-4" />}
-                        </button>
                       </div>
 
-                      {/* Fee + Date */}
-                      <div className="flex items-center justify-between text-xs text-muted-foreground">
-                        <span>الرسوم: {w.fee.toFixed(2)} USDT</span>
-                        <span>الإجمالي: <strong className="text-foreground">{(w.amount + w.fee).toFixed(2)} USDT</strong></span>
+                      {/* Divider */}
+                      <div className="border-t border-white/5 pt-2 mt-2">
+                        <p className="text-xs text-muted-foreground font-medium mb-2">بيانات السحب:</p>
+                        <div className="grid grid-cols-1 gap-1.5">
+                          {/* Method */}
+                          <div className="flex items-center justify-between p-2 rounded-lg bg-white/5">
+                            <div className="flex items-center gap-2">
+                              <span className="text-[10px] text-muted-foreground">الطريقة</span>
+                              <span className="text-xs font-medium">
+                                {w.method === 'crypto' || w.method === 'blockchain' ? 'عملات رقمية' :
+                                 w.method === 'bank_deposit' ? 'إيداع لمحفظة' :
+                                 w.method === 'atm_transfer' ? 'تحويل عبر صراف' :
+                                 w.method === 'bank_transfer' ? 'تحويل بنكي' : w.method}
+                              </span>
+                            </div>
+                            {w.network && (
+                              <span className="text-[10px] px-1.5 py-0.5 rounded-md bg-gold/10 text-gold">{w.network}</span>
+                            )}
+                          </div>
+                          {/* To Address - Copyable (always visible) */}
+                          <div className="flex items-center justify-between p-2 rounded-lg bg-white/5 group">
+                            <div className="flex-1 min-w-0">
+                              <span className="text-[10px] text-muted-foreground block mb-0.5">
+                                {w.method === 'crypto' || w.method === 'blockchain' ? 'عنوان المحفظة' : 'بيانات الاستلام'}
+                              </span>
+                              <p className={`text-xs font-medium ${w.method === 'crypto' || w.method === 'blockchain' ? 'font-mono' : ''}`}
+                                 dir={w.method === 'crypto' || w.method === 'blockchain' ? 'ltr' : 'rtl'}>
+                                {w.toAddress}
+                              </p>
+                            </div>
+                            <button
+                              onClick={() => copyWithdrawalAddress(w)}
+                              className="text-gold hover:text-gold-light transition-colors flex-shrink-0 mr-2"
+                            >
+                              {copiedWithdrawalId === w.id
+                                ? <CheckIcon className="w-4 h-4" />
+                                : <Copy className="w-4 h-4" />}
+                            </button>
+                          </div>
+                          {/* Fee + Total */}
+                          <div className="flex items-center justify-between p-2 rounded-lg bg-white/5 text-xs">
+                            <span className="text-muted-foreground">الرسوم: {w.fee.toFixed(2)} USDT</span>
+                            <span className="text-muted-foreground">الإجمالي: <strong className="text-foreground">{(w.amount + w.fee).toFixed(2)} USDT</strong></span>
+                          </div>
+                        </div>
                       </div>
-                      <div className="text-[10px] text-muted-foreground">{formatDate(w.createdAt)}</div>
+
+                      {/* Date */}
+                      <div className="text-[10px] text-muted-foreground pt-1">{formatDate(w.createdAt)}</div>
                     </div>
 
                     {/* Actions */}
                     {w.status === 'pending' && (
-                      <div className="flex gap-2 pt-1">
-                        <button onClick={() => handleUpdateWithdrawal(w.id, 'approved')} className="flex-1 flex items-center justify-center gap-1 text-xs py-2 rounded-lg bg-green-500/10 text-green-400 hover:bg-green-500/20 transition-colors">
+                      <div className="flex gap-2 p-4 pt-0">
+                        <button onClick={() => handleUpdateWithdrawal(w.id, 'approved')} className="flex-1 flex items-center justify-center gap-1 text-xs py-2.5 rounded-lg bg-green-500/10 text-green-400 hover:bg-green-500/20 transition-colors font-medium">
                           <Check className="w-3 h-3" /> قبول
                         </button>
-                        <button onClick={() => handleUpdateWithdrawal(w.id, 'rejected')} className="flex-1 flex items-center justify-center gap-1 text-xs py-2 rounded-lg bg-red-500/10 text-red-400 hover:bg-red-500/20 transition-colors">
+                        <button onClick={() => handleUpdateWithdrawal(w.id, 'rejected')} className="flex-1 flex items-center justify-center gap-1 text-xs py-2.5 rounded-lg bg-red-500/10 text-red-400 hover:bg-red-500/20 transition-colors font-medium">
                           <X className="w-3 h-3" /> رفض
                         </button>
                       </div>
@@ -980,34 +1036,44 @@ export default function AdminPanel() {
 
 // ===================== PAYMENT METHODS MANAGER =====================
 
+const CRYPTO_NETWORKS = [
+  { value: 'TRC20', label: 'TRC20 (Tron)' },
+  { value: 'BEP20', label: 'BEP20 (BSC)' },
+  { value: 'ERC20', label: 'ERC20 (Ethereum)' },
+  { value: 'SOL', label: 'SOL (Solana)' },
+  { value: 'POLYGON', label: 'Polygon' },
+  { value: 'ARBITRUM', label: 'Arbitrum' },
+  { value: 'OPTIMISM', label: 'Optimism' },
+  { value: 'BTC', label: 'BTC (Bitcoin)' },
+]
+
 function PaymentMethodsManager({ methods, onRefresh }: { methods: any[]; onRefresh: () => void }) {
   const [showAdd, setShowAdd] = useState(false)
   const [editMethod, setEditMethod] = useState<any>(null)
   const [loading, setLoading] = useState(false)
   const [form, setForm] = useState({
-    name: '', type: 'bank_deposit', category: 'bank', purpose: 'deposit',
+    type: 'bank_deposit', category: 'bank',
     network: '', walletAddress: '', accountName: '', accountNumber: '',
     beneficiaryName: '', phone: '', recipientName: '', recipientPhone: '',
     instructions: '', minAmount: '', maxAmount: '',
   })
 
   const resetForm = () => {
-    setForm({ name: '', type: 'bank_deposit', category: 'bank', purpose: 'deposit', network: '', walletAddress: '', accountName: '', accountNumber: '', beneficiaryName: '', phone: '', recipientName: '', recipientPhone: '', instructions: '', minAmount: '', maxAmount: '' })
+    setForm({ type: 'bank_deposit', category: 'bank', network: '', walletAddress: '', accountName: '', accountNumber: '', beneficiaryName: '', phone: '', recipientName: '', recipientPhone: '', instructions: '', minAmount: '', maxAmount: '' })
     setEditMethod(null)
     setShowAdd(false)
   }
 
   const handleEdit = (m: any) => {
     setEditMethod(m)
-    setForm({ name: m.name || '', type: m.type || 'bank_deposit', category: m.category || 'bank', purpose: m.purpose || 'both', network: m.network || '', walletAddress: m.walletAddress || '', accountName: m.accountName || '', accountNumber: m.accountNumber || '', beneficiaryName: m.beneficiaryName || '', phone: m.phone || '', recipientName: m.recipientName || '', recipientPhone: m.recipientPhone || '', instructions: m.instructions || '', minAmount: m.minAmount?.toString() || '', maxAmount: m.maxAmount?.toString() || '' })
+    setForm({ type: m.type || 'bank_deposit', category: m.category || 'bank', network: m.network || '', walletAddress: m.walletAddress || '', accountName: m.accountName || '', accountNumber: m.accountNumber || '', beneficiaryName: m.beneficiaryName || '', phone: m.phone || '', recipientName: m.recipientName || '', recipientPhone: m.recipientPhone || '', instructions: m.instructions || '', minAmount: m.minAmount?.toString() || '', maxAmount: m.maxAmount?.toString() || '' })
     setShowAdd(true)
   }
 
   const handleSave = async () => {
-    if (!form.name) { toast.error('اسم الطريقة مطلوب'); return }
     setLoading(true)
     try {
-      const body: any = { ...form, isActive: true }
+      const body: any = { ...form, purpose: 'deposit', isActive: true }
       if (editMethod) {
         body.action = 'update'; body.id = editMethod.id; body.isActive = editMethod.isActive
       } else {
@@ -1049,9 +1115,15 @@ function PaymentMethodsManager({ methods, onRefresh }: { methods: any[]; onRefre
     } catch { toast.error('خطأ') }
   }
 
-  const TYPE_LABELS: Record<string, string> = { bank_deposit: 'إيداع بنكي', atm_transfer: 'تحويل صراف', bank_transfer: 'تحويل بنكي', crypto: 'عملات رقمية' }
+  const TYPE_LABELS: Record<string, string> = { bank_deposit: 'إيداع لمحفظة', atm_transfer: 'تحويل عبر صراف', crypto: 'عملات رقمية' }
   const CATEGORY_LABELS: Record<string, string> = { bank: '🏦 بنكي', crypto: '₿ عملات رقمية' }
-  const PURPOSE_LABELS: Record<string, string> = { deposit: '💰 إيداع', withdrawal: '📤 سحب', both: '🔄 إيداع وسحب' }
+
+  const getMethodTitle = (m: any) => {
+    if (m.category === 'crypto') {
+      return m.network ? `عملات رقمية - ${m.network}` : 'عملات رقمية'
+    }
+    return TYPE_LABELS[m.type] || m.type
+  }
 
   return (
     <div className="space-y-4">
@@ -1072,10 +1144,9 @@ function PaymentMethodsManager({ methods, onRefresh }: { methods: any[]; onRefre
                   </div>
                   <div>
                     <div className="flex items-center gap-2">
-                      <p className="text-sm font-medium">{m.name}</p>
-                      <span className="text-[10px] px-1.5 py-0.5 rounded-md bg-white/5 text-muted-foreground">{PURPOSE_LABELS[m.purpose] || PURPOSE_LABELS.both}</span>
+                      <p className="text-sm font-medium">{getMethodTitle(m)}</p>
                     </div>
-                    <p className="text-[10px] text-muted-foreground">{CATEGORY_LABELS[m.category] || m.category} | {TYPE_LABELS[m.type] || m.type}</p>
+                    <p className="text-[10px] text-muted-foreground">{CATEGORY_LABELS[m.category] || m.category}</p>
                   </div>
                 </div>
                 <div className="flex items-center gap-1">
@@ -1108,84 +1179,90 @@ function PaymentMethodsManager({ methods, onRefresh }: { methods: any[]; onRefre
 
       {/* Add/Edit Dialog */}
       {showAdd && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={resetForm}>
-          <div className="glass-card bg-background/95 backdrop-blur-xl border-gold/20 w-full max-w-md rounded-2xl p-6 space-y-4 animate-scale-in max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
-            <h3 className="text-lg font-bold gold-text">{editMethod ? 'تعديل طريقة الدفع' : 'إضافة طريقة دفع جديدة'}</h3>
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-end sm:items-center justify-center p-0 sm:p-4" onClick={resetForm}>
+          <div className="glass-card bg-background/95 backdrop-blur-xl border-gold/20 w-full sm:max-w-md sm:rounded-2xl rounded-t-2xl flex flex-col max-h-[90vh] animate-scale-in" onClick={(e) => e.stopPropagation()}>
+            {/* Dialog Header - Fixed */}
+            <div className="p-5 pb-3 border-b border-white/5 flex-shrink-0">
+              <h3 className="text-lg font-bold gold-text">{editMethod ? 'تعديل طريقة الدفع' : 'إضافة طريقة دفع جديدة'}</h3>
+            </div>
 
-            <div className="space-y-3">
-              <div className="space-y-1">
-                <label className="text-xs text-muted-foreground">اسم الطريقة (مثلاً: تحويل بنك الأهلي)</label>
-                <Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} className="glass-input h-10 text-sm" placeholder="اسم الطريقة" />
-              </div>
+            {/* Dialog Content - Scrollable */}
+            <div className="p-5 space-y-4 overflow-y-auto flex-1">
+              <div className="space-y-3">
+                {/* Classification + Type */}
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1">
+                    <label className="text-xs text-muted-foreground">التصنيف</label>
+                    <select value={form.category} onChange={(e) => { const cat = e.target.value; setForm({ ...form, category: cat, type: cat === 'crypto' ? 'crypto' : 'bank_deposit', network: cat === 'crypto' ? form.network : '' }) }} className="w-full h-10 rounded-lg bg-white/5 border border-white/10 px-3 text-sm text-foreground">
+                      <option value="bank">🏦 بنكي</option>
+                      <option value="crypto">₿ عملات رقمية</option>
+                    </select>
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-xs text-muted-foreground">النوع</label>
+                    <select value={form.type} onChange={(e) => setForm({ ...form, type: e.target.value })} className="w-full h-10 rounded-lg bg-white/5 border border-white/10 px-3 text-sm text-foreground">
+                      {form.category === 'bank' ? (
+                        <><option value="bank_deposit">إيداع لمحفظة</option><option value="atm_transfer">تحويل عبر صراف</option></>
+                      ) : (
+                        <option value="crypto">عملات رقمية</option>
+                      )}
+                    </select>
+                  </div>
+                </div>
 
-              <div className="space-y-1">
-                <label className="text-xs text-muted-foreground">الغرض</label>
-                <select value={form.purpose} onChange={(e) => setForm({ ...form, purpose: e.target.value })} className="w-full h-10 rounded-lg bg-white/5 border border-white/10 px-3 text-sm text-foreground">
-                  <option value="deposit">💰 إيداع</option>
-                  <option value="withdrawal">📤 سحب</option>
-                  <option value="both">🔄 إيداع وسحب</option>
-                </select>
-              </div>
+                {/* Bank: Deposit fields */}
+                {form.category === 'bank' && form.type === 'bank_deposit' && (
+                  <div className="space-y-2 p-3 rounded-lg bg-blue-500/5 border border-blue-500/10">
+                    <p className="text-xs text-blue-400 font-medium">بيانات الإيداع البنكي:</p>
+                    <div className="space-y-1">
+                      <Input value={form.accountName} onChange={(e) => setForm({ ...form, accountName: e.target.value })} className="glass-input h-9 text-sm" placeholder="اسم المحفظة" />
+                      <Input value={form.accountNumber} onChange={(e) => setForm({ ...form, accountNumber: e.target.value })} className="glass-input h-9 text-sm" placeholder="رقم الحساب" dir="ltr" />
+                      <Input value={form.beneficiaryName} onChange={(e) => setForm({ ...form, beneficiaryName: e.target.value })} className="glass-input h-9 text-sm" placeholder="اسم المستفيد" />
+                    </div>
+                  </div>
+                )}
 
-              <div className="grid grid-cols-2 gap-3">
+                {/* Bank: ATM Transfer fields */}
+                {form.category === 'bank' && form.type === 'atm_transfer' && (
+                  <div className="space-y-2 p-3 rounded-lg bg-green-500/5 border border-green-500/10">
+                    <p className="text-xs text-green-400 font-medium">بيانات التحويل عبر صراف:</p>
+                    <div className="space-y-1">
+                      <Input value={form.recipientName} onChange={(e) => setForm({ ...form, recipientName: e.target.value })} className="glass-input h-9 text-sm" placeholder="اسم المستلم" />
+                      <Input value={form.recipientPhone} onChange={(e) => setForm({ ...form, recipientPhone: e.target.value })} className="glass-input h-9 text-sm" placeholder="رقم الجوال" dir="ltr" />
+                      <Input value={form.network} onChange={(e) => setForm({ ...form, network: e.target.value })} className="glass-input h-9 text-sm" placeholder="اسم البنك / الشبكة" />
+                    </div>
+                  </div>
+                )}
+
+                {/* Crypto fields */}
+                {form.category === 'crypto' && (
+                  <div className="space-y-2 p-3 rounded-lg bg-orange-500/5 border border-orange-500/10">
+                    <p className="text-xs text-orange-400 font-medium">بيانات المحفظة الرقمية:</p>
+                    <div className="space-y-2">
+                      <div className="space-y-1">
+                        <label className="text-[10px] text-muted-foreground">الشبكة (اختياري)</label>
+                        <select value={form.network} onChange={(e) => setForm({ ...form, network: e.target.value })} className="w-full h-9 rounded-lg bg-white/5 border border-white/10 px-3 text-sm text-foreground">
+                          <option value="">-- اختر الشبكة --</option>
+                          {CRYPTO_NETWORKS.map(n => (
+                            <option key={n.value} value={n.value}>{n.label}</option>
+                          ))}
+                        </select>
+                      </div>
+                      <Input value={form.walletAddress} onChange={(e) => setForm({ ...form, walletAddress: e.target.value })} className="glass-input h-9 text-sm" placeholder="عنوان المحفظة" dir="ltr" />
+                    </div>
+                  </div>
+                )}
+
+                {/* Instructions */}
                 <div className="space-y-1">
-                  <label className="text-xs text-muted-foreground">التصنيف</label>
-                  <select value={form.category} onChange={(e) => { const cat = e.target.value; setForm({ ...form, category: cat, type: cat === 'crypto' ? 'crypto' : 'bank_deposit' }) }} className="w-full h-10 rounded-lg bg-white/5 border border-white/10 px-3 text-sm text-foreground">
-                    <option value="bank">🏦 بنكي</option>
-                    <option value="crypto">₿ عملات رقمية</option>
-                  </select>
+                  <label className="text-xs text-muted-foreground">تعليمات إضافية (اختياري)</label>
+                  <textarea value={form.instructions} onChange={(e) => setForm({ ...form, instructions: e.target.value })} className="w-full h-20 rounded-lg bg-white/5 border border-white/10 px-3 py-2 text-sm text-foreground resize-none" placeholder="ملاحظات أو تعليمات للمستخدم..." />
                 </div>
-                <div className="space-y-1">
-                  <label className="text-xs text-muted-foreground">النوع</label>
-                  <select value={form.type} onChange={(e) => setForm({ ...form, type: e.target.value })} className="w-full h-10 rounded-lg bg-white/5 border border-white/10 px-3 text-sm text-foreground">
-                    {form.category === 'bank' ? (
-                      <><option value="bank_deposit">إيداع بنكي</option><option value="atm_transfer">تحويل عبر صراف</option><option value="bank_transfer">تحويل بنكي</option></>
-                    ) : (
-                      <option value="crypto">عملات رقمية</option>
-                    )}
-                  </select>
-                </div>
-              </div>
-
-              {form.category === 'bank' && form.type === 'bank_deposit' && (
-                <div className="space-y-2 p-3 rounded-lg bg-blue-500/5 border border-blue-500/10">
-                  <p className="text-xs text-blue-400 font-medium">بيانات الإيداع البنكي:</p>
-                  <div className="space-y-1">
-                    <Input value={form.accountName} onChange={(e) => setForm({ ...form, accountName: e.target.value })} className="glass-input h-9 text-sm" placeholder="اسم المحفظة" />
-                    <Input value={form.accountNumber} onChange={(e) => setForm({ ...form, accountNumber: e.target.value })} className="glass-input h-9 text-sm" placeholder="رقم الحساب" dir="ltr" />
-                    <Input value={form.beneficiaryName} onChange={(e) => setForm({ ...form, beneficiaryName: e.target.value })} className="glass-input h-9 text-sm" placeholder="اسم المستفيد" />
-                  </div>
-                </div>
-              )}
-
-              {form.category === 'bank' && (form.type === 'atm_transfer' || form.type === 'bank_transfer') && (
-                <div className="space-y-2 p-3 rounded-lg bg-green-500/5 border border-green-500/10">
-                  <p className="text-xs text-green-400 font-medium">بيانات التحويل:</p>
-                  <div className="space-y-1">
-                    <Input value={form.recipientName} onChange={(e) => setForm({ ...form, recipientName: e.target.value })} className="glass-input h-9 text-sm" placeholder="اسم المستلم" />
-                    <Input value={form.recipientPhone} onChange={(e) => setForm({ ...form, recipientPhone: e.target.value })} className="glass-input h-9 text-sm" placeholder="رقم الجوال" dir="ltr" />
-                    <Input value={form.network} onChange={(e) => setForm({ ...form, network: e.target.value })} className="glass-input h-9 text-sm" placeholder="الشبكة / اسم البنك" />
-                  </div>
-                </div>
-              )}
-
-              {form.category === 'crypto' && (
-                <div className="space-y-2 p-3 rounded-lg bg-orange-500/5 border border-orange-500/10">
-                  <p className="text-xs text-orange-400 font-medium">بيانات المحفظة الرقمية:</p>
-                  <div className="space-y-1">
-                    <Input value={form.network} onChange={(e) => setForm({ ...form, network: e.target.value })} className="glass-input h-9 text-sm" placeholder="الشبكة (مثلاً: TRC20, BEP20)" />
-                    <Input value={form.walletAddress} onChange={(e) => setForm({ ...form, walletAddress: e.target.value })} className="glass-input h-9 text-sm" placeholder="عنوان المحفظة" dir="ltr" />
-                  </div>
-                </div>
-              )}
-
-              <div className="space-y-1">
-                <label className="text-xs text-muted-foreground">تعليمات إضافية (اختياري)</label>
-                <textarea value={form.instructions} onChange={(e) => setForm({ ...form, instructions: e.target.value })} className="w-full h-20 rounded-lg bg-white/5 border border-white/10 px-3 py-2 text-sm text-foreground resize-none" placeholder="ملاحظات أو تعليمات للمستخدم..." />
               </div>
             </div>
 
-            <div className="flex gap-3">
+            {/* Dialog Footer - Fixed at bottom */}
+            <div className="p-5 pt-3 border-t border-white/5 flex gap-3 flex-shrink-0">
               <button onClick={handleSave} disabled={loading} className="flex-1 h-11 gold-gradient text-gray-900 font-bold rounded-xl hover:opacity-90 transition-all">
                 {loading ? <Loader2 className="w-4 h-4 animate-spin mx-auto" /> : editMethod ? 'حفظ التعديلات' : 'إضافة'}
               </button>
