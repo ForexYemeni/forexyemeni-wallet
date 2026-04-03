@@ -876,7 +876,7 @@ export default function AdminPanel() {
 
                           {/* Hide action buttons for sub-admins viewing, AND for promoted admin users being viewed */}
                           {!hasPermissions && !(u.role === 'admin' && u.permissions) && (
-                          <div className="grid grid-cols-3 gap-2 pt-2">
+                          <div className="grid grid-cols-4 gap-2 pt-2">
                             {u.status === 'active' ? (
                               <button
                                 onClick={() => handleUpdateUser(u.id, { status: 'suspended' })}
@@ -902,6 +902,14 @@ export default function AdminPanel() {
                             >
                               <Settings className="w-3.5 h-3.5" />
                               الأجهزة
+                            </button>
+                            <button
+                              onClick={() => handleRoleChange(u, u.role === 'admin' ? 'user' : 'admin')}
+                              disabled={actionLoading === u.id}
+                              className="flex items-center justify-center gap-1 text-xs py-2.5 rounded-lg bg-gold/10 text-gold hover:bg-gold/20 transition-colors font-medium"
+                            >
+                              {actionLoading === u.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Crown className="w-3.5 h-3.5" />}
+                              {u.role === 'admin' ? 'إزالة' : 'ترقية'}
                             </button>
                             <button
                               onClick={() => openDeleteDialog(u)}
