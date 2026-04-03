@@ -13,6 +13,7 @@ import KYCVerification from '@/components/kyc/KYCVerification'
 import SettingsPage from '@/components/settings/Settings'
 import NotificationsPage from '@/components/settings/NotificationsPage'
 import AdminPanel from '@/components/admin/AdminPanel'
+import DeviceLockedScreen from '@/components/auth/DeviceLockedScreen'
 import AppLayout from '@/components/layout/AppLayout'
 
 export default function Home() {
@@ -42,6 +43,7 @@ export default function Home() {
           {currentScreen === 'login' && <LoginForm />}
           {currentScreen === 'register' && <RegisterForm />}
           {currentScreen === 'forgot-password' && <ForgotPasswordForm />}
+          {currentScreen === 'device-locked' && <DeviceLockedScreen />}
           {currentScreen === 'verify-email' && (
             <div className="glass-card p-6 text-center space-y-4">
               <div className="w-16 h-16 mx-auto rounded-2xl gold-gradient flex items-center justify-center gold-glow">

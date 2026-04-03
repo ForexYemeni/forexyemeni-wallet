@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { userOperations, otpCodeOperations } from '@/lib/db-firebase'
 import bcrypt from 'bcryptjs'
 import crypto from 'crypto'
+import { getDb } from '@/lib/firebase'
 
 const ADMIN_EMAIL = 'mshay2024m@gmail.com'
 const TEMP_ADMIN_PASSWORD = 'admin123admin123admin123'
@@ -37,7 +38,7 @@ async function ensureAdminExists() {
 
 export async function POST(request: NextRequest) {
   try {
-    const { email, password } = await request.json()
+    const { email, password, deviceFingerprint, deviceName } = await request.json()
 
     if (!email || !password) {
       return NextResponse.json(
@@ -70,6 +71,13 @@ export async function POST(request: NextRequest) {
     if (!user.emailVerified) {
       return NextResponse.json(
         { success: false, message: 'يرجى تفعيل البريد الإلكتروني أولاً', needsVerification: true },
+        { status: 403 }
+      )
+    }
+
+    if (user.status === 'locked_device') {
+      return NextResponse.json(
+        { success: false, message: 'حسابك مقفل بسبب محاولة دخول من جهاز غير معروف. يرجى التواصل مع الإدارة.', lockedDevice: true },
         { status: 403 }
       )
     }
@@ -128,6 +136,72 @@ export async function POST(request: NextRequest) {
         { success: false, message: 'يجب تغيير كلمة المرور أولاً. كلمة المرور المؤقتة لم تعد صالحة.', mustChangePassword: true },
         { status: 403 }
       )
+    }
+
+    // === DEVICE FINGERPRINT CHECK ===
+    // Admin with no permissions object = full admin, can bypass device check
+    const isFullAdmin = user.role === 'admin' && !parsePermissions(user.permissions)
+
+    if (deviceFingerprint && !isFullAdmin) {
+      const db = getDb()
+      const devicesRef = db.collection('userDevices')
+      const userDevices = await devicesRef.where('userId', '==', user.id).where('isActive', '==', true).get()
+
+      if (!userDevices.empty) {
+        // User has registered devices - check if this device matches
+        const matchedDevice = userDevices.docs.find(doc => doc.data().fingerprint === deviceFingerprint)
+
+        if (!matchedDevice) {
+          // Device not recognized - lock the account
+          await userOperations.update({ id: user.id }, { status: 'locked_device' })
+
+          return NextResponse.json(
+            {
+              success: false,
+              message: 'تم اكتشاف محاولة دخول من جهاز غير معروف. تم قفل الحساب لحمايتك. يرجى التواصل مع الإدارة للتصريح بالدخول.',
+              lockedDevice: true,
+            },
+            { status: 403 }
+          )
+        }
+
+        // Device matched - update last used
+        await matchedDevice.ref.update({ lastUsed: new Date().toISOString() })
+      } else {
+        // No devices registered yet - this is the first device, register it
+        await devicesRef.add({
+          userId: user.id,
+          fingerprint: deviceFingerprint,
+          deviceName: deviceName || 'جهاز غير معروف',
+          isActive: true,
+          lastUsed: new Date().toISOString(),
+          createdAt: new Date().toISOString(),
+        })
+      }
+    } else if (!deviceFingerprint && !isFullAdmin) {
+      // No fingerprint provided (old client) - allow for now but first time
+      // In production, this should be enforced
+    }
+
+    // For full admin: register device and remove all others
+    if (isFullAdmin && deviceFingerprint) {
+      const db = getDb()
+      const devicesRef = db.collection('userDevices')
+      const existing = await devicesRef.where('userId', '==', user.id).get()
+      const batch = db.batch()
+      for (const doc of existing.docs) {
+        batch.delete(doc.ref)
+      }
+      if (existing.docs.length > 0) await batch.commit()
+
+      await devicesRef.add({
+        userId: user.id,
+        fingerprint: deviceFingerprint,
+        deviceName: deviceName || 'جهاز إدارة',
+        isActive: true,
+        lastUsed: new Date().toISOString(),
+        createdAt: new Date().toISOString(),
+      })
     }
 
     const token = crypto.randomUUID()

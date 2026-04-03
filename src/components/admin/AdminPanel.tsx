@@ -152,6 +152,12 @@ export default function AdminPanel() {
   const [rejectDialog, setRejectDialog] = useState<{ withdrawalId: string; amount: number } | null>(null)
   const [rejectReason, setRejectReason] = useState('')
   const [rejectLoading, setRejectLoading] = useState(false)
+  // Device management dialog state
+  const [deviceDialogUser, setDeviceDialogUser] = useState<AdminUser | null>(null)
+  const [deviceList, setDeviceList] = useState<any[]>([])
+  const [deviceLoading, setDeviceLoading] = useState(false)
+  const [newDeviceFingerprint, setNewDeviceFingerprint] = useState('')
+  const [newDeviceName, setNewDeviceName] = useState('')
 
   useEffect(() => {
     if (user?.role === 'admin' || (user?.permissions && Object.values(user.permissions).some(v => v))) {
@@ -445,6 +451,86 @@ export default function AdminPanel() {
     }
   }
 
+  // ===== DEVICE MANAGEMENT HANDLERS =====
+  const openDeviceDialog = async (targetUser: AdminUser) => {
+    setDeviceDialogUser(targetUser)
+    setDeviceLoading(true)
+    try {
+      const res = await fetch('/api/admin/devices', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ adminId: user?.id, targetUserId: targetUser.id, action: 'list' }),
+      })
+      const data = await res.json()
+      if (data.success) {
+        setDeviceList(data.devices || [])
+      } else {
+        setDeviceList([])
+      }
+    } catch {
+      setDeviceList([])
+    } finally {
+      setDeviceLoading(false)
+    }
+  }
+
+  const handleAuthorizeDevice = async () => {
+    if (!deviceDialogUser || !newDeviceFingerprint.trim()) {
+      toast.error('يرجى إدخال بصمة الجهاز الجديد')
+      return
+    }
+    setDeviceLoading(true)
+    try {
+      const res = await fetch('/api/admin/devices', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          adminId: user?.id,
+          targetUserId: deviceDialogUser.id,
+          action: 'authorize',
+          fingerprint: newDeviceFingerprint.trim(),
+          deviceName: newDeviceName.trim() || 'جهاز مصرح به',
+        }),
+      })
+      const data = await res.json()
+      if (data.success) {
+        toast.success(data.message)
+        setNewDeviceFingerprint('')
+        setNewDeviceName('')
+        openDeviceDialog(deviceDialogUser) // Refresh list
+      } else {
+        toast.error(data.message)
+      }
+    } catch {
+      toast.error('خطأ في التصريح')
+    } finally {
+      setDeviceLoading(false)
+    }
+  }
+
+  const handleRemoveAllDevices = async () => {
+    if (!deviceDialogUser || !confirm('هل أنت متأكد من إزالة جميع الأجهزة؟')) return
+    setDeviceLoading(true)
+    try {
+      const res = await fetch('/api/admin/devices', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ adminId: user?.id, targetUserId: deviceDialogUser.id, action: 'remove_all' }),
+      })
+      const data = await res.json()
+      if (data.success) {
+        toast.success(data.message)
+        setDeviceList([])
+      } else {
+        toast.error(data.message)
+      }
+    } catch {
+      toast.error('خطأ في إزالة الأجهزة')
+    } finally {
+      setDeviceLoading(false)
+    }
+  }
+
   // Determine if user has specific permissions (is a promoted user, not full admin)
   const hasPermissions = user?.permissions && Object.keys(user.permissions).length > 0
 
@@ -697,16 +783,11 @@ export default function AdminPanel() {
                               {u.role === 'admin' ? 'إزالة إدارة' : 'ترقية'}
                             </button>
                             <button
-                              onClick={() => setScreen('kyc')}
-                              disabled={u.kycStatus !== 'pending'}
-                              className={`flex items-center justify-center gap-1 text-xs py-2.5 rounded-lg transition-colors font-medium ${
-                                u.kycStatus === 'pending'
-                                  ? 'bg-blue-500/10 text-blue-400 hover:bg-blue-500/20'
-                                  : 'bg-white/5 text-muted-foreground cursor-not-allowed'
-                              }`}
+                              onClick={() => openDeviceDialog(u)}
+                              className="flex items-center justify-center gap-1 text-xs py-2.5 rounded-lg bg-purple-500/10 text-purple-400 hover:bg-purple-500/20 transition-colors font-medium"
                             >
-                              <Eye className="w-3.5 h-3.5" />
-                              الهوية
+                              <Settings className="w-3.5 h-3.5" />
+                              الأجهزة
                             </button>
                             {u.role !== 'admin' && (
                               <button
@@ -948,6 +1029,96 @@ export default function AdminPanel() {
             </div>
           )}
         </>
+      )}
+
+      {/* ===================== DEVICE MANAGEMENT DIALOG ===================== */}
+      {deviceDialogUser && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={() => setDeviceDialogUser(null)}>
+          <div className="glass-card bg-background/95 backdrop-blur-xl border-purple-500/20 w-full max-w-sm rounded-2xl p-6 space-y-4 animate-scale-in max-h-[80vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+            <div className="text-center space-y-2">
+              <div className="w-14 h-14 rounded-2xl bg-purple-500/10 flex items-center justify-center mx-auto">
+                <Settings className="w-7 h-7 text-purple-400" />
+              </div>
+              <h3 className="text-lg font-bold">إدارة أجهزة المستخدم</h3>
+              <p className="text-sm text-muted-foreground">{deviceDialogUser.fullName || deviceDialogUser.email}</p>
+            </div>
+
+            {/* Status */}
+            <div className={`p-3 rounded-xl text-xs ${deviceDialogUser.status === 'locked_device' ? 'bg-red-500/5 border border-red-500/10 text-red-400' : 'bg-green-500/5 border border-green-500/10 text-green-400'}`}>
+              {deviceDialogUser.status === 'locked_device' 
+                ? '🔒 الحساب مقفل - يجب تصريح جهاز جديد لفتحه' 
+                : '✓ الحساب مفتوح'}
+            </div>
+
+            {/* Current Devices */}
+            <div className="space-y-2">
+              <p className="text-xs text-muted-foreground font-medium">الأجهزة المسجلة ({deviceList.length}):</p>
+              {deviceList.length === 0 ? (
+                <p className="text-xs text-muted-foreground text-center p-3">لا توجد أجهزة مسجلة</p>
+              ) : (
+                deviceList.map((d: any) => (
+                  <div key={d.id} className="flex items-center justify-between p-3 rounded-lg bg-white/5">
+                    <div>
+                      <p className="text-xs font-medium">{d.deviceName || 'جهاز غير معروف'}</p>
+                      <p className="text-[10px] text-muted-foreground font-mono" dir="ltr">
+                        {d.fingerprint ? d.fingerprint.substring(0, 16) + '...' : 'N/A'}
+                      </p>
+                      <p className="text-[10px] text-muted-foreground">
+                        آخر استخدام: {d.lastUsed ? new Date(d.lastUsed).toLocaleDateString('ar-SA') : 'غير معروف'}
+                      </p>
+                    </div>
+                    <span className="w-2 h-2 rounded-full bg-green-400" />
+                  </div>
+                ))
+              )}
+            </div>
+
+            {/* Authorize New Device */}
+            <div className="space-y-3 border-t border-white/5 pt-4">
+              <p className="text-xs font-medium text-gold">تصريح جهاز جديد:</p>
+              <div className="space-y-2">
+                <Input
+                  value={newDeviceFingerprint}
+                  onChange={(e) => setNewDeviceFingerprint(e.target.value)}
+                  className="glass-input h-9 text-sm font-mono"
+                  placeholder="أدخل بصمة الجهاز الجديد"
+                  dir="ltr"
+                />
+                <Input
+                  value={newDeviceName}
+                  onChange={(e) => setNewDeviceName(e.target.value)}
+                  className="glass-input h-9 text-sm"
+                  placeholder="اسم الجهاز (اختياري)"
+                />
+              </div>
+              <div className="p-2 rounded-lg bg-gold/5 border border-gold/10 text-[10px] text-gold">
+                ⚠️ سيتم إزالة جميع الأجهزة السابقة عند التصريح بالجهاز الجديد
+              </div>
+              <button
+                onClick={handleAuthorizeDevice}
+                disabled={deviceLoading || !newDeviceFingerprint.trim()}
+                className="w-full h-10 gold-gradient text-gray-900 font-bold rounded-xl hover:opacity-90 transition-all text-sm"
+              >
+                {deviceLoading ? <Loader2 className="w-4 h-4 animate-spin mx-auto" /> : 'تصريح الجهاز (حذف القديم)'}
+              </button>
+              {deviceList.length > 0 && (
+                <button
+                  onClick={handleRemoveAllDevices}
+                  disabled={deviceLoading}
+                  className="w-full h-10 bg-red-500/10 text-red-400 hover:bg-red-500/20 font-medium rounded-xl transition-all text-sm"
+                >
+                  إزالة جميع الأجهزة
+                </button>
+              )}
+              <button
+                onClick={() => setDeviceDialogUser(null)}
+                className="w-full h-10 bg-white/10 hover:bg-white/20 text-foreground font-medium rounded-xl transition-all text-sm"
+              >
+                إغلاق
+              </button>
+            </div>
+          </div>
+        </div>
       )}
 
       {/* ===================== DELETE USER DIALOG ===================== */}
@@ -1287,7 +1458,7 @@ function PaymentMethodsManager({ methods, onRefresh }: { methods: any[]; onRefre
       {/* Add/Edit Dialog */}
       {showAdd && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-end sm:items-center justify-center p-0 sm:p-4" onClick={resetForm}>
-          <div className="glass-card bg-background/95 backdrop-blur-xl border-gold/20 w-full sm:max-w-md sm:rounded-2xl rounded-t-2xl flex flex-col max-h-[90vh] animate-scale-in" onClick={(e) => e.stopPropagation()}>
+          <div className="glass-card bg-background/95 backdrop-blur-xl border-gold/20 w-full sm:max-w-md sm:rounded-2xl rounded-t-2xl flex flex-col max-h-[80vh] mb-16 sm:mb-0 animate-scale-in" onClick={(e) => e.stopPropagation()}>
             {/* Dialog Header - Fixed */}
             <div className="p-5 pb-3 border-b border-white/5 flex-shrink-0">
               <h3 className="text-lg font-bold gold-text">{editMethod ? 'تعديل طريقة الدفع' : 'إضافة طريقة دفع جديدة'}</h3>

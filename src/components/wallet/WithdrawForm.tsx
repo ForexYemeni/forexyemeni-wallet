@@ -400,7 +400,7 @@ export default function WithdrawForm() {
       {/* Add/Edit Payment Method Dialog - Same as admin */}
       {showAddMethod && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-end sm:items-center justify-center p-0 sm:p-4" onClick={resetMethodForm}>
-          <div className="glass-card bg-background/95 backdrop-blur-xl border-gold/20 w-full sm:max-w-md sm:rounded-2xl rounded-t-2xl flex flex-col max-h-[90vh] animate-scale-in" onClick={(e) => e.stopPropagation()}>
+          <div className="glass-card bg-background/95 backdrop-blur-xl border-gold/20 w-full sm:max-w-md sm:rounded-2xl rounded-t-2xl flex flex-col max-h-[80vh] mb-16 sm:mb-0 animate-scale-in" onClick={(e) => e.stopPropagation()}>
             {/* Header */}
             <div className="p-5 pb-3 border-b border-white/5 flex-shrink-0">
               <div className="flex items-center justify-between">

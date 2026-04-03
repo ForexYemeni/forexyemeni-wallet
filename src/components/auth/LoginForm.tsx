@@ -6,7 +6,8 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { useAuthStore } from '@/lib/store'
 import { toast } from 'sonner'
-import { Loader2, Eye, EyeOff, Wallet } from 'lucide-react'
+import { Loader2, Eye, EyeOff, Wallet, Smartphone } from 'lucide-react'
+import { generateDeviceFingerprint, getDeviceName } from '@/lib/device-fingerprint'
 
 export default function LoginForm() {
   const [email, setEmail] = useState('')
@@ -24,10 +25,20 @@ export default function LoginForm() {
 
     setLoading(true)
     try {
+      // Generate device fingerprint
+      let deviceFingerprint = ''
+      let deviceName = ''
+      try {
+        deviceFingerprint = await generateDeviceFingerprint()
+        deviceName = getDeviceName()
+      } catch {
+        // Fingerprint generation failed - continue without it
+      }
+
       const res = await fetch('/api/auth/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password }),
+        body: JSON.stringify({ email, password, deviceFingerprint, deviceName }),
       })
       const data = await res.json()
 
@@ -38,6 +49,11 @@ export default function LoginForm() {
         } else {
           toast.success('تم تسجيل الدخول بنجاح')
         }
+      } else if (data.lockedDevice) {
+        toast.error(data.message, { duration: 8000 })
+        // Show locked device screen
+        setPendingRegistration({ email, fullName: '', password })
+        setScreen('device-locked')
       } else if (data.mustChangePassword) {
         toast.error('⚠️ كلمة المرور المؤقتة لم تعد صالحة. يجب تغييرها أولاً.', { duration: 5000 })
       } else if (data.needsVerification) {
@@ -112,6 +128,12 @@ export default function LoginForm() {
           )}
         </Button>
       </form>
+
+      {/* Security Notice */}
+      <div className="flex items-center gap-2 p-3 rounded-xl bg-white/5 border border-white/10 text-xs text-muted-foreground">
+        <Smartphone className="w-4 h-4 text-gold flex-shrink-0" />
+        <span>يتم التحقق من جهازك تلقائياً لحماية حسابك</span>
+      </div>
 
       <div className="space-y-3 text-center">
         <button
