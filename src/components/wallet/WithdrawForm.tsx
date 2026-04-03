@@ -412,7 +412,7 @@ export default function WithdrawForm() {
             </div>
 
             {/* Content - Scrollable */}
-            <div className="p-5 space-y-4 overflow-y-auto flex-1">
+            <div className="p-5 space-y-4 overflow-y-auto flex-1 min-h-0">
               <div className="space-y-3">
                 {/* Classification + Type */}
                 <div className="grid grid-cols-2 gap-3">

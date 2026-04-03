@@ -467,12 +467,18 @@ export default function AdminPanel() {
   const allowedTabKeys = tabs.map(t => t.key)
   const effectiveActiveTab = allowedTabKeys.includes(activeTab) ? activeTab : allowedTabKeys[0] || 'users'
 
-  const filteredUsers = users.filter(u =>
-    u.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    u.fullName?.includes(searchQuery) ||
-    u.phone?.includes(searchQuery) ||
-    u.id.includes(searchQuery)
-  )
+  const filteredUsers = users
+    // Hide admin accounts from promoted admins
+    .filter(u => {
+      if (hasPermissions && u.role === 'admin') return false
+      return true
+    })
+    .filter(u =>
+      u.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      u.fullName?.includes(searchQuery) ||
+      u.phone?.includes(searchQuery) ||
+      u.id.includes(searchQuery)
+    )
 
   const formatDate = (dateStr: string) => {
     const date = new Date(dateStr)
@@ -660,7 +666,8 @@ export default function AdminPanel() {
                             </div>
                           </div>
 
-                          {/* Action Buttons */}
+                          {/* Action Buttons - Only for full admin, not for promoted admins */}
+                          {!hasPermissions && (
                           <div className="grid grid-cols-4 gap-2 pt-2">
                             {u.status === 'active' ? (
                               <button
@@ -711,6 +718,7 @@ export default function AdminPanel() {
                               </button>
                             )}
                           </div>
+                          )}
                         </div>
                       )}
                     </div>
@@ -1286,7 +1294,7 @@ function PaymentMethodsManager({ methods, onRefresh }: { methods: any[]; onRefre
             </div>
 
             {/* Dialog Content - Scrollable */}
-            <div className="p-5 space-y-4 overflow-y-auto flex-1">
+            <div className="p-5 space-y-4 overflow-y-auto flex-1 min-h-0">
               <div className="space-y-3">
                 {/* Classification + Type */}
                 <div className="grid grid-cols-2 gap-3">
