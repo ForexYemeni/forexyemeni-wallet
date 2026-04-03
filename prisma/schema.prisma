@@ -1,0 +1,134 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id            String   @id @default(cuid())
+  email         String   @unique
+  passwordHash  String
+  fullName      String?
+  phone         String?  @unique
+  country       String?
+  role          String   @default("user")
+  status        String   @default("active")
+  emailVerified Boolean  @default(false)
+  phoneVerified Boolean  @default(false)
+  kycStatus     String   @default("none")
+  kycIdPhoto    String?
+  kycSelfie     String?
+  kycNotes      String?
+  balance       Float    @default(0)
+  frozenBalance Float    @default(0)
+  affiliateCode String   @unique
+  referredBy    String?
+  merchantId    String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  
+  deposits      Deposit[]
+  withdrawals   Withdrawal[]
+  transactions  Transaction[]
+  kycRecords    KYCRecord[]
+  notifications Notification[]
+  otpCodes      OtpCode[]
+}
+
+model OtpCode {
+  id        String   @id @default(cuid())
+  userId    String?
+  email     String
+  phone     String?
+  code      String
+  type      String
+  purpose   String?
+  verified  Boolean  @default(false)
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+  
+  user      User?    @relation(fields: [userId], references: [id])
+}
+
+model KYCRecord {
+  id         String    @id @default(cuid())
+  userId     String
+  type       String
+  fileUrl    String
+  status     String    @default("pending")
+  reviewedAt DateTime?
+  reviewerId String?
+  notes      String?
+  createdAt  DateTime  @default(now())
+  
+  user       User      @relation(fields: [userId], references: [id])
+}
+
+model Deposit {
+  id           String   @id @default(cuid())
+  userId       String
+  amount       Float
+  currency     String   @default("USDT")
+  network      String   @default("TRC20")
+  txId         String?
+  fromAddress  String?
+  toAddress    String?
+  status       String   @default("pending")
+  method       String   @default("blockchain")
+  merchantId   String?
+  merchantNote String?
+  screenshot   String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  
+  user         User     @relation(fields: [userId], references: [id])
+}
+
+model Withdrawal {
+  id          String   @id @default(cuid())
+  userId      String
+  amount      Float
+  currency    String   @default("USDT")
+  network     String   @default("TRC20")
+  toAddress   String
+  status      String   @default("pending")
+  method      String   @default("blockchain")
+  merchantId  String?
+  txId        String?
+  fee         Float    @default(0)
+  adminNote   String?
+  screenshot  String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  user        User     @relation(fields: [userId], references: [id])
+}
+
+model Transaction {
+  id           String   @id @default(cuid())
+  userId       String
+  type         String
+  amount       Float
+  balanceBefore Float
+  balanceAfter  Float
+  description  String?
+  referenceId  String?
+  createdAt    DateTime @default(now())
+  
+  user         User     @relation(fields: [userId], references: [id])
+}
+
+model Notification {
+  id        String   @id @default(cuid())
+  userId    String
+  title     String
+  message   String
+  type      String   @default("info")
+  read      Boolean  @default(false)
+  createdAt DateTime @default(now())
+  
+  user      User     @relation(fields: [userId], references: [id])
+}
