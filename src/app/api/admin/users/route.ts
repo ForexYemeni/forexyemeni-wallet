@@ -5,8 +5,7 @@ import { userOperations } from '@/lib/db-firebase'
 export async function GET() {
   try {
     const users = await userOperations.findMany({
-      orderBy: 'createdAt',
-      take: 100,
+      take: 200,
     })
 
     return NextResponse.json({ success: true, users })
@@ -19,7 +18,7 @@ export async function GET() {
 // POST update user (admin)
 export async function POST(request: NextRequest) {
   try {
-    const { userId, status, role, balance, kycStatus, notes } = await request.json()
+    const { userId, status, role, balance, kycStatus, notes, permissions } = await request.json()
 
     if (!userId) {
       return NextResponse.json({ success: false, message: 'معرف المستخدم مطلوب' }, { status: 400 })
@@ -30,7 +29,9 @@ export async function POST(request: NextRequest) {
     if (role) updateData.role = role
     if (typeof balance === 'number') updateData.balance = balance
     if (kycStatus) updateData.kycStatus = kycStatus
-    if (notes) updateData.kycNotes = notes
+    if (notes !== undefined) updateData.kycNotes = notes
+    // Store permissions as JSON string in a custom field
+    if (permissions) updateData.permissions = JSON.stringify(permissions)
 
     const user = await userOperations.update({ id: userId }, updateData)
 
