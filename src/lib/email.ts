@@ -40,7 +40,7 @@ export async function sendVerificationEmail(to: string, otp: string): Promise<bo
     ].join('\n')
 
     await resend.emails.send({
-      from: 'ForexYemeni Wallet <noreply@forexyemeni.com>',
+      from: 'ForexYemeni Wallet <onboarding@resend.dev>',
       to,
       subject: 'رمز التحقق - فوركس يمني',
       html: htmlContent,
@@ -84,7 +84,7 @@ export async function sendPasswordResetEmail(to: string, otp: string): Promise<b
     ].join('\n')
 
     await resend.emails.send({
-      from: 'ForexYemeni Wallet <noreply@forexyemeni.com>',
+      from: 'ForexYemeni Wallet <onboarding@resend.dev>',
       to,
       subject: 'إعادة تعيين كلمة المرور - فوركس يمني',
       html: htmlContent,
@@ -129,7 +129,7 @@ export async function sendPhoneVerificationEmail(to: string, phone: string, otp:
     ].join('\n')
 
     await resend.emails.send({
-      from: 'ForexYemeni Wallet <noreply@forexyemeni.com>',
+      from: 'ForexYemeni Wallet <onboarding@resend.dev>',
       to,
       subject: 'رمز التحقق من رقم الهاتف - فوركس يمني',
       html: htmlContent,

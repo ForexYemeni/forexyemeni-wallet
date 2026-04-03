@@ -74,13 +74,16 @@ export async function POST(request: NextRequest) {
     // Send email
     const emailSent = await sendVerificationEmail(email, otp)
 
+    if (!emailSent) {
+      console.log('[REGISTER] Email not sent - OTP for ' + email + ': ' + otp)
+    }
+
     return NextResponse.json({
       success: true,
       message: emailSent 
         ? 'تم إرسال رمز التحقق إلى بريدك الإلكتروني' 
-        : 'تم إنشاء الحساب. تحقق من الرمز (وضع التطوير - الرمز يظهر في الاستجابة)',
+        : 'تم إنشاء الحساب بنجاح. يرجى التحقق من بريدك الإلكتروني.',
       otpId: user.id,
-      otp, // For testing only - remove in production
     })
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : 'حدث خطأ في التسجيل'

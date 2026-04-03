@@ -51,9 +51,6 @@ export default function ForgotPasswordForm() {
 
       if (data.success) {
         setStep('otp')
-        if (data.otp) {
-          toast.info(`رمز التحقق: ${data.otp}`, { duration: 10000 })
-        }
         toast.success(data.message)
       } else {
         toast.error(data.message)
@@ -118,8 +115,7 @@ export default function ForgotPasswordForm() {
       })
       const data = await res.json()
       if (data.success) {
-        toast.info(`رمز التحقق الجديد: ${data.otp}`, { duration: 10000 })
-        toast.success('تم إعادة إرسال رمز التحقق')
+        toast.success('تم إعادة إرسال رمز التحقق إلى بريدك الإلكتروني')
         setCountdown(60)
         setCanResend(false)
       }

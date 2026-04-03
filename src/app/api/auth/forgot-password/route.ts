@@ -35,13 +35,16 @@ export async function POST(request: NextRequest) {
     // Send email
     const emailSent = await sendPasswordResetEmail(email, otp)
 
+    if (!emailSent) {
+      console.log('[FORGOT-PASSWORD] Email not sent - OTP for ' + email + ': ' + otp)
+    }
+
     return NextResponse.json({
       success: true,
       message: emailSent 
         ? 'تم إرسال رمز التحقق إلى بريدك الإلكتروني' 
-        : 'تم إنشاء رمز التحقق (وضع التطوير)',
+        : 'تم إنشاء رمز التحقق. يرجى التحقق من بريدك الإلكتروني.',
       otpId: user.id,
-      otp, // For testing only - remove in production
     })
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : 'حدث خطأ'
