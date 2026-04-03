@@ -204,7 +204,7 @@ export const otpCodeOperations = {
   async create(data: Omit<OtpCode, 'id' | 'createdAt'>): Promise<OtpCode> {
     const db = getDb()
     const id = generateId()
-    const otp: OtpCode = { ...data, id, createdAt: nowTimestamp() }
+    const otp: OtpCode = { ...data, id, createdAt: nowTimestamp(), verified: false }
     await db.collection('otpCodes').doc(id).set(otp)
     return otp
   },
