@@ -37,6 +37,8 @@ import {
   AlertTriangle,
   Lock,
   Send,
+  Copy,
+  Check as CheckIcon,
 } from 'lucide-react'
 
 // ===================== TYPES =====================
@@ -71,6 +73,8 @@ interface AdminWithdrawal {
   amount: number
   fee: number
   toAddress: string
+  method: string
+  network: string
   status: string
   createdAt: string
   user: { id: string; email: string; fullName: string | null }
@@ -140,6 +144,7 @@ export default function AdminPanel() {
   const [deleteOtp, setDeleteOtp] = useState('')
   const [deletePassword, setDeletePassword] = useState('')
   const [deleteLoading, setDeleteLoading] = useState(false)
+  const [copiedWithdrawalId, setCopiedWithdrawalId] = useState<string | null>(null)
 
   useEffect(() => {
     if (user?.role === 'admin') {
@@ -378,6 +383,13 @@ export default function AdminPanel() {
     } finally {
       setDeleteLoading(false)
     }
+  }
+
+  const copyWithdrawalAddress = (w: AdminWithdrawal) => {
+    navigator.clipboard.writeText(w.toAddress)
+    setCopiedWithdrawalId(w.id)
+    toast.success('تم النسخ')
+    setTimeout(() => setCopiedWithdrawalId(null), 2000)
   }
 
   const tabs = [
@@ -681,11 +693,12 @@ export default function AdminPanel() {
                 <div className="glass-card p-8 text-center text-muted-foreground text-sm">لا توجد سحوبات</div>
               ) : (
                 withdrawals.map((w) => (
-                  <div key={w.id} className="glass-card p-4 rounded-xl space-y-2">
+                  <div key={w.id} className="glass-card p-4 rounded-xl space-y-3">
+                    {/* Header Row */}
                     <div className="flex items-center justify-between">
                       <div>
                         <p className="text-sm font-medium">{w.user.fullName || w.user.email}</p>
-                        <p className="text-xs text-muted-foreground" dir="ltr">{w.toAddress.substring(0, 16)}...</p>
+                        <p className="text-[10px] text-muted-foreground" dir="ltr">{w.id.substring(0, 16)}</p>
                       </div>
                       <div className="text-left">
                         <p className="text-sm font-bold gold-text">{w.amount.toFixed(2)} USDT</p>
@@ -694,7 +707,56 @@ export default function AdminPanel() {
                         </span>
                       </div>
                     </div>
-                    <div className="text-xs text-muted-foreground">الرسوم: {w.fee.toFixed(2)} USDT</div>
+
+                    {/* Withdrawal Details - Copyable */}
+                    <div className="border-t border-white/5 pt-2 space-y-2">
+                      {/* Method + Network */}
+                      <div className="flex items-center gap-2 text-xs">
+                        <span className="text-muted-foreground">الطريقة:</span>
+                        <span className="text-foreground font-medium">
+                          {w.method === 'crypto' || w.method === 'blockchain' ? 'عملات رقمية' :
+                           w.method === 'bank_deposit' ? 'إيداع بنكي' :
+                           w.method === 'atm_transfer' ? 'تحويل صراف' :
+                           w.method === 'bank_transfer' ? 'تحويل بنكي' : w.method}
+                        </span>
+                        {w.network && w.network !== 'TRC20' && (
+                          <>
+                            <span className="text-muted-foreground">|</span>
+                            <span className="text-foreground">{w.network}</span>
+                          </>
+                        )}
+                      </div>
+
+                      {/* To Address - Copyable */}
+                      <div className="flex items-center justify-between p-2.5 rounded-lg bg-white/5">
+                        <div className="flex-1 min-w-0">
+                          <p className="text-[10px] text-muted-foreground mb-0.5">
+                            {w.method === 'crypto' || w.method === 'blockchain' ? 'عنوان المحفظة' : 'بيانات الاستلام'}
+                          </p>
+                          <p className={`text-xs font-medium truncate ${w.method === 'crypto' || w.method === 'blockchain' ? 'font-mono' : ''}`}
+                             dir={w.method === 'crypto' || w.method === 'blockchain' ? 'ltr' : 'rtl'}>
+                            {w.toAddress}
+                          </p>
+                        </div>
+                        <button
+                          onClick={() => copyWithdrawalAddress(w)}
+                          className="text-gold hover:text-gold-light transition-colors flex-shrink-0 mr-3"
+                        >
+                          {copiedWithdrawalId === w.id
+                            ? <CheckIcon className="w-4 h-4" />
+                            : <Copy className="w-4 h-4" />}
+                        </button>
+                      </div>
+
+                      {/* Fee + Date */}
+                      <div className="flex items-center justify-between text-xs text-muted-foreground">
+                        <span>الرسوم: {w.fee.toFixed(2)} USDT</span>
+                        <span>الإجمالي: <strong className="text-foreground">{(w.amount + w.fee).toFixed(2)} USDT</strong></span>
+                      </div>
+                      <div className="text-[10px] text-muted-foreground">{formatDate(w.createdAt)}</div>
+                    </div>
+
+                    {/* Actions */}
                     {w.status === 'pending' && (
                       <div className="flex gap-2 pt-1">
                         <button onClick={() => handleUpdateWithdrawal(w.id, 'approved')} className="flex-1 flex items-center justify-center gap-1 text-xs py-2 rounded-lg bg-green-500/10 text-green-400 hover:bg-green-500/20 transition-colors">
