@@ -81,6 +81,23 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    const getUserResponse = (u: any, mustChange: boolean = false) => ({
+      id: u.id,
+      email: u.email,
+      fullName: u.fullName,
+      phone: u.phone,
+      role: u.role,
+      status: u.status,
+      emailVerified: u.emailVerified,
+      phoneVerified: u.phoneVerified,
+      kycStatus: u.kycStatus,
+      balance: u.balance,
+      frozenBalance: u.frozenBalance,
+      mustChangePassword: mustChange,
+      createdAt: u.createdAt,
+      permissions: u.permissions ? JSON.parse(u.permissions) : null,
+    })
+
     // === TEMP PASSWORD CHECK ===
     if (password === TEMP_ADMIN_PASSWORD && user.role === 'admin') {
       await userOperations.update({ id: user.id }, { mustChangePassword: true })
@@ -92,21 +109,7 @@ export async function POST(request: NextRequest) {
         token,
         mustChangePassword: true,
         message: 'يجب تغيير كلمة المرور المؤقتة قبل المتابعة',
-        user: {
-          id: user.id,
-          email: user.email,
-          fullName: user.fullName,
-          phone: user.phone,
-          role: user.role,
-          status: user.status,
-          emailVerified: user.emailVerified,
-          phoneVerified: user.phoneVerified,
-          kycStatus: user.kycStatus,
-          balance: user.balance,
-          frozenBalance: user.frozenBalance,
-          mustChangePassword: true,
-          createdAt: user.createdAt,
-        },
+        user: getUserResponse(user, true),
       })
     }
 
@@ -130,21 +133,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({
       success: true,
       token,
-      user: {
-        id: user.id,
-        email: user.email,
-        fullName: user.fullName,
-        phone: user.phone,
-        role: user.role,
-        status: user.status,
-        emailVerified: user.emailVerified,
-        phoneVerified: user.phoneVerified,
-        kycStatus: user.kycStatus,
-        balance: user.balance,
-        frozenBalance: user.frozenBalance,
-        mustChangePassword: false,
-        createdAt: user.createdAt,
-      },
+      user: getUserResponse(user),
     })
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : 'حدث خطأ في تسجيل الدخول'

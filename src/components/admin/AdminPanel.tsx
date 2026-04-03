@@ -39,6 +39,7 @@ import {
   Send,
   Copy,
   Check as CheckIcon,
+  Settings,
 } from 'lucide-react'
 
 // ===================== TYPES =====================
@@ -126,12 +127,13 @@ const ROLE_DESCRIPTIONS: Record<string, string> = {
 
 export default function AdminPanel() {
   const { user, setScreen } = useAuthStore()
-  const [activeTab, setActiveTab] = useState<'users' | 'deposits' | 'withdrawals' | 'kyc' | 'payment-methods'>('users')
+  const [activeTab, setActiveTab] = useState<'users' | 'deposits' | 'withdrawals' | 'kyc' | 'payment-methods' | 'admin-settings'>('users')
   const [users, setUsers] = useState<AdminUser[]>([])
   const [deposits, setDeposits] = useState<AdminDeposit[]>([])
   const [withdrawals, setWithdrawals] = useState<AdminWithdrawal[]>([])
   const [kycRecords, setKycRecords] = useState<KYCRecordItem[]>([])
   const [paymentMethods, setPaymentMethods] = useState<any[]>([])
+  const [adminSettings, setAdminSettings] = useState<{ email: string; phone: string | null; hasPIN: boolean }>({ email: '', phone: null, hasPIN: false })
   const [loading, setLoading] = useState(true)
   const [searchQuery, setSearchQuery] = useState('')
   const [expandedUserId, setExpandedUserId] = useState<string | null>(null)
@@ -146,12 +148,16 @@ export default function AdminPanel() {
   const [deleteLoading, setDeleteLoading] = useState(false)
   const [copiedWithdrawalId, setCopiedWithdrawalId] = useState<string | null>(null)
   const [copiedField, setCopiedField] = useState<string | null>(null)
+  // Rejection reason dialog
+  const [rejectDialog, setRejectDialog] = useState<{ withdrawalId: string; amount: number } | null>(null)
+  const [rejectReason, setRejectReason] = useState('')
+  const [rejectLoading, setRejectLoading] = useState(false)
 
   useEffect(() => {
-    if (user?.role === 'admin') {
+    if (user?.role === 'admin' || (user?.permissions && Object.values(user.permissions).some(v => v))) {
       fetchAll()
     }
-  }, [activeTab])
+  }, [effectiveActiveTab])
 
   const fetchAll = async () => {
     setLoading(true)
@@ -173,6 +179,14 @@ export default function AdminPanel() {
     const pmRes = await fetch('/api/admin/payment-methods')
     const pmData = await pmRes.json()
     if (pmData.success) setPaymentMethods(pmData.methods || [])
+    // Fetch admin settings if full admin
+    if (user?.role === 'admin' && !user.permissions) {
+      try {
+        const asRes = await fetch(`/api/admin/settings?userId=${user.id}`)
+        const asData = await asRes.json()
+        if (asData.success) setAdminSettings(asData.settings)
+      } catch { /* silent */ }
+    }
     } catch {
       toast.error('خطأ في تحميل البيانات')
     } finally {
@@ -400,13 +414,57 @@ export default function AdminPanel() {
     setTimeout(() => setCopiedField(null), 2000)
   }
 
-  const tabs = [
-    { key: 'users' as const, label: 'المستخدمون', icon: Users, count: users.length },
-    { key: 'deposits' as const, label: 'الإيداعات', icon: ArrowDownLeft, count: deposits.filter(d => d.status === 'pending').length },
-    { key: 'withdrawals' as const, label: 'السحوبات', icon: ArrowUpRight, count: withdrawals.filter(w => w.status === 'pending').length },
-    { key: 'kyc' as const, label: 'التحقق', icon: Shield, count: kycRecords.filter(k => k.status === 'pending').length },
-    { key: 'payment-methods' as const, label: 'طرق الدفع', icon: CreditCard, count: paymentMethods.filter(p => p.isActive).length },
+  const openRejectDialog = (w: AdminWithdrawal) => {
+    setRejectDialog({ withdrawalId: w.id, amount: w.amount })
+    setRejectReason('')
+  }
+
+  const handleRejectWithReason = async () => {
+    if (!rejectDialog) return
+    if (!rejectReason.trim()) { toast.error('يرجى إدخال سبب الرفض'); return }
+    setRejectLoading(true)
+    try {
+      const res = await fetch('/api/admin/withdrawals', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ withdrawalId: rejectDialog.withdrawalId, status: 'rejected', adminNote: rejectReason.trim() }),
+      })
+      const data = await res.json()
+      if (data.success) {
+        toast.success('تم رفض السحب')
+        setRejectDialog(null)
+        fetchAll()
+      } else {
+        toast.error(data.message)
+      }
+    } catch {
+      toast.error('خطأ في رفض السحب')
+    } finally {
+      setRejectLoading(false)
+    }
+  }
+
+  // Determine if user has specific permissions (is a promoted user, not full admin)
+  const hasPermissions = user?.permissions && Object.keys(user.permissions).length > 0
+
+  const allTabs = [
+    { key: 'users' as const, label: 'المستخدمون', icon: Users, count: users.length, perm: 'manageUsers' as const },
+    { key: 'deposits' as const, label: 'الإيداعات', icon: ArrowDownLeft, count: deposits.filter(d => d.status === 'pending').length, perm: 'approveDeposits' as const },
+    { key: 'withdrawals' as const, label: 'السحوبات', icon: ArrowUpRight, count: withdrawals.filter(w => w.status === 'pending').length, perm: 'approveWithdrawals' as const },
+    { key: 'kyc' as const, label: 'التحقق', icon: Shield, count: kycRecords.filter(k => k.status === 'pending').length, perm: 'approveKYC' as const },
+    { key: 'payment-methods' as const, label: 'طرق الدفع', icon: CreditCard, count: paymentMethods.filter(p => p.isActive).length, perm: 'manageUsers' as const },
+    // Admin settings tab - only for full admin (no permissions object)
+    ...(user?.role === 'admin' && !hasPermissions ? [{ key: 'admin-settings' as const, label: 'إعدادات الإدارة', icon: Settings, count: 0, perm: 'manageSettings' as const }] : []),
   ]
+
+  // Filter tabs based on permissions: full admin sees all, others only see what they have permission for
+  const tabs = hasPermissions
+    ? allTabs.filter(tab => user.permissions?.[tab.perm])
+    : allTabs
+
+  // Set first available tab as default if current tab is not available
+  const allowedTabKeys = tabs.map(t => t.key)
+  const effectiveActiveTab = allowedTabKeys.includes(activeTab) ? activeTab : allowedTabKeys[0] || 'users'
 
   const filteredUsers = users.filter(u =>
     u.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -424,7 +482,10 @@ export default function AdminPanel() {
     })
   }
 
-  if (user?.role !== 'admin') {
+  // Allow access for admin role, or any user with permissions
+  const canAccess = user?.role === 'admin' || (user?.permissions && Object.values(user.permissions).some(v => v))
+
+  if (!canAccess) {
     return (
       <div className="glass-card p-8 text-center">
         <Shield className="w-12 h-12 text-muted-foreground/20 mx-auto mb-3" />
@@ -450,13 +511,13 @@ export default function AdminPanel() {
       </div>
 
       {/* Tabs */}
-      <div className="grid grid-cols-5 gap-2">
+      <div className={`grid gap-2 ${tabs.length <= 3 ? 'grid-cols-3' : tabs.length === 4 ? 'grid-cols-4' : 'grid-cols-5'}`}>
         {tabs.map((tab) => (
           <button
             key={tab.key}
             onClick={() => setActiveTab(tab.key)}
             className={`flex flex-col items-center gap-1 p-3 rounded-xl text-xs transition-all relative ${
-              activeTab === tab.key
+              effectiveActiveTab === tab.key
                 ? 'bg-gold/10 text-gold border border-gold/20'
                 : 'text-muted-foreground hover:text-foreground hover:bg-white/5'
             }`}
@@ -481,7 +542,7 @@ export default function AdminPanel() {
       ) : (
         <>
           {/* ===================== USERS TAB ===================== */}
-          {activeTab === 'users' && (
+          {effectiveActiveTab === 'users' && (
             <div className="space-y-3">
               <div className="relative">
                 <Search className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
@@ -659,7 +720,7 @@ export default function AdminPanel() {
           )}
 
           {/* ===================== DEPOSITS TAB ===================== */}
-          {activeTab === 'deposits' && (
+          {effectiveActiveTab === 'deposits' && (
             <div className="space-y-2 max-h-[500px] overflow-y-auto">
               {deposits.length === 0 ? (
                 <div className="glass-card p-8 text-center text-muted-foreground text-sm">لا توجد إيداعات</div>
@@ -695,7 +756,7 @@ export default function AdminPanel() {
           )}
 
           {/* ===================== WITHDRAWALS TAB ===================== */}
-          {activeTab === 'withdrawals' && (
+          {effectiveActiveTab === 'withdrawals' && (
             <div className="space-y-2 max-h-[600px] overflow-y-auto">
               {withdrawals.length === 0 ? (
                 <div className="glass-card p-8 text-center text-muted-foreground text-sm">لا توجد سحوبات</div>
@@ -818,7 +879,7 @@ export default function AdminPanel() {
                         <button onClick={() => handleUpdateWithdrawal(w.id, 'approved')} className="flex-1 flex items-center justify-center gap-1 text-xs py-2.5 rounded-lg bg-green-500/10 text-green-400 hover:bg-green-500/20 transition-colors font-medium">
                           <Check className="w-3 h-3" /> قبول
                         </button>
-                        <button onClick={() => handleUpdateWithdrawal(w.id, 'rejected')} className="flex-1 flex items-center justify-center gap-1 text-xs py-2.5 rounded-lg bg-red-500/10 text-red-400 hover:bg-red-500/20 transition-colors font-medium">
+                        <button onClick={() => openRejectDialog(w)} className="flex-1 flex items-center justify-center gap-1 text-xs py-2.5 rounded-lg bg-red-500/10 text-red-400 hover:bg-red-500/20 transition-colors font-medium">
                           <X className="w-3 h-3" /> رفض
                         </button>
                       </div>
@@ -830,12 +891,17 @@ export default function AdminPanel() {
           )}
 
           {/* ===================== PAYMENT METHODS TAB ===================== */}
-          {activeTab === 'payment-methods' && (
+          {effectiveActiveTab === 'payment-methods' && (
             <PaymentMethodsManager methods={paymentMethods} onRefresh={() => fetchAll()} />
           )}
 
+          {/* ===================== ADMIN SETTINGS TAB ===================== */}
+          {effectiveActiveTab === 'admin-settings' && (
+            <AdminSettingsPanel settings={adminSettings} onRefresh={() => fetchAll()} />
+          )}
+
           {/* ===================== KYC TAB ===================== */}
-          {activeTab === 'kyc' && (
+          {effectiveActiveTab === 'kyc' && (
             <div className="space-y-2 max-h-[500px] overflow-y-auto">
               {kycRecords.length === 0 ? (
                 <div className="glass-card p-8 text-center text-muted-foreground text-sm">لا توجد طلبات تحقق</div>
@@ -1026,6 +1092,38 @@ export default function AdminPanel() {
               >
                 إلغاء
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ===================== REJECT WITHDRAWAL DIALOG ===================== */}
+      {rejectDialog && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={() => setRejectDialog(null)}>
+          <div className="glass-card bg-background/95 backdrop-blur-xl border-red-500/20 w-full max-w-sm rounded-2xl p-6 space-y-5 animate-scale-in" onClick={(e) => e.stopPropagation()}>
+            <div className="text-center space-y-2">
+              <div className="w-14 h-14 rounded-2xl bg-red-500/10 flex items-center justify-center mx-auto">
+                <X className="w-7 h-7 text-red-400" />
+              </div>
+              <h3 className="text-lg font-bold text-red-400">رفض السحب</h3>
+              <p className="text-sm text-muted-foreground">
+                مبلغ: <strong className="text-foreground">{rejectDialog.amount.toFixed(2)} USDT</strong>
+              </p>
+            </div>
+            <div className="space-y-3">
+              <div className="space-y-2">
+                <Label className="text-sm text-muted-foreground">سبب الرفض</Label>
+                <textarea
+                  value={rejectReason}
+                  onChange={(e) => setRejectReason(e.target.value)}
+                  className="w-full h-24 rounded-lg bg-white/5 border border-white/10 px-3 py-2 text-sm text-foreground resize-none"
+                  placeholder="أدخل سبب رفض السحب..."
+                />
+              </div>
+              <button onClick={handleRejectWithReason} disabled={rejectLoading || !rejectReason.trim()} className="w-full h-11 bg-red-500 text-white font-bold rounded-xl hover:bg-red-600 transition-all">
+                {rejectLoading ? <Loader2 className="w-4 h-4 animate-spin mx-auto" /> : 'تأكيد الرفض'}
+              </button>
+              <button onClick={() => setRejectDialog(null)} className="w-full h-10 bg-white/10 hover:bg-white/20 text-foreground font-medium rounded-xl transition-all text-sm">إلغاء</button>
             </div>
           </div>
         </div>
@@ -1269,6 +1367,232 @@ function PaymentMethodsManager({ methods, onRefresh }: { methods: any[]; onRefre
               <button onClick={resetForm} className="flex-1 h-11 bg-white/10 hover:bg-white/20 text-foreground font-medium rounded-xl transition-all">إلغاء</button>
             </div>
           </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ===================== ADMIN SETTINGS PANEL =====================
+
+function AdminSettingsPanel({ settings, onRefresh }: { settings: { email: string; phone: string | null; hasPIN: boolean }; onRefresh: () => void }) {
+  const { user, updateUser } = useAuthStore()
+  const [activeSection, setActiveSection] = useState<'phone' | 'email' | 'password' | 'pin'>('phone')
+  const [loading, setLoading] = useState(false)
+
+  // Phone form
+  const [newPhone, setNewPhone] = useState('')
+  const [phonePassword, setPhonePassword] = useState('')
+
+  // Email form
+  const [newEmail, setNewEmail] = useState('')
+  const [emailPassword, setEmailPassword] = useState('')
+
+  // Password form
+  const [currentPassword, setCurrentPassword] = useState('')
+  const [newPassword, setNewPassword] = useState('')
+
+  // PIN form
+  const [pinPassword, setPinPassword] = useState('')
+  const [pinCode, setPinCode] = useState('')
+  const [pinConfirm, setPinConfirm] = useState('')
+
+  const handleSave = async (action: string, body: any) => {
+    setLoading(true)
+    try {
+      const res = await fetch('/api/admin/settings', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId: user?.id, ...body }),
+      })
+      const data = await res.json()
+      if (data.success) {
+        toast.success(data.message)
+        if (action === 'change_email' && data.message.includes('تسجيل الدخول')) {
+          // Will need to re-login
+          toast.info('سيتم تسجيل الخروج لتحديث البريد')
+          setTimeout(() => useAuthStore.getState().logout(), 2000)
+        }
+        onRefresh()
+      } else {
+        toast.error(data.message)
+      }
+    } catch {
+      toast.error('خطأ في الاتصال')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const sections = [
+    { key: 'phone' as const, label: 'رقم الهاتف', icon: Phone, hasValue: !!settings.phone, value: settings.phone },
+    { key: 'email' as const, label: 'البريد الإلكتروني', icon: Mail, hasValue: !!settings.email, value: settings.email },
+    { key: 'password' as const, label: 'كلمة المرور', icon: Lock, hasValue: true, value: '••••••••' },
+    { key: 'pin' as const, label: 'رمز PIN', icon: Shield, hasValue: settings.hasPIN, value: settings.hasPIN ? 'تم تعيينه ✓' : 'غير معين' },
+  ]
+
+  return (
+    <div className="space-y-4 animate-fade-in">
+      {/* Info */}
+      <div className="glass-card p-4 space-y-2">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-xl bg-gold/10 flex items-center justify-center">
+            <Settings className="w-5 h-5 text-gold" />
+          </div>
+          <div>
+            <h3 className="text-sm font-bold">إعدادات الإدارة</h3>
+            <p className="text-[10px] text-muted-foreground">إدارة بيانات الحساب والأمان</p>
+          </div>
+        </div>
+        <div className="grid grid-cols-2 gap-2 text-xs border-t border-white/5 pt-2">
+          <div className="flex items-center gap-2 p-2 rounded-lg bg-white/5">
+            <Mail className="w-3.5 h-3.5 text-muted-foreground" />
+            <span className="truncate" dir="ltr">{settings.email}</span>
+          </div>
+          <div className="flex items-center gap-2 p-2 rounded-lg bg-white/5">
+            <Phone className="w-3.5 h-3.5 text-muted-foreground" />
+            <span dir="ltr">{settings.phone || 'غير محدد'}</span>
+          </div>
+          <div className="flex items-center gap-2 p-2 rounded-lg bg-white/5">
+            <Lock className="w-3.5 h-3.5 text-muted-foreground" />
+            <span>كلمة المرور</span>
+          </div>
+          <div className="flex items-center gap-2 p-2 rounded-lg bg-white/5">
+            <Shield className={`w-3.5 h-3.5 ${settings.hasPIN ? 'text-green-400' : 'text-red-400'}`} />
+            <span>PIN: {settings.hasPIN ? 'مُفعّل ✓' : 'غير مُفعّل ✗'}</span>
+          </div>
+        </div>
+      </div>
+
+      {/* Section Tabs */}
+      <div className="grid grid-cols-4 gap-2">
+        {sections.map((sec) => (
+          <button
+            key={sec.key}
+            onClick={() => setActiveSection(sec.key)}
+            className={`flex flex-col items-center gap-1 p-3 rounded-xl text-xs transition-all ${
+              activeSection === sec.key
+                ? 'bg-gold/10 text-gold border border-gold/20'
+                : 'text-muted-foreground hover:text-foreground hover:bg-white/5'
+            }`}
+          >
+            <sec.icon className="w-4 h-4" />
+            {sec.label}
+          </button>
+        ))}
+      </div>
+
+      {/* Phone Section */}
+      {activeSection === 'phone' && (
+        <div className="glass-card p-5 space-y-4">
+          <h3 className="text-sm font-bold">تغيير رقم الهاتف</h3>
+          <p className="text-xs text-muted-foreground">رقم الهاتف يُستخدم لاستعادة كلمة المرور في حالة فقدان البريد الإلكتروني</p>
+          <div className="space-y-3">
+            <div className="space-y-1">
+              <label className="text-xs text-muted-foreground">الرقم الحالي</label>
+              <Input disabled value={settings.phone ? `+967 ${settings.phone}` : 'غير محدد'} className="glass-input h-10 text-sm opacity-60" dir="ltr" />
+            </div>
+            <div className="space-y-1">
+              <label className="text-xs text-muted-foreground">الرقم الجديد</label>
+              <Input value={newPhone} onChange={(e) => setNewPhone(e.target.value)} className="glass-input h-10 text-sm" placeholder="7XXXXXXXX" dir="ltr" />
+            </div>
+            <div className="space-y-1">
+              <label className="text-xs text-muted-foreground">كلمة المرور للتأكيد</label>
+              <Input type="password" value={phonePassword} onChange={(e) => setPhonePassword(e.target.value)} className="glass-input h-10 text-sm" placeholder="أدخل كلمة المرور" dir="ltr" />
+            </div>
+          </div>
+          <button onClick={() => handleSave('change_phone', { action: 'change_phone', newPhone, currentPassword: phonePassword })} disabled={loading || !newPhone || !phonePassword} className="w-full h-11 gold-gradient text-gray-900 font-bold rounded-xl hover:opacity-90 transition-all">
+            {loading ? <Loader2 className="w-4 h-4 animate-spin mx-auto" /> : 'تغيير الرقم'}
+          </button>
+        </div>
+      )}
+
+      {/* Email Section */}
+      {activeSection === 'email' && (
+        <div className="glass-card p-5 space-y-4">
+          <h3 className="text-sm font-bold">تغيير البريد الإلكتروني</h3>
+          <div className="p-3 rounded-lg bg-gold/5 border border-gold/10 text-xs text-gold">
+            ⚠️ تغيير البريد يتطلب تسجيل الدخول بالبريد الجديد
+          </div>
+          <div className="space-y-3">
+            <div className="space-y-1">
+              <label className="text-xs text-muted-foreground">البريد الحالي</label>
+              <Input disabled value={settings.email} className="glass-input h-10 text-sm opacity-60" dir="ltr" />
+            </div>
+            <div className="space-y-1">
+              <label className="text-xs text-muted-foreground">البريد الجديد</label>
+              <Input type="email" value={newEmail} onChange={(e) => setNewEmail(e.target.value)} className="glass-input h-10 text-sm" placeholder="new@email.com" dir="ltr" />
+            </div>
+            <div className="space-y-1">
+              <label className="text-xs text-muted-foreground">كلمة المرور للتأكيد</label>
+              <Input type="password" value={emailPassword} onChange={(e) => setEmailPassword(e.target.value)} className="glass-input h-10 text-sm" placeholder="أدخل كلمة المرور" dir="ltr" />
+            </div>
+          </div>
+          <button onClick={() => handleSave('change_email', { action: 'change_email', newEmail, currentPassword: emailPassword })} disabled={loading || !newEmail || !emailPassword} className="w-full h-11 gold-gradient text-gray-900 font-bold rounded-xl hover:opacity-90 transition-all">
+            {loading ? <Loader2 className="w-4 h-4 animate-spin mx-auto" /> : 'تغيير البريد'}
+          </button>
+        </div>
+      )}
+
+      {/* Password Section */}
+      {activeSection === 'password' && (
+        <div className="glass-card p-5 space-y-4">
+          <h3 className="text-sm font-bold">تغيير كلمة المرور</h3>
+          <div className="space-y-3">
+            <div className="space-y-1">
+              <label className="text-xs text-muted-foreground">كلمة المرور الحالية</label>
+              <Input type="password" value={currentPassword} onChange={(e) => setCurrentPassword(e.target.value)} className="glass-input h-10 text-sm" placeholder="أدخل كلمة المرور الحالية" dir="ltr" />
+            </div>
+            <div className="space-y-1">
+              <label className="text-xs text-muted-foreground">كلمة المرور الجديدة (8 أحرف على الأقل)</label>
+              <Input type="password" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} className="glass-input h-10 text-sm" placeholder="أدخل كلمة المرور الجديدة" dir="ltr" />
+            </div>
+          </div>
+          <button onClick={() => handleSave('change_password', { action: 'change_password', currentPassword, newPassword })} disabled={loading || !currentPassword || !newPassword || newPassword.length < 8} className="w-full h-11 gold-gradient text-gray-900 font-bold rounded-xl hover:opacity-90 transition-all">
+            {loading ? <Loader2 className="w-4 h-4 animate-spin mx-auto" /> : 'تغيير كلمة المرور'}
+          </button>
+        </div>
+      )}
+
+      {/* PIN Section */}
+      {activeSection === 'pin' && (
+        <div className="glass-card p-5 space-y-4">
+          <h3 className="text-sm font-bold">رمز PIN للاستعادة</h3>
+          <p className="text-xs text-muted-foreground">رمز PIN يُستخدم لاستعادة كلمة المرور عند فقدان البريد الإلكتروني. يجب أن يكون بين 4 و 8 أرقام.</p>
+
+          {settings.hasPIN ? (
+            <div className="p-3 rounded-lg bg-green-500/5 border border-green-500/10 text-xs text-green-400">
+              ✓ تم تعيين رمز PIN بالفعل. يمكنك تغييره أدناه.
+            </div>
+          ) : (
+            <div className="p-3 rounded-lg bg-red-500/5 border border-red-500/10 text-xs text-red-400">
+              ✗ لم يتم تعيين رمز PIN. بدون PIN لن تتمكن من استعادة كلمة المرور بسهولة.
+            </div>
+          )}
+
+          <div className="space-y-3">
+            <div className="space-y-1">
+              <label className="text-xs text-muted-foreground">كلمة المرور للتأكيد</label>
+              <Input type="password" value={pinPassword} onChange={(e) => setPinPassword(e.target.value)} className="glass-input h-10 text-sm" placeholder="أدخل كلمة المرور" dir="ltr" />
+            </div>
+            <div className="space-y-1">
+              <label className="text-xs text-muted-foreground">رمز PIN (4-8 أرقام)</label>
+              <Input type="text" maxLength={8} value={pinCode} onChange={(e) => setPinCode(e.target.value.replace(/\D/g, ''))} className="glass-input h-10 text-sm text-center tracking-[0.3em] font-mono" placeholder="••••" dir="ltr" />
+            </div>
+            {settings.hasPIN && (
+              <div className="space-y-1">
+                <label className="text-xs text-muted-foreground">تأكيد رمز PIN الجديد</label>
+                <Input type="text" maxLength={8} value={pinConfirm} onChange={(e) => setPinConfirm(e.target.value.replace(/\D/g, ''))} className="glass-input h-10 text-sm text-center tracking-[0.3em] font-mono" placeholder="••••" dir="ltr" />
+              </div>
+            )}
+          </div>
+          <button
+            onClick={() => handleSave('set_pin', { action: 'set_pin', pin: pinCode, currentPassword: pinPassword })}
+            disabled={loading || !pinPassword || !pinCode || pinCode.length < 4 || (settings.hasPIN && pinCode !== pinConfirm)}
+            className="w-full h-11 gold-gradient text-gray-900 font-bold rounded-xl hover:opacity-90 transition-all"
+          >
+            {loading ? <Loader2 className="w-4 h-4 animate-spin mx-auto" /> : settings.hasPIN ? 'تغيير PIN' : 'تعيين PIN'}
+          </button>
         </div>
       )}
     </div>

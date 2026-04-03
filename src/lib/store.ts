@@ -15,6 +15,7 @@ export interface User {
   frozenBalance: number
   mustChangePassword: boolean
   createdAt: string
+  permissions?: { manageUsers?: boolean; approveDeposits?: boolean; approveWithdrawals?: boolean; approveKYC?: boolean; manageSettings?: boolean } | null
 }
 
 interface AuthState {

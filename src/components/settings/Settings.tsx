@@ -65,9 +65,25 @@ export default function SettingsPage() {
 
     setLoading(true)
     try {
-      toast.success('تم تغيير كلمة المرور بنجاح')
-      setCurrentPassword('')
-      setNewPassword('')
+      const res = await fetch('/api/user/change-password', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          userId: user?.id,
+          currentPassword,
+          newPassword,
+        }),
+      })
+      const data = await res.json()
+      if (data.success) {
+        toast.success('تم تغيير كلمة المرور بنجاح')
+        setCurrentPassword('')
+        setNewPassword('')
+      } else {
+        toast.error(data.message)
+      }
+    } catch {
+      toast.error('حدث خطأ في الاتصال')
     } finally {
       setLoading(false)
     }

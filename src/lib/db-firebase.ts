@@ -24,6 +24,8 @@ export interface User {
   affiliateCode: string
   referredBy?: string | null
   merchantId?: string | null
+  pinHash?: string | null
+  permissions?: string | null
   createdAt: string
   updatedAt: string
 }
