@@ -1,40 +1,56 @@
-// ===================== EMAIL SERVICE (Google Apps Script) =====================
-// This service sends emails via a free Google Apps Script deployed as a web app
-// No API keys needed - just set GOOGLE_APPS_SCRIPT_URL in environment variables
+// ===================== EMAIL SERVICE (Google Apps Script - FREE) =====================
+// Sends emails via a free Google Apps Script web app (no API keys needed)
 
 const SCRIPT_URL = process.env.GOOGLE_APPS_SCRIPT_URL || ''
-
-// Simple shared secret to prevent unauthorized use of the script
 const EMAIL_SECRET = process.env.EMAIL_SECRET || 'fxwallet2024'
 
 async function sendEmailViaScript(to: string, subject: string, htmlContent: string): Promise<boolean> {
   if (!SCRIPT_URL) {
-    console.log('[EMAIL] Skipped - No GOOGLE_APPS_SCRIPT_URL configured')
+    console.log('[EMAIL] Skipped - No GOOGLE_APPS_SCRIPT_URL configured. OTP for ' + to + ': WILL NOT BE SENT')
     return false
   }
 
   try {
     const response = await fetch(SCRIPT_URL, {
       method: 'POST',
-      headers: { 'Content-Type': 'text/plain' },
+      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
       body: JSON.stringify({
         secret: EMAIL_SECRET,
         to: to,
         subject: subject,
         html: htmlContent,
       }),
+      redirect: 'follow',
     })
 
-    const result = await response.json()
+    // Google Apps Script might return HTML wrapping the JSON
+    const responseText = await response.text()
+
+    // Try to extract JSON from the response
+    let jsonStr = responseText
+    // If response contains HTML tags, try to extract the JSON part
+    const jsonMatch = responseText.match(/\{[\s\S]*\}/)
+    if (jsonMatch) {
+      jsonStr = jsonMatch[0]
+    }
+
+    let result: { success?: boolean; error?: string; message?: string }
+    try {
+      result = JSON.parse(jsonStr)
+    } catch {
+      console.error('[EMAIL] Could not parse response:', responseText.substring(0, 200))
+      return false
+    }
+
     if (result.success) {
       console.log('[EMAIL] Email sent successfully to ' + to)
       return true
     } else {
-      console.error('[EMAIL] Script returned error:', result.error)
+      console.error('[EMAIL] Script returned error:', result.error || result.message)
       return false
     }
   } catch (error) {
-    console.error('[EMAIL] Failed to send email via script:', error)
+    console.error('[EMAIL] Failed to send email via script:', error instanceof Error ? error.message : String(error))
     return false
   }
 }
