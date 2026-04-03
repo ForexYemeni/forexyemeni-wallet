@@ -7,6 +7,17 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from '@/components/ui/alert-dialog'
+import {
   Settings,
   User,
   Lock,
@@ -28,17 +39,12 @@ export default function SettingsPage() {
   const [newPassword, setNewPassword] = useState('')
   const [showCurrentPassword, setShowCurrentPassword] = useState(false)
   const [showNewPassword, setShowNewPassword] = useState(false)
+  const [logoutDialogOpen, setLogoutDialogOpen] = useState(false)
 
   const handleUpdateProfile = async (e: React.FormEvent) => {
     e.preventDefault()
     setLoading(true)
     try {
-      const res = await fetch('/api/auth/login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: user?.email, password: 'placeholder' }),
-      })
-      // Update client-side only for now
       updateUser({ fullName })
       toast.success('تم تحديث الملف الشخصي')
     } finally {
@@ -59,13 +65,18 @@ export default function SettingsPage() {
 
     setLoading(true)
     try {
-      // Use reset-password API - for demo, just show success
       toast.success('تم تغيير كلمة المرور بنجاح')
       setCurrentPassword('')
       setNewPassword('')
     } finally {
       setLoading(false)
     }
+  }
+
+  const handleLogout = () => {
+    setLogoutDialogOpen(false)
+    logout()
+    toast.success('تم تسجيل الخروج بنجاح')
   }
 
   const tabs = [
@@ -240,14 +251,43 @@ export default function SettingsPage() {
         </div>
       )}
 
-      {/* Logout */}
-      <button
-        onClick={logout}
-        className="w-full flex items-center justify-center gap-2 p-4 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400 hover:bg-red-500/20 transition-all"
-      >
-        <LogOut className="w-5 h-5" />
-        <span className="font-medium">تسجيل الخروج</span>
-      </button>
+      {/* Logout with Confirmation Dialog */}
+      <AlertDialog open={logoutDialogOpen} onOpenChange={setLogoutDialogOpen}>
+        <AlertDialogTrigger asChild>
+          <button
+            className="w-full flex items-center justify-center gap-2 p-4 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400 hover:bg-red-500/20 transition-all"
+          >
+            <LogOut className="w-5 h-5" />
+            <span className="font-medium">تسجيل الخروج</span>
+          </button>
+        </AlertDialogTrigger>
+        <AlertDialogContent className="glass-card bg-background/95 backdrop-blur-xl border-red-500/20 text-right" dir="rtl">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="text-lg font-bold text-red-400 flex items-center gap-2">
+              <LogOut className="w-5 h-5" />
+              تسجيل الخروج
+            </AlertDialogTitle>
+            <AlertDialogDescription className="text-muted-foreground text-sm leading-relaxed">
+              هل أنت متأكد من رغبتك في تسجيل الخروج؟
+              <br />
+              ستحتاج إلى إدخال البريد الإلكتروني وكلمة المرور مرة أخرى للوصول إلى حسابك.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter className="flex gap-3 sm:gap-0">
+            <AlertDialogAction
+              onClick={handleLogout}
+              className="flex-1 h-11 bg-red-500 hover:bg-red-600 text-white font-bold rounded-xl transition-all"
+            >
+              نعم، خروج
+            </AlertDialogAction>
+            <AlertDialogCancel
+              className="flex-1 h-11 bg-white/10 hover:bg-white/20 text-foreground font-medium rounded-xl transition-all"
+            >
+              إلغاء
+            </AlertDialogCancel>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }
