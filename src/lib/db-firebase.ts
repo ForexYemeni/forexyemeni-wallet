@@ -134,16 +134,15 @@ export const userOperations = {
     const db = getDb()
     let query: Query<DocumentData> = db.collection('users')
     
-    if (options?.orderBy === 'createdAt') {
-      query = query.orderBy('createdAt', 'desc')
-    }
-    
     if (options?.take) {
       query = query.limit(options.take)
     }
     
     const snapshot = await query.get()
-    return snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() } as User))
+    const results = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() } as User))
+    // Sort in JS
+    results.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+    return results
   },
 
   async create(data: Omit<User, 'id' | 'createdAt' | 'updatedAt'>): Promise<User> {
@@ -221,45 +220,30 @@ export const otpCodeOperations = {
   }): Promise<OtpCode | null> {
     const db = getDb()
 
-    // Build query with equality filters + orderBy on createdAt
-    // Firestore requires composite indexes when filtering + ordering on different fields
-    // We use a collection group query approach: filter by type+verified, orderBy createdAt
     let query: Query<DocumentData> = db.collection('otpCodes')
-      .where('type', '==', options.where.type)
-      .where('verified', '==', options.where.type ? false : false)
-    
-    // Single filter approach to avoid composite index
+
+    // Only use equality filters - NO orderBy to avoid composite index errors
     if (options.where.email) {
-      query = db.collection('otpCodes')
-        .where('email', '==', options.where.email)
-        .where('type', '==', options.where.type)
-        .where('verified', '==', false)
-        .orderBy('createdAt', 'desc')
-        .limit(1)
-    } else if (options.where.userId) {
-      query = db.collection('otpCodes')
-        .where('userId', '==', options.where.userId)
-        .where('type', '==', options.where.type)
-        .where('verified', '==', false)
-        .orderBy('createdAt', 'desc')
-        .limit(1)
-    } else {
-      query = db.collection('otpCodes')
-        .where('type', '==', options.where.type)
-        .where('verified', '==', false)
-        .orderBy('createdAt', 'desc')
-        .limit(1)
+      query = query.where('email', '==', options.where.email)
     }
+    if (options.where.userId) {
+      query = query.where('userId', '==', options.where.userId)
+    }
+    query = query.where('type', '==', options.where.type)
+    query = query.where('verified', '==', false)
+    query = query.limit(10) // fetch a few and sort in JS
     
     const snapshot = await query.get()
     if (snapshot.empty) return null
     
-    const doc = snapshot.docs[0]
-    const data = doc.data() as OtpCode
-    // Check expiration
-    if (new Date(data.expiresAt) < new Date()) return null
+    // Sort in JS by createdAt desc and find the latest non-expired one
+    const results = snapshot.docs
+      .map((doc) => ({ id: doc.id, ...doc.data() } as OtpCode))
+      .filter((r) => new Date(r.expiresAt) >= new Date())
+      .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
     
-    return { id: doc.id, ...data }
+    if (results.length === 0) return null
+    return results[0]
   },
 
   async update(id: string, data: Partial<OtpCode>): Promise<void> {
@@ -281,7 +265,7 @@ export const kycRecordOperations = {
 
   async findMany(): Promise<(KYCRecord & { user?: { id: string; email: string; fullName: string | null; phone: string | null } })[]> {
     const db = getDb()
-    const snapshot = await db.collection('kycRecords').orderBy('createdAt', 'desc').limit(100).get()
+    const snapshot = await db.collection('kycRecords').limit(100).get()
     
     const results: (KYCRecord & { user?: { id: string; email: string; fullName: string | null; phone: string | null } })[] = []
     
@@ -296,6 +280,8 @@ export const kycRecordOperations = {
       results.push({ id: doc.id, ...data, user })
     }
     
+    // Sort in JS
+    results.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
     return results
   },
 
@@ -336,7 +322,7 @@ export const depositOperations = {
       query = query.where('status', '==', options.status)
     }
     
-    query = query.orderBy('createdAt', 'desc').limit(100)
+    query = query.limit(100)
     const snapshot = await query.get()
     
     const results: (Deposit & { user?: { id: string; email: string; fullName: string | null } })[] = []
@@ -352,6 +338,8 @@ export const depositOperations = {
       results.push({ id: doc.id, ...data, user })
     }
     
+    // Sort in JS
+    results.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
     return results
   },
 
@@ -390,7 +378,7 @@ export const withdrawalOperations = {
       query = query.where('status', '==', options.status)
     }
     
-    query = query.orderBy('createdAt', 'desc').limit(100)
+    query = query.limit(100)
     const snapshot = await query.get()
     
     const results: (Withdrawal & { user?: { id: string; email: string; fullName: string | null } })[] = []
@@ -406,6 +394,7 @@ export const withdrawalOperations = {
       results.push({ id: doc.id, ...data, user })
     }
     
+    results.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
     return results
   },
 
