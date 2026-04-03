@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { userOperations, otpCodeOperations } from '@/lib/db-firebase'
-import { sendPasswordResetEmail } from '@/lib/email'
+import { sendVerificationEmail } from '@/lib/email'
 import { getDb } from '@/lib/firebase'
 
 export async function POST(request: NextRequest) {
@@ -14,6 +14,7 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    // Check if user exists
     const user = await userOperations.findUnique({ email })
     if (!user) {
       return NextResponse.json(
@@ -22,14 +23,15 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Delete old password_reset OTPs for this email
+    // Delete old OTPs for this email (email_verify type only)
     const db = getDb()
     try {
       const oldOtps = await db.collection('otpCodes')
         .where('email', '==', email)
-        .where('type', '==', 'password_reset')
+        .where('type', '==', 'email_verify')
         .limit(20)
         .get()
+      
       const batch = db.batch()
       for (const doc of oldOtps.docs) {
         batch.delete(doc.ref)
@@ -38,9 +40,10 @@ export async function POST(request: NextRequest) {
         await batch.commit()
       }
     } catch {
-      // Continue even if delete fails
+      // If batch delete fails, continue anyway
     }
 
+    // Generate new OTP
     const otp = Math.floor(100000 + Math.random() * 900000).toString()
     const expiresAt = new Date(Date.now() + 10 * 60 * 1000).toISOString()
 
@@ -48,23 +51,22 @@ export async function POST(request: NextRequest) {
       userId: user.id,
       email,
       code: otp,
-      type: 'password_reset',
+      type: 'email_verify',
       expiresAt,
     })
 
     // Send email
-    const emailSent = await sendPasswordResetEmail(email, otp)
+    const emailSent = await sendVerificationEmail(email, otp)
 
     if (!emailSent) {
-      console.log('[FORGOT-PASSWORD] Email not sent - OTP for ' + email + ': ' + otp)
+      console.log('[RESEND-VERIFY] Email not sent - OTP for ' + email + ': ' + otp)
     }
 
     return NextResponse.json({
       success: true,
       message: emailSent
-        ? 'تم إرسال رمز التحقق إلى بريدك الإلكتروني'
+        ? 'تم إعادة إرسال رمز التحقق إلى بريدك الإلكتروني'
         : 'تم إنشاء رمز التحقق. يرجى التحقق من بريدك الإلكتروني.',
-      otpId: user.id,
     })
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : 'حدث خطأ'

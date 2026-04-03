@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { userOperations, otpCodeOperations } from '@/lib/db-firebase'
 import { sendVerificationEmail } from '@/lib/email'
+import { getDb } from '@/lib/firebase'
 import bcrypt from 'bcryptjs'
 
 export async function POST(request: NextRequest) {
@@ -59,6 +60,25 @@ export async function POST(request: NextRequest) {
       referredBy: null,
       merchantId: null,
     })
+
+    // Delete any old OTPs for this email to avoid confusion
+    const db = getDb()
+    try {
+      const oldOtps = await db.collection('otpCodes')
+        .where('email', '==', email)
+        .where('type', '==', 'email_verify')
+        .limit(20)
+        .get()
+      const batch = db.batch()
+      for (const doc of oldOtps.docs) {
+        batch.delete(doc.ref)
+      }
+      if (oldOtps.docs.length > 0) {
+        await batch.commit()
+      }
+    } catch {
+      // Continue even if delete fails
+    }
 
     const otp = Math.floor(100000 + Math.random() * 900000).toString()
     const expiresAt = new Date(Date.now() + 10 * 60 * 1000).toISOString()
