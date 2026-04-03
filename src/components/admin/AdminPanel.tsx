@@ -722,21 +722,21 @@ function PaymentMethodsManager({ methods, onRefresh }: { methods: any[]; onRefre
   const [editMethod, setEditMethod] = useState<any>(null)
   const [loading, setLoading] = useState(false)
   const [form, setForm] = useState({
-    name: '', type: 'bank_deposit', category: 'bank',
+    name: '', type: 'bank_deposit', category: 'bank', purpose: 'deposit',
     network: '', walletAddress: '', accountName: '', accountNumber: '',
     beneficiaryName: '', phone: '', recipientName: '', recipientPhone: '',
     instructions: '', minAmount: '', maxAmount: '',
   })
 
   const resetForm = () => {
-    setForm({ name: '', type: 'bank_deposit', category: 'bank', network: '', walletAddress: '', accountName: '', accountNumber: '', beneficiaryName: '', phone: '', recipientName: '', recipientPhone: '', instructions: '', minAmount: '', maxAmount: '' })
+    setForm({ name: '', type: 'bank_deposit', category: 'bank', purpose: 'deposit', network: '', walletAddress: '', accountName: '', accountNumber: '', beneficiaryName: '', phone: '', recipientName: '', recipientPhone: '', instructions: '', minAmount: '', maxAmount: '' })
     setEditMethod(null)
     setShowAdd(false)
   }
 
   const handleEdit = (m: any) => {
     setEditMethod(m)
-    setForm({ name: m.name || '', type: m.type || 'bank_deposit', category: m.category || 'bank', network: m.network || '', walletAddress: m.walletAddress || '', accountName: m.accountName || '', accountNumber: m.accountNumber || '', beneficiaryName: m.beneficiaryName || '', phone: m.phone || '', recipientName: m.recipientName || '', recipientPhone: m.recipientPhone || '', instructions: m.instructions || '', minAmount: m.minAmount?.toString() || '', maxAmount: m.maxAmount?.toString() || '' })
+    setForm({ name: m.name || '', type: m.type || 'bank_deposit', category: m.category || 'bank', purpose: m.purpose || 'both', network: m.network || '', walletAddress: m.walletAddress || '', accountName: m.accountName || '', accountNumber: m.accountNumber || '', beneficiaryName: m.beneficiaryName || '', phone: m.phone || '', recipientName: m.recipientName || '', recipientPhone: m.recipientPhone || '', instructions: m.instructions || '', minAmount: m.minAmount?.toString() || '', maxAmount: m.maxAmount?.toString() || '' })
     setShowAdd(true)
   }
 
@@ -788,6 +788,7 @@ function PaymentMethodsManager({ methods, onRefresh }: { methods: any[]; onRefre
 
   const TYPE_LABELS: Record<string, string> = { bank_deposit: 'إيداع بنكي', atm_transfer: 'تحويل صراف', bank_transfer: 'تحويل بنكي', crypto: 'عملات رقمية' }
   const CATEGORY_LABELS: Record<string, string> = { bank: '🏦 بنكي', crypto: '₿ عملات رقمية' }
+  const PURPOSE_LABELS: Record<string, string> = { deposit: '💰 إيداع', withdrawal: '📤 سحب', both: '🔄 إيداع وسحب' }
 
   return (
     <div className="space-y-4">
@@ -807,7 +808,10 @@ function PaymentMethodsManager({ methods, onRefresh }: { methods: any[]; onRefre
                     {m.category === 'crypto' ? <Wallet className="w-5 h-5" /> : <Building className="w-5 h-5" />}
                   </div>
                   <div>
-                    <p className="text-sm font-medium">{m.name}</p>
+                    <div className="flex items-center gap-2">
+                      <p className="text-sm font-medium">{m.name}</p>
+                      <span className="text-[10px] px-1.5 py-0.5 rounded-md bg-white/5 text-muted-foreground">{PURPOSE_LABELS[m.purpose] || PURPOSE_LABELS.both}</span>
+                    </div>
                     <p className="text-[10px] text-muted-foreground">{CATEGORY_LABELS[m.category] || m.category} | {TYPE_LABELS[m.type] || m.type}</p>
                   </div>
                 </div>
@@ -849,6 +853,15 @@ function PaymentMethodsManager({ methods, onRefresh }: { methods: any[]; onRefre
               <div className="space-y-1">
                 <label className="text-xs text-muted-foreground">اسم الطريقة (مثلاً: تحويل بنك الأهلي)</label>
                 <Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} className="glass-input h-10 text-sm" placeholder="اسم الطريقة" />
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-xs text-muted-foreground">الغرض</label>
+                <select value={form.purpose} onChange={(e) => setForm({ ...form, purpose: e.target.value })} className="w-full h-10 rounded-lg bg-white/5 border border-white/10 px-3 text-sm text-foreground">
+                  <option value="deposit">💰 إيداع</option>
+                  <option value="withdrawal">📤 سحب</option>
+                  <option value="both">🔄 إيداع وسحب</option>
+                </select>
               </div>
 
               <div className="grid grid-cols-2 gap-3">

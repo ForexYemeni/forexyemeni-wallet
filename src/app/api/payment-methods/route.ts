@@ -1,10 +1,12 @@
-import { NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
 import { paymentMethodOperations } from '@/lib/db-firebase'
 
 // GET active payment methods (user-facing)
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
-    const methods = await paymentMethodOperations.findActive()
+    const { searchParams } = new URL(request.url)
+    const purpose = searchParams.get('purpose') || undefined
+    const methods = await paymentMethodOperations.findActive(purpose)
     return NextResponse.json({ success: true, methods })
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : 'حدث خطأ'

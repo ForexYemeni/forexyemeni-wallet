@@ -36,7 +36,7 @@ export default function DepositForm() {
   const fetchMethods = async () => {
     setLoadingMethods(true)
     try {
-      const res = await fetch('/api/payment-methods')
+      const res = await fetch('/api/payment-methods?purpose=deposit')
       const data = await res.json()
       if (data.success) setMethods(data.methods || [])
     } catch {

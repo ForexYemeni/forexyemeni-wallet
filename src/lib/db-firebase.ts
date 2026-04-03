@@ -116,6 +116,7 @@ export interface PaymentMethod {
   name: string
   type: string // 'bank_transfer' | 'bank_deposit' | 'atm_transfer' | 'crypto'
   category: string // 'bank' | 'crypto'
+  purpose: string // 'deposit' | 'withdrawal' | 'both'
   isActive: boolean
   network?: string | null
   walletAddress?: string | null
@@ -502,13 +503,17 @@ export const paymentMethodOperations = {
     return results
   },
 
-  async findActive(): Promise<PaymentMethod[]> {
+  async findActive(purpose?: string): Promise<PaymentMethod[]> {
     const db = getDb()
     const snapshot = await db.collection('paymentMethods')
       .where('isActive', '==', true)
       .limit(50)
       .get()
-    const results = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() } as PaymentMethod))
+    let results = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() } as PaymentMethod))
+    // Filter by purpose in JS
+    if (purpose) {
+      results = results.filter((m) => m.purpose === purpose || m.purpose === 'both')
+    }
     results.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
     return results
   },
