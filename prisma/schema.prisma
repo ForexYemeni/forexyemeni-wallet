@@ -22,9 +22,10 @@ model User {
   kycIdPhoto    String?
   kycSelfie     String?
   kycNotes      String?
-  balance       Float    @default(0)
-  frozenBalance Float    @default(0)
-  affiliateCode String   @unique
+  balance          Float    @default(0)
+  frozenBalance     Float    @default(0)
+  mustChangePassword Boolean  @default(false)
+  affiliateCode     String   @unique
   referredBy    String?
   merchantId    String?
   createdAt     DateTime @default(now())

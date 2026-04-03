@@ -4,6 +4,7 @@ import { useAuthStore } from '@/lib/store'
 import LoginForm from '@/components/auth/LoginForm'
 import RegisterForm from '@/components/auth/RegisterForm'
 import ForgotPasswordForm from '@/components/auth/ForgotPasswordForm'
+import ForceChangePassword from '@/components/auth/ForceChangePassword'
 import Dashboard from '@/components/wallet/Dashboard'
 import DepositForm from '@/components/wallet/DepositForm'
 import WithdrawForm from '@/components/wallet/WithdrawForm'
@@ -16,6 +17,11 @@ import AppLayout from '@/components/layout/AppLayout'
 
 export default function Home() {
   const { currentScreen, isAuthenticated, setScreen } = useAuthStore()
+
+  // Force change password screen (shown after login with temp password)
+  if (isAuthenticated && currentScreen === 'force-change-password') {
+    return <ForceChangePassword />
+  }
 
   // Authentication Screens
   if (!isAuthenticated) {

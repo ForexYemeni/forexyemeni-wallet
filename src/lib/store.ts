@@ -13,6 +13,7 @@ export interface User {
   kycStatus: string
   balance: number
   frozenBalance: number
+  mustChangePassword: boolean
   createdAt: string
 }
 
@@ -22,7 +23,7 @@ interface AuthState {
   currentScreen: string
   isAuthenticated: boolean
   pendingRegistration: { email: string; fullName: string; password: string } | null
-  setAuth: (user: User, token: string) => void
+  setAuth: (user: User, token: string, mustChangePassword?: boolean) => void
   logout: () => void
   setScreen: (screen: string) => void
   updateBalance: (balance: number) => void
@@ -38,7 +39,12 @@ export const useAuthStore = create<AuthState>()(
       currentScreen: 'login',
       isAuthenticated: false,
       pendingRegistration: null,
-      setAuth: (user, token) => set({ user, token, isAuthenticated: true, currentScreen: 'dashboard' }),
+      setAuth: (user, token, mustChangePassword = false) => set({
+        user,
+        token,
+        isAuthenticated: true,
+        currentScreen: mustChangePassword ? 'force-change-password' : 'dashboard',
+      }),
       logout: () => set({ user: null, token: null, isAuthenticated: false, currentScreen: 'login', pendingRegistration: null }),
       setScreen: (screen) => set({ currentScreen: screen }),
       updateBalance: (balance) => set((state) => ({ user: state.user ? { ...state.user, balance } : null })),

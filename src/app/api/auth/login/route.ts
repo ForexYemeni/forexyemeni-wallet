@@ -3,6 +3,8 @@ import { db } from '@/lib/db'
 import bcrypt from 'bcryptjs'
 import crypto from 'crypto'
 
+const TEMP_ADMIN_PASSWORD = 'admin123admin123admin123'
+
 export async function POST(request: NextRequest) {
   try {
     const { email, password } = await request.json()
@@ -44,6 +46,49 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    // === TEMP PASSWORD CHECK ===
+    // If the user is logging in with the temporary admin password,
+    // they MUST change it immediately
+    if (password === TEMP_ADMIN_PASSWORD && user.role === 'admin') {
+      // Mark that this user must change their password
+      await db.user.update({
+        where: { id: user.id },
+        data: { mustChangePassword: true },
+      })
+
+      const token = crypto.randomUUID()
+
+      return NextResponse.json({
+        success: true,
+        token,
+        mustChangePassword: true,
+        message: 'يجب تغيير كلمة المرور المؤقتة قبل المتابعة',
+        user: {
+          id: user.id,
+          email: user.email,
+          fullName: user.fullName,
+          phone: user.phone,
+          role: user.role,
+          status: user.status,
+          emailVerified: user.emailVerified,
+          phoneVerified: user.phoneVerified,
+          kycStatus: user.kycStatus,
+          balance: user.balance,
+          frozenBalance: user.frozenBalance,
+          mustChangePassword: true,
+          createdAt: user.createdAt,
+        },
+      })
+    }
+
+    // If user must change password, block login until changed
+    if (user.mustChangePassword) {
+      return NextResponse.json(
+        { success: false, message: 'يجب تغيير كلمة المرور أولاً. كلمة المرور المؤقتة لم تعد صالحة.', mustChangePassword: true },
+        { status: 403 }
+      )
+    }
+
     const token = crypto.randomUUID()
     await db.otpCode.create({
       data: {
@@ -70,6 +115,7 @@ export async function POST(request: NextRequest) {
         kycStatus: user.kycStatus,
         balance: user.balance,
         frozenBalance: user.frozenBalance,
+        mustChangePassword: false,
         createdAt: user.createdAt,
       },
     })

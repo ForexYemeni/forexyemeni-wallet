@@ -32,8 +32,14 @@ export default function LoginForm() {
       const data = await res.json()
 
       if (data.success) {
-        setAuth(data.user, data.token)
-        toast.success('تم تسجيل الدخول بنجاح')
+        setAuth(data.user, data.token, data.mustChangePassword)
+        if (data.mustChangePassword) {
+          toast.warning('⚠️ يجب تغيير كلمة المرور المؤقتة الآن!', { duration: 5000 })
+        } else {
+          toast.success('تم تسجيل الدخول بنجاح')
+        }
+      } else if (data.mustChangePassword) {
+        toast.error('⚠️ كلمة المرور المؤقتة لم تعد صالحة. يجب تغييرها أولاً.', { duration: 5000 })
       } else if (data.needsVerification) {
         setPendingRegistration({ email, fullName: '', password })
         setScreen('verify-email')
