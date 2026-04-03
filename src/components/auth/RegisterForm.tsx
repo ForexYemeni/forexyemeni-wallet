@@ -113,7 +113,7 @@ export default function RegisterForm() {
       )}
 
       {step === 'details' && (
-        <CompleteRegistration email={email} onComplete={() => setScreen('login')} />
+        <CompleteRegistration email={email} />
       )}
     </div>
   )
@@ -235,12 +235,12 @@ function OtpStep({ email, loading, onVerify, onBack }: {
   )
 }
 
-function CompleteRegistration({ email, onComplete }: { email: string; onComplete: () => void }) {
+function CompleteRegistration({ email }: { email: string }) {
   const [fullName, setFullName] = useState('')
   const [password, setPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
   const [loading, setLoading] = useState(false)
-  const { setPendingRegistration } = useAuthStore()
+  const { setAuth, setPendingRegistration } = useAuthStore()
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -255,28 +255,22 @@ function CompleteRegistration({ email, onComplete }: { email: string; onComplete
 
     setLoading(true)
     try {
-      const res = await fetch('/api/auth/reset-password', {
+      const res = await fetch('/api/auth/complete-registration', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, code: '000000', newPassword: password }),
+        body: JSON.stringify({ email, fullName, password }),
       })
-      // Update user name
-      const res2 = await fetch('/api/auth/login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password }),
-      })
-      const data2 = await res2.json()
-      if (data2.success) {
-        toast.success('تم إنشاء الحساب بنجاح! يمكنك الآن تسجيل الدخول')
+      const data = await res.json()
+
+      if (data.success && data.user) {
+        setAuth(data.user, data.token)
         setPendingRegistration(null)
-        onComplete()
+        toast.success('مرحباً بك! تم إنشاء حسابك بنجاح')
       } else {
-        toast.success('تم إنشاء الحساب بنجاح! يمكنك الآن تسجيل الدخول')
-        onComplete()
+        toast.error(data.message || 'حدث خطأ في إنشاء الحساب')
       }
     } catch {
-      toast.error('حدث خطأ')
+      toast.error('حدث خطأ في الاتصال بالخادم')
     } finally {
       setLoading(false)
     }
