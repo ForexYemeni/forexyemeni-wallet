@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { db } from '@/lib/db'
+import { userOperations, otpCodeOperations } from '@/lib/db-firebase'
 
 export async function POST(request: NextRequest) {
   try {
@@ -12,14 +12,12 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    const otpRecord = await db.otpCode.findFirst({
+    const otpRecord = await otpCodeOperations.findFirst({
       where: {
         email,
         type: 'email_verify',
         verified: false,
-        expiresAt: { gt: new Date() },
       },
-      orderBy: { createdAt: 'desc' },
     })
 
     if (!otpRecord) {
@@ -36,16 +34,10 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    await db.otpCode.update({
-      where: { id: otpRecord.id },
-      data: { verified: true },
-    })
+    await otpCodeOperations.update(otpRecord.id, { verified: true })
 
     if (otpRecord.userId) {
-      await db.user.update({
-        where: { id: otpRecord.userId },
-        data: { emailVerified: true },
-      })
+      await userOperations.update({ id: otpRecord.userId }, { emailVerified: true })
     }
 
     return NextResponse.json({

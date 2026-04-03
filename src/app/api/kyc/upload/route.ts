@@ -1,7 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { db } from '@/lib/db'
-import { writeFile, mkdir } from 'fs/promises'
-import path from 'path'
+import { userOperations, kycRecordOperations } from '@/lib/db-firebase'
 
 export async function POST(request: NextRequest) {
   try {
@@ -24,7 +22,7 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    const user = await db.user.findUnique({ where: { id: userId } })
+    const user = await userOperations.findUnique({ id: userId })
     if (!user) {
       return NextResponse.json(
         { success: false, message: 'المستخدم غير موجود' },
@@ -32,43 +30,47 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    // Convert file to base64 for Firestore storage
     const bytes = await file.arrayBuffer()
     const buffer = Buffer.from(bytes)
+    const base64 = buffer.toString('base64')
+    const fileUrl = `data:${file.type};base64,${base64.substring(0, 50)}...`
 
-    const uploadDir = path.join(process.cwd(), 'public', 'uploads', 'kyc')
-    await mkdir(uploadDir, { recursive: true })
+    // For Vercel, we store a reference. In production, you'd use Firebase Storage or Cloudinary
+    const fileExt = file.name.split('.').pop()
+    const fileName = `${userId}_${type}_${Date.now()}.${fileExt}`
+    // Store the base64 data in Firestore (for demo - in production use Firebase Storage)
+    const storageUrl = `/api/kyc/file/${fileName}`
 
-    const fileName = `${userId}_${type}_${Date.now()}.${file.name.split('.').pop()}`
-    const filePath = path.join(uploadDir, fileName)
-    await writeFile(filePath, buffer)
+    await kycRecordOperations.create({
+      userId,
+      type,
+      fileUrl: storageUrl,
+      status: 'pending',
+    })
 
-    const fileUrl = `/uploads/kyc/${fileName}`
-
-    await db.kYCRecord.create({
-      data: {
-        userId,
-        type,
-        fileUrl,
-        status: 'pending',
-      },
+    // Store the actual file data in a separate collection for retrieval
+    const { getDb } = await import('@/lib/firebase')
+    const db = getDb()
+    await db.collection('kycFiles').doc(fileName).set({
+      userId,
+      type,
+      fileName,
+      mimeType: file.type,
+      data: base64,
+      createdAt: new Date().toISOString(),
     })
 
     if (type === 'id_photo') {
-      await db.user.update({
-        where: { id: userId },
-        data: { kycIdPhoto: fileUrl },
-      })
+      await userOperations.update({ id: userId }, { kycIdPhoto: storageUrl })
     } else if (type === 'selfie') {
-      await db.user.update({
-        where: { id: userId },
-        data: { kycSelfie: fileUrl },
-      })
+      await userOperations.update({ id: userId }, { kycSelfie: storageUrl })
     }
 
     return NextResponse.json({
       success: true,
       message: 'تم رفع الملف بنجاح',
-      fileUrl,
+      fileUrl: storageUrl,
     })
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : 'حدث خطأ في رفع الملف'

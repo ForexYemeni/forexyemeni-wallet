@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { db } from '@/lib/db'
+import { userOperations, depositOperations, transactionOperations, notificationOperations } from '@/lib/db-firebase'
 
 // GET all deposits (admin)
 export async function GET(request: NextRequest) {
@@ -7,17 +7,7 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url)
     const status = searchParams.get('status')
 
-    const where: Record<string, unknown> = {}
-    if (status && status !== 'all') {
-      where.status = status
-    }
-
-    const deposits = await db.deposit.findMany({
-      where,
-      include: { user: { select: { id: true, email: true, fullName: true } } },
-      orderBy: { createdAt: 'desc' },
-      take: 100,
-    })
+    const deposits = await depositOperations.findMany(status ? { status } : undefined)
 
     return NextResponse.json({ success: true, deposits })
   } catch (error: unknown) {
@@ -39,46 +29,39 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ success: false, message: 'حالة غير صحيحة' }, { status: 400 })
     }
 
-    const deposit = await db.deposit.findUnique({ where: { id: depositId } })
+    const deposit = await depositOperations.findUnique(depositId)
     if (!deposit) {
       return NextResponse.json({ success: false, message: 'الإيداع غير موجود' }, { status: 404 })
     }
 
-    const updatedDeposit = await db.deposit.update({
-      where: { id: depositId },
-      data: { status, adminNote: adminNote || null },
+    const updatedDeposit = await depositOperations.update(depositId, {
+      status,
+      adminNote: adminNote || null,
     })
 
     if (status === 'confirmed') {
-      const user = await db.user.findUnique({ where: { id: deposit.userId } })
+      const user = await userOperations.findUnique({ id: deposit.userId })
       if (user) {
         const balanceBefore = user.balance
         const balanceAfter = balanceBefore + deposit.amount
 
-        await db.user.update({
-          where: { id: deposit.userId },
-          data: { balance: balanceAfter },
+        await userOperations.updateBalance(deposit.userId, balanceAfter)
+
+        await transactionOperations.create({
+          userId: deposit.userId,
+          type: 'deposit',
+          amount: deposit.amount,
+          balanceBefore,
+          balanceAfter,
+          description: `إيداع USDT TRC20 - ${deposit.txId || deposit.id.substring(0, 8)}`,
+          referenceId: deposit.id,
         })
 
-        await db.transaction.create({
-          data: {
-            userId: deposit.userId,
-            type: 'deposit',
-            amount: deposit.amount,
-            balanceBefore,
-            balanceAfter,
-            description: `إيداع USDT TRC20 - ${deposit.txId || deposit.id.substring(0, 8)}`,
-            referenceId: deposit.id,
-          },
-        })
-
-        await db.notification.create({
-          data: {
-            userId: deposit.userId,
-            title: 'تم تأكيد الإيداع',
-            message: `تم تأكيد إيداعك بقيمة ${deposit.amount} USDT`,
-            type: 'success',
-          },
+        await notificationOperations.create({
+          userId: deposit.userId,
+          title: 'تم تأكيد الإيداع',
+          message: `تم تأكيد إيداعك بقيمة ${deposit.amount} USDT`,
+          type: 'success',
         })
       }
     }

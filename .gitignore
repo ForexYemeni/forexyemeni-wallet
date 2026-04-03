@@ -53,9 +53,8 @@ dev.out.log
 .z-ai-config
 local-*
 
-# database (regenerated on setup)
-db/*.db
-db/*.db-journal
+# database (Firebase now - no local db needed)
+db/
 
 # uploads
 /public/uploads/

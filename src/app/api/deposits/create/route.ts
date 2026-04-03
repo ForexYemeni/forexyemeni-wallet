@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { db } from '@/lib/db'
+import { userOperations, depositOperations } from '@/lib/db-firebase'
 
 export async function POST(request: NextRequest) {
   try {
@@ -19,7 +19,7 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    const user = await db.user.findUnique({ where: { id: userId } })
+    const user = await userOperations.findUnique({ id: userId })
     if (!user) {
       return NextResponse.json(
         { success: false, message: 'المستخدم غير موجود' },
@@ -27,17 +27,19 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    const deposit = await db.deposit.create({
-      data: {
-        userId,
-        amount,
-        currency: 'USDT',
-        network: 'TRC20',
-        txId: txId || null,
-        method: method || 'blockchain',
-        screenshot: screenshot || null,
-        status: 'pending',
-      },
+    const deposit = await depositOperations.create({
+      userId,
+      amount,
+      currency: 'USDT',
+      network: 'TRC20',
+      txId: txId || null,
+      fromAddress: null,
+      toAddress: null,
+      method: method || 'blockchain',
+      merchantId: null,
+      merchantNote: null,
+      screenshot: screenshot || null,
+      status: 'pending',
     })
 
     return NextResponse.json({

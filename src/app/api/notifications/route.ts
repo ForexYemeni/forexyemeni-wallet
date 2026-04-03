@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { db } from '@/lib/db'
+import { notificationOperations } from '@/lib/db-firebase'
 
 export async function GET(request: NextRequest) {
   try {
@@ -13,11 +13,7 @@ export async function GET(request: NextRequest) {
       )
     }
 
-    const notifications = await db.notification.findMany({
-      where: { userId },
-      orderBy: { createdAt: 'desc' },
-      take: 50,
-    })
+    const notifications = await notificationOperations.findMany(userId)
 
     return NextResponse.json({
       success: true,
@@ -43,13 +39,11 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    const notification = await db.notification.create({
-      data: {
-        userId,
-        title,
-        message,
-        type,
-      },
+    const notification = await notificationOperations.create({
+      userId,
+      title,
+      message,
+      type,
     })
 
     return NextResponse.json({

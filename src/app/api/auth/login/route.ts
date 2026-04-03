@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { db } from '@/lib/db'
+import { userOperations, otpCodeOperations } from '@/lib/db-firebase'
 import bcrypt from 'bcryptjs'
 import crypto from 'crypto'
 
@@ -16,7 +16,7 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    const user = await db.user.findUnique({ where: { email } })
+    const user = await userOperations.findUnique({ email })
     if (!user) {
       return NextResponse.json(
         { success: false, message: 'البريد الإلكتروني أو كلمة المرور غير صحيحة' },
@@ -47,14 +47,8 @@ export async function POST(request: NextRequest) {
     }
 
     // === TEMP PASSWORD CHECK ===
-    // If the user is logging in with the temporary admin password,
-    // they MUST change it immediately
     if (password === TEMP_ADMIN_PASSWORD && user.role === 'admin') {
-      // Mark that this user must change their password
-      await db.user.update({
-        where: { id: user.id },
-        data: { mustChangePassword: true },
-      })
+      await userOperations.update({ id: user.id }, { mustChangePassword: true })
 
       const token = crypto.randomUUID()
 
@@ -90,14 +84,12 @@ export async function POST(request: NextRequest) {
     }
 
     const token = crypto.randomUUID()
-    await db.otpCode.create({
-      data: {
-        userId: user.id,
-        email: user.email,
-        code: token,
-        type: 'login',
-        expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
-      },
+    await otpCodeOperations.create({
+      userId: user.id,
+      email: user.email,
+      code: token,
+      type: 'login',
+      expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
     })
 
     return NextResponse.json({

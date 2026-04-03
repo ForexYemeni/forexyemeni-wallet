@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { db } from '@/lib/db'
+import { transactionOperations } from '@/lib/db-firebase'
 
 export async function GET(request: NextRequest) {
   try {
@@ -13,11 +13,7 @@ export async function GET(request: NextRequest) {
       )
     }
 
-    const transactions = await db.transaction.findMany({
-      where: { userId },
-      orderBy: { createdAt: 'desc' },
-      take: 100,
-    })
+    const transactions = await transactionOperations.findMany(userId)
 
     return NextResponse.json({
       success: true,

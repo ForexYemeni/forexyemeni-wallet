@@ -1,27 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { db } from '@/lib/db'
+import { userOperations } from '@/lib/db-firebase'
 
 // GET all users (admin)
 export async function GET() {
   try {
-    const users = await db.user.findMany({
-      orderBy: { createdAt: 'desc' },
+    const users = await userOperations.findMany({
+      orderBy: 'createdAt',
       take: 100,
-      select: {
-        id: true,
-        email: true,
-        fullName: true,
-        phone: true,
-        country: true,
-        role: true,
-        status: true,
-        emailVerified: true,
-        phoneVerified: true,
-        kycStatus: true,
-        balance: true,
-        frozenBalance: true,
-        createdAt: true,
-      },
     })
 
     return NextResponse.json({ success: true, users })
@@ -47,10 +32,7 @@ export async function POST(request: NextRequest) {
     if (kycStatus) updateData.kycStatus = kycStatus
     if (notes) updateData.kycNotes = notes
 
-    const user = await db.user.update({
-      where: { id: userId },
-      data: updateData,
-    })
+    const user = await userOperations.update({ id: userId }, updateData)
 
     return NextResponse.json({ success: true, user })
   } catch (error: unknown) {

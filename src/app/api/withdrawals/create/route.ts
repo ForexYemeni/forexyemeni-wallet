@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { db } from '@/lib/db'
+import { userOperations, withdrawalOperations } from '@/lib/db-firebase'
 
 export async function POST(request: NextRequest) {
   try {
@@ -19,7 +19,7 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    const user = await db.user.findUnique({ where: { id: userId } })
+    const user = await userOperations.findUnique({ id: userId })
     if (!user) {
       return NextResponse.json(
         { success: false, message: 'المستخدم غير موجود' },
@@ -37,25 +37,24 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    await db.user.update({
-      where: { id: userId },
-      data: {
-        balance: { decrement: totalAmount },
-        frozenBalance: { increment: totalAmount },
-      },
+    await userOperations.update({ id: userId }, {
+      balance: user.balance - totalAmount,
+      frozenBalance: user.frozenBalance + totalAmount,
     })
 
-    const withdrawal = await db.withdrawal.create({
-      data: {
-        userId,
-        amount,
-        currency: 'USDT',
-        network: 'TRC20',
-        toAddress,
-        method,
-        fee,
-        status: 'pending',
-      },
+    const withdrawal = await withdrawalOperations.create({
+      userId,
+      amount,
+      currency: 'USDT',
+      network: 'TRC20',
+      toAddress,
+      method,
+      merchantId: null,
+      txId: null,
+      fee,
+      adminNote: null,
+      screenshot: null,
+      status: 'pending',
     })
 
     return NextResponse.json({

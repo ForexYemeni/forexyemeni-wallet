@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { db } from '@/lib/db'
+import { userOperations } from '@/lib/db-firebase'
 import bcrypt from 'bcryptjs'
 
 const TEMP_ADMIN_PASSWORD = 'admin123admin123admin123'
@@ -15,7 +15,6 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Validate new password
     if (newPassword.length < 8) {
       return NextResponse.json(
         { success: false, message: 'كلمة المرور الجديدة يجب أن تكون 8 أحرف على الأقل' },
@@ -30,7 +29,7 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    const user = await db.user.findUnique({ where: { id: userId } })
+    const user = await userOperations.findUnique({ id: userId })
     if (!user) {
       return NextResponse.json(
         { success: false, message: 'المستخدم غير موجود' },
@@ -45,15 +44,11 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Hash new password and update
     const newHash = await bcrypt.hash(newPassword, 12)
 
-    await db.user.update({
-      where: { id: userId },
-      data: {
-        passwordHash: newHash,
-        mustChangePassword: false,
-      },
+    await userOperations.update({ id: userId }, {
+      passwordHash: newHash,
+      mustChangePassword: false,
     })
 
     return NextResponse.json({

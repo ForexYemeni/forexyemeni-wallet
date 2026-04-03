@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { db } from '@/lib/db'
+import { userOperations, otpCodeOperations } from '@/lib/db-firebase'
 import bcrypt from 'bcryptjs'
-import crypto from 'crypto'
+import { generateId, nowTimestamp } from '@/lib/firebase'
 
 export async function POST(request: NextRequest) {
   try {
@@ -29,7 +29,7 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    const existingUser = await db.user.findUnique({ where: { email } })
+    const existingUser = await userOperations.findUnique({ email })
     if (existingUser) {
       return NextResponse.json(
         { success: false, message: 'هذا البريد الإلكتروني مسجل بالفعل' },
@@ -38,28 +38,37 @@ export async function POST(request: NextRequest) {
     }
 
     const passwordHash = await bcrypt.hash(password, 12)
-    const affiliateCode = crypto.randomBytes(4).toString('hex').toUpperCase()
 
-    const user = await db.user.create({
-      data: {
-        email,
-        passwordHash,
-        fullName: fullName || null,
-        affiliateCode,
-      },
+    const user = await userOperations.create({
+      email,
+      passwordHash,
+      fullName: fullName || null,
+      phone: null,
+      country: null,
+      role: 'user',
+      status: 'active',
+      emailVerified: false,
+      phoneVerified: false,
+      kycStatus: 'none',
+      kycIdPhoto: null,
+      kycSelfie: null,
+      kycNotes: null,
+      balance: 0,
+      frozenBalance: 0,
+      mustChangePassword: false,
+      referredBy: null,
+      merchantId: null,
     })
 
     const otp = Math.floor(100000 + Math.random() * 900000).toString()
-    const expiresAt = new Date(Date.now() + 10 * 60 * 1000)
+    const expiresAt = new Date(Date.now() + 10 * 60 * 1000).toISOString()
 
-    await db.otpCode.create({
-      data: {
-        userId: user.id,
-        email,
-        code: otp,
-        type: 'email_verify',
-        expiresAt,
-      },
+    await otpCodeOperations.create({
+      userId: user.id,
+      email,
+      code: otp,
+      type: 'email_verify',
+      expiresAt,
     })
 
     return NextResponse.json({

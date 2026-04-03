@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { db } from '@/lib/db'
+import { userOperations, otpCodeOperations } from '@/lib/db-firebase'
 
 export async function POST(request: NextRequest) {
   try {
@@ -12,7 +12,7 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    const user = await db.user.findUnique({ where: { id: userId } })
+    const user = await userOperations.findUnique({ id: userId })
     if (!user) {
       return NextResponse.json(
         { success: false, message: 'المستخدم غير موجود' },
@@ -21,18 +21,16 @@ export async function POST(request: NextRequest) {
     }
 
     const otp = Math.floor(100000 + Math.random() * 900000).toString()
-    const expiresAt = new Date(Date.now() + 10 * 60 * 1000)
+    const expiresAt = new Date(Date.now() + 10 * 60 * 1000).toISOString()
 
-    await db.otpCode.create({
-      data: {
-        userId,
-        email: user.email,
-        phone,
-        code: otp,
-        type: 'phone_verify',
-        purpose: `phone:${phone}`,
-        expiresAt,
-      },
+    await otpCodeOperations.create({
+      userId,
+      email: user.email,
+      phone,
+      code: otp,
+      type: 'phone_verify',
+      purpose: `phone:${phone}`,
+      expiresAt,
     })
 
     return NextResponse.json({

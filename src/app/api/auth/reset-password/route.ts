@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { db } from '@/lib/db'
+import { userOperations, otpCodeOperations } from '@/lib/db-firebase'
 import bcrypt from 'bcryptjs'
 
 export async function POST(request: NextRequest) {
@@ -20,14 +20,12 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    const otpRecord = await db.otpCode.findFirst({
+    const otpRecord = await otpCodeOperations.findFirst({
       where: {
         email,
         type: 'password_reset',
         verified: false,
-        expiresAt: { gt: new Date() },
       },
-      orderBy: { createdAt: 'desc' },
     })
 
     if (!otpRecord) {
@@ -44,18 +42,12 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    await db.otpCode.update({
-      where: { id: otpRecord.id },
-      data: { verified: true },
-    })
+    await otpCodeOperations.update(otpRecord.id, { verified: true })
 
     const passwordHash = await bcrypt.hash(newPassword, 12)
 
     if (otpRecord.userId) {
-      await db.user.update({
-        where: { id: otpRecord.userId },
-        data: { passwordHash },
-      })
+      await userOperations.update({ id: otpRecord.userId }, { passwordHash })
     }
 
     return NextResponse.json({

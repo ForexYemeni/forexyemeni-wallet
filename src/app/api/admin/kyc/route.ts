@@ -1,14 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { db } from '@/lib/db'
+import { userOperations, kycRecordOperations, notificationOperations } from '@/lib/db-firebase'
 
 // GET all KYC records (admin)
 export async function GET() {
   try {
-    const kycRecords = await db.kYCRecord.findMany({
-      include: { user: { select: { id: true, email: true, fullName: true, phone: true } } },
-      orderBy: { createdAt: 'desc' },
-      take: 100,
-    })
+    const kycRecords = await kycRecordOperations.findMany()
 
     return NextResponse.json({ success: true, kycRecords })
   } catch (error: unknown) {
@@ -30,54 +26,35 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ success: false, message: 'حالة غير صحيحة' }, { status: 400 })
     }
 
-    const updatedRecord = await db.kYCRecord.update({
-      where: { id: recordId },
-      data: {
-        status,
-        notes: notes || null,
-        reviewedAt: new Date(),
-      },
+    const updatedRecord = await kycRecordOperations.update(recordId, {
+      status,
+      notes: notes || null,
+      reviewedAt: new Date().toISOString(),
     })
 
-    // Check if all KYC records for this user are approved
     if (status === 'approved') {
-      const pendingRecords = await db.kYCRecord.count({
-        where: {
-          userId,
-          status: { in: ['pending'] },
-        },
-      })
+      const pendingRecords = await kycRecordOperations.countPending(userId)
 
       if (pendingRecords === 0) {
-        await db.user.update({
-          where: { id: userId },
-          data: { kycStatus: 'approved' },
-        })
+        await userOperations.update({ id: userId }, { kycStatus: 'approved' })
 
-        await db.notification.create({
-          data: {
-            userId,
-            title: 'تم قبول التحقق',
-            message: 'تم قبول جميع مستندات التحقق الخاصة بك',
-            type: 'success',
-          },
+        await notificationOperations.create({
+          userId,
+          title: 'تم قبول التحقق',
+          message: 'تم قبول جميع مستندات التحقق الخاصة بك',
+          type: 'success',
         })
       }
     }
 
     if (status === 'rejected') {
-      await db.user.update({
-        where: { id: userId },
-        data: { kycStatus: 'rejected' },
-      })
+      await userOperations.update({ id: userId }, { kycStatus: 'rejected' })
 
-      await db.notification.create({
-        data: {
-          userId,
-          title: 'تم رفض التحقق',
-          message: 'تم رفض أحد مستندات التحقق. يرجى إعادة الرفع.',
-          type: 'warning',
-        },
+      await notificationOperations.create({
+        userId,
+        title: 'تم رفض التحقق',
+        message: 'تم رفض أحد مستندات التحقق. يرجى إعادة الرفع.',
+        type: 'warning',
       })
     }
 
