@@ -20,33 +20,7 @@ import {
   X,
 } from 'lucide-react'
 
-const compressImage = (file: File): Promise<File> => {
-  return new Promise((resolve) => {
-    const img = new Image()
-    const url = URL.createObjectURL(file)
-    img.onload = () => {
-      const MAX_SIZE = 800
-      const QUALITY = 0.7
-      let { width, height } = img
-      if (width > MAX_SIZE || height > MAX_SIZE) {
-        if (width > height) { height = Math.round((height * MAX_SIZE) / width); width = MAX_SIZE }
-        else { width = Math.round((width * MAX_SIZE) / height); height = MAX_SIZE }
-      }
-      const canvas = document.createElement('canvas')
-      canvas.width = width
-      canvas.height = height
-      const ctx = canvas.getContext('2d')
-      ctx?.drawImage(img, 0, 0, width, height)
-      canvas.toBlob((blob) => {
-        URL.revokeObjectURL(url)
-        if (blob) resolve(new File([blob], file.name, { type: 'image/jpeg' }))
-        else resolve(file)
-      }, 'image/jpeg', QUALITY)
-    }
-    img.onerror = () => { URL.revokeObjectURL(url); resolve(file) }
-    img.src = url
-  })
-}
+import { compressImage } from '@/lib/image-compress'
 
 export default function DepositForm() {
   const { user } = useAuthStore()

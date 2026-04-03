@@ -17,12 +17,52 @@ import AdminPanel from '@/components/admin/AdminPanel'
 import DeviceLockedScreen from '@/components/auth/DeviceLockedScreen'
 import AppLayout from '@/components/layout/AppLayout'
 import { toast } from 'sonner'
-import { Loader2, Lock } from 'lucide-react'
+import { Loader2, Lock, Image as ImageIcon } from 'lucide-react'
+
+interface PendingWithdrawal {
+  amount: number
+  fee: number
+  netAmount: number
+  method: string
+  screenshot: string | null
+  status: string
+  walletAddress?: string
+  walletName?: string
+}
 
 export default function Home() {
   const { currentScreen, isAuthenticated, setScreen, user, setPendingWithdrawalConfirmation, updateUser } = useAuthStore()
   const [confirmPassword, setConfirmPassword] = useState('')
   const [confirmLoading, setConfirmLoading] = useState(false)
+  const [pendingWithdrawal, setPendingWithdrawal] = useState<PendingWithdrawal | null>(null)
+  const [loadingWithdrawal, setLoadingWithdrawal] = useState(true)
+  const [showProofImage, setShowProofImage] = useState(false)
+
+  // Fetch withdrawal data when confirmation is pending
+  useEffect(() => {
+    if (isAuthenticated && user?.pendingConfirmation) {
+      setLoadingWithdrawal(true)
+      fetch(`/api/admin/withdrawals?id=${user.pendingConfirmation}`)
+        .then(res => res.json())
+        .then(data => {
+          if (data.success && data.withdrawals?.length > 0) {
+            const w = data.withdrawals[0]
+            setPendingWithdrawal({
+              amount: w.amount,
+              fee: w.fee || 0,
+              netAmount: w.netAmount || w.amount - (w.fee || 0),
+              method: w.method || '',
+              screenshot: w.screenshot || null,
+              status: w.status,
+              walletAddress: w.walletAddress,
+              walletName: w.walletName,
+            })
+          }
+        })
+        .catch(() => {})
+        .finally(() => setLoadingWithdrawal(false))
+    }
+  }, [isAuthenticated, user?.pendingConfirmation])
 
   // Check pendingConfirmation on mount
   useEffect(() => {
@@ -65,20 +105,78 @@ export default function Home() {
 
     return (
       <div className="fixed inset-0 bg-background flex items-center justify-center p-4 z-50">
-        <div className="glass-card p-6 space-y-5 w-full max-w-sm animate-scale-in">
+        <div className="glass-card p-6 space-y-5 w-full max-w-sm animate-scale-in max-h-[90vh] overflow-y-auto">
           <div className="text-center space-y-3">
             <div className="w-16 h-16 mx-auto rounded-2xl bg-gold/10 flex items-center justify-center gold-glow">
               <Lock className="w-8 h-8 text-gold" />
             </div>
             <h2 className="text-xl font-bold gold-text">تأكيد الاستلام</h2>
             <p className="text-sm text-muted-foreground">
-              تم سحب أموالك بنجاح. يرجى تأكيد استلامك بإدخال كلمة المرور للمتابعة.
+              تم سحب أموالك بنجاح. تحقق من التفاصيل ثم أكد الاستلام بكلمة المرور.
             </p>
           </div>
+
+          {loadingWithdrawal ? (
+            <div className="flex justify-center py-6">
+              <Loader2 className="w-6 h-6 animate-spin text-gold" />
+            </div>
+          ) : pendingWithdrawal ? (
+            <div className="space-y-4">
+              {/* Withdrawal amount details */}
+              <div className="p-4 rounded-xl bg-white/5 border border-white/10 space-y-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-muted-foreground">مبلغ السحب</span>
+                  <span className="text-lg font-bold gold-text">{pendingWithdrawal.amount.toFixed(2)} USDT</span>
+                </div>
+                {pendingWithdrawal.fee > 0 && (
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm text-muted-foreground">الرسوم</span>
+                    <span className="text-sm text-red-400">-{pendingWithdrawal.fee.toFixed(2)} USDT</span>
+                  </div>
+                )}
+                <div className="border-t border-white/10 pt-2 flex items-center justify-between">
+                  <span className="text-sm font-medium">المبلغ الصافي</span>
+                  <span className="text-lg font-bold text-green-400">{pendingWithdrawal.netAmount.toFixed(2)} USDT</span>
+                </div>
+                {pendingWithdrawal.method && (
+                  <div className="flex items-center justify-between text-xs text-muted-foreground">
+                    <span>الطريقة</span>
+                    <span>{pendingWithdrawal.method}</span>
+                  </div>
+                )}
+              </div>
+
+              {/* Payment proof image */}
+              {pendingWithdrawal.screenshot ? (
+                <div className="space-y-2">
+                  <p className="text-xs text-muted-foreground font-medium">إثبات الدفع:</p>
+                  <div
+                    className="relative rounded-xl overflow-hidden border border-white/10 cursor-pointer hover:border-gold/30 transition-colors"
+                    onClick={() => setShowProofImage(true)}
+                  >
+                    <img
+                      src={pendingWithdrawal.screenshot}
+                      alt="إثبات الدفع"
+                      className="w-full h-48 object-contain bg-black/30"
+                    />
+                    <div className="absolute bottom-2 right-2 bg-black/60 px-2 py-1 rounded-lg flex items-center gap-1 text-xs text-white">
+                      <ImageIcon className="w-3 h-3" />
+                      اضغط لتكبير
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <div className="p-3 rounded-xl bg-yellow-500/5 border border-yellow-500/10 text-xs text-yellow-400 text-center">
+                  لم يتم رفع إثبات دفع بعد
+                </div>
+              )}
+            </div>
+          ) : null}
+
           <div className="space-y-3">
             <input
               type="password"
-              placeholder="أدخل كلمة المرور"
+              placeholder="أدخل كلمة المرور للتأكيد"
               value={confirmPassword}
               onChange={(e) => setConfirmPassword(e.target.value)}
               className="w-full h-12 rounded-xl bg-white/5 border border-white/10 px-4 text-sm"
@@ -93,6 +191,28 @@ export default function Home() {
             </button>
           </div>
         </div>
+
+        {/* Full screen image preview */}
+        {showProofImage && pendingWithdrawal?.screenshot && (
+          <div
+            className="fixed inset-0 bg-black/90 z-[60] flex items-center justify-center p-4"
+            onClick={() => setShowProofImage(false)}
+          >
+            <div className="relative max-w-lg w-full">
+              <button
+                className="absolute -top-10 left-0 text-white text-sm hover:text-gold transition-colors"
+                onClick={() => setShowProofImage(false)}
+              >
+                ✕ إغلاق
+              </button>
+              <img
+                src={pendingWithdrawal.screenshot}
+                alt="إثبات الدفع"
+                className="w-full rounded-xl"
+              />
+            </div>
+          </div>
+        )}
       </div>
     )
   }

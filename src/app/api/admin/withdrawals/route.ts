@@ -7,6 +7,16 @@ export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url)
     const status = searchParams.get('status')
+    const id = searchParams.get('id')
+
+    // Support filtering by single ID
+    if (id) {
+      const withdrawal = await withdrawalOperations.findUnique({ id })
+      if (!withdrawal) {
+        return NextResponse.json({ success: true, withdrawals: [] })
+      }
+      return NextResponse.json({ success: true, withdrawals: [withdrawal] })
+    }
 
     const withdrawals = await withdrawalOperations.findMany(status ? { status } : undefined)
 

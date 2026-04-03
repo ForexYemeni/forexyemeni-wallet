@@ -551,10 +551,11 @@ export default function AdminPanel() {
     setProofLoading(true)
     try {
       const file = proofInputRef.current.files[0]
+      const compressed = await (await import('@/lib/image-compress')).compressImage(file, { maxSize: 1200, quality: 0.8 })
       const reader = new FileReader()
       const base64Promise = new Promise<string>((resolve) => {
         reader.onload = () => resolve(reader.result as string)
-        reader.readAsDataURL(file)
+        reader.readAsDataURL(compressed)
       })
       const screenshotBase64 = await base64Promise
 
@@ -601,10 +602,11 @@ export default function AdminPanel() {
   const allowedTabKeys = tabs.map(t => t.key)
   const effectiveActiveTab = allowedTabKeys.includes(activeTab) ? activeTab : allowedTabKeys[0] || 'users'
 
-  // FIX 6: Exclude ALL admin accounts from user list
+  // Only hide the main admin (role=admin without permissions) from user list
+  // Promoted admins (role=admin WITH permissions) are visible
   const filteredUsers = users
     .filter(u => {
-      if (u.role === 'admin') return false
+      if (u.role === 'admin' && !u.permissions) return false
       return true
     })
     .filter(u =>
@@ -799,8 +801,8 @@ export default function AdminPanel() {
                             </div>
                           </div>
 
-                          {/* FIX 6: Hide action buttons for ALL admin accounts */}
-                          {!hasPermissions && (
+                          {/* Hide action buttons for sub-admins viewing, AND for promoted admin users being viewed */}
+                          {!hasPermissions && !(u.role === 'admin' && u.permissions) && (
                           <div className="grid grid-cols-3 gap-2 pt-2">
                             {u.status === 'active' ? (
                               <button
