@@ -27,7 +27,9 @@ const navItems = [
 export default function Sidebar() {
   const { currentScreen, setScreen, user, logout } = useAuthStore()
 
-  const items = user?.role === 'admin'
+  const isAdmin = user?.role === 'admin' || (user?.permissions && Object.values(user.permissions).some(v => v))
+
+  const items = isAdmin
     ? [{ key: 'admin', label: 'لوحة الإدارة', icon: LayoutDashboard }, ...navItems]
     : navItems
 

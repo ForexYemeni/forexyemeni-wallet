@@ -157,7 +157,8 @@ export default function AdminPanel() {
     if (user?.role === 'admin' || (user?.permissions && Object.values(user.permissions).some(v => v))) {
       fetchAll()
     }
-  }, [effectiveActiveTab])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTab])
 
   const fetchAll = async () => {
     setLoading(true)

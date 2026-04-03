@@ -81,6 +81,15 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    const parsePermissions = (perm: any) => {
+      if (!perm) return null
+      try {
+        if (typeof perm === 'string') return JSON.parse(perm)
+        if (typeof perm === 'object') return perm
+        return null
+      } catch { return null }
+    }
+
     const getUserResponse = (u: any, mustChange: boolean = false) => ({
       id: u.id,
       email: u.email,
@@ -95,7 +104,7 @@ export async function POST(request: NextRequest) {
       frozenBalance: u.frozenBalance,
       mustChangePassword: mustChange,
       createdAt: u.createdAt,
-      permissions: u.permissions ? JSON.parse(u.permissions) : null,
+      permissions: parsePermissions(u.permissions),
     })
 
     // === TEMP PASSWORD CHECK ===
