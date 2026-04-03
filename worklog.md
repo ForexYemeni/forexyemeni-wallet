@@ -133,3 +133,95 @@ Fix "Application error: a client-side exception has occurred" on forexyemeni-wal
 
 ### Git Commit
 - Committed and pushed as `hotfix: إصلاح خطأ العميل`
+
+---
+## Task ID: v1.6 - Major Feature Update
+
+### Work Task
+Comprehensive v1.6 update addressing multiple user-reported issues: deposit name duplication, KYC image upload errors, admin panel improvements, fee system, deposit/withdrawal flow overhauls, device auth simplification, and UI consistency.
+
+### Work Summary
+
+#### 1. Deposit Screen - Fixed Duplicate Name
+- **DepositForm.tsx**: Changed subtitle display from `TYPE_LABELS[m.type]` to show contextual info:
+  - bank_deposit: shows `m.accountName` (wallet name)
+  - crypto: shows `m.network`
+  - atm_transfer: shows `m.recipientName` or `m.network`
+
+#### 2. KYC Image Upload - Fixed Firestore 1MB Limit
+- **KYCVerification.tsx**: Reduced image compression parameters:
+  - MAX_SIZE: 800 → 600 pixels
+  - QUALITY: 0.7 → 0.5 (50% JPEG quality)
+- This ensures base64 images stay well under the 1,048,487 byte Firestore document limit
+
+#### 3. Admin Account - Excluded from User List
+- **AdminPanel.tsx filteredUsers**: Already filters out ALL admin accounts (`u.role === 'admin'`)
+- Action buttons (suspend/promote/delete) already hidden for admin accounts since they're excluded from the list
+
+#### 4. Admin KYC - Rejection Reason + Image Error Handling
+- **AdminPanel.tsx KYC tab**: 
+  - Added KYC rejection dialog with textarea for reason
+  - Added `onError` handler on images showing fallback "failed to load" message
+  - Displays previous rejection notes on rejected records
+- **Admin KYC API**: Already accepts `adminNote` parameter and sends notification to user
+
+#### 5. Device Lock - Simplified Authorization
+- **Login route**: When device not recognized, stores fingerprint in `pendingDeviceAuth` collection before locking account
+- **Admin devices API**: `authorize` action checks `pendingDeviceAuth` first, auto-uses fingerprint without manual input
+- **Admin device dialog**: Shows pending device info (name, fingerprint preview, time), single "Authorize" button (no manual fingerprint input)
+- Admin just clicks "Authorize" - the system automatically uses the pending fingerprint from the user's last login attempt
+
+#### 6. Admin Panel - Tabs Layout
+- Changed from grid layout to horizontal scrollable flex layout
+- Tabs now have consistent sizing with `whitespace-nowrap` and `flex-shrink-0`
+- Active tab highlighted with gold border, inactive tabs have transparent border
+- Better mobile experience with horizontal scrolling
+
+#### 7. Admin Withdrawals - Wallet Name Display
+- **WithdrawForm.tsx**: Passes `paymentMethodName` (wallet/method title) in withdrawal creation
+- **Withdrawals API**: Stores `paymentMethodName` in withdrawal document
+- **Admin withdrawals API**: Returns `paymentMethodName` field
+- **AdminPanel withdrawals tab**: Shows wallet name in withdrawal details
+
+#### 8. Fee System - Admin Configurable
+- **System settings**: New `systemSettings/fees` Firestore document with `depositFee` and `withdrawalFee` percentage fields
+- **GET /api/settings**: Returns current fee settings (creates defaults if not exists)
+- **Admin settings API**: `update_fees` action to save new fee percentages
+- **Admin settings panel**: Added "الرسوم" (Fees) section with deposit and withdrawal fee inputs
+- **DepositForm**: Fetches fees from `/api/settings`, shows fee calculation in UI
+- **WithdrawForm**: Fetches fees from `/api/settings`, uses dynamic fee instead of hardcoded 0.1%
+- **Withdrawals create API**: Fetches fee from systemSettings instead of hardcoded 0.001
+
+#### 9. Deposit 3-Stage Flow
+- **DepositForm**: Mandatory screenshot upload with image compression, sent as base64
+- **Deposits create API**: Requires `screenshot` field (returns error if missing)
+- **Admin deposits API**: Added `reviewing` status between pending and confirmed
+- **Admin deposits tab**: 
+  - Status labels: pending→"تم استلام طلبك", reviewing→"طلبك قيد المراجعة", confirmed→"مؤكد"
+  - Shows deposit screenshot with click-to-preview
+  - "مراجعة" button → reviewing, "تأكيد" → confirmed, "رفض" → rejected
+- **Notifications**: User notified at each status change
+
+#### 10. Withdrawal 3-Stage Flow + User Confirmation
+- **Admin withdrawals tab**: 
+  - Status labels: pending→"معلق", approved→"تم قبول السحب", processing→"تم السحب", rejected→"مرفوض"
+  - "رفع صورة الدفع" button for uploading payment proof (mandatory for completion)
+  - Shows uploaded proof image in withdrawal details
+- **Admin withdrawals API**: `processing` status with screenshot sets `pendingConfirmation` on user
+- **User confirmation dialog**: Blocking overlay on app load when `pendingConfirmation` exists
+  - Requires password entry to confirm receipt
+  - API `/api/withdrawals/confirm-receipt` verifies password and clears flag
+  - User cannot access any app feature until confirmed
+
+#### 11. Store & Auth Updates
+- **User interface**: Added `pendingConfirmation?: string | null` field
+- **Store**: Added `pendingWithdrawalConfirmation` state with persistence
+- **Login API**: Returns `pendingConfirmation` in user response
+
+### New Files Created
+- `/src/app/api/settings/route.ts` - Public fee settings API
+- `/src/app/api/withdrawals/confirm-receipt/route.ts` - User receipt confirmation API
+
+### Git Commit
+- Committed and pushed as v1.6 tag
+- 137 files changed, 1143 insertions(+), 347 deletions(-)
