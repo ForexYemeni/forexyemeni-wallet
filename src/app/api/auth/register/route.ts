@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { userOperations, otpCodeOperations } from '@/lib/db-firebase'
+import { sendVerificationEmail } from '@/lib/email'
 import bcrypt from 'bcryptjs'
-import { generateId, nowTimestamp } from '@/lib/firebase'
 
 export async function POST(request: NextRequest) {
   try {
@@ -71,11 +71,16 @@ export async function POST(request: NextRequest) {
       expiresAt,
     })
 
+    // Send email
+    const emailSent = await sendVerificationEmail(email, otp)
+
     return NextResponse.json({
       success: true,
-      message: 'تم إرسال رمز التحقق إلى بريدك الإلكتروني',
+      message: emailSent 
+        ? 'تم إرسال رمز التحقق إلى بريدك الإلكتروني' 
+        : 'تم إنشاء الحساب. تحقق من الرمز (وضع التطوير - الرمز يظهر في الاستجابة)',
       otpId: user.id,
-      otp, // For testing only
+      otp, // For testing only - remove in production
     })
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : 'حدث خطأ في التسجيل'

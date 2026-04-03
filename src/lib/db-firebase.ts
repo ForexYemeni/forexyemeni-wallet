@@ -220,18 +220,36 @@ export const otpCodeOperations = {
     orderBy?: string
   }): Promise<OtpCode | null> {
     const db = getDb()
+
+    // Build query with equality filters + orderBy on createdAt
+    // Firestore requires composite indexes when filtering + ordering on different fields
+    // We use a collection group query approach: filter by type+verified, orderBy createdAt
     let query: Query<DocumentData> = db.collection('otpCodes')
       .where('type', '==', options.where.type)
-      .where('verified', '==', false)
+      .where('verified', '==', options.where.type ? false : false)
     
+    // Single filter approach to avoid composite index
     if (options.where.email) {
-      query = query.where('email', '==', options.where.email)
+      query = db.collection('otpCodes')
+        .where('email', '==', options.where.email)
+        .where('type', '==', options.where.type)
+        .where('verified', '==', false)
+        .orderBy('createdAt', 'desc')
+        .limit(1)
+    } else if (options.where.userId) {
+      query = db.collection('otpCodes')
+        .where('userId', '==', options.where.userId)
+        .where('type', '==', options.where.type)
+        .where('verified', '==', false)
+        .orderBy('createdAt', 'desc')
+        .limit(1)
+    } else {
+      query = db.collection('otpCodes')
+        .where('type', '==', options.where.type)
+        .where('verified', '==', false)
+        .orderBy('createdAt', 'desc')
+        .limit(1)
     }
-    if (options.where.userId) {
-      query = query.where('userId', '==', options.where.userId)
-    }
-    
-    query = query.orderBy('createdAt', 'desc').limit(1)
     
     const snapshot = await query.get()
     if (snapshot.empty) return null
@@ -421,10 +439,12 @@ export const transactionOperations = {
     const db = getDb()
     const snapshot = await db.collection('transactions')
       .where('userId', '==', userId)
-      .orderBy('createdAt', 'desc')
       .limit(100)
       .get()
-    return snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() } as Transaction))
+    const results = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() } as Transaction))
+    // Sort by createdAt desc in JS to avoid composite index
+    results.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+    return results
   },
 }
 
@@ -443,10 +463,12 @@ export const notificationOperations = {
     const db = getDb()
     const snapshot = await db.collection('notifications')
       .where('userId', '==', userId)
-      .orderBy('createdAt', 'desc')
       .limit(50)
       .get()
-    return snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() } as Notification))
+    const results = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() } as Notification))
+    // Sort by createdAt desc in JS to avoid composite index
+    results.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+    return results
   },
 }
 

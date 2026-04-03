@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { userOperations, otpCodeOperations } from '@/lib/db-firebase'
+import { sendPhoneVerificationEmail } from '@/lib/email'
 
 export async function POST(request: NextRequest) {
   try {
@@ -33,11 +34,16 @@ export async function POST(request: NextRequest) {
       expiresAt,
     })
 
+    // Send email with phone verification code
+    const emailSent = await sendPhoneVerificationEmail(user.email, phone, otp)
+
     return NextResponse.json({
       success: true,
-      message: `تم إرسال رمز التحقق إلى بريدك الإلكتروني ${user.email} للتحقق من رقم الهاتف`,
+      message: emailSent 
+        ? `تم إرسال رمز التحقق إلى بريدك الإلكتروني ${user.email} للتحقق من رقم الهاتف` 
+        : `تم إنشاء رمز التحقق - تحقق من بريدك ${user.email} (وضع التطوير)`,
       otpId: userId,
-      otp, // For testing only
+      otp, // For testing only - remove in production
     })
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : 'حدث خطأ'
