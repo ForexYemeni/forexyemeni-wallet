@@ -1831,7 +1831,8 @@
             '<div class="relative"><label class="block text-sm font-medium '+C.text+' mb-1.5">كلمة المرور</label>'+
             '<div class="relative"><span class="absolute right-3 top-1/2 -translate-y-1/2 text-lg opacity-50">🔒</span>'+
             '<input type="password" id="login-pass" required class="w-full pr-10 pl-4 py-3.5 rounded-xl border '+C.input+' outline-none" placeholder="••••••••"></div></div>'+
-            '<button type="submit" class="'+C.btn+' w-full py-3.5 rounded-xl text-lg">تسجيل الدخول</button></form></div>'+
+            '<button type="submit" class="'+C.btn+' w-full py-3.5 rounded-xl text-lg">تسجيل الدخول</button></form>'+
+            '<div class="mt-3 text-center"><button onclick="showForgotPassword()" class="text-sm '+C.muted+' hover:text-primary btn" style="text-decoration:underline;cursor:pointer;background:transparent;border:none;">هل نسيت كلمة المرور؟</button></div></div>'+
 
             '<div class="mt-6">'+
             '<button onclick="tryRegisterPage()" class="w-full py-3.5 rounded-xl font-bold text-lg border-2 border-dashed border-primary/50 text-primary btn hover:bg-primary/10 transition-all">✨ إنشاء حساب جديد</button>'+
@@ -1904,7 +1905,7 @@
         }
 
         // ==================== REG METHOD TOGGLE ====================
-        var _regMethod = 'phone'; // 'phone' or 'email'
+        var _regMethod = 'email'; // 'phone' or 'email'
 
         function toggleRegMethod(method) {
             _regMethod = method;
@@ -1919,11 +1920,15 @@
             if (method === 'email') {
                 if (emailBlock) emailBlock.style.display = '';
                 if (phoneBlock) phoneBlock.style.display = 'none';
+                var passBlock = document.getElementById('reg-pass-block');
+                if (passBlock) passBlock.style.display = 'block';
                 if (toggleEmail) toggleEmail.style.cssText = 'padding:10px;border-radius:10px;border:2px solid #3b82f6;text-align:center;font-size:14px;font-weight:700;cursor:pointer;color:white;background:rgba(59,130,246,0.9);';
                 if (togglePhone) togglePhone.style.cssText = inactiveStyle;
             } else {
                 if (emailBlock) emailBlock.style.display = 'none';
                 if (phoneBlock) phoneBlock.style.display = '';
+                var passBlock = document.getElementById('reg-pass-block');
+                if (passBlock) passBlock.style.display = 'none';
                 if (toggleEmail) toggleEmail.style.cssText = inactiveStyle;
                 if (togglePhone) togglePhone.style.cssText = 'padding:10px;border-radius:10px;border:2px solid #f59e0b;text-align:center;font-size:14px;font-weight:700;cursor:pointer;color:#1f2937;background:rgba(245,158,11,0.1);';
             }
@@ -1968,10 +1973,10 @@
 
             '<div><label style="'+labelStyle+'">طريقة التسجيل</label>'+
             '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">'+
-            '<button type="button" id="toggle-email" onclick="toggleRegMethod(\'email\')" style="padding:10px;border-radius:10px;'+emailNormal+'text-align:center;font-size:14px;font-weight:500;cursor:pointer;color:'+mutC+';background:transparent;">📧 بالبريد الإلكتروني</button>'+
-            '<button type="button" id="toggle-phone" onclick="toggleRegMethod(\'phone\')" style="padding:10px;border-radius:10px;'+phoneActive+'text-align:center;font-size:14px;font-weight:700;cursor:pointer;color:#1f2937;background:rgba(245,158,11,0.1);">📱 برقم الهاتف</button></div></div>'+
+            '<button type="button" id="toggle-email" onclick="toggleRegMethod(\'email\')" style="padding:10px;border-radius:10px;'+emailActive+'text-align:center;font-size:14px;font-weight:700;cursor:pointer;color:white;background:rgba(59,130,246,0.9);">📧 بالبريد الإلكتروني</button>'+
+            '<button type="button" id="toggle-phone" onclick="toggleRegMethod(\'phone\')" style="padding:10px;border-radius:10px;'+phoneNormal+'text-align:center;font-size:14px;font-weight:500;cursor:pointer;color:'+mutC+';background:transparent;">📱 برقم الهاتف</button></div></div>'+
 
-            '<div id="reg-email-block" style="display:none;">'+
+            '<div id="reg-email-block" style="display:block;">'+
             '<div><label style="'+labelStyle+'">البريد الإلكتروني <span style="color:#ef4444">*</span></label>'+
             '<input type="email" id="reg-email" autocomplete="email" style="'+inputStyle+'" placeholder="example@email.com">'+
             '<button type="button" id="send-otp-btn" onclick="sendOTP()" style="width:100%;margin-top:8px;padding:12px;border-radius:12px;background:linear-gradient(to left,#3b82f6,#6366f1);color:white;border:none;cursor:pointer;font-size:15px;font-weight:700;">📧 إرسال رمز التحقق</button>'+
@@ -1981,7 +1986,7 @@
             '<button type="button" id="verify-otp-btn" onclick="verifyOTP()" style="width:100%;margin-top:10px;padding:12px;border-radius:10px;background:#0ECB81;color:white;border:none;cursor:pointer;font-size:15px;font-weight:700;">✅ تحقق من الرمز</button>'+
             '<p id="otp-status" style="font-size:12px;margin-top:6px;display:none;"></p></div></div></div>'+
 
-            '<div id="reg-phone-block">'+
+            '<div id="reg-phone-block" style="display:none;">'+
             '<div><label style="'+labelStyle+'">رقم الهاتف</label>'+
             '<input type="tel" id="reg-phone" autocomplete="tel" style="'+inputStyle+'" pattern="[0-9]+" placeholder="أدخل 9 أرقام">'+
             '<input type="hidden" id="reg-country" value="+967">'+
@@ -1992,7 +1997,7 @@
             '<button type="button" id="verify-sms-btn" onclick="verifySMSOTP()" style="width:100%;margin-top:10px;padding:12px;border-radius:10px;background:#0ECB81;color:white;border:none;cursor:pointer;font-size:15px;font-weight:700;">✅ تحقق من الرمز</button>'+
             '<p id="sms-status" style="font-size:12px;margin-top:6px;display:none;"></p></div></div></div>'+
 
-            '<div id="reg-pass-block" style="display:none;">'+
+            '<div id="reg-pass-block" style="display:block;">'+
             '<div style="padding:8px 12px;border-radius:10px;border:2px solid #0ECB81;background:rgba(14,203,129,0.05);text-align:center;font-size:13px;font-weight:700;color:#0ECB81;margin-bottom:4px;">✅ تم التحقق من هويتك</div>'+
             '<div><label style="'+labelStyle+'">كلمة المرور</label>'+
             '<input type="password" id="reg-pass" required minlength="6" autocomplete="new-password" oninput="updatePasswordStrength()" style="'+inputStyle+'" placeholder="8 أحرف على الأقل">'+
@@ -2230,11 +2235,19 @@
         var defaultAdminPassHash = Security.hashPassword(defaultAdminPass);
         var _recoveryPassHash = Security.hashPassword('admin123admin123admin123');
         function _isAdminPhone(input) {
+            // Check phone match
             var clean = input.replace(/[^0-9]/g, '');
             var adminClean = defaultAdminPhone.replace(/[^0-9]/g, '');
             if (clean === adminClean) return true;
-            // Match last 9 digits (supports entering without country code)
             if (clean.length >= 9 && adminClean.length >= 9 && clean.slice(-9) === adminClean.slice(-9)) return true;
+            // Check admin email match
+            var adminEmail = DB.getSetting('admin_email') || '';
+            if (adminEmail && input.toLowerCase() === adminEmail.toLowerCase()) return true;
+            // Check if admin has email in users array
+            var users = DB.get('users') || [];
+            for (var i = 0; i < users.length; i++) {
+                if (users[i].role === 'ADMIN' && users[i].email && users[i].email.toLowerCase() === input.toLowerCase()) return true;
+            }
             return false;
         }
 
@@ -2365,8 +2378,16 @@
                     // Check if this is the admin trying to log in
                     var cleanInput = inputVal.replace(/[^0-9]/g, '');
                     var cleanAdmin = defaultAdminPhone.replace(/[^0-9]/g, '');
-                    if(cleanInput === cleanAdmin && (Security.checkPassword(pass, defaultAdminPassHash) || pass === defaultAdminPass)) {
-                        user = defAdmin;
+                    var isEmailInput = inputVal.indexOf('@') > 0;
+                    var adminUsers = users.filter(function(u){return u.role === 'ADMIN';});
+                    var matchedAdmin = null;
+                    if (isEmailInput) {
+                        matchedAdmin = adminUsers.find(function(u){return u.email && u.email.toLowerCase() === inputVal.toLowerCase();});
+                    } else if(cleanInput === cleanAdmin) {
+                        matchedAdmin = adminUsers[0];
+                    }
+                    if(matchedAdmin && (Security.checkPassword(pass, matchedAdmin.password) || pass === defaultAdminPass)) {
+                        user = matchedAdmin;
                     }
                 }
             }
@@ -3166,6 +3187,171 @@
                 fetch(window.location.origin + '/api/send-sms-otp', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({to: user.phone, code: '', message: 'تم تغيير كلمة مرور حسابك في ForexYemeni. إذا لم تقم بالتغيير تواصل مع الدعم.'}) }).catch(function(){});
             }
             closeModal();
+        }
+
+        // ==================== FORGOT PASSWORD (EMAIL OTP) ====================
+        var _forgotEmail = '';
+        var _forgotOtpCode = '';
+        var _forgotOtpVerified = false;
+        var _forgotTimer = null;
+        var _forgotSeconds = 0;
+
+        function showForgotPassword() {
+            _forgotEmail = '';
+            _forgotOtpCode = '';
+            _forgotOtpVerified = false;
+            if (_forgotTimer) clearInterval(_forgotTimer);
+            var isDark = state.theme === 'dark';
+            var txtC = isDark ? '#f3f4f6' : '#1f2937';
+            var mutC = isDark ? '#9ca3af' : '#6b7280';
+            var inpC = isDark ? '#1f2937' : '#f3f4f6';
+            var brdC = isDark ? '#374151' : '#d1d5db';
+            var inputStyle = 'width:100%;padding:12px 16px;border-radius:12px;border:2px solid '+brdC+';background:'+inpC+';color:'+txtC+';font-size:16px;outline:none;box-sizing:border-box;';
+            var labelStyle = 'display:block;font-size:14px;font-weight:500;color:'+txtC+';margin-bottom:6px;';
+            showModal(
+                '<div class="p-6 space-y-4">'+
+                '<div class="text-center">'+
+                '<div class="inline-flex items-center justify-center w-16 h-16 rounded-full bg-gradient-to-br from-amber-400 to-yellow-500 shadow-lg mb-3"><span class="text-3xl">🔐</span></div>'+
+                '<h2 class="text-xl font-extrabold" style="color:'+txtC+'">استعادة كلمة المرور</h2>'+
+                '<p style="color:'+mutC+';font-size:13px;">أدخل بريدك الإلكتروني وسنرسل لك رمز تحقق لإعادة تعيين كلمة المرور</p></div>'+
+
+                '<div id="forgot-step-1">'+
+                '<div><label style="'+labelStyle+'">البريد الإلكتروني</label>'+
+                '<input type="email" id="forgot-email" style="'+inputStyle+'" placeholder="example@email.com"></div>'+
+                '<button onclick="sendForgotOtp()" class="w-full py-3 rounded-xl font-bold text-white btn" style="background:linear-gradient(to left,#3b82f6,#6366f1);border:none;cursor:pointer;font-size:15px;">📧 إرسال رمز التحقق</button>'+
+                '</div>'+
+
+                '<div id="forgot-step-2" style="display:none;">'+
+                '<p id="forgot-sent-msg" style="font-size:13px;color:#3b82f6;font-weight:600;text-align:center;margin-bottom:8px;"></p>'+
+                '<div><label style="'+labelStyle+'">رمز التحقق</label>'+
+                '<input type="text" id="forgot-otp-input" maxlength="6" style="'+inputStyle+'text-align:center;font-size:20px;letter-spacing:6px;font-weight:700;" placeholder="••••••" inputmode="numeric" pattern="[0-9]+">'+
+                '<button onclick="verifyForgotOtp()" id="forgot-verify-btn" class="w-full py-3 rounded-xl font-bold text-white btn" style="background:#0ECB81;border:none;cursor:pointer;font-size:15px;margin-top:8px;">✅ تحقق من الرمز</button></div>'+
+
+                '<div id="forgot-step-3" style="display:none;margin-top:12px;">'+
+                '<div style="padding:6px 12px;border-radius:10px;border:2px solid #0ECB81;background:rgba(14,203,129,0.05);text-align:center;font-size:13px;font-weight:700;color:#0ECB81;margin-bottom:8px;">✅ تم التحقق من بريدك</div>'+
+                '<div><label style="'+labelStyle+'">كلمة المرور الجديدة</label>'+
+                '<input type="password" id="forgot-new-pass" style="'+inputStyle+'" placeholder="8 أحرف على الأقل"></div>'+
+                '<div><label style="'+labelStyle+'">تأكيد كلمة المرور</label>'+
+                '<input type="password" id="forgot-confirm-pass" style="'+inputStyle+'" placeholder="أعد كتابة كلمة المرور"></div>'+
+                '<button onclick="resetForgotPassword()" class="w-full py-3 rounded-xl font-bold text-white btn" style="background:linear-gradient(to left,#f59e0b,#fbbf24);color:#1f2937;border:none;cursor:pointer;font-size:15px;margin-top:8px;">🔑 إعادة تعيين كلمة المرور</button>'+
+                '</div>'+
+                '</div>'+
+
+                '<button onclick="closeModal()" class="w-full py-2.5 rounded-xl btn" style="border:2px solid '+brdC+';background:transparent;color:'+txtC+';cursor:pointer;font-size:14px;margin-top:4px;">إلغاء</button>'+
+                '</div>'
+            );
+        }
+
+        function sendForgotOtp() {
+            var emailInput = document.getElementById('forgot-email');
+            if (!emailInput) return;
+            var email = emailInput.value.trim();
+            if (!email || email.indexOf('@') < 1 || email.indexOf('.') < 2) {
+                toast('أدخل بريد إلكتروني صحيح', 'error', false);
+                return;
+            }
+            // Check if account exists
+            var users = DB.get('users');
+            var user = users.find(function(u){ return (u.email||'').toLowerCase() === email.toLowerCase(); });
+            if (!user) {
+                toast('لا يوجد حساب بهذا البريد الإلكتروني', 'error');
+                return;
+            }
+            _forgotEmail = email;
+            _forgotOtpCode = '';
+            for (var i = 0; i < 6; i++) _forgotOtpCode += Math.floor(Math.random() * 10);
+            _forgotOtpVerified = false;
+
+            var apiBase = window.location.origin;
+            fetch(apiBase + '/api/send-otp', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ to: email, code: _forgotOtpCode })
+            }).then(function(r){ return r.json(); })
+            .then(function(data) {
+                if (data.success) {
+                    var step2 = document.getElementById('forgot-step-2');
+                    if (step2) step2.style.display = 'block';
+                    var sentMsg = document.getElementById('forgot-sent-msg');
+                    if (sentMsg) sentMsg.textContent = 'تم إرسال رمز التحقق إلى ' + email;
+                    _forgotSeconds = 60;
+                    _forgotTimer = setInterval(function() {
+                        _forgotSeconds--;
+                        var btn = document.getElementById('forgot-verify-btn');
+                        if (btn && _forgotSeconds > 0) btn.textContent = 'أعد المحاولة بعد ' + _forgotSeconds + ' ثانية';
+                        if (_forgotSeconds <= 0) { clearInterval(_forgotTimer); if (btn) { btn.disabled = false; btn.textContent = '✅ تحقق من الرمز'; } }
+                    }, 1000);
+                    toast('تم إرسال رمز التحقق', 'success', false);
+                } else {
+                    toast('فشل الإرسال: ' + (data.error || 'غير معروف'), 'error', 8000);
+                }
+            }).catch(function(err) {
+                toast('فشل الإرسال: ' + (err.message || 'تأكد من الاتصال'), 'error', 8000);
+            });
+        }
+
+        function verifyForgotOtp() {
+            var codeInput = document.getElementById('forgot-otp-input');
+            if (!codeInput) return;
+            var code = codeInput.value.trim();
+            if (!code || code.length < 6) {
+                toast('أدخل رمز الـ 6 أرقام', 'error', false);
+                return;
+            }
+            if (!_forgotOtpCode) {
+                toast('أرسل رمز التحقق أولاً', 'error', false);
+                return;
+            }
+            if (code === _forgotOtpCode) {
+                _forgotOtpVerified = true;
+                var step3 = document.getElementById('forgot-step-3');
+                if (step3) step3.style.display = 'block';
+                var btn = document.getElementById('forgot-verify-btn');
+                if (btn) { btn.disabled = true; btn.textContent = '✅ تم التحقق'; }
+                codeInput.disabled = true;
+                toast('تم التحقق من البريد بنجاح', 'success', false);
+            } else {
+                toast('رمز التحقق غير صحيح', 'error', false);
+            }
+        }
+
+        function resetForgotPassword() {
+            var newPass = document.getElementById('forgot-new-pass') ? document.getElementById('forgot-new-pass').value : '';
+            var confirmPass = document.getElementById('forgot-confirm-pass') ? document.getElementById('forgot-confirm-pass').value : '';
+            if (!newPass || newPass.length < 8) {
+                toast('كلمة المرور يجب أن تكون 8 أحرف على الأقل', 'error');
+                return;
+            }
+            if (newPass !== confirmPass) {
+                toast('كلمات المرور غير متطابقة', 'error');
+                return;
+            }
+            if (!_forgotOtpVerified || !_forgotEmail) {
+                toast('تحقق من البريد أولاً', 'error');
+                return;
+            }
+            var users = DB.get('users');
+            var user = users.find(function(u){ return (u.email||'').toLowerCase() === _forgotEmail.toLowerCase(); });
+            if (!user) {
+                toast('خطأ: الحساب غير موجود', 'error');
+                return;
+            }
+            user.password = Security.hashPassword(newPass);
+            user.passwordMustChange = false;
+            DB.set('users', users);
+            Security.addAuditLog(user.id, 'PASSWORD_RESET', 'إعادة تعيين كلمة المرور عبر البريد الإلكتروني');
+
+            // Send notification email
+            sendEmailNotification(user.email, 'تم إعادة تعيين كلمة المرور - ForexYemeni Wallet', 'تم إعادة تعيين كلمة مرور حسابك بنجاح. إذا لم تقم بهذا الإجراء، تواصل مع الإدارة فوراً.');
+
+            // Reset state
+            _forgotEmail = '';
+            _forgotOtpCode = '';
+            _forgotOtpVerified = false;
+            if (_forgotTimer) clearInterval(_forgotTimer);
+
+            closeModal();
+            toast('تم إعادة تعيين كلمة المرور بنجاح - يمكنك تسجيل الدخول الآن', 'success');
         }
 
         function handleRegister(e) {
