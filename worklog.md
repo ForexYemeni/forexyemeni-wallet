@@ -106,3 +106,30 @@ Implement withdrawal methods so users see them the same way as deposit methods. 
 #### Git Commit
 - Committed and pushed as `v1.2: إضافة طرق سحب للمستخدمين بنفس نظام الإيداع`
 - 6 files changed, 384 insertions(+), 87 deletions(-)
+
+---
+## Task ID: hotfix-1 - Client-Side Error Fix
+
+### Work Task
+Fix "Application error: a client-side exception has occurred" on forexyemeni-wallet.vercel.app after v1.5 deployment.
+
+### Work Summary
+
+#### Issues Found & Fixed:
+1. **Missing `animate-scale-in` CSS animation** - The class was used in AdminPanel and WithdrawForm but never defined in globals.css. Added `@keyframes scaleIn` and `.animate-scale-in` class.
+
+2. **Unsafe `JSON.parse` on permissions** - In login route, `JSON.parse(u.permissions)` would crash if `u.permissions` was an object instead of a string (could happen if Firestore auto-parses). Created safe `parsePermissions()` helper with try-catch that handles strings, objects, and null/undefined.
+
+3. **`useEffect` dependency on derived variable** - AdminPanel used `effectiveActiveTab` (a computed value) in useEffect dependency array, which could cause unexpected re-renders. Changed to use `activeTab` state directly.
+
+4. **Navigation missing for promoted users** - Sidebar and BottomNav only checked `user?.role === 'admin'` to show admin tab. Promoted users (with permissions but potentially different role) wouldn't see the admin navigation. Added `isAdmin` check that also considers permissions.
+
+### Files Changed:
+- `src/app/globals.css` - Added scaleIn animation
+- `src/app/api/auth/login/route.ts` - Safe permissions parsing
+- `src/components/admin/AdminPanel.tsx` - Fixed useEffect dependency
+- `src/components/layout/Sidebar.tsx` - Show admin tab for promoted users
+- `src/components/layout/BottomNav.tsx` - Show admin tab for promoted users
+
+### Git Commit
+- Committed and pushed as `hotfix: إصلاح خطأ العميل`
