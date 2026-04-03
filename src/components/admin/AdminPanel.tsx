@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useAuthStore } from '@/lib/store'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
@@ -40,6 +40,8 @@ import {
   Copy,
   Check as CheckIcon,
   Settings,
+  Upload,
+  ImageOff,
 } from 'lucide-react'
 
 // ===================== TYPES =====================
@@ -66,6 +68,7 @@ interface AdminDeposit {
   txId: string | null
   status: string
   createdAt: string
+  screenshot?: string | null
   user: { id: string; email: string; fullName: string | null }
 }
 
@@ -78,6 +81,9 @@ interface AdminWithdrawal {
   network: string
   status: string
   createdAt: string
+  screenshot?: string | null
+  adminNote?: string | null
+  paymentMethodName?: string | null
   user: { id: string; email: string; fullName: string | null; phone: string | null }
 }
 
@@ -87,6 +93,7 @@ interface KYCRecordItem {
   fileUrl: string
   status: string
   userId: string
+  notes?: string | null
   user: { id: string; email: string; fullName: string | null; phone: string | null }
 }
 
@@ -114,13 +121,6 @@ const ROLE_LABELS: Record<string, string> = {
   moderator: 'مشرف',
   kyc_manager: 'مدير تحقق',
   finance_manager: 'مدير مالي',
-}
-
-const ROLE_DESCRIPTIONS: Record<string, string> = {
-  admin: 'صلاحية كاملة على كل شيء',
-  moderator: 'إدارة المستخدمين والتحقق فقط',
-  kyc_manager: 'الموافقة على الهويات فقط',
-  finance_manager: 'الموافقة على الإيداعات والسحوبات فقط',
 }
 
 // ===================== MAIN COMPONENT =====================
@@ -152,12 +152,21 @@ export default function AdminPanel() {
   const [rejectDialog, setRejectDialog] = useState<{ withdrawalId: string; amount: number } | null>(null)
   const [rejectReason, setRejectReason] = useState('')
   const [rejectLoading, setRejectLoading] = useState(false)
+  // KYC rejection dialog
+  const [kycRejectDialog, setKycRejectDialog] = useState<{ recordId: string; userId: string } | null>(null)
+  const [kycRejectReason, setKycRejectReason] = useState('')
+  const [kycRejectLoading, setKycRejectLoading] = useState(false)
   // Device management dialog state
   const [deviceDialogUser, setDeviceDialogUser] = useState<AdminUser | null>(null)
   const [deviceList, setDeviceList] = useState<any[]>([])
+  const [pendingDevice, setPendingDevice] = useState<any>(null)
   const [deviceLoading, setDeviceLoading] = useState(false)
-  const [newDeviceFingerprint, setNewDeviceFingerprint] = useState('')
-  const [newDeviceName, setNewDeviceName] = useState('')
+  // Withdrawal payment proof upload
+  const [proofDialogWithdrawal, setProofDialogWithdrawal] = useState<AdminWithdrawal | null>(null)
+  const proofInputRef = useRef<HTMLInputElement>(null)
+  const [proofLoading, setProofLoading] = useState(false)
+  // Full image preview
+  const [previewImage, setPreviewImage] = useState<string | null>(null)
 
   useEffect(() => {
     if (user?.role === 'admin' || (user?.permissions && Object.values(user.permissions).some(v => v))) {
@@ -182,18 +191,16 @@ export default function AdminPanel() {
       if (depositsData.success) setDeposits(depositsData.deposits || [])
       if (withdrawalsData.success) setWithdrawals(withdrawalsData.withdrawals || [])
       if (kycData.success) setKycRecords(kycData.kycRecords || [])
-    // Fetch payment methods separately
-    const pmRes = await fetch('/api/admin/payment-methods')
-    const pmData = await pmRes.json()
-    if (pmData.success) setPaymentMethods(pmData.methods || [])
-    // Fetch admin settings if full admin
-    if (user?.role === 'admin' && !user.permissions) {
-      try {
-        const asRes = await fetch(`/api/admin/settings?userId=${user.id}`)
-        const asData = await asRes.json()
-        if (asData.success) setAdminSettings(asData.settings)
-      } catch { /* silent */ }
-    }
+      const pmRes = await fetch('/api/admin/payment-methods')
+      const pmData = await pmRes.json()
+      if (pmData.success) setPaymentMethods(pmData.methods || [])
+      if (user?.role === 'admin' && !user.permissions) {
+        try {
+          const asRes = await fetch(`/api/admin/settings?userId=${user.id}`)
+          const asData = await asRes.json()
+          if (asData.success) setAdminSettings(asData.settings)
+        } catch { /* silent */ }
+      }
     } catch {
       toast.error('خطأ في تحميل البيانات')
     } finally {
@@ -211,7 +218,11 @@ export default function AdminPanel() {
       })
       const data = await res.json()
       if (data.success) {
-        toast.success(status === 'confirmed' ? 'تم تأكيد الإيداع' : 'تم رفض الإيداع')
+        toast.success(
+          status === 'confirmed' ? 'تم تأكيد الإيداع' :
+          status === 'reviewing' ? 'تم تحويل للمراجعة' :
+          'تم رفض الإيداع'
+        )
         fetchAll()
       } else {
         toast.error(data.message)
@@ -245,17 +256,18 @@ export default function AdminPanel() {
     }
   }
 
-  const handleUpdateKYC = async (recordId: string, status: string, userId: string) => {
+  const handleUpdateKYC = async (recordId: string, status: string, userId: string, adminNote?: string) => {
     setActionLoading(recordId)
     try {
       const res = await fetch('/api/admin/kyc', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ recordId, status, userId }),
+        body: JSON.stringify({ recordId, status, userId, adminNote }),
       })
       const data = await res.json()
       if (data.success) {
         toast.success(status === 'approved' ? 'تم قبول المستند' : 'تم رفض المستند')
+        if (kycRejectDialog) setKycRejectDialog(null)
         fetchAll()
       } else {
         toast.error(data.message)
@@ -289,7 +301,7 @@ export default function AdminPanel() {
     }
   }
 
-  const handleRoleChange = (targetUser: AdminUser, newRole: string) => {
+  const handleRoleChange = (targetUser: AdminUser, _newRole: string) => {
     setRoleDialogUser(targetUser)
     setSelectedPermissions(DEFAULT_PERMISSIONS)
   }
@@ -464,21 +476,21 @@ export default function AdminPanel() {
       const data = await res.json()
       if (data.success) {
         setDeviceList(data.devices || [])
+        setPendingDevice(data.pendingDevice || null)
       } else {
         setDeviceList([])
+        setPendingDevice(null)
       }
     } catch {
       setDeviceList([])
+      setPendingDevice(null)
     } finally {
       setDeviceLoading(false)
     }
   }
 
   const handleAuthorizeDevice = async () => {
-    if (!deviceDialogUser || !newDeviceFingerprint.trim()) {
-      toast.error('يرجى إدخال بصمة الجهاز الجديد')
-      return
-    }
+    if (!deviceDialogUser) return
     setDeviceLoading(true)
     try {
       const res = await fetch('/api/admin/devices', {
@@ -488,15 +500,12 @@ export default function AdminPanel() {
           adminId: user?.id,
           targetUserId: deviceDialogUser.id,
           action: 'authorize',
-          fingerprint: newDeviceFingerprint.trim(),
-          deviceName: newDeviceName.trim() || 'جهاز مصرح به',
         }),
       })
       const data = await res.json()
       if (data.success) {
         toast.success(data.message)
-        setNewDeviceFingerprint('')
-        setNewDeviceName('')
+        setPendingDevice(null)
         openDeviceDialog(deviceDialogUser) // Refresh list
       } else {
         toast.error(data.message)
@@ -521,6 +530,7 @@ export default function AdminPanel() {
       if (data.success) {
         toast.success(data.message)
         setDeviceList([])
+        setPendingDevice(null)
       } else {
         toast.error(data.message)
       }
@@ -531,32 +541,70 @@ export default function AdminPanel() {
     }
   }
 
-  // Determine if user has specific permissions (is a promoted user, not full admin)
+  // ===== WITHDRAWAL PAYMENT PROOF =====
+  const openProofDialog = (w: AdminWithdrawal) => {
+    setProofDialogWithdrawal(w)
+  }
+
+  const handleUploadProof = async () => {
+    if (!proofDialogWithdrawal || !proofInputRef.current?.files?.[0]) return
+    setProofLoading(true)
+    try {
+      const file = proofInputRef.current.files[0]
+      const reader = new FileReader()
+      const base64Promise = new Promise<string>((resolve) => {
+        reader.onload = () => resolve(reader.result as string)
+        reader.readAsDataURL(file)
+      })
+      const screenshotBase64 = await base64Promise
+
+      const res = await fetch('/api/admin/withdrawals', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          withdrawalId: proofDialogWithdrawal.id,
+          status: 'processing',
+          screenshot: screenshotBase64,
+        }),
+      })
+      const data = await res.json()
+      if (data.success) {
+        toast.success('تم رفع إثبات الدفع بنجاح')
+        setProofDialogWithdrawal(null)
+        fetchAll()
+      } else {
+        toast.error(data.message)
+      }
+    } catch {
+      toast.error('خطأ في رفع الصورة')
+    } finally {
+      setProofLoading(false)
+    }
+  }
+
+  // Determine if user has specific permissions
   const hasPermissions = user?.permissions && Object.keys(user.permissions).length > 0
 
   const allTabs = [
     { key: 'users' as const, label: 'المستخدمون', icon: Users, count: users.length, perm: 'manageUsers' as const },
-    { key: 'deposits' as const, label: 'الإيداعات', icon: ArrowDownLeft, count: deposits.filter(d => d.status === 'pending').length, perm: 'approveDeposits' as const },
-    { key: 'withdrawals' as const, label: 'السحوبات', icon: ArrowUpRight, count: withdrawals.filter(w => w.status === 'pending').length, perm: 'approveWithdrawals' as const },
+    { key: 'deposits' as const, label: 'الإيداعات', icon: ArrowDownLeft, count: deposits.filter(d => d.status === 'pending' || d.status === 'reviewing').length, perm: 'approveDeposits' as const },
+    { key: 'withdrawals' as const, label: 'السحوبات', icon: ArrowUpRight, count: withdrawals.filter(w => w.status === 'pending' || w.status === 'approved').length, perm: 'approveWithdrawals' as const },
     { key: 'kyc' as const, label: 'التحقق', icon: Shield, count: kycRecords.filter(k => k.status === 'pending').length, perm: 'approveKYC' as const },
     { key: 'payment-methods' as const, label: 'طرق الدفع', icon: CreditCard, count: paymentMethods.filter(p => p.isActive).length, perm: 'manageUsers' as const },
-    // Admin settings tab - only for full admin (no permissions object)
     ...(user?.role === 'admin' && !hasPermissions ? [{ key: 'admin-settings' as const, label: 'إعدادات الإدارة', icon: Settings, count: 0, perm: 'manageSettings' as const }] : []),
   ]
 
-  // Filter tabs based on permissions: full admin sees all, others only see what they have permission for
   const tabs = hasPermissions
     ? allTabs.filter(tab => user.permissions?.[tab.perm])
     : allTabs
 
-  // Set first available tab as default if current tab is not available
   const allowedTabKeys = tabs.map(t => t.key)
   const effectiveActiveTab = allowedTabKeys.includes(activeTab) ? activeTab : allowedTabKeys[0] || 'users'
 
+  // FIX 6: Exclude ALL admin accounts from user list
   const filteredUsers = users
-    // Hide admin accounts from promoted admins
     .filter(u => {
-      if (hasPermissions && u.role === 'admin') return false
+      if (u.role === 'admin') return false
       return true
     })
     .filter(u =>
@@ -575,8 +623,21 @@ export default function AdminPanel() {
     })
   }
 
-  // Allow access for admin role, or any user with permissions
   const canAccess = user?.role === 'admin' || (user?.permissions && Object.values(user.permissions).some(v => v))
+
+  const DEPOSIT_STATUS_MAP: Record<string, { label: string; color: string }> = {
+    pending: { label: 'تم استلام طلبك', color: 'text-yellow-400 bg-yellow-500/10' },
+    reviewing: { label: 'طلبك قيد المراجعة', color: 'text-blue-400 bg-blue-500/10' },
+    confirmed: { label: 'تم التأكيد', color: 'text-green-400 bg-green-500/10' },
+    rejected: { label: 'مرفوض', color: 'text-red-400 bg-red-500/10' },
+  }
+
+  const WITHDRAWAL_STATUS_MAP: Record<string, { label: string; color: string }> = {
+    pending: { label: 'معلق', color: 'text-yellow-400 bg-yellow-500/10' },
+    approved: { label: 'تم قبول السحب - قيد المراجعة', color: 'text-blue-400 bg-blue-500/10' },
+    processing: { label: 'تم السحب', color: 'text-green-400 bg-green-500/10' },
+    rejected: { label: 'مرفوض', color: 'text-red-400 bg-red-500/10' },
+  }
 
   if (!canAccess) {
     return (
@@ -588,7 +649,7 @@ export default function AdminPanel() {
   }
 
   return (
-    <div className="space-y-6 animate-fade-in">
+    <div className="space-y-6 animate-fade-in pb-24">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
@@ -603,22 +664,22 @@ export default function AdminPanel() {
         </div>
       </div>
 
-      {/* Tabs */}
-      <div className={`grid gap-2 ${tabs.length <= 3 ? 'grid-cols-3' : tabs.length === 4 ? 'grid-cols-4' : 'grid-cols-5'}`}>
+      {/* FIX 10: Scrollable horizontal tabs */}
+      <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-none">
         {tabs.map((tab) => (
           <button
             key={tab.key}
             onClick={() => setActiveTab(tab.key)}
-            className={`flex flex-col items-center gap-1 p-3 rounded-xl text-xs transition-all relative ${
+            className={`flex items-center gap-2 px-4 py-3 rounded-xl text-xs transition-all relative whitespace-nowrap flex-shrink-0 ${
               effectiveActiveTab === tab.key
                 ? 'bg-gold/10 text-gold border border-gold/20'
-                : 'text-muted-foreground hover:text-foreground hover:bg-white/5'
+                : 'text-muted-foreground hover:text-foreground hover:bg-white/5 border border-transparent'
             }`}
           >
             <tab.icon className="w-4 h-4" />
             {tab.label}
             {tab.count > 0 && (
-              <span className="absolute -top-1 -left-1 w-5 h-5 bg-gold text-gray-900 text-[10px] font-bold rounded-full flex items-center justify-center">
+              <span className="w-5 h-5 bg-gold text-gray-900 text-[10px] font-bold rounded-full flex items-center justify-center">
                 {tab.count}
               </span>
             )}
@@ -655,25 +716,18 @@ export default function AdminPanel() {
                 <div className="space-y-2 max-h-[600px] overflow-y-auto">
                   {filteredUsers.map((u) => (
                     <div key={u.id} className="glass-card rounded-xl overflow-hidden">
-                      {/* User Header Row */}
                       <div
                         className="p-3 flex items-center justify-between cursor-pointer hover:bg-white/5 transition-colors"
                         onClick={() => setExpandedUserId(expandedUserId === u.id ? null : u.id)}
                       >
                         <div className="flex items-center gap-3">
-                          {/* Avatar */}
                           <div className={`w-10 h-10 rounded-xl flex items-center justify-center text-sm font-bold ${
-                            u.role === 'admin' ? 'bg-gold/20 text-gold' :
-                            u.status === 'active' ? 'bg-green-500/10 text-green-400' :
-                            'bg-red-500/10 text-red-400'
+                            u.status === 'active' ? 'bg-green-500/10 text-green-400' : 'bg-red-500/10 text-red-400'
                           }`}>
                             {(u.fullName || u.email).charAt(0).toUpperCase()}
                           </div>
                           <div>
-                            <div className="flex items-center gap-2">
-                              <p className="text-sm font-medium">{u.fullName || 'بدون اسم'}</p>
-                              {u.role === 'admin' && <Crown className="w-3.5 h-3.5 text-gold" />}
-                            </div>
+                            <p className="text-sm font-medium">{u.fullName || 'بدون اسم'}</p>
                             <p className="text-xs text-muted-foreground flex items-center gap-1" dir="ltr">
                               <Mail className="w-3 h-3" /> {u.email}
                             </p>
@@ -683,18 +737,15 @@ export default function AdminPanel() {
                           <span className={`text-[10px] px-2 py-1 rounded-md font-medium ${
                             u.status === 'active' ? 'bg-green-500/10 text-green-400' : 'bg-red-500/10 text-red-400'
                           }`}>
-                            {u.status === 'active' ? 'نشط' : 'معلق'}
+                            {u.status === 'active' ? 'نشط' : u.status === 'locked_device' ? '🔒 مقفل' : 'معلق'}
                           </span>
                           {expandedUserId === u.id ? <ChevronUp className="w-4 h-4 text-muted-foreground" /> : <ChevronDown className="w-4 h-4 text-muted-foreground" />}
                         </div>
                       </div>
 
-                      {/* Expanded Details */}
                       {expandedUserId === u.id && (
                         <div className="border-t border-white/5 p-4 space-y-4 animate-fade-in">
-                          {/* Info Grid */}
                           <div className="grid grid-cols-2 gap-3">
-                            {/* Email Verified */}
                             <div className="flex items-center gap-2 p-2.5 rounded-lg bg-white/5">
                               <Mail className={`w-4 h-4 ${u.emailVerified ? 'text-green-400' : 'text-muted-foreground'}`} />
                               <div>
@@ -702,7 +753,6 @@ export default function AdminPanel() {
                                 <p className="text-xs font-medium">{u.emailVerified ? 'متحقق ✓' : 'غير متحقق'}</p>
                               </div>
                             </div>
-                            {/* Phone */}
                             <div className="flex items-center gap-2 p-2.5 rounded-lg bg-white/5">
                               <Phone className={`w-4 h-4 ${u.phoneVerified ? 'text-green-400' : u.phone ? 'text-yellow-400' : 'text-muted-foreground'}`} />
                               <div>
@@ -710,7 +760,6 @@ export default function AdminPanel() {
                                 <p className="text-xs font-medium">{u.phone ? (u.phoneVerified ? '+967 ' + u.phone + ' ✓' : '+967 ' + u.phone) : 'غير محدد'}</p>
                               </div>
                             </div>
-                            {/* Balance */}
                             <div className="flex items-center gap-2 p-2.5 rounded-lg bg-white/5">
                               <DollarSign className="w-4 h-4 text-gold" />
                               <div>
@@ -718,7 +767,6 @@ export default function AdminPanel() {
                                 <p className="text-xs font-bold gold-text">{u.balance.toFixed(2)} USDT</p>
                               </div>
                             </div>
-                            {/* KYC Status */}
                             <div className="flex items-center gap-2 p-2.5 rounded-lg bg-white/5">
                               <BadgeCheck className={`w-4 h-4 ${
                                 u.kycStatus === 'approved' ? 'text-green-400' :
@@ -740,7 +788,6 @@ export default function AdminPanel() {
                             </div>
                           </div>
 
-                          {/* Role & Registration Date */}
                           <div className="flex items-center justify-between text-xs text-muted-foreground px-1">
                             <div className="flex items-center gap-2">
                               <Star className="w-3.5 h-3.5" />
@@ -752,9 +799,9 @@ export default function AdminPanel() {
                             </div>
                           </div>
 
-                          {/* Action Buttons - Only for full admin, not for promoted admins */}
+                          {/* FIX 6: Hide action buttons for ALL admin accounts */}
                           {!hasPermissions && (
-                          <div className="grid grid-cols-4 gap-2 pt-2">
+                          <div className="grid grid-cols-3 gap-2 pt-2">
                             {u.status === 'active' ? (
                               <button
                                 onClick={() => handleUpdateUser(u.id, { status: 'suspended' })}
@@ -775,29 +822,19 @@ export default function AdminPanel() {
                               </button>
                             )}
                             <button
-                              onClick={() => handleRoleChange(u)}
-                              disabled={actionLoading === u.id}
-                              className="flex items-center justify-center gap-1 text-xs py-2.5 rounded-lg bg-gold/10 text-gold hover:bg-gold/20 transition-colors font-medium"
-                            >
-                              {actionLoading === u.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Crown className="w-3.5 h-3.5" />}
-                              {u.role === 'admin' ? 'إزالة إدارة' : 'ترقية'}
-                            </button>
-                            <button
                               onClick={() => openDeviceDialog(u)}
                               className="flex items-center justify-center gap-1 text-xs py-2.5 rounded-lg bg-purple-500/10 text-purple-400 hover:bg-purple-500/20 transition-colors font-medium"
                             >
                               <Settings className="w-3.5 h-3.5" />
                               الأجهزة
                             </button>
-                            {u.role !== 'admin' && (
-                              <button
-                                onClick={() => openDeleteDialog(u)}
-                                className="flex items-center justify-center gap-1 text-xs py-2.5 rounded-lg bg-red-600/10 text-red-500 hover:bg-red-600/20 transition-colors font-medium"
-                              >
-                                <Trash2 className="w-3.5 h-3.5" />
-                                حذف
-                              </button>
-                            )}
+                            <button
+                              onClick={() => openDeleteDialog(u)}
+                              className="flex items-center justify-center gap-1 text-xs py-2.5 rounded-lg bg-red-600/10 text-red-500 hover:bg-red-600/20 transition-colors font-medium"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                              حذف
+                            </button>
                           </div>
                           )}
                         </div>
@@ -824,17 +861,36 @@ export default function AdminPanel() {
                       </div>
                       <div className="text-left">
                         <p className="text-sm font-bold gold-text">{d.amount.toFixed(2)} USDT</p>
-                        <span className={`text-xs px-2 py-0.5 rounded-md status-${d.status}`}>
-                          {d.status === 'pending' ? 'معلق' : d.status === 'confirmed' ? 'مؤكد' : 'مرفوض'}
+                        <span className={`text-xs px-2 py-0.5 rounded-md font-medium ${DEPOSIT_STATUS_MAP[d.status]?.color || ''}`}>
+                          {DEPOSIT_STATUS_MAP[d.status]?.label || d.status}
                         </span>
                       </div>
                     </div>
+                    {/* Screenshot */}
+                    {d.screenshot && (
+                      <div className="pt-1">
+                        <button
+                          onClick={() => setPreviewImage(d.screenshot)}
+                          className="rounded-xl overflow-hidden border border-white/10 block"
+                        >
+                          <img src={d.screenshot} alt="إثبات الدفع" className="w-full h-32 object-cover" />
+                        </button>
+                      </div>
+                    )}
+                    {/* Actions */}
                     {d.status === 'pending' && (
                       <div className="flex gap-2 pt-1">
-                        <button onClick={() => handleUpdateDeposit(d.id, 'confirmed')} className="flex-1 flex items-center justify-center gap-1 text-xs py-2 rounded-lg bg-green-500/10 text-green-400 hover:bg-green-500/20 transition-colors">
+                        <button onClick={() => handleUpdateDeposit(d.id, 'reviewing')} disabled={actionLoading === d.id} className="flex-1 flex items-center justify-center gap-1 text-xs py-2 rounded-lg bg-blue-500/10 text-blue-400 hover:bg-blue-500/20 transition-colors font-medium">
+                          <Eye className="w-3 h-3" /> مراجعة
+                        </button>
+                      </div>
+                    )}
+                    {d.status === 'reviewing' && (
+                      <div className="flex gap-2 pt-1">
+                        <button onClick={() => handleUpdateDeposit(d.id, 'confirmed')} disabled={actionLoading === d.id} className="flex-1 flex items-center justify-center gap-1 text-xs py-2 rounded-lg bg-green-500/10 text-green-400 hover:bg-green-500/20 transition-colors font-medium">
                           <Check className="w-3 h-3" /> تأكيد
                         </button>
-                        <button onClick={() => handleUpdateDeposit(d.id, 'rejected')} className="flex-1 flex items-center justify-center gap-1 text-xs py-2 rounded-lg bg-red-500/10 text-red-400 hover:bg-red-500/20 transition-colors">
+                        <button onClick={() => handleUpdateDeposit(d.id, 'rejected')} disabled={actionLoading === d.id} className="flex-1 flex items-center justify-center gap-1 text-xs py-2 rounded-lg bg-red-500/10 text-red-400 hover:bg-red-500/20 transition-colors font-medium">
                           <X className="w-3 h-3" /> رفض
                         </button>
                       </div>
@@ -853,7 +909,6 @@ export default function AdminPanel() {
               ) : (
                 withdrawals.map((w) => (
                   <div key={w.id} className="glass-card rounded-xl overflow-hidden">
-                    {/* Header Row */}
                     <div className="p-4 flex items-center justify-between border-b border-white/5">
                       <div className="flex items-center gap-3">
                         <div className="w-10 h-10 rounded-xl bg-gold/10 flex items-center justify-center text-sm font-bold gold-text">
@@ -866,17 +921,15 @@ export default function AdminPanel() {
                       </div>
                       <div className="text-left">
                         <p className="text-sm font-bold gold-text">{w.amount.toFixed(2)} USDT</p>
-                        <span className={`text-xs px-2 py-0.5 rounded-md status-${w.status === 'approved' || w.status === 'confirmed' ? 'approved' : w.status}`}>
-                          {w.status === 'pending' ? 'معلق' : w.status === 'processing' ? 'قيد المعالجة' : w.status === 'approved' || w.status === 'confirmed' ? 'مقبول' : 'مرفوض'}
+                        <span className={`text-xs px-2 py-0.5 rounded-md font-medium ${WITHDRAWAL_STATUS_MAP[w.status]?.color || ''}`}>
+                          {WITHDRAWAL_STATUS_MAP[w.status]?.label || w.status}
                         </span>
                       </div>
                     </div>
 
-                    {/* Withdrawer Details - Organized & Copyable */}
                     <div className="p-4 space-y-2">
                       <p className="text-xs text-muted-foreground font-medium mb-2">بيانات الساحب:</p>
                       <div className="grid grid-cols-1 gap-1.5">
-                        {/* Name */}
                         {w.user.fullName && (
                           <div className="flex items-center justify-between p-2 rounded-lg bg-white/5 group">
                             <div className="flex items-center gap-2 min-w-0">
@@ -888,7 +941,6 @@ export default function AdminPanel() {
                             </button>
                           </div>
                         )}
-                        {/* Phone */}
                         {w.user.phone && (
                           <div className="flex items-center justify-between p-2 rounded-lg bg-white/5 group">
                             <div className="flex items-center gap-2 min-w-0">
@@ -900,7 +952,6 @@ export default function AdminPanel() {
                             </button>
                           </div>
                         )}
-                        {/* Email */}
                         <div className="flex items-center justify-between p-2 rounded-lg bg-white/5 group">
                           <div className="flex items-center gap-2 min-w-0">
                             <span className="text-[10px] text-muted-foreground flex-shrink-0">البريد</span>
@@ -912,26 +963,24 @@ export default function AdminPanel() {
                         </div>
                       </div>
 
-                      {/* Divider */}
                       <div className="border-t border-white/5 pt-2 mt-2">
                         <p className="text-xs text-muted-foreground font-medium mb-2">بيانات السحب:</p>
                         <div className="grid grid-cols-1 gap-1.5">
-                          {/* Method */}
                           <div className="flex items-center justify-between p-2 rounded-lg bg-white/5">
                             <div className="flex items-center gap-2">
                               <span className="text-[10px] text-muted-foreground">الطريقة</span>
                               <span className="text-xs font-medium">
-                                {w.method === 'crypto' || w.method === 'blockchain' ? 'عملات رقمية' :
-                                 w.method === 'bank_deposit' ? 'إيداع لمحفظة' :
-                                 w.method === 'atm_transfer' ? 'تحويل عبر صراف' :
-                                 w.method === 'bank_transfer' ? 'تحويل بنكي' : w.method}
+                                {w.paymentMethodName ||
+                                 (w.method === 'crypto' || w.method === 'blockchain' ? 'عملات رقمية' :
+                                  w.method === 'bank_deposit' ? 'إيداع لمحفظة' :
+                                  w.method === 'atm_transfer' ? 'تحويل عبر صراف' :
+                                  w.method === 'bank_transfer' ? 'تحويل بنكي' : w.method)}
                               </span>
                             </div>
                             {w.network && (
                               <span className="text-[10px] px-1.5 py-0.5 rounded-md bg-gold/10 text-gold">{w.network}</span>
                             )}
                           </div>
-                          {/* To Address - Copyable (always visible) */}
                           <div className="flex items-center justify-between p-2 rounded-lg bg-white/5 group">
                             <div className="flex-1 min-w-0">
                               <span className="text-[10px] text-muted-foreground block mb-0.5">
@@ -942,16 +991,10 @@ export default function AdminPanel() {
                                 {w.toAddress}
                               </p>
                             </div>
-                            <button
-                              onClick={() => copyWithdrawalAddress(w)}
-                              className="text-gold hover:text-gold-light transition-colors flex-shrink-0 mr-2"
-                            >
-                              {copiedWithdrawalId === w.id
-                                ? <CheckIcon className="w-4 h-4" />
-                                : <Copy className="w-4 h-4" />}
+                            <button onClick={() => copyWithdrawalAddress(w)} className="text-gold hover:text-gold-light transition-colors flex-shrink-0 mr-2">
+                              {copiedWithdrawalId === w.id ? <CheckIcon className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
                             </button>
                           </div>
-                          {/* Fee + Total */}
                           <div className="flex items-center justify-between p-2 rounded-lg bg-white/5 text-xs">
                             <span className="text-muted-foreground">الرسوم: {w.fee.toFixed(2)} USDT</span>
                             <span className="text-muted-foreground">الإجمالي: <strong className="text-foreground">{(w.amount + w.fee).toFixed(2)} USDT</strong></span>
@@ -959,15 +1002,34 @@ export default function AdminPanel() {
                         </div>
                       </div>
 
+                      {/* Payment proof */}
+                      {w.screenshot && (
+                        <div className="pt-2">
+                          <button onClick={() => setPreviewImage(w.screenshot)} className="rounded-xl overflow-hidden border border-white/10 block">
+                            <img src={w.screenshot} alt="إثبات الدفع" className="w-full h-32 object-cover" />
+                          </button>
+                        </div>
+                      )}
+
                       {/* Date */}
                       <div className="text-[10px] text-muted-foreground pt-1">{formatDate(w.createdAt)}</div>
                     </div>
 
-                    {/* Actions */}
+                    {/* Withdrawal Actions */}
                     {w.status === 'pending' && (
                       <div className="flex gap-2 p-4 pt-0">
-                        <button onClick={() => handleUpdateWithdrawal(w.id, 'approved')} className="flex-1 flex items-center justify-center gap-1 text-xs py-2.5 rounded-lg bg-green-500/10 text-green-400 hover:bg-green-500/20 transition-colors font-medium">
-                          <Check className="w-3 h-3" /> قبول
+                        <button onClick={() => handleUpdateWithdrawal(w.id, 'approved')} disabled={actionLoading === w.id} className="flex-1 flex items-center justify-center gap-1 text-xs py-2.5 rounded-lg bg-blue-500/10 text-blue-400 hover:bg-blue-500/20 transition-colors font-medium">
+                          {actionLoading === w.id ? <Loader2 className="w-3 h-3 animate-spin" /> : <Check className="w-3 h-3" />} قبول
+                        </button>
+                        <button onClick={() => openRejectDialog(w)} className="flex-1 flex items-center justify-center gap-1 text-xs py-2.5 rounded-lg bg-red-500/10 text-red-400 hover:bg-red-500/20 transition-colors font-medium">
+                          <X className="w-3 h-3" /> رفض
+                        </button>
+                      </div>
+                    )}
+                    {w.status === 'approved' && (
+                      <div className="flex gap-2 p-4 pt-0">
+                        <button onClick={() => openProofDialog(w)} className="flex-1 flex items-center justify-center gap-1 text-xs py-2.5 rounded-lg bg-gold/10 text-gold hover:bg-gold/20 transition-colors font-medium">
+                          <Upload className="w-3 h-3" /> رفع صورة الدفع
                         </button>
                         <button onClick={() => openRejectDialog(w)} className="flex-1 flex items-center justify-center gap-1 text-xs py-2.5 rounded-lg bg-red-500/10 text-red-400 hover:bg-red-500/20 transition-colors font-medium">
                           <X className="w-3 h-3" /> رفض
@@ -1010,15 +1072,36 @@ export default function AdminPanel() {
                         {k.status === 'pending' ? 'معلق' : k.status === 'approved' ? 'مقبول' : 'مرفوض'}
                       </span>
                     </div>
-                    <div className="rounded-xl overflow-hidden border border-white/10">
-                      <img src={k.fileUrl} alt={k.type} className="w-full h-40 object-cover" />
+                    {/* FIX 3: Image with error handler */}
+                    <div className="rounded-xl overflow-hidden border border-white/10 bg-white/5 relative">
+                      <img
+                        src={k.fileUrl}
+                        alt={k.type}
+                        className="w-full h-40 object-cover"
+                        onError={(e) => {
+                          (e.target as HTMLImageElement).style.display = 'none'
+                          (e.target as HTMLImageElement).nextElementSibling?.classList.remove('hidden')
+                        }}
+                      />
+                      <div className="absolute inset-0 flex items-center justify-center bg-white/5 hidden">
+                        <div className="text-center">
+                          <ImageOff className="w-8 h-8 text-muted-foreground/30 mx-auto mb-1" />
+                          <p className="text-xs text-muted-foreground">فشل تحميل الصورة</p>
+                        </div>
+                      </div>
                     </div>
+                    {/* Notes */}
+                    {k.notes && (
+                      <div className="p-2 rounded-lg bg-yellow-500/5 border border-yellow-500/10 text-xs text-yellow-400">
+                        سبب الرفض: {k.notes}
+                      </div>
+                    )}
                     {k.status === 'pending' && (
                       <div className="flex gap-2">
                         <button onClick={() => handleUpdateKYC(k.id, 'approved', k.userId)} className="flex-1 flex items-center justify-center gap-1 text-xs py-2 rounded-lg bg-green-500/10 text-green-400 hover:bg-green-500/20 transition-colors">
                           <Check className="w-3 h-3" /> قبول
                         </button>
-                        <button onClick={() => handleUpdateKYC(k.id, 'rejected', k.userId)} className="flex-1 flex items-center justify-center gap-1 text-xs py-2 rounded-lg bg-red-500/10 text-red-400 hover:bg-red-500/20 transition-colors">
+                        <button onClick={() => { setKycRejectDialog({ recordId: k.id, userId: k.userId }); setKycRejectReason('') }} className="flex-1 flex items-center justify-center gap-1 text-xs py-2 rounded-lg bg-red-500/10 text-red-400 hover:bg-red-500/20 transition-colors">
                           <X className="w-3 h-3" /> رفض
                         </button>
                       </div>
@@ -1043,12 +1126,25 @@ export default function AdminPanel() {
               <p className="text-sm text-muted-foreground">{deviceDialogUser.fullName || deviceDialogUser.email}</p>
             </div>
 
-            {/* Status */}
             <div className={`p-3 rounded-xl text-xs ${deviceDialogUser.status === 'locked_device' ? 'bg-red-500/5 border border-red-500/10 text-red-400' : 'bg-green-500/5 border border-green-500/10 text-green-400'}`}>
-              {deviceDialogUser.status === 'locked_device' 
-                ? '🔒 الحساب مقفل - يجب تصريح جهاز جديد لفتحه' 
+              {deviceDialogUser.status === 'locked_device'
+                ? '🔒 الحساب مقفل - يجب تصريح جهاز جديد لفتحه'
                 : '✓ الحساب مفتوح'}
             </div>
+
+            {/* Pending Device Info */}
+            {pendingDevice ? (
+              <div className="p-3 rounded-xl bg-yellow-500/5 border border-yellow-500/10 text-xs text-yellow-400 space-y-1">
+                <p className="font-medium">📱 طلب تصريح معلق:</p>
+                <p>الجهاز: {pendingDevice.deviceName || 'جهاز غير معروف'}</p>
+                <p className="text-[10px]" dir="ltr">البصمة: {pendingDevice.fingerprint ? pendingDevice.fingerprint.substring(0, 24) + '...' : 'N/A'}</p>
+                <p className="text-[10px]">الوقت: {pendingDevice.requestedAt ? new Date(pendingDevice.requestedAt).toLocaleDateString('ar-SA') : 'غير معروف'}</p>
+              </div>
+            ) : (
+              <div className="p-3 rounded-xl bg-white/5 border border-white/10 text-xs text-muted-foreground text-center">
+                لا يوجد طلب تصريح معلق. اطلب من المستخدم تسجيل الدخول من الجهاز الجديد أولاً.
+              </div>
+            )}
 
             {/* Current Devices */}
             <div className="space-y-2">
@@ -1073,33 +1169,14 @@ export default function AdminPanel() {
               )}
             </div>
 
-            {/* Authorize New Device */}
+            {/* Authorize/Remove buttons */}
             <div className="space-y-3 border-t border-white/5 pt-4">
-              <p className="text-xs font-medium text-gold">تصريح جهاز جديد:</p>
-              <div className="space-y-2">
-                <Input
-                  value={newDeviceFingerprint}
-                  onChange={(e) => setNewDeviceFingerprint(e.target.value)}
-                  className="glass-input h-9 text-sm font-mono"
-                  placeholder="أدخل بصمة الجهاز الجديد"
-                  dir="ltr"
-                />
-                <Input
-                  value={newDeviceName}
-                  onChange={(e) => setNewDeviceName(e.target.value)}
-                  className="glass-input h-9 text-sm"
-                  placeholder="اسم الجهاز (اختياري)"
-                />
-              </div>
-              <div className="p-2 rounded-lg bg-gold/5 border border-gold/10 text-[10px] text-gold">
-                ⚠️ سيتم إزالة جميع الأجهزة السابقة عند التصريح بالجهاز الجديد
-              </div>
               <button
                 onClick={handleAuthorizeDevice}
-                disabled={deviceLoading || !newDeviceFingerprint.trim()}
+                disabled={deviceLoading || !pendingDevice}
                 className="w-full h-10 gold-gradient text-gray-900 font-bold rounded-xl hover:opacity-90 transition-all text-sm"
               >
-                {deviceLoading ? <Loader2 className="w-4 h-4 animate-spin mx-auto" /> : 'تصريح الجهاز (حذف القديم)'}
+                {deviceLoading ? <Loader2 className="w-4 h-4 animate-spin mx-auto" /> : 'تصريح الجهاز المعلق'}
               </button>
               {deviceList.length > 0 && (
                 <button
@@ -1125,89 +1202,59 @@ export default function AdminPanel() {
       {deleteDialogUser && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={closeDeleteDialog}>
           <div className="glass-card bg-background/95 backdrop-blur-xl border-red-500/20 w-full max-w-sm rounded-2xl p-6 space-y-5 animate-scale-in" onClick={(e) => e.stopPropagation()}>
-            {/* Step 1: Confirm */}
             {deleteStep === 'confirm' && (
               <>
                 <div className="text-center space-y-2">
                   <div className="w-14 h-14 rounded-2xl bg-red-500/10 flex items-center justify-center mx-auto">
-                    <AlertTriangle className="w-7 h-7 text-red-400" />
+                    <Trash2 className="w-7 h-7 text-red-400" />
                   </div>
-                  <h3 className="text-lg font-bold text-red-400">حذف مستخدم</h3>
+                  <h3 className="text-lg font-bold text-red-400">حذف المستخدم</h3>
                   <p className="text-sm text-muted-foreground">
-                    هل أنت متأكد من حذف <strong className="text-foreground">{deleteDialogUser.fullName || deleteDialogUser.email}</strong>؟
+                    {deleteDialogUser.fullName || deleteDialogUser.email}
                   </p>
-                  <p className="text-xs text-red-400/80">سيتم حذف جميع بيانات المستخدم بشكل نهائي ولا يمكن التراجع</p>
                 </div>
-                <div className="flex gap-3">
-                  <button onClick={handleSendDeleteOtp} disabled={deleteLoading} className="flex-1 h-11 bg-red-500 text-white font-bold rounded-xl hover:bg-red-600 transition-all">
-                    {deleteLoading ? <Loader2 className="w-4 h-4 animate-spin mx-auto" /> : 'متابعة'}
-                  </button>
-                  <button onClick={closeDeleteDialog} className="flex-1 h-11 bg-white/10 hover:bg-white/20 text-foreground font-medium rounded-xl transition-all">إلغاء</button>
-                </div>
+                <button onClick={handleSendDeleteOtp} disabled={deleteLoading} className="w-full h-11 bg-red-500 text-white font-bold rounded-xl hover:bg-red-600 transition-all text-sm">
+                  {deleteLoading ? <Loader2 className="w-4 h-4 animate-spin mx-auto" /> : 'التالي'}
+                </button>
+                <button onClick={closeDeleteDialog} className="w-full h-10 bg-white/10 hover:bg-white/20 text-foreground font-medium rounded-xl transition-all text-sm">إلغاء</button>
               </>
             )}
-
-            {/* Step 2: OTP Verification */}
             {deleteStep === 'otp' && (
               <>
                 <div className="text-center space-y-2">
-                  <div className="w-14 h-14 rounded-2xl bg-gold/10 flex items-center justify-center mx-auto">
-                    <Send className="w-7 h-7 text-gold" />
-                  </div>
-                  <h3 className="text-lg font-bold gold-text">التحقق من البريد</h3>
-                  <p className="text-sm text-muted-foreground">
-                    تم إرسال رمز تحقق مكون من 6 أرقام إلى بريدك الإلكتروني
-                  </p>
-                  <p className="text-xs text-muted-foreground" dir="ltr">{user?.email}</p>
+                  <p className="text-sm">أدخل رمز التحقق المرسل إلى بريدك</p>
+                  <Input
+                    value={deleteOtp}
+                    onChange={(e) => setDeleteOtp(e.target.value)}
+                    className="glass-input h-12 text-base text-center tracking-[0.3em] font-mono"
+                    placeholder="000000"
+                    maxLength={6}
+                    dir="ltr"
+                  />
                 </div>
-                <div className="space-y-3">
-                  <div className="space-y-2">
-                    <Label className="text-sm text-muted-foreground">رمز التحقق</Label>
-                    <Input
-                      value={deleteOtp}
-                      onChange={(e) => setDeleteOtp(e.target.value.replace(/\D/g, '').slice(0, 6))}
-                      className="glass-input h-12 text-center text-2xl font-mono tracking-[0.5em]"
-                      placeholder="000000"
-                      maxLength={6}
-                      dir="ltr"
-                    />
-                  </div>
-                  <button onClick={handleVerifyDeleteOtp} disabled={deleteLoading || deleteOtp.length < 6} className="w-full h-11 gold-gradient text-gray-900 font-bold rounded-xl hover:opacity-90 transition-all">
-                    {deleteLoading ? <Loader2 className="w-4 h-4 animate-spin mx-auto" /> : 'تحقق'}
-                  </button>
-                  <button onClick={closeDeleteDialog} className="w-full h-10 bg-white/10 hover:bg-white/20 text-foreground font-medium rounded-xl transition-all text-sm">إلغاء</button>
-                </div>
+                <button onClick={handleVerifyDeleteOtp} disabled={deleteLoading || deleteOtp.length !== 6} className="w-full h-11 bg-red-500 text-white font-bold rounded-xl hover:bg-red-600 transition-all text-sm">
+                  {deleteLoading ? <Loader2 className="w-4 h-4 animate-spin mx-auto" /> : 'تحقق'}
+                </button>
+                <button onClick={closeDeleteDialog} className="w-full h-10 bg-white/10 hover:bg-white/20 text-foreground font-medium rounded-xl transition-all text-sm">إلغاء</button>
               </>
             )}
-
-            {/* Step 3: Password Confirmation */}
             {deleteStep === 'password' && (
               <>
                 <div className="text-center space-y-2">
-                  <div className="w-14 h-14 rounded-2xl bg-red-500/10 flex items-center justify-center mx-auto">
-                    <Lock className="w-7 h-7 text-red-400" />
-                  </div>
-                  <h3 className="text-lg font-bold text-red-400">تأكيد الحذف</h3>
-                  <p className="text-sm text-muted-foreground">
-                    أدخل كلمة المرور لحذف <strong className="text-foreground">{deleteDialogUser.fullName || deleteDialogUser.email}</strong>
-                  </p>
+                  <p className="text-sm">أدخل كلمة المرور للإدارة للتأكيد الحذف</p>
+                  <Input
+                    value={deletePassword}
+                    onChange={(e) => setDeletePassword(e.target.value)}
+                    type="password"
+                    className="glass-input h-12 text-base"
+                    placeholder="أدخل كلمة المرور"
+                    dir="ltr"
+                  />
                 </div>
-                <div className="space-y-3">
-                  <div className="space-y-2">
-                    <Label className="text-sm text-muted-foreground">كلمة المرور</Label>
-                    <Input
-                      type="password"
-                      value={deletePassword}
-                      onChange={(e) => setDeletePassword(e.target.value)}
-                      className="glass-input h-12 text-base"
-                      placeholder="أدخل كلمة المرور"
-                    />
-                  </div>
-                  <button onClick={handleConfirmDelete} disabled={deleteLoading || !deletePassword} className="w-full h-11 bg-red-500 text-white font-bold rounded-xl hover:bg-red-600 transition-all">
-                    {deleteLoading ? <Loader2 className="w-4 h-4 animate-spin mx-auto" /> : 'حذف نهائي'}
-                  </button>
-                  <button onClick={closeDeleteDialog} className="w-full h-10 bg-white/10 hover:bg-white/20 text-foreground font-medium rounded-xl transition-all text-sm">إلغاء</button>
-                </div>
+                <button onClick={handleConfirmDelete} disabled={deleteLoading || !deletePassword} className="w-full h-11 bg-red-500 text-white font-bold rounded-xl hover:bg-red-600 transition-all">
+                  {deleteLoading ? <Loader2 className="w-4 h-4 animate-spin mx-auto" /> : 'حذف نهائي'}
+                </button>
+                <button onClick={closeDeleteDialog} className="w-full h-10 bg-white/10 hover:bg-white/20 text-foreground font-medium rounded-xl transition-all text-sm">إلغاء</button>
               </>
             )}
           </div>
@@ -1230,7 +1277,6 @@ export default function AdminPanel() {
               </p>
             </div>
 
-            {/* Permissions */}
             {roleDialogUser.role !== 'admin' && (
               <div className="space-y-3">
                 <p className="text-xs text-muted-foreground font-medium">اختر الصلاحيات:</p>
@@ -1308,6 +1354,82 @@ export default function AdminPanel() {
           </div>
         </div>
       )}
+
+      {/* ===================== KYC REJECT DIALOG ===================== */}
+      {kycRejectDialog && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={() => setKycRejectDialog(null)}>
+          <div className="glass-card bg-background/95 backdrop-blur-xl border-red-500/20 w-full max-w-sm rounded-2xl p-6 space-y-5 animate-scale-in" onClick={(e) => e.stopPropagation()}>
+            <div className="text-center space-y-2">
+              <div className="w-14 h-14 rounded-2xl bg-red-500/10 flex items-center justify-center mx-auto">
+                <X className="w-7 h-7 text-red-400" />
+              </div>
+              <h3 className="text-lg font-bold text-red-400">رفض المستند</h3>
+            </div>
+            <div className="space-y-3">
+              <div className="space-y-2">
+                <Label className="text-sm text-muted-foreground">سبب الرفض</Label>
+                <textarea
+                  value={kycRejectReason}
+                  onChange={(e) => setKycRejectReason(e.target.value)}
+                  className="w-full h-24 rounded-lg bg-white/5 border border-white/10 px-3 py-2 text-sm text-foreground resize-none"
+                  placeholder="أدخل سبب الرفض..."
+                />
+              </div>
+              <button onClick={() => handleUpdateKYC(kycRejectDialog.recordId, 'rejected', kycRejectDialog.userId, kycRejectReason)} disabled={kycRejectLoading || !kycRejectReason.trim()} className="w-full h-11 bg-red-500 text-white font-bold rounded-xl hover:bg-red-600 transition-all">
+                {kycRejectLoading ? <Loader2 className="w-4 h-4 animate-spin mx-auto" /> : 'تأكيد الرفض'}
+              </button>
+              <button onClick={() => setKycRejectDialog(null)} className="w-full h-10 bg-white/10 hover:bg-white/20 text-foreground font-medium rounded-xl transition-all text-sm">إلغاء</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ===================== PAYMENT PROOF DIALOG ===================== */}
+      {proofDialogWithdrawal && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={() => setProofDialogWithdrawal(null)}>
+          <div className="glass-card bg-background/95 backdrop-blur-xl border-gold/20 w-full max-w-sm rounded-2xl p-6 space-y-5 animate-scale-in" onClick={(e) => e.stopPropagation()}>
+            <div className="text-center space-y-2">
+              <div className="w-14 h-14 rounded-2xl bg-gold/10 flex items-center justify-center mx-auto">
+                <Upload className="w-7 h-7 text-gold" />
+              </div>
+              <h3 className="text-lg font-bold gold-text">رفع صورة الدفع</h3>
+              <p className="text-sm text-muted-foreground">
+                مبلغ: <strong className="text-foreground">{proofDialogWithdrawal.amount.toFixed(2)} USDT</strong>
+              </p>
+            </div>
+            <div className="space-y-3">
+              <div className="flex flex-col items-start gap-2 rounded-xl bg-white/5 border border-white/10 p-3 cursor-pointer hover:border-gold/30 transition-colors">
+                <label className="text-xs text-muted-foreground">صورة إثبات الدفع</label>
+                <input
+                  ref={proofInputRef}
+                  type="file"
+                  accept="image/*"
+                  className="w-full text-sm text-foreground file:mr-2 file:ml-0 file:rounded-lg file:border-0 file:bg-transparent file:text-foreground file:font-medium"
+                />
+              </div>
+              <button onClick={handleUploadProof} disabled={proofLoading} className="w-full h-11 gold-gradient text-gray-900 font-bold rounded-xl hover:opacity-90 transition-all">
+                {proofLoading ? <Loader2 className="w-4 h-4 animate-spin mx-auto" /> : 'رفع الصورة وتأكيد السحب'}
+              </button>
+              <button onClick={() => setProofDialogWithdrawal(null)} className="w-full h-10 bg-white/10 hover:bg-white/20 text-foreground font-medium rounded-xl transition-all text-sm">إلغاء</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ===================== FULL IMAGE PREVIEW ===================== */}
+      {previewImage && (
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-[60] flex items-center justify-center p-4" onClick={() => setPreviewImage(null)}>
+          <div className="relative max-w-lg w-full animate-scale-in">
+            <img src={previewImage} alt="معاينة" className="w-full rounded-xl" onClick={(e) => e.stopPropagation()} />
+            <button
+              onClick={() => setPreviewImage(null)}
+              className="absolute top-3 left-3 w-8 h-8 bg-black/60 rounded-full flex items-center justify-center hover:bg-black/80"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
@@ -1334,24 +1456,25 @@ function PaymentMethodsManager({ methods, onRefresh }: { methods: any[]; onRefre
     network: '', walletAddress: '', accountName: '', accountNumber: '',
     beneficiaryName: '', phone: '', recipientName: '', recipientPhone: '',
     instructions: '', minAmount: '', maxAmount: '',
+    purpose: 'deposit',
   })
 
   const resetForm = () => {
-    setForm({ type: 'bank_deposit', category: 'bank', network: '', walletAddress: '', accountName: '', accountNumber: '', beneficiaryName: '', phone: '', recipientName: '', recipientPhone: '', instructions: '', minAmount: '', maxAmount: '' })
+    setForm({ type: 'bank_deposit', category: 'bank', network: '', walletAddress: '', accountName: '', accountNumber: '', beneficiaryName: '', phone: '', recipientName: '', recipientPhone: '', instructions: '', minAmount: '', maxAmount: '', purpose: 'deposit' })
     setEditMethod(null)
     setShowAdd(false)
   }
 
   const handleEdit = (m: any) => {
     setEditMethod(m)
-    setForm({ type: m.type || 'bank_deposit', category: m.category || 'bank', network: m.network || '', walletAddress: m.walletAddress || '', accountName: m.accountName || '', accountNumber: m.accountNumber || '', beneficiaryName: m.beneficiaryName || '', phone: m.phone || '', recipientName: m.recipientName || '', recipientPhone: m.recipientPhone || '', instructions: m.instructions || '', minAmount: m.minAmount?.toString() || '', maxAmount: m.maxAmount?.toString() || '' })
+    setForm({ type: m.type || 'bank_deposit', category: m.category || 'bank', network: m.network || '', walletAddress: m.walletAddress || '', accountName: m.accountName || '', accountNumber: m.accountNumber || '', beneficiaryName: m.beneficiaryName || '', phone: m.phone || '', recipientName: m.recipientName || '', recipientPhone: m.recipientPhone || '', instructions: m.instructions || '', minAmount: m.minAmount?.toString() || '', maxAmount: m.maxAmount?.toString() || '', purpose: m.purpose || 'deposit' })
     setShowAdd(true)
   }
 
   const handleSave = async () => {
     setLoading(true)
     try {
-      const body: any = { ...form, purpose: 'deposit', isActive: true }
+      const body: any = { ...form, isActive: true }
       if (editMethod) {
         body.action = 'update'; body.id = editMethod.id; body.isActive = editMethod.isActive
       } else {
@@ -1376,7 +1499,7 @@ function PaymentMethodsManager({ methods, onRefresh }: { methods: any[]; onRefre
       })
       const data = await res.json()
       if (data.success) { toast.success(data.message); onRefresh() }
-      else { toast.error(data.message) }
+      else toast.error(data.message)
     } catch { toast.error('خطأ') }
     finally { setLoading(false) }
   }
@@ -1397,9 +1520,7 @@ function PaymentMethodsManager({ methods, onRefresh }: { methods: any[]; onRefre
   const CATEGORY_LABELS: Record<string, string> = { bank: '🏦 بنكي', crypto: '₿ عملات رقمية' }
 
   const getMethodTitle = (m: any) => {
-    if (m.category === 'crypto') {
-      return m.network ? `عملات رقمية - ${m.network}` : 'عملات رقمية'
-    }
+    if (m.category === 'crypto') { return m.network ? `عملات رقمية - ${m.network}` : 'عملات رقمية' }
     return TYPE_LABELS[m.type] || m.type
   }
 
@@ -1439,7 +1560,6 @@ function PaymentMethodsManager({ methods, onRefresh }: { methods: any[]; onRefre
                   </button>
                 </div>
               </div>
-              {/* Details */}
               <div className="text-xs text-muted-foreground space-y-1 border-t border-white/5 pt-2">
                 {m.accountName && <p>اسم المحفظة: <span className="text-foreground">{m.accountName}</span></p>}
                 {m.accountNumber && <p>رقم الحساب: <span className="text-foreground" dir="ltr">{m.accountNumber}</span></p>}
@@ -1459,15 +1579,12 @@ function PaymentMethodsManager({ methods, onRefresh }: { methods: any[]; onRefre
       {showAdd && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-end sm:items-center justify-center p-0 sm:p-4" onClick={resetForm}>
           <div className="glass-card bg-background/95 backdrop-blur-xl border-gold/20 w-full sm:max-w-md sm:rounded-2xl rounded-t-2xl flex flex-col max-h-[80vh] mb-16 sm:mb-0 animate-scale-in" onClick={(e) => e.stopPropagation()}>
-            {/* Dialog Header - Fixed */}
             <div className="p-5 pb-3 border-b border-white/5 flex-shrink-0">
               <h3 className="text-lg font-bold gold-text">{editMethod ? 'تعديل طريقة الدفع' : 'إضافة طريقة دفع جديدة'}</h3>
             </div>
 
-            {/* Dialog Content - Scrollable */}
             <div className="p-5 space-y-4 overflow-y-auto flex-1 min-h-0">
               <div className="space-y-3">
-                {/* Classification + Type */}
                 <div className="grid grid-cols-2 gap-3">
                   <div className="space-y-1">
                     <label className="text-xs text-muted-foreground">التصنيف</label>
@@ -1488,7 +1605,6 @@ function PaymentMethodsManager({ methods, onRefresh }: { methods: any[]; onRefre
                   </div>
                 </div>
 
-                {/* Bank: Deposit fields */}
                 {form.category === 'bank' && form.type === 'bank_deposit' && (
                   <div className="space-y-2 p-3 rounded-lg bg-blue-500/5 border border-blue-500/10">
                     <p className="text-xs text-blue-400 font-medium">بيانات الإيداع البنكي:</p>
@@ -1500,7 +1616,6 @@ function PaymentMethodsManager({ methods, onRefresh }: { methods: any[]; onRefre
                   </div>
                 )}
 
-                {/* Bank: ATM Transfer fields */}
                 {form.category === 'bank' && form.type === 'atm_transfer' && (
                   <div className="space-y-2 p-3 rounded-lg bg-green-500/5 border border-green-500/10">
                     <p className="text-xs text-green-400 font-medium">بيانات التحويل عبر صراف:</p>
@@ -1512,7 +1627,6 @@ function PaymentMethodsManager({ methods, onRefresh }: { methods: any[]; onRefre
                   </div>
                 )}
 
-                {/* Crypto fields */}
                 {form.category === 'crypto' && (
                   <div className="space-y-2 p-3 rounded-lg bg-orange-500/5 border border-orange-500/10">
                     <p className="text-xs text-orange-400 font-medium">بيانات المحفظة الرقمية:</p>
@@ -1531,7 +1645,6 @@ function PaymentMethodsManager({ methods, onRefresh }: { methods: any[]; onRefre
                   </div>
                 )}
 
-                {/* Instructions */}
                 <div className="space-y-1">
                   <label className="text-xs text-muted-foreground">تعليمات إضافية (اختياري)</label>
                   <textarea value={form.instructions} onChange={(e) => setForm({ ...form, instructions: e.target.value })} className="w-full h-20 rounded-lg bg-white/5 border border-white/10 px-3 py-2 text-sm text-foreground resize-none" placeholder="ملاحظات أو تعليمات للمستخدم..." />
@@ -1539,7 +1652,6 @@ function PaymentMethodsManager({ methods, onRefresh }: { methods: any[]; onRefre
               </div>
             </div>
 
-            {/* Dialog Footer - Fixed at bottom */}
             <div className="p-5 pt-3 border-t border-white/5 flex gap-3 flex-shrink-0">
               <button onClick={handleSave} disabled={loading} className="flex-1 h-11 gold-gradient text-gray-900 font-bold rounded-xl hover:opacity-90 transition-all">
                 {loading ? <Loader2 className="w-4 h-4 animate-spin mx-auto" /> : editMethod ? 'حفظ التعديلات' : 'إضافة'}
@@ -1556,28 +1668,44 @@ function PaymentMethodsManager({ methods, onRefresh }: { methods: any[]; onRefre
 // ===================== ADMIN SETTINGS PANEL =====================
 
 function AdminSettingsPanel({ settings, onRefresh }: { settings: { email: string; phone: string | null; hasPIN: boolean }; onRefresh: () => void }) {
-  const { user, updateUser } = useAuthStore()
-  const [activeSection, setActiveSection] = useState<'phone' | 'email' | 'password' | 'pin'>('phone')
+  const { user } = useAuthStore()
+  const [activeSection, setActiveSection] = useState<'phone' | 'email' | 'password' | 'pin' | 'fees'>('phone')
   const [loading, setLoading] = useState(false)
 
   // Phone form
   const [newPhone, setNewPhone] = useState('')
   const [phonePassword, setPhonePassword] = useState('')
-
   // Email form
   const [newEmail, setNewEmail] = useState('')
   const [emailPassword, setEmailPassword] = useState('')
-
   // Password form
   const [currentPassword, setCurrentPassword] = useState('')
   const [newPassword, setNewPassword] = useState('')
-
   // PIN form
   const [pinPassword, setPinPassword] = useState('')
   const [pinCode, setPinCode] = useState('')
   const [pinConfirm, setPinConfirm] = useState('')
+  // Fee form
+  const [depositFee, setDepositFee] = useState('')
+  const [withdrawalFee, setWithdrawalFee] = useState('')
 
-  const handleSave = async (action: string, body: any) => {
+  // Fetch fees on mount
+  useEffect(() => {
+    const fetchFees()
+  }, [])
+
+  const fetchFees = async () => {
+    try {
+      const res = await fetch('/api/settings')
+      const data = await res.json()
+      if (data.success && data.settings) {
+        setDepositFee(String(data.settings.depositFee || 0))
+        setWithdrawalFee(String(data.settings.withdrawalFee || 0.1))
+      }
+    } catch { /* silent */ }
+  }
+
+  const handleSave = async (body: any) => {
     setLoading(true)
     try {
       const res = await fetch('/api/admin/settings', {
@@ -1588,11 +1716,11 @@ function AdminSettingsPanel({ settings, onRefresh }: { settings: { email: string
       const data = await res.json()
       if (data.success) {
         toast.success(data.message)
-        if (action === 'change_email' && data.message.includes('تسجيل الدخول')) {
-          // Will need to re-login
+        if (body.action === 'change_email' && data.message.includes('تسجيل الدخول')) {
           toast.info('سيتم تسجيل الخروج لتحديث البريد')
           setTimeout(() => useAuthStore.getState().logout(), 2000)
         }
+        if (body.action === 'update_fees') fetchFees()
         onRefresh()
       } else {
         toast.error(data.message)
@@ -1605,10 +1733,11 @@ function AdminSettingsPanel({ settings, onRefresh }: { settings: { email: string
   }
 
   const sections = [
-    { key: 'phone' as const, label: 'رقم الهاتف', icon: Phone, hasValue: !!settings.phone, value: settings.phone },
-    { key: 'email' as const, label: 'البريد الإلكتروني', icon: Mail, hasValue: !!settings.email, value: settings.email },
-    { key: 'password' as const, label: 'كلمة المرور', icon: Lock, hasValue: true, value: '••••••••' },
-    { key: 'pin' as const, label: 'رمز PIN', icon: Shield, hasValue: settings.hasPIN, value: settings.hasPIN ? 'تم تعيينه ✓' : 'غير معين' },
+    { key: 'fees' as const, label: 'الرسوم', icon: DollarSign },
+    { key: 'phone' as const, label: 'الهاتف', icon: Phone, hasValue: !!settings.phone, value: settings.phone },
+    { key: 'email' as const, label: 'البريد', icon: Mail, hasValue: !!settings.email, value: settings.email },
+    { key: 'password' as const, label: 'كلمة المرور', icon: Lock, hasValue: true },
+    { key: 'pin' as const, label: 'رمز PIN', icon: Shield, hasValue: settings.hasPIN, value: settings.hasPIN ? 'مُفعّل ✓' : 'غير معين' },
   ]
 
   return (
@@ -1621,7 +1750,7 @@ function AdminSettingsPanel({ settings, onRefresh }: { settings: { email: string
           </div>
           <div>
             <h3 className="text-sm font-bold">إعدادات الإدارة</h3>
-            <p className="text-[10px] text-muted-foreground">إدارة بيانات الحساب والأمان</p>
+            <p className="text-[10px] text-muted-foreground">إدارة بيانات الحساب والأمان والرسوم</p>
           </div>
         </div>
         <div className="grid grid-cols-2 gap-2 text-xs border-t border-white/5 pt-2">
@@ -1645,15 +1774,15 @@ function AdminSettingsPanel({ settings, onRefresh }: { settings: { email: string
       </div>
 
       {/* Section Tabs */}
-      <div className="grid grid-cols-4 gap-2">
+      <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-none">
         {sections.map((sec) => (
           <button
             key={sec.key}
             onClick={() => setActiveSection(sec.key)}
-            className={`flex flex-col items-center gap-1 p-3 rounded-xl text-xs transition-all ${
+            className={`flex items-center gap-1.5 px-4 py-2.5 rounded-xl text-xs transition-all whitespace-nowrap flex-shrink-0 ${
               activeSection === sec.key
                 ? 'bg-gold/10 text-gold border border-gold/20'
-                : 'text-muted-foreground hover:text-foreground hover:bg-white/5'
+                : 'text-muted-foreground hover:text-foreground hover:bg-white/5 border border-transparent'
             }`}
           >
             <sec.icon className="w-4 h-4" />
@@ -1661,6 +1790,33 @@ function AdminSettingsPanel({ settings, onRefresh }: { settings: { email: string
           </button>
         ))}
       </div>
+
+      {/* Fees Section */}
+      {activeSection === 'fees' && (
+        <div className="glass-card p-5 space-y-4">
+          <h3 className="text-sm font-bold">إعدادات الرسوم</h3>
+          <p className="text-xs text-muted-foreground">تحديد نسبة الرسوم على الإيداعات والسحوب</p>
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-1">
+              <Label className="text-xs text-muted-foreground">رسوم الإيداع (%)</Label>
+              <Input type="number" value={depositFee} onChange={(e) => setDepositFee(e.target.value)} className="glass-input h-10 text-sm" placeholder="0" dir="ltr" step="0.1" min="0" max="100" />
+              <p className="text-[10px] text-muted-foreground">النسبة رسوم الإيداع (0 يعني بدون رسوم)</p>
+            </div>
+            <div className="space-y-1">
+              <Label className="text-xs text-muted-foreground">رسوم السحب (%)</Label>
+              <Input type="number" value={withdrawalFee} onChange={(e) => setWithdrawalFee(e.target.value)} className="glass-input h-10 text-sm" placeholder="0.1" dir="ltr" step="0.1" min="0" max="100" />
+              <p className="text-[10px] text-muted-foreground">نسبة رسوم السحب (0.1 يعني 0.1%)</p>
+            </div>
+          </div>
+          <button
+            onClick={() => handleSave('update_fees', { action: 'update_fees', depositFee: parseFloat(depositFee) || 0, withdrawalFee: parseFloat(withdrawalFee) || 0.1 })}
+            disabled={loading}
+            className="w-full h-11 gold-gradient text-gray-900 font-bold rounded-xl hover:opacity-90 transition-all"
+          >
+            {loading ? <Loader2 className="w-4 h-4 animate-spin mx-auto" /> : 'حفظ الرسوم'}
+          </button>
+        </div>
+      )}
 
       {/* Phone Section */}
       {activeSection === 'phone' && (

@@ -23,11 +23,23 @@ export async function POST(request: NextRequest) {
     const devicesRef = db.collection('userDevices')
 
     if (action === 'authorize') {
-      // Remove all existing devices and add the new one
-      if (!fingerprint) {
-        return NextResponse.json({ success: false, message: 'بصمة الجهاز مطلوبة' }, { status: 400 })
+      // Check for pending device auth first
+      const pendingDoc = await db.collection('pendingDeviceAuth').doc(targetUserId).get()
+      let fp = fingerprint
+      let dName = deviceName || 'جهاز مصرح به'
+
+      if (!fp && pendingDoc.exists) {
+        fp = pendingDoc.data().fingerprint
+        dName = pendingDoc.data().deviceName || deviceName || 'جهاز مصرح به'
+        // Delete pending
+        await pendingDoc.ref.delete()
       }
 
+      if (!fp) {
+        return NextResponse.json({ success: false, message: 'لا يوجد طلب تصريح معلق. اطلب من المستخدم محاولة تسجيل الدخول من الجهاز الجديد أولاً.' }, { status: 400 })
+      }
+
+      // Remove all existing devices and add the new one
       const existing = await devicesRef.where('userId', '==', targetUserId).get()
       const batch = db.batch()
       for (const doc of existing.docs) {
@@ -38,8 +50,8 @@ export async function POST(request: NextRequest) {
       // Add new device
       await devicesRef.add({
         userId: targetUserId,
-        fingerprint,
-        deviceName: deviceName || 'جهاز مصرح به',
+        fingerprint: fp,
+        deviceName: dName,
         isActive: true,
         lastUsed: new Date().toISOString(),
         createdAt: new Date().toISOString(),
@@ -67,6 +79,10 @@ export async function POST(request: NextRequest) {
       }
       if (existing.docs.length > 0) await batch.commit()
 
+      // Also clean up pending device auth
+      const pendingDoc = await db.collection('pendingDeviceAuth').doc(targetUserId).get()
+      if (pendingDoc.exists) await pendingDoc.ref.delete()
+
       return NextResponse.json({
         success: true,
         message: 'تم إزالة جميع الأجهزة بنجاح',
@@ -79,7 +95,15 @@ export async function POST(request: NextRequest) {
         id: doc.id,
         ...doc.data(),
       }))
-      return NextResponse.json({ success: true, devices: devicesList })
+
+      // Check pending device auth
+      const pendingDoc = await db.collection('pendingDeviceAuth').doc(targetUserId).get()
+      let pendingDevice = null
+      if (pendingDoc.exists) {
+        pendingDevice = pendingDoc.data()
+      }
+
+      return NextResponse.json({ success: true, devices: devicesList, pendingDevice })
     }
 
     return NextResponse.json({ success: false, message: 'إجراء غير معروف' }, { status: 400 })

@@ -54,6 +54,7 @@ export default function WithdrawForm() {
   const [amount, setAmount] = useState('')
   const [loading, setLoading] = useState(false)
   const [loadingMethods, setLoadingMethods] = useState(true)
+  const [feePercentage, setFeePercentage] = useState(0.1)
   // Add/Edit method dialog
   const [showAddMethod, setShowAddMethod] = useState(false)
   const [editMethodData, setEditMethodData] = useState<any>(null)
@@ -66,7 +67,18 @@ export default function WithdrawForm() {
 
   useEffect(() => {
     fetchMethods()
+    fetchSettings()
   }, [])
+
+  const fetchSettings = async () => {
+    try {
+      const res = await fetch('/api/settings')
+      const data = await res.json()
+      if (data.success && data.settings) {
+        setFeePercentage(data.settings.withdrawalFee || 0.1)
+      }
+    } catch { /* silent */ }
+  }
 
   const fetchMethods = async () => {
     if (!user?.id) return
@@ -82,7 +94,7 @@ export default function WithdrawForm() {
     }
   }
 
-  const fee = amount ? (parseFloat(amount) * 0.001).toFixed(2) : '0.00'
+  const fee = amount ? (parseFloat(amount) * (feePercentage / 100)).toFixed(2) : '0.00'
   const total = amount ? (parseFloat(amount) + parseFloat(fee)).toFixed(2) : '0.00'
   const hasEnoughBalance = user && parseFloat(total) <= user.balance
 
@@ -167,12 +179,14 @@ export default function WithdrawForm() {
       let toAddress = ''
       let network = 'TRC20'
       let methodType = selectedMethod?.type || 'blockchain'
+      let paymentMethodName = getMethodTitle(selectedMethod)
 
       if (selectedMethod?.category === 'crypto') {
         toAddress = selectedMethod.walletAddress || ''
         network = selectedMethod.network || 'TRC20'
       } else if (selectedMethod?.type === 'bank_deposit') {
         toAddress = `بنكي: ${selectedMethod.beneficiaryName || ''} - ${selectedMethod.accountNumber || ''}`
+        paymentMethodName = selectedMethod.accountName || 'إيداع لمحفظة'
       } else if (selectedMethod?.type === 'atm_transfer') {
         toAddress = `صراف: ${selectedMethod.recipientName || ''} - ${selectedMethod.recipientPhone || ''} - ${selectedMethod.network || ''}`
       }
@@ -193,6 +207,7 @@ export default function WithdrawForm() {
           toAddress,
           network,
           paymentMethodId: selectedMethod?.id,
+          paymentMethodName,
         }),
       })
       const data = await res.json()
@@ -218,8 +233,8 @@ export default function WithdrawForm() {
   }
 
   const setMaxAmount = () => {
-    if (user && user.balance > 0) {
-      setAmount((user.balance / 1.001).toFixed(2))
+    if (user && user.balance > 0 && feePercentage > 0) {
+      setAmount((user.balance / (1 + feePercentage / 100)).toFixed(2))
     }
   }
 
@@ -364,7 +379,7 @@ export default function WithdrawForm() {
               {amount && parseFloat(amount) > 0 && (
                 <div className="space-y-2 p-3 rounded-xl bg-white/5">
                   <div className="flex items-center justify-between text-sm">
-                    <span className="text-muted-foreground">الرسوم (0.1%)</span>
+                    <span className="text-muted-foreground">الرسوم ({feePercentage}%)</span>
                     <span>{fee} USDT</span>
                   </div>
                   <div className="flex items-center justify-between text-sm">
@@ -385,7 +400,7 @@ export default function WithdrawForm() {
                 <div className="space-y-1 text-xs text-muted-foreground">
                   <p>• سيتم إرسال المبلغ إلى البيانات المحفوظة أعلاه</p>
                   <p>• السحبات تتم مراجعتها يدوياً خلال 24 ساعة</p>
-                  <p>• الرسوم: 0.1% من المبلغ</p>
+                  <p>• الرسوم: {feePercentage}% من المبلغ</p>
                 </div>
               </div>
 

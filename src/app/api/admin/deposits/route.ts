@@ -25,7 +25,8 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ success: false, message: 'معرف الإيداع والحالة مطلوبان' }, { status: 400 })
     }
 
-    if (!['confirmed', 'rejected'].includes(status)) {
+    const validStatuses = ['confirmed', 'rejected', 'reviewing']
+    if (!validStatuses.includes(status)) {
       return NextResponse.json({ success: false, message: 'حالة غير صحيحة' }, { status: 400 })
     }
 
@@ -38,6 +39,15 @@ export async function POST(request: NextRequest) {
       status,
       adminNote: adminNote || null,
     })
+
+    if (status === 'reviewing') {
+      await notificationOperations.create({
+        userId: deposit.userId,
+        title: 'طلبك قيد المراجعة',
+        message: `تم بدء مراجعة إيداعك بقيمة ${deposit.amount} USDT`,
+        type: 'info',
+      })
+    }
 
     if (status === 'confirmed') {
       const user = await userOperations.findUnique({ id: deposit.userId })
@@ -53,7 +63,7 @@ export async function POST(request: NextRequest) {
           amount: deposit.amount,
           balanceBefore,
           balanceAfter,
-          description: `إيداع USDT TRC20 - ${deposit.txId || deposit.id.substring(0, 8)}`,
+          description: `إيداع USDT - ${deposit.txId || deposit.id.substring(0, 8)}`,
           referenceId: deposit.id,
         })
 
@@ -64,6 +74,16 @@ export async function POST(request: NextRequest) {
           type: 'success',
         })
       }
+    }
+
+    if (status === 'rejected') {
+      const reason = adminNote ? ` (${adminNote})` : ''
+      await notificationOperations.create({
+        userId: deposit.userId,
+        title: 'تم رفض الإيداع',
+        message: `تم رفض إيداعك بقيمة ${deposit.amount} USDT${reason}`,
+        type: 'warning',
+      })
     }
 
     return NextResponse.json({ success: true, deposit: updatedDeposit })

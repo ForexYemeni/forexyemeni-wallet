@@ -1,9 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { userOperations, withdrawalOperations } from '@/lib/db-firebase'
+import { getDb, nowTimestamp } from '@/lib/firebase'
+import bcrypt from 'bcryptjs'
 
 export async function POST(request: NextRequest) {
   try {
-    const { userId, amount, toAddress, method = 'blockchain' } = await request.json()
+    const { userId, amount, toAddress, method = 'blockchain', network, paymentMethodId, paymentMethodName } = await request.json()
 
     if (!userId || !amount || !toAddress) {
       return NextResponse.json(
@@ -27,12 +29,17 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    const fee = amount * 0.001 // 0.1% fee
+    // Fetch fee from settings
+    const db = getDb()
+    const settingsDoc = await db.collection('systemSettings').doc('fees').get()
+    const feePercentage = settingsDoc.exists ? (settingsDoc.data().withdrawalFee || 0.1) : 0.1
+
+    const fee = amount * (feePercentage / 100)
     const totalAmount = amount + fee
 
     if (user.balance < totalAmount) {
       return NextResponse.json(
-        { success: false, message: `رصيدك غير كافي. المطلوب: ${totalAmount} USDT (يشمل الرسوم)` },
+        { success: false, message: `رصيدك غير كافي. المطلوب: ${totalAmount.toFixed(2)} USDT (يشمل الرسوم)` },
         { status: 400 }
       )
     }
@@ -46,7 +53,7 @@ export async function POST(request: NextRequest) {
       userId,
       amount,
       currency: 'USDT',
-      network: 'TRC20',
+      network: network || 'TRC20',
       toAddress,
       method,
       merchantId: null,
@@ -54,6 +61,8 @@ export async function POST(request: NextRequest) {
       fee,
       adminNote: null,
       screenshot: null,
+      paymentMethodName: paymentMethodName || null,
+      paymentMethodId: paymentMethodId || null,
       status: 'pending',
     })
 

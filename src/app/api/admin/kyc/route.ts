@@ -16,7 +16,7 @@ export async function GET() {
 // POST update KYC status (admin)
 export async function POST(request: NextRequest) {
   try {
-    const { recordId, status, notes, userId } = await request.json()
+    const { recordId, status, adminNote, userId } = await request.json()
 
     if (!recordId || !status || !userId) {
       return NextResponse.json({ success: false, message: 'جميع الحقول مطلوبة' }, { status: 400 })
@@ -28,7 +28,7 @@ export async function POST(request: NextRequest) {
 
     const updatedRecord = await kycRecordOperations.update(recordId, {
       status,
-      notes: notes || null,
+      notes: adminNote || null,
       reviewedAt: new Date().toISOString(),
     })
 
@@ -50,10 +50,11 @@ export async function POST(request: NextRequest) {
     if (status === 'rejected') {
       await userOperations.update({ id: userId }, { kycStatus: 'rejected' })
 
+      const reason = adminNote ? ` (${adminNote})` : ''
       await notificationOperations.create({
         userId,
         title: 'تم رفض التحقق',
-        message: 'تم رفض أحد مستندات التحقق. يرجى إعادة الرفع.',
+        message: `تم رفض أحد مستندات التحقق. يرجى إعادة الرفع.${reason}`,
         type: 'warning',
       })
     }

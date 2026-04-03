@@ -90,17 +90,46 @@ export default function KYCVerification() {
     }
   }
 
-  const handleFileChange = (type: 'id_photo' | 'selfie', file: File) => {
+  const compressImage = (file: File): Promise<File> => {
+    return new Promise((resolve) => {
+      const img = new Image()
+      const url = URL.createObjectURL(file)
+      img.onload = () => {
+        const MAX_SIZE = 600
+        const QUALITY = 0.5
+        let { width, height } = img
+        if (width > MAX_SIZE || height > MAX_SIZE) {
+          if (width > height) { height = Math.round((height * MAX_SIZE) / width); width = MAX_SIZE }
+          else { width = Math.round((width * MAX_SIZE) / height); height = MAX_SIZE }
+        }
+        const canvas = document.createElement('canvas')
+        canvas.width = width
+        canvas.height = height
+        const ctx = canvas.getContext('2d')
+        ctx?.drawImage(img, 0, 0, width, height)
+        canvas.toBlob((blob) => {
+          URL.revokeObjectURL(url)
+          if (blob) resolve(new File([blob], file.name, { type: 'image/jpeg' }))
+          else resolve(file)
+        }, 'image/jpeg', QUALITY)
+      }
+      img.onerror = () => { URL.revokeObjectURL(url); resolve(file) }
+      img.src = url
+    })
+  }
+
+  const handleFileChange = async (type: 'id_photo' | 'selfie', file: File) => {
+    const compressed = await compressImage(file)
     if (type === 'id_photo') {
-      setIdPhoto(file)
+      setIdPhoto(compressed)
       const reader = new FileReader()
       reader.onload = (e) => setIdPreview(e.target?.result as string)
-      reader.readAsDataURL(file)
+      reader.readAsDataURL(compressed)
     } else {
-      setSelfie(file)
+      setSelfie(compressed)
       const reader = new FileReader()
       reader.onload = (e) => setSelfiePreview(e.target?.result as string)
-      reader.readAsDataURL(file)
+      reader.readAsDataURL(compressed)
     }
   }
 

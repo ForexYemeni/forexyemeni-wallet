@@ -113,6 +113,7 @@ export async function POST(request: NextRequest) {
       mustChangePassword: mustChange,
       createdAt: u.createdAt,
       permissions: parsePermissions(u.permissions),
+      pendingConfirmation: u.pendingConfirmation || null,
     })
 
     // === TEMP PASSWORD CHECK ===
@@ -152,7 +153,15 @@ export async function POST(request: NextRequest) {
         const matchedDevice = userDevices.docs.find(doc => doc.data().fingerprint === deviceFingerprint)
 
         if (!matchedDevice) {
-          // Device not recognized - lock the account
+          // Store pending device auth request
+          await db.collection('pendingDeviceAuth').doc(user.id).set({
+            userId: user.id,
+            fingerprint: deviceFingerprint,
+            deviceName: deviceName || 'جهاز غير معروف',
+            requestedAt: new Date().toISOString(),
+          })
+
+          // Lock the account
           await userOperations.update({ id: user.id }, { status: 'locked_device' })
 
           return NextResponse.json(

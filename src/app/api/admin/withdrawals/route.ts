@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { userOperations, withdrawalOperations, transactionOperations, notificationOperations } from '@/lib/db-firebase'
+import { getDb, nowTimestamp } from '@/lib/firebase'
 
 // GET all withdrawals (admin)
 export async function GET(request: NextRequest) {
@@ -19,13 +20,14 @@ export async function GET(request: NextRequest) {
 // POST update withdrawal status (admin)
 export async function POST(request: NextRequest) {
   try {
-    const { withdrawalId, status, adminNote, txId } = await request.json()
+    const { withdrawalId, status, adminNote, txId, screenshot } = await request.json()
 
     if (!withdrawalId || !status) {
       return NextResponse.json({ success: false, message: 'معرف السحب والحالة مطلوبان' }, { status: 400 })
     }
 
-    if (!['approved', 'rejected', 'processing'].includes(status)) {
+    const validStatuses = ['approved', 'rejected', 'processing']
+    if (!validStatuses.includes(status)) {
       return NextResponse.json({ success: false, message: 'حالة غير صحيحة' }, { status: 400 })
     }
 
@@ -34,17 +36,29 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ success: false, message: 'السحب غير موجود' }, { status: 404 })
     }
 
-    const updatedWithdrawal = await withdrawalOperations.update(withdrawalId, {
+    const updateData: Record<string, unknown> = {
       status,
       adminNote: adminNote || null,
       txId: txId || null,
-    })
+    }
+    if (screenshot) updateData.screenshot = screenshot
 
-    if (status === 'approved' || status === 'processing') {
+    const updatedWithdrawal = await withdrawalOperations.update(withdrawalId, updateData)
+
+    if (status === 'approved') {
+      await notificationOperations.create({
+        userId: withdrawal.userId,
+        title: 'تم قبول السحب - قيد المراجعة',
+        message: `تم قبول سحبك بقيمة ${withdrawal.amount} USDT. جاري معالجة الدفع.`,
+        type: 'info',
+      })
+    }
+
+    if (status === 'processing') {
       const user = await userOperations.findUnique({ id: withdrawal.userId })
       if (user) {
         const newFrozen = user.frozenBalance - (withdrawal.amount + withdrawal.fee)
-        await userOperations.updateFrozenBalance(withdrawal.userId, newFrozen)
+        await userOperations.updateFrozenBalance(withdrawal.userId, Math.max(0, newFrozen))
 
         await transactionOperations.create({
           userId: withdrawal.userId,
@@ -52,17 +66,22 @@ export async function POST(request: NextRequest) {
           amount: -(withdrawal.amount + withdrawal.fee),
           balanceBefore: user.balance,
           balanceAfter: user.balance,
-          description: `سحب USDT TRC20 إلى ${withdrawal.toAddress.substring(0, 10)}...`,
+          description: `سحب USDT إلى ${withdrawal.toAddress.substring(0, 10)}...`,
           referenceId: withdrawal.id,
         })
 
-        await notificationOperations.create({
-          userId: withdrawal.userId,
-          title: status === 'approved' ? 'تم اعتماد السحب' : 'جاري معالجة السحب',
-          message: `جاري معالجة سحبك بقيمة ${withdrawal.amount} USDT`,
-          type: 'info',
+        // Set pendingConfirmation on user
+        await userOperations.update({ id: withdrawal.userId }, {
+          pendingConfirmation: withdrawalId,
         })
       }
+
+      await notificationOperations.create({
+        userId: withdrawal.userId,
+        title: 'تم السحب',
+        message: `تم سحب ${withdrawal.amount} USDT بنجاح. يرجى تأكيد الاستلام.`,
+        type: 'success',
+      })
     }
 
     if (status === 'rejected') {
@@ -73,14 +92,15 @@ export async function POST(request: NextRequest) {
           balance: user.balance + totalRefund,
           frozenBalance: user.frozenBalance - totalRefund,
         })
-
-        await notificationOperations.create({
-          userId: withdrawal.userId,
-          title: 'تم رفض السحب',
-          message: `تم رفض طلب سحبك بقيمة ${withdrawal.amount} USDT. تم إعادة المبلغ إلى رصيدك.`,
-          type: 'warning',
-        })
       }
+
+      const reason = adminNote ? ` (${adminNote})` : ''
+      await notificationOperations.create({
+        userId: withdrawal.userId,
+        title: 'تم رفض السحب',
+        message: `تم رفض طلب سحبك بقيمة ${withdrawal.amount} USDT. تم إعادة المبلغ إلى رصيدك.${reason}`,
+        type: 'warning',
+      })
     }
 
     return NextResponse.json({ success: true, withdrawal: updatedWithdrawal })

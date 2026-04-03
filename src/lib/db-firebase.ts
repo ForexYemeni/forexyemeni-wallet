@@ -25,6 +25,7 @@ export interface User {
   referredBy?: string | null
   merchantId?: string | null
   pinHash?: string | null
+  pendingConfirmation?: string | null
   permissions?: string | null
   createdAt: string
   updatedAt: string
@@ -87,6 +88,8 @@ export interface Withdrawal {
   fee: number
   adminNote?: string | null
   screenshot?: string | null
+  paymentMethodName?: string | null
+  paymentMethodId?: string | null
   createdAt: string
   updatedAt: string
 }

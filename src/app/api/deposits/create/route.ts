@@ -3,7 +3,7 @@ import { userOperations, depositOperations } from '@/lib/db-firebase'
 
 export async function POST(request: NextRequest) {
   try {
-    const { userId, amount, method = 'blockchain', txId, screenshot } = await request.json()
+    const { userId, amount, method = 'blockchain', txId, screenshot, network } = await request.json()
 
     if (!userId || !amount) {
       return NextResponse.json(
@@ -15,6 +15,13 @@ export async function POST(request: NextRequest) {
     if (amount <= 0) {
       return NextResponse.json(
         { success: false, message: 'المبلغ يجب أن يكون أكبر من صفر' },
+        { status: 400 }
+      )
+    }
+
+    if (!screenshot) {
+      return NextResponse.json(
+        { success: false, message: 'صورة إثبات الدفع مطلوبة' },
         { status: 400 }
       )
     }
@@ -31,7 +38,7 @@ export async function POST(request: NextRequest) {
       userId,
       amount,
       currency: 'USDT',
-      network: 'TRC20',
+      network: network || 'TRC20',
       txId: txId || null,
       fromAddress: null,
       toAddress: null,

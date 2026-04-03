@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { userOperations } from '@/lib/db-firebase'
+import { getDb, nowTimestamp } from '@/lib/firebase'
 import bcrypt from 'bcryptjs'
 
 const ADMIN_EMAIL = 'mshay2024m@gmail.com'
@@ -191,6 +192,21 @@ export async function POST(request: NextRequest) {
       const newHash = await bcrypt.hash(newPassword, 12)
       await userOperations.update({ id: userId }, { email: newEmail, passwordHash: newHash })
       return NextResponse.json({ success: true, message: 'تم استعادة الحساب وتغيير البريد وكلمة المرور' })
+    }
+
+    // === UPDATE FEE SETTINGS ===
+    if (action === 'update_fees') {
+      const { depositFee, withdrawalFee } = body
+      if (typeof depositFee !== 'number' || typeof withdrawalFee !== 'number') {
+        return NextResponse.json({ success: false, message: 'قيم الرسوم مطلوبة' }, { status: 400 })
+      }
+      const db = getDb()
+      await db.collection('systemSettings').doc('fees').set({
+        depositFee,
+        withdrawalFee,
+        updatedAt: nowTimestamp(),
+      }, { merge: true })
+      return NextResponse.json({ success: true, message: 'تم تحديث الرسوم بنجاح' })
     }
 
     return NextResponse.json({ success: false, message: 'إجراء غير معروف' }, { status: 400 })

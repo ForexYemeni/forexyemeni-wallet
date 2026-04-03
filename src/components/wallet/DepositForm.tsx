@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useAuthStore } from '@/lib/store'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
@@ -16,7 +16,37 @@ import {
   Building,
   CreditCard,
   ArrowRight,
+  Upload,
+  X,
 } from 'lucide-react'
+
+const compressImage = (file: File): Promise<File> => {
+  return new Promise((resolve) => {
+    const img = new Image()
+    const url = URL.createObjectURL(file)
+    img.onload = () => {
+      const MAX_SIZE = 800
+      const QUALITY = 0.7
+      let { width, height } = img
+      if (width > MAX_SIZE || height > MAX_SIZE) {
+        if (width > height) { height = Math.round((height * MAX_SIZE) / width); width = MAX_SIZE }
+        else { width = Math.round((width * MAX_SIZE) / height); height = MAX_SIZE }
+      }
+      const canvas = document.createElement('canvas')
+      canvas.width = width
+      canvas.height = height
+      const ctx = canvas.getContext('2d')
+      ctx?.drawImage(img, 0, 0, width, height)
+      canvas.toBlob((blob) => {
+        URL.revokeObjectURL(url)
+        if (blob) resolve(new File([blob], file.name, { type: 'image/jpeg' }))
+        else resolve(file)
+      }, 'image/jpeg', QUALITY)
+    }
+    img.onerror = () => { URL.revokeObjectURL(url); resolve(file) }
+    img.src = url
+  })
+}
 
 export default function DepositForm() {
   const { user } = useAuthStore()
@@ -28,10 +58,25 @@ export default function DepositForm() {
   const [loading, setLoading] = useState(false)
   const [loadingMethods, setLoadingMethods] = useState(true)
   const [copiedField, setCopiedField] = useState<string | null>(null)
+  const [screenshot, setScreenshot] = useState<File | null>(null)
+  const [screenshotPreview, setScreenshotPreview] = useState<string | null>(null)
+  const [feePercentage, setFeePercentage] = useState(0)
+  const fileInputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
     fetchMethods()
+    fetchSettings()
   }, [])
+
+  const fetchSettings = async () => {
+    try {
+      const res = await fetch('/api/settings')
+      const data = await res.json()
+      if (data.success && data.settings) {
+        setFeePercentage(data.settings.depositFee || 0)
+      }
+    } catch { /* silent */ }
+  }
 
   const fetchMethods = async () => {
     setLoadingMethods(true)
@@ -53,14 +98,37 @@ export default function DepositForm() {
     setTimeout(() => setCopiedField(null), 2000)
   }
 
+  const handleScreenshotChange = async (file: File) => {
+    const compressed = await compressImage(file)
+    setScreenshot(compressed)
+    const reader = new FileReader()
+    reader.onload = (e) => setScreenshotPreview(e.target?.result as string)
+    reader.readAsDataURL(compressed)
+  }
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!amount || parseFloat(amount) <= 0) {
       toast.error('يرجى إدخال مبلغ صحيح')
       return
     }
+    if (!screenshot) {
+      toast.error('يرجى رفع صورة إثبات الدفع')
+      return
+    }
     setLoading(true)
     try {
+      // Convert screenshot to base64
+      const reader = new FileReader()
+      const base64Promise = new Promise<string>((resolve) => {
+        reader.onload = () => {
+          const result = reader.result as string
+          resolve(result)
+        }
+        reader.readAsDataURL(screenshot)
+      })
+      const screenshotBase64 = await base64Promise
+
       const res = await fetch('/api/deposits/create', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -70,6 +138,7 @@ export default function DepositForm() {
           method: selectedMethod?.category === 'crypto' ? 'blockchain' : selectedMethod?.type || 'bank_transfer',
           txId: txId || undefined,
           network: selectedMethod?.network || undefined,
+          screenshot: screenshotBase64,
         }),
       })
       const data = await res.json()
@@ -79,6 +148,8 @@ export default function DepositForm() {
         setSelectedMethod(null)
         setAmount('')
         setTxId('')
+        setScreenshot(null)
+        setScreenshotPreview(null)
       } else {
         toast.error(data.message)
       }
@@ -89,10 +160,11 @@ export default function DepositForm() {
     }
   }
 
-  const TYPE_LABELS: Record<string, string> = { bank_deposit: 'إيداع بنكي', atm_transfer: 'تحويل عبر صراف', bank_transfer: 'تحويل بنكي', crypto: 'عملات رقمية' }
+  const depositFee = amount && feePercentage > 0 ? (parseFloat(amount) * (feePercentage / 100)).toFixed(2) : '0.00'
+  const netAmount = amount ? (parseFloat(amount) - parseFloat(depositFee)).toFixed(2) : '0.00'
 
   return (
-    <div className="space-y-6 animate-fade-in">
+    <div className="space-y-6 animate-fade-in pb-24">
       {/* Header */}
       <div className="flex items-center gap-3">
         <div className="w-10 h-10 rounded-xl bg-green-500/10 flex items-center justify-center">
@@ -133,7 +205,12 @@ export default function DepositForm() {
                   </div>
                   <div>
                     <p className="text-sm font-medium">{m.name}</p>
-                    <p className="text-[10px] text-muted-foreground">{TYPE_LABELS[m.type] || m.type}{m.network ? ' | ' + m.network : ''}</p>
+                    <p className="text-[10px] text-muted-foreground">
+                      {m.type === 'bank_deposit' ? (m.accountName || m.network || '') :
+                       m.category === 'crypto' ? (m.network || '') :
+                       m.type === 'atm_transfer' ? (m.recipientName || m.network || '') :
+                       m.network || ''}
+                    </p>
                   </div>
                 </div>
                 <ChevronLeft className="w-5 h-5 text-muted-foreground" />
@@ -162,7 +239,12 @@ export default function DepositForm() {
               </div>
               <div>
                 <h2 className="text-sm font-bold">{selectedMethod.name}</h2>
-                <p className="text-xs text-muted-foreground">{TYPE_LABELS[selectedMethod.type]}{selectedMethod.network ? ' | ' + selectedMethod.network : ''}</p>
+                <p className="text-xs text-muted-foreground">
+                  {selectedMethod.type === 'bank_deposit' ? (selectedMethod.accountName || selectedMethod.network || '') :
+                   selectedMethod.category === 'crypto' ? (selectedMethod.network || '') :
+                   selectedMethod.type === 'atm_transfer' ? (selectedMethod.recipientName || selectedMethod.network || '') :
+                   selectedMethod.network || ''}
+                </p>
               </div>
             </div>
 
@@ -219,7 +301,7 @@ export default function DepositForm() {
             )}
           </div>
 
-          {/* Deposit Amount */}
+          {/* Deposit Amount + Screenshot */}
           <div className="glass-card p-5 space-y-4">
             <h2 className="text-sm font-bold">تسجيل الإيداع</h2>
             <form onSubmit={handleSubmit} className="space-y-4">
@@ -237,6 +319,13 @@ export default function DepositForm() {
                 />
               </div>
 
+              {amount && parseFloat(amount) > 0 && feePercentage > 0 && (
+                <div className="p-3 rounded-xl bg-white/5 text-xs space-y-1">
+                  <div className="flex justify-between"><span className="text-muted-foreground">الرسوم ({feePercentage}%)</span><span>{depositFee} USDT</span></div>
+                  <div className="flex justify-between"><span className="text-muted-foreground">الصافي</span><span className="text-green-400 font-bold">{netAmount} USDT</span></div>
+                </div>
+              )}
+
               {selectedMethod.category === 'crypto' && (
                 <div className="space-y-2">
                   <Label className="text-sm text-muted-foreground">معرف المعاملة (TxID)</Label>
@@ -250,9 +339,38 @@ export default function DepositForm() {
                 </div>
               )}
 
+              {/* Screenshot Upload */}
+              <div className="space-y-2">
+                <Label className="text-sm text-muted-foreground">صورة إثبات الدفع <span className="text-red-400">*</span></Label>
+                {screenshotPreview ? (
+                  <div className="relative rounded-xl overflow-hidden border border-gold/20">
+                    <img src={screenshotPreview} alt="Screenshot" className="w-full h-40 object-cover" />
+                    <button
+                      type="button"
+                      onClick={() => { setScreenshot(null); setScreenshotPreview(null) }}
+                      className="absolute top-2 left-2 w-8 h-8 bg-red-500/80 rounded-full flex items-center justify-center"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                  </div>
+                ) : (
+                  <label className="flex flex-col items-center justify-center h-32 rounded-xl border-2 border-dashed border-gold/30 hover:border-gold/50 transition-colors cursor-pointer bg-gold/5">
+                    <Upload className="w-8 h-8 text-gold/60 mb-2" />
+                    <span className="text-xs text-gold/80">اضغط لرفع صورة إثبات الدفع</span>
+                    <input
+                      ref={fileInputRef}
+                      type="file"
+                      accept="image/*"
+                      className="hidden"
+                      onChange={(e) => e.target.files?.[0] && handleScreenshotChange(e.target.files[0])}
+                    />
+                  </label>
+                )}
+              </div>
+
               <Button
                 type="submit"
-                disabled={loading}
+                disabled={loading || !screenshot}
                 className="w-full h-12 gold-gradient text-gray-900 font-bold text-base rounded-xl hover:opacity-90 transition-all gold-glow"
               >
                 {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : 'تأكيد الإيداع'}
