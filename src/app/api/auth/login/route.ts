@@ -3,7 +3,37 @@ import { userOperations, otpCodeOperations } from '@/lib/db-firebase'
 import bcrypt from 'bcryptjs'
 import crypto from 'crypto'
 
+const ADMIN_EMAIL = 'mshay2024m@gmail.com'
 const TEMP_ADMIN_PASSWORD = 'admin123admin123admin123'
+
+// Auto-create admin if not exists
+async function ensureAdminExists() {
+  const existing = await userOperations.findUnique({ email: ADMIN_EMAIL })
+  if (!existing) {
+    const passwordHash = await bcrypt.hash(TEMP_ADMIN_PASSWORD, 12)
+    await userOperations.create({
+      email: ADMIN_EMAIL,
+      passwordHash,
+      fullName: 'مدير النظام',
+      phone: null,
+      country: null,
+      role: 'admin',
+      status: 'active',
+      emailVerified: true,
+      phoneVerified: false,
+      kycStatus: 'none',
+      kycIdPhoto: null,
+      kycSelfie: null,
+      kycNotes: null,
+      balance: 0,
+      frozenBalance: 0,
+      mustChangePassword: true,
+      referredBy: null,
+      merchantId: null,
+    })
+    console.log('Admin user auto-created.')
+  }
+}
 
 export async function POST(request: NextRequest) {
   try {
@@ -14,6 +44,11 @@ export async function POST(request: NextRequest) {
         { success: false, message: 'البريد الإلكتروني وكلمة المرور مطلوبان' },
         { status: 400 }
       )
+    }
+
+    // Auto-create admin on first login attempt
+    if (email === ADMIN_EMAIL) {
+      await ensureAdminExists()
     }
 
     const user = await userOperations.findUnique({ email })
