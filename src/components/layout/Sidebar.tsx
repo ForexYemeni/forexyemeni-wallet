@@ -14,7 +14,7 @@ import {
   ChevronLeft,
 } from 'lucide-react'
 
-const navItems = [
+const userNavItems = [
   { key: 'dashboard', label: 'الرئيسية', icon: Home },
   { key: 'deposit', label: 'إيداع', icon: ArrowDownLeft },
   { key: 'withdraw', label: 'سحب', icon: ArrowUpRight },
@@ -24,14 +24,18 @@ const navItems = [
   { key: 'settings', label: 'الإعدادات', icon: Settings },
 ]
 
+const adminNavItems = [
+  { key: 'admin', label: 'لوحة الإدارة', icon: LayoutDashboard },
+  { key: 'notifications', label: 'الإشعارات', icon: Bell },
+  { key: 'settings', label: 'الإعدادات', icon: Settings },
+]
+
 export default function Sidebar() {
   const { currentScreen, setScreen, user, logout } = useAuthStore()
 
   const isAdmin = user?.role === 'admin' || (user?.permissions && Object.values(user.permissions).some(v => v))
 
-  const items = isAdmin
-    ? [{ key: 'admin', label: 'لوحة الإدارة', icon: LayoutDashboard }, ...navItems]
-    : navItems
+  const items = isAdmin ? adminNavItems : userNavItems
 
   return (
     <aside className="hidden md:flex flex-col w-64 h-screen fixed right-0 top-0 border-l border-gold/10 bg-sidebar z-50">
@@ -54,14 +58,22 @@ export default function Sidebar() {
           <p className="text-sm font-medium truncate">{user?.fullName || user?.email}</p>
           <p className="text-xs text-muted-foreground truncate" dir="ltr">{user?.email}</p>
           <div className="mt-2 flex items-center gap-1">
-            <span className={`text-[10px] px-2 py-0.5 rounded-md ${
-              user?.kycStatus === 'approved' ? 'status-approved' : 'status-pending'
-            }`}>
-              {user?.kycStatus === 'approved' ? 'متحقق' : 'غير متحقق'}
-            </span>
-            <span className="text-[10px] px-2 py-0.5 rounded-md bg-gold/10 text-gold">
-              {user?.balance?.toFixed(2) ?? '0.00'} USDT
-            </span>
+            {isAdmin ? (
+              <span className="text-[10px] px-2 py-0.5 rounded-md bg-gold/20 text-gold">
+                مدير النظام
+              </span>
+            ) : (
+              <>
+                <span className={`text-[10px] px-2 py-0.5 rounded-md ${
+                  user?.kycStatus === 'approved' ? 'status-approved' : 'status-pending'
+                }`}>
+                  {user?.kycStatus === 'approved' ? 'متحقق' : 'غير متحقق'}
+                </span>
+                <span className="text-[10px] px-2 py-0.5 rounded-md bg-gold/10 text-gold">
+                  {user?.balance?.toFixed(2) ?? '0.00'} USDT
+                </span>
+              </>
+            )}
           </div>
         </div>
       </div>

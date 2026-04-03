@@ -48,7 +48,11 @@ export const useAuthStore = create<AuthState>()(
         user,
         token,
         isAuthenticated: true,
-        currentScreen: mustChangePassword ? 'force-change-password' : 'dashboard',
+        currentScreen: mustChangePassword
+          ? 'force-change-password'
+          : (user.role === 'admin' || (user.permissions && Object.values(user.permissions).some(v => v)))
+            ? 'admin'
+            : 'dashboard',
       }),
       logout: () => set({ user: null, token: null, isAuthenticated: false, currentScreen: 'login', pendingRegistration: null, pendingWithdrawalConfirmation: null }),
       setScreen: (screen) => set({ currentScreen: screen }),

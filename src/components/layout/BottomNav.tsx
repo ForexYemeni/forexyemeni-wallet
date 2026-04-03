@@ -7,15 +7,19 @@ import {
   ArrowUpRight,
   Shield,
   Settings,
-  Bell,
   LayoutDashboard,
 } from 'lucide-react'
 
-const navItems = [
+const userNavItems = [
   { key: 'dashboard', label: 'الرئيسية', icon: Home },
   { key: 'deposit', label: 'إيداع', icon: ArrowDownLeft },
   { key: 'withdraw', label: 'سحب', icon: ArrowUpRight },
   { key: 'kyc', label: 'التحقق', icon: Shield },
+  { key: 'settings', label: 'الإعدادات', icon: Settings },
+]
+
+const adminNavItems = [
+  { key: 'admin', label: 'الإدارة', icon: LayoutDashboard },
   { key: 'settings', label: 'الإعدادات', icon: Settings },
 ]
 
@@ -24,15 +28,13 @@ export default function BottomNav() {
 
   const isAdmin = user?.role === 'admin' || (user?.permissions && Object.values(user.permissions).some(v => v))
 
-  const items = isAdmin
-    ? [{ key: 'admin', label: 'الإدارة', icon: LayoutDashboard }, ...navItems]
-    : navItems
+  const items = isAdmin ? adminNavItems : userNavItems
 
   return (
     <nav className="fixed bottom-0 left-0 right-0 z-50 md:hidden">
       <div className="mx-3 mb-3 rounded-2xl glass-card border-gold/10 px-2 py-2">
         <div className="flex items-center justify-around">
-          {items.slice(0, 5).map((item) => {
+          {items.map((item) => {
             const isActive = currentScreen === item.key
             return (
               <button

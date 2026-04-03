@@ -21,6 +21,8 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   const { user, setScreen, logout } = useAuthStore()
   const [logoutDialogOpen, setLogoutDialogOpen] = useState(false)
 
+  const isAdmin = user?.role === 'admin' || (user?.permissions && Object.values(user.permissions).some(v => v))
+
   const handleLogout = () => {
     setLogoutDialogOpen(false)
     logout()
