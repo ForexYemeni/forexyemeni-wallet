@@ -1705,22 +1705,23 @@ function AdminSettingsPanel({ settings, onRefresh }: { settings: { email: string
     } catch { /* silent */ }
   }
 
-  const handleSave = async (body: any) => {
+  const handleSave = async (actionKey: string, payload?: any) => {
     setLoading(true)
     try {
+      const body = payload || {}
       const res = await fetch('/api/admin/settings', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userId: user?.id, ...body }),
+        body: JSON.stringify({ userId: user?.id, action: actionKey, ...body }),
       })
       const data = await res.json()
       if (data.success) {
         toast.success(data.message)
-        if (body.action === 'change_email' && data.message.includes('تسجيل الدخول')) {
+        if (actionKey === 'change_email' && data.message.includes('تسجيل الدخول')) {
           toast.info('سيتم تسجيل الخروج لتحديث البريد')
           setTimeout(() => useAuthStore.getState().logout(), 2000)
         }
-        if (body.action === 'update_fees') fetchFees()
+        if (actionKey === 'update_fees') fetchFees()
         onRefresh()
       } else {
         toast.error(data.message)
@@ -1809,7 +1810,7 @@ function AdminSettingsPanel({ settings, onRefresh }: { settings: { email: string
             </div>
           </div>
           <button
-            onClick={() => handleSave('update_fees', { action: 'update_fees', depositFee: parseFloat(depositFee) || 0, withdrawalFee: parseFloat(withdrawalFee) || 0.1 })}
+            onClick={() => handleSave('update_fees', { depositFee: parseFloat(depositFee) || 0, withdrawalFee: parseFloat(withdrawalFee) || 0.1 })}
             disabled={loading}
             className="w-full h-11 gold-gradient text-gray-900 font-bold rounded-xl hover:opacity-90 transition-all"
           >

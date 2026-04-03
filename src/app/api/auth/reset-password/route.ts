@@ -4,18 +4,11 @@ import bcrypt from 'bcryptjs'
 
 export async function POST(request: NextRequest) {
   try {
-    const { email, code, newPassword } = await request.json()
+    const { email, code, newPassword, isAdmin, pin, adminNumber, newEmail } = await request.json()
 
-    if (!email || !code || !newPassword) {
+    if (!email || !code) {
       return NextResponse.json(
-        { success: false, message: 'جميع الحقول مطلوبة' },
-        { status: 400 }
-      )
-    }
-
-    if (newPassword.length < 8) {
-      return NextResponse.json(
-        { success: false, message: 'كلمة المرور يجب أن تكون 8 أحرف على الأقل' },
+        { success: false, message: 'البريد الإلكتروني ورمز التحقق مطلوبان' },
         { status: 400 }
       )
     }
@@ -23,7 +16,7 @@ export async function POST(request: NextRequest) {
     const otpRecord = await otpCodeOperations.findFirst({
       where: {
         email,
-        type: 'password_reset',
+        type: isAdmin ? 'admin_password_reset' : 'password_reset',
         verified: false,
       },
     })
@@ -42,6 +35,32 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    // For admin: verify OTP only, don't reset password yet
+    if (isAdmin) {
+      await otpCodeOperations.update(otpRecord.id, { verified: true })
+      return NextResponse.json({
+        success: true,
+        otpVerified: true,
+        message: 'تم التحقق من الرمز بنجاح',
+        userId: otpRecord.userId,
+      })
+    }
+
+    // Normal user: verify OTP and change password directly
+    if (!newPassword) {
+      return NextResponse.json(
+        { success: false, message: 'كلمة المرور الجديدة مطلوبة' },
+        { status: 400 }
+      )
+    }
+
+    if (newPassword.length < 8) {
+      return NextResponse.json(
+        { success: false, message: 'كلمة المرور يجب أن تكون 8 أحرف على الأقل' },
+        { status: 400 }
+      )
+    }
+
     await otpCodeOperations.update(otpRecord.id, { verified: true })
 
     const passwordHash = await bcrypt.hash(newPassword, 12)
@@ -52,6 +71,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({
       success: true,
+      otpVerified: true,
       message: 'تم تغيير كلمة المرور بنجاح',
     })
   } catch (error: unknown) {

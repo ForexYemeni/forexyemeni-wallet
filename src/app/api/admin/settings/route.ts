@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { userOperations } from '@/lib/db-firebase'
+import { userOperations, otpCodeOperations } from '@/lib/db-firebase'
 import { getDb, nowTimestamp } from '@/lib/firebase'
 import bcrypt from 'bcryptjs'
 
@@ -192,6 +192,83 @@ export async function POST(request: NextRequest) {
       const newHash = await bcrypt.hash(newPassword, 12)
       await userOperations.update({ id: userId }, { email: newEmail, passwordHash: newHash })
       return NextResponse.json({ success: true, message: 'تم استعادة الحساب وتغيير البريد وكلمة المرور' })
+    }
+
+    // === ADMIN RESET PASSWORD WITH EMAIL OTP + PIN ===
+    if (action === 'admin_reset_with_pin') {
+      const { email, pin, newPassword } = body
+      if (!email || !pin || !newPassword) {
+        return NextResponse.json({ success: false, message: 'جميع الحقول مطلوبة' }, { status: 400 })
+      }
+      if (newPassword.length < 8) {
+        return NextResponse.json({ success: false, message: 'كلمة المرور الجديدة يجب أن تكون 8 أحرف على الأقل' }, { status: 400 })
+      }
+
+      // Verify email matches admin account
+      if (user.email !== email) {
+        return NextResponse.json({ success: false, message: 'البريد الإلكتروني غير متطابق' }, { status: 401 })
+      }
+
+      // Check that the OTP was verified (exists and verified)
+      const verifiedOtp = await otpCodeOperations.findFirst({
+        where: { email, type: 'admin_password_reset', verified: true },
+      })
+      if (!verifiedOtp) {
+        return NextResponse.json({ success: false, message: 'يرجى التحقق من رمز البريد الإلكتروني أولاً' }, { status: 400 })
+      }
+
+      // Verify PIN
+      if (!user.pinHash) {
+        return NextResponse.json({ success: false, message: 'لم يتم تعيين رمز PIN بعد. لا يمكن تغيير كلمة المرور.' }, { status: 400 })
+      }
+
+      const pinValid = await bcrypt.compare(pin, user.pinHash)
+      if (!pinValid) {
+        return NextResponse.json({ success: false, message: 'رمز PIN غير صحيح' }, { status: 401 })
+      }
+
+      const newHash = await bcrypt.hash(newPassword, 12)
+      await userOperations.update({ id: userId }, { passwordHash: newHash })
+      return NextResponse.json({ success: true, message: 'تم تغيير كلمة المرور بنجاح' })
+    }
+
+    // === ADMIN RECOVER WITH PHONE NUMBER + NEW EMAIL + OTP + PIN ===
+    if (action === 'admin_reset_with_number') {
+      const { adminNumber, newEmail, pin, newPassword } = body
+      if (!adminNumber || !newEmail || !pin || !newPassword) {
+        return NextResponse.json({ success: false, message: 'جميع الحقول مطلوبة' }, { status: 400 })
+      }
+      if (newPassword.length < 8) {
+        return NextResponse.json({ success: false, message: 'كلمة المرور الجديدة يجب أن تكون 8 أحرف على الأقل' }, { status: 400 })
+      }
+
+      // Verify admin phone number matches
+      if (!user.phone || user.phone !== adminNumber) {
+        return NextResponse.json({ success: false, message: 'رقم الإدارة غير صحيح' }, { status: 401 })
+      }
+
+      // Check that OTP was sent to the NEW email and verified
+      const verifiedOtp = await otpCodeOperations.findFirst({
+        where: { email: newEmail, type: 'admin_password_reset', verified: true },
+      })
+      if (!verifiedOtp) {
+        return NextResponse.json({ success: false, message: 'يرجى التحقق من رمز البريد الإلكتروني الجديد أولاً' }, { status: 400 })
+      }
+
+      // Verify PIN
+      if (!user.pinHash) {
+        return NextResponse.json({ success: false, message: 'لم يتم تعيين رمز PIN. لا يمكن الاستعادة.' }, { status: 400 })
+      }
+
+      const pinValid = await bcrypt.compare(pin, user.pinHash)
+      if (!pinValid) {
+        return NextResponse.json({ success: false, message: 'رمز PIN غير صحيح' }, { status: 401 })
+      }
+
+      // Update both email and password
+      const newHash = await bcrypt.hash(newPassword, 12)
+      await userOperations.update({ id: userId }, { email: newEmail, passwordHash: newHash })
+      return NextResponse.json({ success: true, message: 'تم استعادة الحساب وتغيير البريد وكلمة المرور بنجاح' })
     }
 
     // === UPDATE FEE SETTINGS ===

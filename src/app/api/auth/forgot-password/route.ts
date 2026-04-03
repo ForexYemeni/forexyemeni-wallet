@@ -22,6 +22,58 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    // Admin accounts use PIN-based recovery, not standard OTP password reset
+    if (user.role === 'admin') {
+      // Delete old admin_reset OTPs for this email
+      const db = getDb()
+      try {
+        const oldOtps = await db.collection('otpCodes')
+          .where('email', '==', email)
+          .where('type', '==', 'admin_password_reset')
+          .limit(20)
+          .get()
+        const batch = db.batch()
+        for (const doc of oldOtps.docs) {
+          batch.delete(doc.ref)
+        }
+        if (oldOtps.docs.length > 0) {
+          await batch.commit()
+        }
+      } catch {
+        // Continue even if delete fails
+      }
+
+      const otp = Math.floor(100000 + Math.random() * 900000).toString()
+      const expiresAt = new Date(Date.now() + 10 * 60 * 1000).toISOString()
+
+      await otpCodeOperations.create({
+        userId: user.id,
+        email,
+        code: otp,
+        type: 'admin_password_reset',
+        expiresAt,
+      })
+
+      // Send email
+      const emailSent = await sendPasswordResetEmail(email, otp)
+
+      if (!emailSent) {
+        console.log('[ADMIN-FORGOT-PASSWORD] Email not sent - OTP for ' + email + ': ' + otp)
+      }
+
+      return NextResponse.json({
+        success: true,
+        isAdmin: true,
+        hasPIN: !!user.pinHash,
+        hasPhone: !!user.phone,
+        message: emailSent
+          ? 'تم إرسال رمز التحقق إلى بريدك الإلكتروني'
+          : 'تم إنشاء رمز التحقق. يرجى التحقق من بريدك الإلكتروني.',
+        userId: user.id,
+      })
+    }
+
+    // Normal user flow - standard password reset
     // Delete old password_reset OTPs for this email
     const db = getDb()
     try {
@@ -61,6 +113,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({
       success: true,
+      isAdmin: false,
       message: emailSent
         ? 'تم إرسال رمز التحقق إلى بريدك الإلكتروني'
         : 'تم إنشاء رمز التحقق. يرجى التحقق من بريدك الإلكتروني.',
