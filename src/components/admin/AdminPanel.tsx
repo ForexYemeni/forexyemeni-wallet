@@ -33,6 +33,9 @@ import {
   Building,
   Trash2,
   Power,
+  AlertTriangle,
+  Lock,
+  Send,
 } from 'lucide-react'
 
 // ===================== TYPES =====================
@@ -130,6 +133,12 @@ export default function AdminPanel() {
   const [roleDialogUser, setRoleDialogUser] = useState<AdminUser | null>(null)
   const [selectedPermissions, setSelectedPermissions] = useState<AdminPermission>(DEFAULT_PERMISSIONS)
   const [actionLoading, setActionLoading] = useState<string | null>(null)
+  // Delete user dialog state
+  const [deleteDialogUser, setDeleteDialogUser] = useState<AdminUser | null>(null)
+  const [deleteStep, setDeleteStep] = useState<'confirm' | 'otp' | 'password'>('confirm')
+  const [deleteOtp, setDeleteOtp] = useState('')
+  const [deletePassword, setDeletePassword] = useState('')
+  const [deleteLoading, setDeleteLoading] = useState(false)
 
   useEffect(() => {
     if (user?.role === 'admin') {
@@ -278,6 +287,95 @@ export default function AdminPanel() {
       toast.error('خطأ في تحديث الصلاحيات')
     } finally {
       setActionLoading(null)
+    }
+  }
+
+  // ===== DELETE USER HANDLERS =====
+  const openDeleteDialog = (targetUser: AdminUser) => {
+    setDeleteDialogUser(targetUser)
+    setDeleteStep('confirm')
+    setDeleteOtp('')
+    setDeletePassword('')
+  }
+
+  const closeDeleteDialog = () => {
+    setDeleteDialogUser(null)
+    setDeleteStep('confirm')
+    setDeleteOtp('')
+    setDeletePassword('')
+    setDeleteLoading(false)
+  }
+
+  const handleSendDeleteOtp = async () => {
+    if (!deleteDialogUser || !user?.id) return
+    setDeleteLoading(true)
+    try {
+      const res = await fetch('/api/admin/delete-user', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ adminId: user.id, userId: deleteDialogUser.id, step: 'send_otp' }),
+      })
+      const data = await res.json()
+      if (data.success) {
+        toast.success(data.message)
+        setDeleteStep('otp')
+        if (data.debugOtp) {
+          toast.info(`رمز التحقق (للتطوير): ${data.debugOtp}`)
+        }
+      } else {
+        toast.error(data.message)
+      }
+    } catch {
+      toast.error('خطأ في إرسال رمز التحقق')
+    } finally {
+      setDeleteLoading(false)
+    }
+  }
+
+  const handleVerifyDeleteOtp = async () => {
+    if (!deleteDialogUser || !user?.id || !deleteOtp) return
+    setDeleteLoading(true)
+    try {
+      const res = await fetch('/api/admin/delete-user', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ adminId: user.id, userId: deleteDialogUser.id, step: 'verify_otp', otp: deleteOtp }),
+      })
+      const data = await res.json()
+      if (data.success) {
+        toast.success(data.message)
+        setDeleteStep('password')
+      } else {
+        toast.error(data.message)
+      }
+    } catch {
+      toast.error('خطأ في التحقق')
+    } finally {
+      setDeleteLoading(false)
+    }
+  }
+
+  const handleConfirmDelete = async () => {
+    if (!deleteDialogUser || !user?.id || !deletePassword) return
+    setDeleteLoading(true)
+    try {
+      const res = await fetch('/api/admin/delete-user', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ adminId: user.id, userId: deleteDialogUser.id, step: 'confirm_delete', password: deletePassword }),
+      })
+      const data = await res.json()
+      if (data.success) {
+        toast.success(data.message)
+        closeDeleteDialog()
+        fetchAll()
+      } else {
+        toast.error(data.message)
+      }
+    } catch {
+      toast.error('خطأ في حذف المستخدم')
+    } finally {
+      setDeleteLoading(false)
     }
   }
 
@@ -480,7 +578,7 @@ export default function AdminPanel() {
                           </div>
 
                           {/* Action Buttons */}
-                          <div className="grid grid-cols-3 gap-2 pt-2">
+                          <div className="grid grid-cols-4 gap-2 pt-2">
                             {u.status === 'active' ? (
                               <button
                                 onClick={() => handleUpdateUser(u.id, { status: 'suspended' })}
@@ -518,8 +616,17 @@ export default function AdminPanel() {
                               }`}
                             >
                               <Eye className="w-3.5 h-3.5" />
-                              مراجعة الهوية
+                              الهوية
                             </button>
+                            {u.role !== 'admin' && (
+                              <button
+                                onClick={() => openDeleteDialog(u)}
+                                className="flex items-center justify-center gap-1 text-xs py-2.5 rounded-lg bg-red-600/10 text-red-500 hover:bg-red-600/20 transition-colors font-medium"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                                حذف
+                              </button>
+                            )}
                           </div>
                         </div>
                       )}
@@ -647,6 +754,99 @@ export default function AdminPanel() {
             </div>
           )}
         </>
+      )}
+
+      {/* ===================== DELETE USER DIALOG ===================== */}
+      {deleteDialogUser && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={closeDeleteDialog}>
+          <div className="glass-card bg-background/95 backdrop-blur-xl border-red-500/20 w-full max-w-sm rounded-2xl p-6 space-y-5 animate-scale-in" onClick={(e) => e.stopPropagation()}>
+            {/* Step 1: Confirm */}
+            {deleteStep === 'confirm' && (
+              <>
+                <div className="text-center space-y-2">
+                  <div className="w-14 h-14 rounded-2xl bg-red-500/10 flex items-center justify-center mx-auto">
+                    <AlertTriangle className="w-7 h-7 text-red-400" />
+                  </div>
+                  <h3 className="text-lg font-bold text-red-400">حذف مستخدم</h3>
+                  <p className="text-sm text-muted-foreground">
+                    هل أنت متأكد من حذف <strong className="text-foreground">{deleteDialogUser.fullName || deleteDialogUser.email}</strong>؟
+                  </p>
+                  <p className="text-xs text-red-400/80">سيتم حذف جميع بيانات المستخدم بشكل نهائي ولا يمكن التراجع</p>
+                </div>
+                <div className="flex gap-3">
+                  <button onClick={handleSendDeleteOtp} disabled={deleteLoading} className="flex-1 h-11 bg-red-500 text-white font-bold rounded-xl hover:bg-red-600 transition-all">
+                    {deleteLoading ? <Loader2 className="w-4 h-4 animate-spin mx-auto" /> : 'متابعة'}
+                  </button>
+                  <button onClick={closeDeleteDialog} className="flex-1 h-11 bg-white/10 hover:bg-white/20 text-foreground font-medium rounded-xl transition-all">إلغاء</button>
+                </div>
+              </>
+            )}
+
+            {/* Step 2: OTP Verification */}
+            {deleteStep === 'otp' && (
+              <>
+                <div className="text-center space-y-2">
+                  <div className="w-14 h-14 rounded-2xl bg-gold/10 flex items-center justify-center mx-auto">
+                    <Send className="w-7 h-7 text-gold" />
+                  </div>
+                  <h3 className="text-lg font-bold gold-text">التحقق من البريد</h3>
+                  <p className="text-sm text-muted-foreground">
+                    تم إرسال رمز تحقق مكون من 6 أرقام إلى بريدك الإلكتروني
+                  </p>
+                  <p className="text-xs text-muted-foreground" dir="ltr">{user?.email}</p>
+                </div>
+                <div className="space-y-3">
+                  <div className="space-y-2">
+                    <Label className="text-sm text-muted-foreground">رمز التحقق</Label>
+                    <Input
+                      value={deleteOtp}
+                      onChange={(e) => setDeleteOtp(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                      className="glass-input h-12 text-center text-2xl font-mono tracking-[0.5em]"
+                      placeholder="000000"
+                      maxLength={6}
+                      dir="ltr"
+                    />
+                  </div>
+                  <button onClick={handleVerifyDeleteOtp} disabled={deleteLoading || deleteOtp.length < 6} className="w-full h-11 gold-gradient text-gray-900 font-bold rounded-xl hover:opacity-90 transition-all">
+                    {deleteLoading ? <Loader2 className="w-4 h-4 animate-spin mx-auto" /> : 'تحقق'}
+                  </button>
+                  <button onClick={closeDeleteDialog} className="w-full h-10 bg-white/10 hover:bg-white/20 text-foreground font-medium rounded-xl transition-all text-sm">إلغاء</button>
+                </div>
+              </>
+            )}
+
+            {/* Step 3: Password Confirmation */}
+            {deleteStep === 'password' && (
+              <>
+                <div className="text-center space-y-2">
+                  <div className="w-14 h-14 rounded-2xl bg-red-500/10 flex items-center justify-center mx-auto">
+                    <Lock className="w-7 h-7 text-red-400" />
+                  </div>
+                  <h3 className="text-lg font-bold text-red-400">تأكيد الحذف</h3>
+                  <p className="text-sm text-muted-foreground">
+                    أدخل كلمة المرور لحذف <strong className="text-foreground">{deleteDialogUser.fullName || deleteDialogUser.email}</strong>
+                  </p>
+                </div>
+                <div className="space-y-3">
+                  <div className="space-y-2">
+                    <Label className="text-sm text-muted-foreground">كلمة المرور</Label>
+                    <Input
+                      type="password"
+                      value={deletePassword}
+                      onChange={(e) => setDeletePassword(e.target.value)}
+                      className="glass-input h-12 text-base"
+                      placeholder="أدخل كلمة المرور"
+                    />
+                  </div>
+                  <button onClick={handleConfirmDelete} disabled={deleteLoading || !deletePassword} className="w-full h-11 bg-red-500 text-white font-bold rounded-xl hover:bg-red-600 transition-all">
+                    {deleteLoading ? <Loader2 className="w-4 h-4 animate-spin mx-auto" /> : 'حذف نهائي'}
+                  </button>
+                  <button onClick={closeDeleteDialog} className="w-full h-10 bg-white/10 hover:bg-white/20 text-foreground font-medium rounded-xl transition-all text-sm">إلغاء</button>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
       )}
 
       {/* ===================== ROLE CHANGE DIALOG ===================== */}

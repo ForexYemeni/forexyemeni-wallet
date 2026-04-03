@@ -133,6 +133,25 @@ export interface PaymentMethod {
   updatedAt: string
 }
 
+export interface UserPaymentMethod {
+  id: string
+  userId: string
+  name: string // e.g., "حسابي البنكي", "محفظة TRC20"
+  type: string // 'bank_transfer' | 'bank_deposit' | 'atm_transfer' | 'crypto'
+  category: string // 'bank' | 'crypto'
+  isActive: boolean
+  network?: string | null
+  walletAddress?: string | null
+  accountName?: string | null
+  accountNumber?: string | null
+  beneficiaryName?: string | null
+  phone?: string | null
+  recipientName?: string | null
+  recipientPhone?: string | null
+  createdAt: string
+  updatedAt: string
+}
+
 // ===================== USER OPERATIONS =====================
 
 export const userOperations = {
@@ -526,6 +545,40 @@ export const paymentMethodOperations = {
   async delete(id: string): Promise<void> {
     const db = getDb()
     await db.collection('paymentMethods').doc(id).delete()
+  },
+}
+
+// ===================== USER PAYMENT METHOD OPERATIONS =====================
+
+export const userPaymentMethodOperations = {
+  async create(data: Omit<UserPaymentMethod, 'id' | 'createdAt' | 'updatedAt'>): Promise<UserPaymentMethod> {
+    const db = getDb()
+    const id = generateId()
+    const now = nowTimestamp()
+    const method: UserPaymentMethod = { ...data, id, createdAt: now, updatedAt: now }
+    await db.collection('userPaymentMethods').doc(id).set(method)
+    return method
+  },
+
+  async findByUserId(userId: string): Promise<UserPaymentMethod[]> {
+    const db = getDb()
+    const snapshot = await db.collection('userPaymentMethods')
+      .where('userId', '==', userId)
+      .limit(50)
+      .get()
+    const results = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() } as UserPaymentMethod))
+    results.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+    return results
+  },
+
+  async update(id: string, data: Partial<UserPaymentMethod>): Promise<void> {
+    const db = getDb()
+    await db.collection('userPaymentMethods').doc(id).update({ ...data, updatedAt: nowTimestamp() })
+  },
+
+  async delete(id: string): Promise<void> {
+    const db = getDb()
+    await db.collection('userPaymentMethods').doc(id).delete()
   },
 }
 
