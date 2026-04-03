@@ -1691,7 +1691,7 @@ function AdminSettingsPanel({ settings, onRefresh }: { settings: { email: string
 
   // Fetch fees on mount
   useEffect(() => {
-    const fetchFees()
+    fetchFees()
   }, [])
 
   const fetchFees = async () => {
