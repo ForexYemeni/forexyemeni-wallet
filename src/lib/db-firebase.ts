@@ -313,20 +313,21 @@ export const kycRecordOperations = {
     const db = getDb()
     const snapshot = await db.collection('kycRecords').limit(100).get()
     
-    const results: (KYCRecord & { user?: { id: string; email: string; fullName: string | null; phone: string | null } })[] = []
-    
-    for (const doc of snapshot.docs) {
-      const data = doc.data() as KYCRecord
-      const userDoc = await db.collection('users').doc(data.userId).get()
-      let user: { id: string; email: string; fullName: string | null; phone: string | null } | undefined
+    if (snapshot.empty) return []
+
+    // Batch fetch all users in a single call
+    const records = snapshot.docs.map(doc => ({ id: doc.id, ...(doc.data() as KYCRecord) }))
+    const uniqueUserIds = [...new Set(records.map(r => r.userId))]
+    const userDocs = await Promise.all(uniqueUserIds.map(uid => db.collection('users').doc(uid).get()))
+    const userMap = new Map<string, { id: string; email: string; fullName: string | null; phone: string | null }>()
+    for (const userDoc of userDocs) {
       if (userDoc.exists) {
         const ud = userDoc.data()
-        user = { id: userDoc.id, email: ud.email, fullName: ud.fullName || null, phone: ud.phone || null }
+        userMap.set(userDoc.id, { id: userDoc.id, email: ud.email, fullName: ud.fullName || null, phone: ud.phone || null })
       }
-      results.push({ id: doc.id, ...data, user })
     }
-    
-    // Sort in JS
+
+    const results = records.map(r => ({ ...r, user: userMap.get(r.userId) }))
     results.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
     return results
   },
@@ -371,20 +372,21 @@ export const depositOperations = {
     query = query.limit(100)
     const snapshot = await query.get()
     
-    const results: (Deposit & { user?: { id: string; email: string; fullName: string | null } })[] = []
-    
-    for (const doc of snapshot.docs) {
-      const data = doc.data() as Deposit
-      const userDoc = await db.collection('users').doc(data.userId).get()
-      let user: { id: string; email: string; fullName: string | null } | undefined
+    if (snapshot.empty) return []
+
+    // Batch fetch all users in parallel
+    const deposits = snapshot.docs.map(doc => ({ id: doc.id, ...(doc.data() as Deposit) }))
+    const uniqueUserIds = [...new Set(deposits.map(d => d.userId))]
+    const userDocs = await Promise.all(uniqueUserIds.map(uid => db.collection('users').doc(uid).get()))
+    const userMap = new Map<string, { id: string; email: string; fullName: string | null }>()
+    for (const userDoc of userDocs) {
       if (userDoc.exists) {
         const ud = userDoc.data()
-        user = { id: userDoc.id, email: ud.email, fullName: ud.fullName || null }
+        userMap.set(userDoc.id, { id: userDoc.id, email: ud.email, fullName: ud.fullName || null })
       }
-      results.push({ id: doc.id, ...data, user })
     }
-    
-    // Sort in JS
+
+    const results = deposits.map(d => ({ ...d, user: userMap.get(d.userId) }))
     results.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
     return results
   },
@@ -427,19 +429,21 @@ export const withdrawalOperations = {
     query = query.limit(100)
     const snapshot = await query.get()
     
-    const results: (Withdrawal & { user?: { id: string; email: string; fullName: string | null; phone: string | null } })[] = []
-    
-    for (const doc of snapshot.docs) {
-      const data = doc.data() as Withdrawal
-      const userDoc = await db.collection('users').doc(data.userId).get()
-      let user: { id: string; email: string; fullName: string | null; phone: string | null } | undefined
+    if (snapshot.empty) return []
+
+    // Batch fetch all users in parallel
+    const withdrawals = snapshot.docs.map(doc => ({ id: doc.id, ...(doc.data() as Withdrawal) }))
+    const uniqueUserIds = [...new Set(withdrawals.map(w => w.userId))]
+    const userDocs = await Promise.all(uniqueUserIds.map(uid => db.collection('users').doc(uid).get()))
+    const userMap = new Map<string, { id: string; email: string; fullName: string | null; phone: string | null }>()
+    for (const userDoc of userDocs) {
       if (userDoc.exists) {
         const ud = userDoc.data()
-        user = { id: userDoc.id, email: ud.email, fullName: ud.fullName || null, phone: ud.phone || null }
+        userMap.set(userDoc.id, { id: userDoc.id, email: ud.email, fullName: ud.fullName || null, phone: ud.phone || null })
       }
-      results.push({ id: doc.id, ...data, user })
     }
-    
+
+    const results = withdrawals.map(w => ({ ...w, user: userMap.get(w.userId) }))
     results.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
     return results
   },

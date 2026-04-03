@@ -1,23 +1,26 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import dynamic from 'next/dynamic'
 import { useAuthStore } from '@/lib/store'
-import LoginForm from '@/components/auth/LoginForm'
-import RegisterForm from '@/components/auth/RegisterForm'
-import ForgotPasswordForm from '@/components/auth/ForgotPasswordForm'
-import ForceChangePassword from '@/components/auth/ForceChangePassword'
-import Dashboard from '@/components/wallet/Dashboard'
-import DepositForm from '@/components/wallet/DepositForm'
-import WithdrawForm from '@/components/wallet/WithdrawForm'
-import TransactionHistory from '@/components/wallet/TransactionHistory'
-import KYCVerification from '@/components/kyc/KYCVerification'
-import SettingsPage from '@/components/settings/Settings'
-import NotificationsPage from '@/components/settings/NotificationsPage'
-import AdminPanel from '@/components/admin/AdminPanel'
-import DeviceLockedScreen from '@/components/auth/DeviceLockedScreen'
-import AppLayout from '@/components/layout/AppLayout'
 import { toast } from 'sonner'
 import { Loader2, Lock, Image as ImageIcon } from 'lucide-react'
+
+// Lazy load ALL components — only loads what's needed
+const LoginForm = dynamic(() => import('@/components/auth/LoginForm'), { ssr: false })
+const RegisterForm = dynamic(() => import('@/components/auth/RegisterForm'), { ssr: false })
+const ForgotPasswordForm = dynamic(() => import('@/components/auth/ForgotPasswordForm'), { ssr: false })
+const ForceChangePassword = dynamic(() => import('@/components/auth/ForceChangePassword'), { ssr: false })
+const DeviceLockedScreen = dynamic(() => import('@/components/auth/DeviceLockedScreen'), { ssr: false })
+const Dashboard = dynamic(() => import('@/components/wallet/Dashboard'), { ssr: false })
+const DepositForm = dynamic(() => import('@/components/wallet/DepositForm'), { ssr: false })
+const WithdrawForm = dynamic(() => import('@/components/wallet/WithdrawForm'), { ssr: false })
+const TransactionHistory = dynamic(() => import('@/components/wallet/TransactionHistory'), { ssr: false })
+const KYCVerification = dynamic(() => import('@/components/kyc/KYCVerification'), { ssr: false })
+const SettingsPage = dynamic(() => import('@/components/settings/Settings'), { ssr: false })
+const NotificationsPage = dynamic(() => import('@/components/settings/NotificationsPage'), { ssr: false })
+const AdminPanel = dynamic(() => import('@/components/admin/AdminPanel'), { ssr: false })
+const AppLayout = dynamic(() => import('@/components/layout/AppLayout'), { ssr: false })
 
 interface PendingWithdrawal {
   amount: number
@@ -31,7 +34,12 @@ interface PendingWithdrawal {
 }
 
 export default function Home() {
-  const { currentScreen, isAuthenticated, setScreen, user, setPendingWithdrawalConfirmation, updateUser } = useAuthStore()
+  const currentScreen = useAuthStore(s => s.currentScreen)
+  const isAuthenticated = useAuthStore(s => s.isAuthenticated)
+  const setScreen = useAuthStore(s => s.setScreen)
+  const user = useAuthStore(s => s.user)
+  const setPendingWithdrawalConfirmation = useAuthStore(s => s.setPendingWithdrawalConfirmation)
+  const updateUser = useAuthStore(s => s.updateUser)
   const [confirmPassword, setConfirmPassword] = useState('')
   const [confirmLoading, setConfirmLoading] = useState(false)
   const [pendingWithdrawal, setPendingWithdrawal] = useState<PendingWithdrawal | null>(null)
@@ -64,14 +72,7 @@ export default function Home() {
     }
   }, [isAuthenticated, user?.pendingConfirmation])
 
-  // Check pendingConfirmation on mount
-  useEffect(() => {
-    if (isAuthenticated && user?.pendingConfirmation) {
-      // Keep the confirmation dialog visible
-    }
-  }, [isAuthenticated, user?.pendingConfirmation])
-
-  // Force change password screen (shown after login with temp password)
+  // Force change password screen
   if (isAuthenticated && currentScreen === 'force-change-password') {
     return <ForceChangePassword />
   }
@@ -122,7 +123,6 @@ export default function Home() {
             </div>
           ) : pendingWithdrawal ? (
             <div className="space-y-4">
-              {/* Withdrawal amount details */}
               <div className="p-4 rounded-xl bg-white/5 border border-white/10 space-y-3">
                 <div className="flex items-center justify-between">
                   <span className="text-sm text-muted-foreground">مبلغ السحب</span>
@@ -146,7 +146,6 @@ export default function Home() {
                 )}
               </div>
 
-              {/* Payment proof image */}
               {pendingWithdrawal.screenshot ? (
                 <div className="space-y-2">
                   <p className="text-xs text-muted-foreground font-medium">إثبات الدفع:</p>
@@ -158,6 +157,7 @@ export default function Home() {
                       src={pendingWithdrawal.screenshot}
                       alt="إثبات الدفع"
                       className="w-full h-48 object-contain bg-black/30"
+                      loading="lazy"
                     />
                     <div className="absolute bottom-2 right-2 bg-black/60 px-2 py-1 rounded-lg flex items-center gap-1 text-xs text-white">
                       <ImageIcon className="w-3 h-3" />
@@ -192,7 +192,6 @@ export default function Home() {
           </div>
         </div>
 
-        {/* Full screen image preview */}
         {showProofImage && pendingWithdrawal?.screenshot && (
           <div
             className="fixed inset-0 bg-black/90 z-[60] flex items-center justify-center p-4"
@@ -221,17 +220,17 @@ export default function Home() {
   if (!isAuthenticated) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background relative overflow-hidden">
-        {/* Background */}
         <div className="absolute inset-0">
           <img
             src="/hero-bg.png"
             alt=""
             className="w-full h-full object-cover opacity-30"
+            loading="eager"
+            fetchPriority="high"
           />
           <div className="absolute inset-0 bg-gradient-to-b from-background/60 via-background/80 to-background" />
         </div>
 
-        {/* Auth Content */}
         <div className="relative z-10 w-full max-w-sm mx-auto px-4">
           {currentScreen === 'login' && <LoginForm />}
           {currentScreen === 'register' && <RegisterForm />}

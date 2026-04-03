@@ -168,39 +168,112 @@ export default function AdminPanel() {
   // Full image preview
   const [previewImage, setPreviewImage] = useState<string | null>(null)
 
+  // Track which tabs have been loaded to avoid re-fetching
+  const [loadedTabs, setLoadedTabs] = useState<Set<string>>(new Set())
+
+  // Fetch only data for the active tab
   useEffect(() => {
     if (user?.role === 'admin' || (user?.permissions && Object.values(user.permissions).some(v => v))) {
-      fetchAll()
+      if (!loadedTabs.has(activeTab)) {
+        fetchTabData(activeTab)
+        setLoadedTabs(prev => new Set(prev).add(activeTab))
+      }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeTab])
 
+  // Initial load: fetch users + payment-methods + settings (always needed)
+  useEffect(() => {
+    if (user?.role === 'admin' || (user?.permissions && Object.values(user.permissions).some(v => v))) {
+      fetchUsers()
+      fetchPaymentMethods()
+      fetchAdminSettings()
+      // Pre-load the active tab
+      fetchTabData(activeTab)
+      setLoadedTabs(prev => new Set(prev).add(activeTab))
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  const fetchUsers = async () => {
+    try {
+      const res = await fetch('/api/admin/users')
+      const data = await res.json()
+      if (data.success) setUsers(data.users || [])
+    } catch { /* silent */ }
+  }
+
+  const fetchDeposits = async () => {
+    try {
+      const res = await fetch('/api/admin/deposits')
+      const data = await res.json()
+      if (data.success) setDeposits(data.deposits || [])
+    } catch { /* silent */ }
+  }
+
+  const fetchWithdrawals = async () => {
+    try {
+      const res = await fetch('/api/admin/withdrawals')
+      const data = await res.json()
+      if (data.success) setWithdrawals(data.withdrawals || [])
+    } catch { /* silent */ }
+  }
+
+  const fetchKYC = async () => {
+    try {
+      const res = await fetch('/api/admin/kyc')
+      const data = await res.json()
+      if (data.success) setKycRecords(data.kycRecords || [])
+    } catch { /* silent */ }
+  }
+
+  const fetchPaymentMethods = async () => {
+    try {
+      const res = await fetch('/api/admin/payment-methods')
+      const data = await res.json()
+      if (data.success) setPaymentMethods(data.methods || [])
+    } catch { /* silent */ }
+  }
+
+  const fetchAdminSettings = async () => {
+    if (user?.role === 'admin' && !user.permissions) {
+      try {
+        const res = await fetch(`/api/admin/settings?userId=${user.id}`)
+        const data = await res.json()
+        if (data.success) setAdminSettings(data.settings)
+      } catch { /* silent */ }
+    }
+  }
+
+  const fetchTabData = (tab: string) => {
+    switch (tab) {
+      case 'deposits': fetchDeposits(); break
+      case 'withdrawals': fetchWithdrawals(); break
+      case 'kyc': fetchKYC(); break
+      case 'payment-methods': fetchPaymentMethods(); break
+    }
+  }
+
+  // Lightweight refresh: only re-fetch the affected tab
+  const refreshCurrentTab = () => {
+    fetchTabData(activeTab)
+    fetchPaymentMethods()
+  }
+
+  // Full refresh for cross-tab data changes (used sparingly)
   const fetchAll = async () => {
     setLoading(true)
     try {
-      const [usersRes, depositsRes, withdrawalsRes, kycRes] = await Promise.all([
-        fetch('/api/admin/users'),
-        fetch('/api/admin/deposits'),
-        fetch('/api/admin/withdrawals'),
-        fetch('/api/admin/kyc'),
+      await Promise.all([
+        fetchUsers(),
+        fetchDeposits(),
+        fetchWithdrawals(),
+        fetchKYC(),
+        fetchPaymentMethods(),
+        fetchAdminSettings(),
       ])
-      const [usersData, depositsData, withdrawalsData, kycData] = await Promise.all([
-        usersRes.json(), depositsRes.json(), withdrawalsRes.json(), kycRes.json(),
-      ])
-      if (usersData.success) setUsers(usersData.users || [])
-      if (depositsData.success) setDeposits(depositsData.deposits || [])
-      if (withdrawalsData.success) setWithdrawals(withdrawalsData.withdrawals || [])
-      if (kycData.success) setKycRecords(kycData.kycRecords || [])
-      const pmRes = await fetch('/api/admin/payment-methods')
-      const pmData = await pmRes.json()
-      if (pmData.success) setPaymentMethods(pmData.methods || [])
-      if (user?.role === 'admin' && !user.permissions) {
-        try {
-          const asRes = await fetch(`/api/admin/settings?userId=${user.id}`)
-          const asData = await asRes.json()
-          if (asData.success) setAdminSettings(asData.settings)
-        } catch { /* silent */ }
-      }
+      // Mark all tabs as loaded
+      setLoadedTabs(new Set(['users', 'deposits', 'withdrawals', 'kyc', 'payment-methods', 'admin-settings']))
     } catch {
       toast.error('خطأ في تحميل البيانات')
     } finally {
@@ -223,7 +296,7 @@ export default function AdminPanel() {
           status === 'reviewing' ? 'تم تحويل للمراجعة' :
           'تم رفض الإيداع'
         )
-        fetchAll()
+        fetchDeposits(); fetchUsers()
       } else {
         toast.error(data.message)
       }
@@ -245,7 +318,7 @@ export default function AdminPanel() {
       const data = await res.json()
       if (data.success) {
         toast.success('تم تحديث السحب')
-        fetchAll()
+        fetchWithdrawals(); fetchUsers()
       } else {
         toast.error(data.message)
       }
@@ -268,7 +341,7 @@ export default function AdminPanel() {
       if (data.success) {
         toast.success(status === 'approved' ? 'تم قبول المستند' : 'تم رفض المستند')
         if (kycRejectDialog) setKycRejectDialog(null)
-        fetchAll()
+        fetchKYC(); fetchUsers()
       } else {
         toast.error(data.message)
       }
@@ -290,7 +363,7 @@ export default function AdminPanel() {
       const data = await res.json()
       if (data.success) {
         toast.success('تم تحديث المستخدم')
-        fetchAll()
+        fetchUsers()
       } else {
         toast.error(data.message)
       }
@@ -319,7 +392,7 @@ export default function AdminPanel() {
       if (data.success) {
         toast.success('تم تحديث صلاحيات المستخدم')
         setRoleDialogUser(null)
-        fetchAll()
+        fetchUsers()
       } else {
         toast.error(data.message)
       }
@@ -408,7 +481,7 @@ export default function AdminPanel() {
       if (data.success) {
         toast.success(data.message)
         closeDeleteDialog()
-        fetchAll()
+        fetchUsers()
       } else {
         toast.error(data.message)
       }
@@ -1046,12 +1119,12 @@ export default function AdminPanel() {
 
           {/* ===================== PAYMENT METHODS TAB ===================== */}
           {effectiveActiveTab === 'payment-methods' && (
-            <PaymentMethodsManager methods={paymentMethods} onRefresh={() => fetchAll()} />
+            <PaymentMethodsManager methods={paymentMethods} onRefresh={() => { fetchPaymentMethods() }} />
           )}
 
           {/* ===================== ADMIN SETTINGS TAB ===================== */}
           {effectiveActiveTab === 'admin-settings' && (
-            <AdminSettingsPanel settings={adminSettings} onRefresh={() => fetchAll()} />
+            <AdminSettingsPanel settings={adminSettings} onRefresh={() => { fetchAdminSettings(); fetchFees() }} />
           )}
 
           {/* ===================== KYC TAB ===================== */}
