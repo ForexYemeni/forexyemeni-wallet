@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef, lazy, Suspense } from 'react'
 import { useAuthStore } from '@/lib/store'
 import { toast } from 'sonner'
+import { convertUSDTtoYER, formatYER } from '@/lib/currency'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -184,7 +185,7 @@ export default function AdminPanel() {
   const { user, setScreen } = useAuthStore()
   const AdminFaqManager = lazy(() => import('@/components/admin/AdminFaqManager'))
   const AdminReferralSettings = lazy(() => import('@/components/admin/AdminReferralSettings'))
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'users' | 'deposits' | 'withdrawals' | 'kyc' | 'payment-methods' | 'admin-settings' | 'faq-bot' | 'chats' | 'referral-settings' | 'p2p' | 'audit-log' | 'reports' | 'system-monitor' | 'admin-team' | 'admin-financial' | 'super-admin'>('dashboard')
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'users' | 'deposits' | 'withdrawals' | 'kyc' | 'payment-methods' | 'admin-settings' | 'faq-bot' | 'chats' | 'referral-settings' | 'p2p' | 'audit-log' | 'reports' | 'system-monitor' | 'admin-team' | 'admin-financial' | 'banners' | 'super-admin'>('dashboard')
   const AdminChat = lazy(() => import('@/components/admin/AdminChat'))
   const AdminP2P = lazy(() => import('@/components/admin/AdminP2P'))
   const AdminAuditLog = lazy(() => import('@/components/admin/AdminAuditLog'))
@@ -193,6 +194,7 @@ export default function AdminPanel() {
   const SuperAdminPanel = lazy(() => import('@/components/admin/SuperAdminPanel'))
   const AdminTeam = lazy(() => import('@/components/admin/AdminTeam'))
   const AdminFinancial = lazy(() => import('@/components/admin/AdminFinancial'))
+  const BannerManager = lazy(() => import('@/components/admin/BannerManager'))
   const [chatUnreadCount, setChatUnreadCount] = useState(0)
 
   // Fetch data when switching tabs (lazy load)
@@ -904,6 +906,7 @@ export default function AdminPanel() {
     { key: 'system-monitor' as const, label: 'مراقبة النظام', icon: Activity, count: 0 },
     { key: 'admin-team' as const, label: '👥 فريق الإدارة', icon: Users, count: 0 },
     { key: 'admin-financial' as const, label: '💰 الملخص المالي', icon: CreditCard, count: 0 },
+    { key: 'banners' as const, label: 'إدارة البانرات', icon: Store, count: 0 },
     { key: 'super-admin' as const, label: '🛡️ تحكم خارق', icon: Shield, count: 0 },
   ]
 
@@ -1064,6 +1067,7 @@ export default function AdminPanel() {
                       </div>
                       <p className="text-2xl font-bold text-green-400">{stats.totalDepositsAmount.toLocaleString()}</p>
                       <span className="text-[10px] text-muted-foreground">USDT إجمالي المبالغ المؤكدة</span>
+                      <span className="block text-[10px] text-muted-foreground/70 mt-0.5">≈ {formatYER(convertUSDTtoYER(stats.totalDepositsAmount))}</span>
                       <div className="flex gap-3 mt-2 text-[10px]">
                         <span className="text-yellow-400">معلق: {stats.depositsPending}</span>
                         <span className="text-green-400">مؤكد: {stats.depositsConfirmed}</span>
@@ -1078,6 +1082,7 @@ export default function AdminPanel() {
                       </div>
                       <p className="text-2xl font-bold text-red-400">{stats.totalWithdrawalsAmount.toLocaleString()}</p>
                       <span className="text-[10px] text-muted-foreground">USDT إجمالي المبالغ المحولة</span>
+                      <span className="block text-[10px] text-muted-foreground/70 mt-0.5">≈ {formatYER(convertUSDTtoYER(stats.totalWithdrawalsAmount))}</span>
                       <div className="flex gap-3 mt-2 text-[10px]">
                         <span className="text-yellow-400">معلق: {stats.withdrawalsPending}</span>
                         <span className="text-green-400">مكتمل: {stats.withdrawalsProcessing}</span>
@@ -1091,7 +1096,9 @@ export default function AdminPanel() {
                         <span className="text-xs text-muted-foreground">الإيرادات والرصيد</span>
                       </div>
                       <p className="text-lg font-bold text-gold">{stats.totalFees.toLocaleString()} <span className="text-xs">USDT رسوم</span></p>
+                      <span className="text-[10px] text-muted-foreground/70">≈ {formatYER(convertUSDTtoYER(stats.totalFees))}</span>
                       <p className="text-sm font-medium mt-1">{stats.adminBalance.toLocaleString()} <span className="text-xs text-muted-foreground">USDT رصيد الإدارة</span></p>
+                      <span className="text-[10px] text-muted-foreground/70">≈ {formatYER(convertUSDTtoYER(stats.adminBalance))}</span>
                     </div>
                   </div>
 
@@ -1792,6 +1799,19 @@ export default function AdminPanel() {
               </div>
             }>
               <AdminFinancial />
+            </Suspense>
+          )}
+
+          {/* ===================== BANNERS TAB ===================== */}
+          {effectiveActiveTab === 'banners' && (
+            <Suspense fallback={
+              <div className="space-y-3">
+                {[...Array(3)].map((_, i) => (
+                  <div key={i} className="glass-card p-4 shimmer h-32 rounded-xl" />
+                ))}
+              </div>
+            }>
+              <BannerManager />
             </Suspense>
           )}
 

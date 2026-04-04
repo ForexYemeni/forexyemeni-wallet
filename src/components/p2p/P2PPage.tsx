@@ -15,8 +15,9 @@ const P2PMarketplace = dynamic(() => import('./P2PMarketplace'), { ssr: false })
 const P2PMyListings = dynamic(() => import('./P2PMyListings'), { ssr: false })
 const P2PMyTrades = dynamic(() => import('./P2PMyTrades'), { ssr: false })
 const P2PTradeDetail = dynamic(() => import('./P2PTradeDetail'), { ssr: false })
+const MerchantDashboard = dynamic(() => import('@/components/merchant/MerchantDashboard'), { ssr: false })
 
-type SubScreen = 'overview' | 'market' | 'my-listings' | 'my-trades' | 'trade-detail' | 'verification'
+type SubScreen = 'overview' | 'market' | 'my-listings' | 'my-trades' | 'trade-detail' | 'verification' | 'dashboard'
 
 export default function P2PPage() {
   const { user } = useAuthStore()
@@ -101,6 +102,7 @@ export default function P2PPage() {
   }
 
   const tabs = isMerchant ? [
+    { key: 'dashboard' as const, label: 'المالية', icon: DollarSign },
     { key: 'overview' as const, label: 'لوحة التحكم', icon: TrendingUp },
     { key: 'my-listings' as const, label: 'إعلاناتي', icon: Store },
     { key: 'my-trades' as const, label: 'الطلبات', icon: History },
@@ -137,6 +139,12 @@ export default function P2PPage() {
       </div>
 
       {/* Content */}
+      {subScreen === 'dashboard' && isMerchant && (
+        <MerchantDashboard
+          onNavigateToListings={() => setSubScreen('my-listings')}
+          onNavigateToTrades={() => setSubScreen('my-trades')}
+        />
+      )}
       {subScreen === 'overview' && isMerchant && (
         <MerchantOverview
           stats={stats}

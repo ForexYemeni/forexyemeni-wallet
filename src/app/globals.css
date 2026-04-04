@@ -370,3 +370,29 @@
   color: #818cf8;
   border: 1px solid rgba(99, 102, 241, 0.3);
 }
+
+/* ==================== Welcome Wizard Slide Animations ==================== */
+@keyframes wizEnterLeft {
+  from { opacity: 0; transform: translateX(40px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+
+@keyframes wizExitLeft {
+  from { opacity: 1; transform: translateX(0); }
+  to   { opacity: 0; transform: translateX(-40px); }
+}
+
+@keyframes wizEnterRight {
+  from { opacity: 0; transform: translateX(-40px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+
+@keyframes wizExitRight {
+  from { opacity: 1; transform: translateX(0); }
+  to   { opacity: 0; transform: translateX(40px); }
+}
+
+.animate-wiz-enter-left  { animation: wizEnterLeft  0.3s ease-out forwards; }
+.animate-wiz-exit-left    { animation: wizExitLeft    0.3s ease-in  forwards; }
+.animate-wiz-enter-right  { animation: wizEnterRight  0.3s ease-out forwards; }
+.animate-wiz-exit-right   { animation: wizExitRight   0.3s ease-in  forwards; }

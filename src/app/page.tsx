@@ -27,6 +27,7 @@ const AppLayout = dynamic(() => import('@/components/layout/AppLayout'), { ssr: 
 const FaqPage = dynamic(() => import('@/components/chat/FaqPage'), { ssr: false })
 const SupportBot = dynamic(() => import('@/components/chat/SupportBot'), { ssr: false })
 const P2PPage = dynamic(() => import('@/components/p2p/P2PPage'), { ssr: false })
+const WelcomeWizard = dynamic(() => import('@/components/auth/WelcomeWizard'), { ssr: false })
 
 interface PendingWithdrawal {
   amount: number
@@ -145,6 +146,7 @@ export default function Home() {
   const [pendingWithdrawal, setPendingWithdrawal] = useState<PendingWithdrawal | null>(null)
   const [loadingWithdrawal, setLoadingWithdrawal] = useState(true)
   const [showProofImage, setShowProofImage] = useState(false)
+  const [showWelcome, setShowWelcome] = useState(false)
 
   // Hydration safety: wait until client-side is mounted
   const [mounted, setMounted] = useState(false)
@@ -153,6 +155,14 @@ export default function Home() {
 
   useEffect(() => {
     setMounted(true)
+    // Check if user has already seen the welcome wizard
+    try {
+      if (localStorage.getItem('forexyemeni-welcome-seen') !== 'true') {
+        setShowWelcome(true)
+      }
+    } catch {
+      // localStorage unavailable
+    }
   }, [])
 
   // Global error handler — only for truly critical errors
@@ -534,6 +544,11 @@ export default function Home() {
         </div>
       </div>
     )
+  }
+
+  // Welcome Wizard — shows once after login (before main content)
+  if (isAuthenticated && showWelcome) {
+    return <WelcomeWizard onComplete={() => setShowWelcome(false)} />
   }
 
   // Main App Screens

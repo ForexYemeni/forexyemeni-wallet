@@ -3,9 +3,42 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useAuthStore } from '@/lib/store'
 import { toast } from 'sonner'
-import { BarChart3, TrendingUp, TrendingDown, DollarSign, Users, ArrowDownLeft, ArrowUpRight, Calendar, RefreshCw, FileDown } from 'lucide-react'
+import {
+  BarChart3,
+  TrendingUp,
+  TrendingDown,
+  DollarSign,
+  Users,
+  ArrowDownLeft,
+  ArrowUpRight,
+  Calendar,
+  RefreshCw,
+  FileDown,
+  ArrowDownCircle,
+  ArrowUpCircle,
+  Loader2,
+  FileCheck,
+} from 'lucide-react'
 
 type PeriodType = 'daily' | 'weekly' | 'monthly'
+
+interface AutoReport {
+  period: string
+  periodLabel: string
+  generatedAt: string
+  fromDate: string
+  toDate: string
+  stats: {
+    totalUsers: number
+    newUsersInPeriod: number
+    activeUsersInPeriod: number
+    depositAmountInPeriod: number
+    depositCountInPeriod: number
+    withdrawalAmountInPeriod: number
+    withdrawalCountInPeriod: number
+    p2pTradeCountInPeriod: number
+  }
+}
 
 export default function AdminReports() {
   const { user } = useAuthStore()
@@ -15,6 +48,10 @@ export default function AdminReports() {
   const [toDate, setToDate] = useState('')
   const [useCustomRange, setUseCustomRange] = useState(false)
   const [report, setReport] = useState<any>(null)
+
+  // Auto-report state
+  const [autoReport, setAutoReport] = useState<AutoReport | null>(null)
+  const [autoReportLoading, setAutoReportLoading] = useState(false)
 
   // Set default date range (last 7 days)
   useEffect(() => {
@@ -48,12 +85,111 @@ export default function AdminReports() {
 
   useEffect(() => { fetchReport() }, [fetchReport])
 
+  // ===== AUTO REPORT GENERATION =====
+  const generateAutoReport = async (reportPeriod: 'daily' | 'weekly') => {
+    if (!user?.id) return
+    setAutoReportLoading(true)
+    try {
+      const res = await fetch('/api/admin/reports/generate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ adminId: user.id, period: reportPeriod }),
+      })
+      const data = await res.json()
+      if (data.success) {
+        setAutoReport(data.report)
+        toast.success('تم إنشاء التقرير بنجاح')
+      } else {
+        toast.error(data.message || 'خطأ في إنشاء التقرير')
+      }
+    } catch {
+      toast.error('خطأ في إنشاء التقرير')
+    } finally {
+      setAutoReportLoading(false)
+    }
+  }
+
+  // ===== EXPORT AUTO REPORT =====
+  const exportAutoReport = () => {
+    if (!autoReport) return
+    const s = autoReport.stats
+    const dateGenerated = new Date(autoReport.generatedAt).toLocaleString('ar-SA')
+    const periodRange = `${new Date(autoReport.fromDate).toLocaleDateString('ar-SA')} - ${new Date(autoReport.toDate).toLocaleDateString('ar-SA')}`
+
+    const text = [
+      `═══════════════════════════════════════════`,
+      `  ${autoReport.periodLabel}`,
+      `  ForexYemeni Wallet`,
+      `═══════════════════════════════════════════`,
+      ``,
+      `📅 الفترة: ${periodRange}`,
+      `🕐 تاريخ الإنشاء: ${dateGenerated}`,
+      ``,
+      `───────────────────────────────────────────`,
+      `  📊 الإحصائيات`,
+      `───────────────────────────────────────────`,
+      ``,
+      `👥 إجمالي المستخدمين: ${s.totalUsers}`,
+      `🆕 مستخدمون جدد: ${s.newUsersInPeriod}`,
+      `🟢 مستخدمون نشطون: ${s.activeUsersInPeriod}`,
+      ``,
+      `───────────────────────────────────────────`,
+      `  💰 الإيداعات`,
+      `───────────────────────────────────────────`,
+      ``,
+      `💵 إجمالي المبالغ: ${s.depositAmountInPeriod.toFixed(2)} USDT`,
+      `📝 عدد العمليات: ${s.depositCountInPeriod}`,
+      ``,
+      `───────────────────────────────────────────`,
+      `  💸 السحوبات`,
+      `───────────────────────────────────────────`,
+      ``,
+      `💵 إجمالي المبالغ: ${s.withdrawalAmountInPeriod.toFixed(2)} USDT`,
+      `📝 عدد العمليات: ${s.withdrawalCountInPeriod}`,
+      ``,
+      `───────────────────────────────────────────`,
+      `  🔄 P2P`,
+      `───────────────────────────────────────────`,
+      ``,
+      `📊 عدد الصفقات: ${s.p2pTradeCountInPeriod}`,
+      ``,
+      `═══════════════════════════════════════════`,
+      `  تم إنشاء هذا التقرير تلقائياً`,
+      `═══════════════════════════════════════════`,
+    ].join('\n')
+
+    const blob = new Blob([text], { type: 'text/plain;charset=utf-8' })
+    const url = window.URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `${autoReport.periodLabel}_${new Date().toISOString().split('T')[0]}.txt`
+    a.click()
+    window.URL.revokeObjectURL(url)
+    toast.success('تم تصدير التقرير بنجاح')
+  }
+
   const summary = report?.summary || {}
   const dailyStats = report?.dailyStats || []
   const topUsers = report?.topUsers || []
 
   const totalFlow = (summary.totalDeposits || 0) - (summary.totalWithdrawals || 0)
   const isPositive = totalFlow >= 0
+
+  // Metric card component for auto-report
+  const MetricCard = ({ icon: Icon, value, label, color, sub }: { icon: any; value: string | number; label: string; color: string; sub?: string }) => (
+    <div className="glass-card p-4 rounded-xl">
+      <div className="flex items-center justify-between mb-2">
+        <span className="text-xs text-muted-foreground">{label}</span>
+        <div className={`w-8 h-8 rounded-lg ${color}/10 flex items-center justify-center`}>
+          <Icon className={`w-4 h-4 ${color}`} />
+        </div>
+      </div>
+      <p className={`text-xl font-bold ${color === 'gold' ? 'gold-text' : `text-${color}-400`}`}>
+        {typeof value === 'number' ? value.toLocaleString() : value}
+      </p>
+      {sub && <p className="text-[10px] text-muted-foreground mt-1">{sub}</p>}
+    </div>
+  )
 
   return (
     <div className="space-y-4">
@@ -91,6 +227,145 @@ export default function AdminReports() {
             تصدير CSV
           </button>
         </div>
+      </div>
+
+      {/* ===================== AUTO REPORT SECTION ===================== */}
+      <div className="glass-card p-4 rounded-xl border border-gold/10 space-y-4">
+        <div className="flex items-center justify-between">
+          <h3 className="text-sm font-bold flex items-center gap-2">
+            <FileCheck className="w-4 h-4 text-gold" />
+            تقارير تلقائية
+          </h3>
+          {autoReport && (
+            <button
+              onClick={exportAutoReport}
+              className="flex items-center gap-1.5 px-3 h-8 rounded-lg bg-blue-500/10 text-blue-400 hover:bg-blue-500/20 transition-colors text-xs font-medium"
+            >
+              <FileDown className="w-3.5 h-3.5" />
+              تصدير
+            </button>
+          )}
+        </div>
+
+        {/* Generate Buttons */}
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => generateAutoReport('daily')}
+            disabled={autoReportLoading}
+            className="flex-1 flex items-center justify-center gap-2 h-11 rounded-xl gold-gradient text-gray-900 font-bold hover:opacity-90 transition-all text-sm"
+          >
+            {autoReportLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <BarChart3 className="w-4 h-4" />}
+            تقرير يومي
+          </button>
+          <button
+            onClick={() => generateAutoReport('weekly')}
+            disabled={autoReportLoading}
+            className="flex-1 flex items-center justify-center gap-2 h-11 rounded-xl bg-white/10 border border-white/10 text-foreground font-bold hover:bg-white/20 transition-all text-sm"
+          >
+            {autoReportLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <BarChart3 className="w-4 h-4" />}
+            تقرير أسبوعي
+          </button>
+        </div>
+
+        {/* Generated Report Card */}
+        {autoReport && (
+          <div className="space-y-3 animate-fade-in">
+            {/* Report Header */}
+            <div className="text-center py-3 border-b border-white/5">
+              <p className="text-lg font-bold gold-text">{autoReport.periodLabel}</p>
+              <p className="text-[10px] text-muted-foreground mt-1">
+                تم الإنشاء: {new Date(autoReport.generatedAt).toLocaleString('ar-SA')}
+              </p>
+              <p className="text-[10px] text-muted-foreground">
+                {new Date(autoReport.fromDate).toLocaleDateString('ar-SA')} — {new Date(autoReport.toDate).toLocaleDateString('ar-SA')}
+              </p>
+            </div>
+
+            {/* Metric Cards Grid */}
+            <div className="grid grid-cols-2 gap-3">
+              {/* New Users */}
+              <MetricCard
+                icon={Users}
+                value={autoReport.stats.newUsersInPeriod}
+                label="مستخدمون جدد"
+                color="blue"
+                sub={`إجمالي: ${autoReport.stats.totalUsers}`}
+              />
+
+              {/* Active Users */}
+              <MetricCard
+                icon={TrendingUp}
+                value={autoReport.stats.activeUsersInPeriod}
+                label="مستخدمون نشطون"
+                color="emerald"
+              />
+
+              {/* Deposits */}
+              <MetricCard
+                icon={ArrowDownCircle}
+                value={`${autoReport.stats.depositAmountInPeriod.toFixed(2)}`}
+                label="إجمالي الإيداعات"
+                color="green"
+                sub={`${autoReport.stats.depositCountInPeriod} عملية | USDT`}
+              />
+
+              {/* Withdrawals */}
+              <MetricCard
+                icon={ArrowUpCircle}
+                value={`${autoReport.stats.withdrawalAmountInPeriod.toFixed(2)}`}
+                label="إجمالي السحوبات"
+                color="red"
+                sub={`${autoReport.stats.withdrawalCountInPeriod} عملية | USDT`}
+              />
+
+              {/* P2P Trades - full width */}
+              <div className="col-span-2 glass-card p-4 rounded-xl">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <span className="text-xs text-muted-foreground">صفقات P2P</span>
+                    <p className="text-xl font-bold text-purple-400">{autoReport.stats.p2pTradeCountInPeriod.toLocaleString()}</p>
+                    <p className="text-[10px] text-muted-foreground">صفقة خلال الفترة</p>
+                  </div>
+                  <div className="w-10 h-10 rounded-xl bg-purple-500/10 flex items-center justify-center">
+                    <RefreshCw className="w-5 h-5 text-purple-400" />
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Net Flow Summary */}
+            <div className="glass-card p-3 rounded-xl bg-gold/5 border border-gold/10">
+              <div className="flex items-center justify-between">
+                <span className="text-xs text-muted-foreground">صافي التدفق</span>
+                <p className={`text-lg font-bold ${
+                  (autoReport.stats.depositAmountInPeriod - autoReport.stats.withdrawalAmountInPeriod) >= 0
+                    ? 'text-green-400'
+                    : 'text-red-400'
+                }`}>
+                  {(autoReport.stats.depositAmountInPeriod - autoReport.stats.withdrawalAmountInPeriod) >= 0 ? '+' : ''}
+                  {(autoReport.stats.depositAmountInPeriod - autoReport.stats.withdrawalAmountInPeriod).toFixed(2)}
+                  <span className="text-xs text-muted-foreground mr-1">USDT</span>
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Loading State for Auto Report */}
+        {autoReportLoading && (
+          <div className="grid grid-cols-2 gap-3">
+            {[...Array(5)].map((_, i) => (
+              <div key={i} className={`glass-card p-4 shimmer h-20 rounded-xl ${i === 4 ? 'col-span-2' : ''}`} />
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Separator */}
+      <div className="flex items-center gap-3 py-1">
+        <div className="flex-1 h-px bg-white/5" />
+        <span className="text-[10px] text-muted-foreground">تحليل مالي تفصيلي</span>
+        <div className="flex-1 h-px bg-white/5" />
       </div>
 
       {/* Period Selector */}

@@ -2,7 +2,9 @@
 
 import { useState, useEffect } from 'react'
 import { useAuthStore } from '@/lib/store'
+import { convertUSDTtoYER, formatYER } from '@/lib/currency'
 import { toast } from 'sonner'
+import BannerSlider from '@/components/BannerSlider'
 import {
   TrendingUp,
   TrendingDown,
@@ -107,6 +109,9 @@ export default function Dashboard() {
 
   return (
     <div className="space-y-6 animate-fade-in">
+      {/* Banner Slider */}
+      <BannerSlider />
+
       {/* Balance Card */}
       <div className="glass-card gold-border gold-glow p-6 relative overflow-hidden">
         <div className="absolute top-0 left-0 w-32 h-32 bg-gold/5 rounded-full -translate-x-8 -translate-y-8" />
@@ -123,6 +128,9 @@ export default function Dashboard() {
 
           <div className="text-4xl font-bold gold-text tracking-tight">
             {user?.balance?.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) ?? '0.00'}
+          </div>
+          <div className="text-sm text-muted-foreground">
+            ≈ {formatYER(convertUSDTtoYER(user?.balance ?? 0))}
           </div>
 
           <div className="flex items-center gap-2 text-sm">

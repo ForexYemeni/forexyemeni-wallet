@@ -2,21 +2,49 @@ import { NextRequest, NextResponse } from 'next/server'
 import { userOperations, merchantOperations, merchantApplicationOperations, p2pListingOperations } from '@/lib/db-firebase'
 
 // GET: get active listings with filters
+// Supports ?merchantId=xxx to return ALL listings for a specific merchant (including paused)
 export async function GET(req: NextRequest) {
   try {
     const type = req.nextUrl.searchParams.get('type') || undefined
     const network = req.nextUrl.searchParams.get('network') || undefined
     const paymentMethod = req.nextUrl.searchParams.get('paymentMethod') || undefined
+    const merchantId = req.nextUrl.searchParams.get('merchantId') || undefined
+
+    // If merchantId is provided, return ALL listings for that merchant (not just active)
+    if (merchantId) {
+      const listings = await p2pListingOperations.findByMerchant(merchantId)
+      // Apply optional filters in JS
+      let filtered = listings
+      if (type) filtered = filtered.filter(l => l.type === type)
+      if (network) filtered = filtered.filter(l => l.network === network)
+      if (paymentMethod) filtered = filtered.filter(l => l.paymentMethods.includes(paymentMethod))
+      // Enrich with merchant name
+      const enriched = await Promise.all(filtered.map(async (l) => {
+        let merchant: any = await merchantOperations.findUnique(l.merchantId)
+        if (!merchant) {
+          merchant = await merchantApplicationOperations.findById(l.merchantId)
+        }
+        const merchantUserId = merchant?.userId
+        const user = merchantUserId ? await userOperations.findUnique({ id: merchantUserId }) : null
+        return {
+          ...l,
+          merchantName: merchant?.fullName || merchant?.userFullName || user?.fullName || 'تاجر',
+          merchantTrades: l.totalTrades,
+          merchantRate: l.successRate,
+        }
+      }))
+      return NextResponse.json({ success: true, listings: enriched })
+    }
 
     const listings = await p2pListingOperations.findActive({ type, network, paymentMethod })
 
     // Attach merchant info (check both merchant systems)
     const enriched = await Promise.all(listings.map(async (l) => {
       // Try old merchant system first
-      let merchant = await merchantOperations.findUnique(l.merchantId)
+      let merchant: any = await merchantOperations.findUnique(l.merchantId)
       if (!merchant) {
         // Try application system
-        merchant = await merchantApplicationOperations.findById(l.merchantId) as any
+        merchant = await merchantApplicationOperations.findById(l.merchantId)
       }
       const merchantUserId = merchant?.userId
       const user = merchantUserId ? await userOperations.findUnique({ id: merchantUserId }) : null

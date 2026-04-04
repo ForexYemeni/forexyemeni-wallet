@@ -45,6 +45,22 @@ export default function P2PCreateListing({ onCreated, onBack }: P2PCreateListing
       toast.error('يرجى إدخال سعر صحيح')
       return
     }
+    // Validate min/max amounts
+    const numAmount = parseFloat(amount)
+    const numMin = parseFloat(minAmount) || 0
+    const numMax = parseFloat(maxAmount) || 0
+    if (numMin > 0 && numMin >= numAmount) {
+      toast.error('الحد الأدنى يجب أن يكون أقل من الكمية')
+      return
+    }
+    if (numMax > 0 && numMax > numAmount) {
+      toast.error('الحد الأقصى يجب أن يكون أقل من أو يساوي الكمية')
+      return
+    }
+    if (numMin > 0 && numMax > 0 && numMin >= numMax) {
+      toast.error('الحد الأدنى يجب أن يكون أقل من الحد الأقصى')
+      return
+    }
     if (paymentMethods.length === 0) {
       toast.error('يرجى اختيار طريقة دفع واحدة على الأقل')
       return
@@ -69,6 +85,14 @@ export default function P2PCreateListing({ onCreated, onBack }: P2PCreateListing
       const data = await res.json()
       if (data.success) {
         toast.success('تم إنشاء الإعلان بنجاح')
+        // Reset form
+        setAmount('')
+        setPrice('')
+        setMinAmount('')
+        setMaxAmount('')
+        setPaymentMethods([])
+        setType('sell')
+        setNetwork('TRC20')
         onCreated()
       } else {
         toast.error(data.message || 'خطأ في إنشاء الإعلان')

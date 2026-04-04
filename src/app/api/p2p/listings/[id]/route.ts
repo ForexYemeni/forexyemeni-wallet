@@ -9,12 +9,12 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
     if (!listing) return NextResponse.json({ success: false, message: 'الإعلان غير موجود' }, { status: 404 })
 
     // Try both merchant systems for merchant info
-    let merchant = await merchantOperations.findUnique(listing.merchantId)
+    let merchant: any = await merchantOperations.findUnique(listing.merchantId)
     let merchantUserId: string | undefined
 
     if (!merchant) {
       // Try application system
-      const app = await merchantApplicationOperations.findById(listing.merchantId) as any
+      const app = await merchantApplicationOperations.findById(listing.merchantId)
       if (app) {
         merchant = app
         merchantUserId = app.userId

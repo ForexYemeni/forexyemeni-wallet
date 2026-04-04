@@ -75,10 +75,11 @@ export default function P2PMyListings() {
     if (!effectiveMerchantId) { setLoading(false); return }
     setLoading(true)
     try {
-      const res = await fetch(`/api/p2p/listings`)
+      // Use merchantId query param to get ALL listings (including paused) for this merchant
+      const res = await fetch(`/api/p2p/listings?merchantId=${effectiveMerchantId}`)
       const data = await res.json()
       if (data.success) {
-        setListings((data.listings || []).filter((l: Listing) => l.merchantId === effectiveMerchantId))
+        setListings(data.listings || [])
       }
     } catch { /* silent */ }
     finally { setLoading(false) }
