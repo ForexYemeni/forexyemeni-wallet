@@ -14,6 +14,8 @@ import {
   Clock,
   ChevronLeft,
   Users,
+  UserCog,
+  DollarSign,
   ArrowDownCircle,
   ArrowUpCircle,
   FileCheck,
@@ -74,11 +76,13 @@ const adminSubItems = [
   { key: 'admin-reports', label: 'التقارير المالية', icon: BarChart3, tab: 'reports' },
   { key: 'admin-monitor', label: 'مراقبة النظام', icon: Activity, tab: 'system-monitor' },
   { key: 'admin-settings', label: 'إعدادات النظام', icon: Sliders, tab: 'admin-settings' },
+  { key: 'admin-team', label: '👥 فريق الإدارة', icon: UserCog, tab: 'admin-team' },
+  { key: 'admin-financial', label: '💰 الملخص المالي', icon: DollarSign, tab: 'admin-financial' },
   { key: 'admin-super', label: '🛡️ تحكم خارق', icon: Shield, tab: 'super-admin' },
 ]
 
 export default function Sidebar() {
-  const { currentScreen, setScreen, user, logout } = useAuthStore()
+  const { currentScreen, setScreen, user, logout, setPendingAdminTab } = useAuthStore()
   const [theme, setThemeState] = useState<Theme>('dark')
   const [adminExpanded, setAdminExpanded] = useState(false)
 
@@ -91,6 +95,12 @@ export default function Sidebar() {
     setThemeState(getTheme())
   }, [])
 
+  useEffect(() => {
+    if (currentScreen === 'admin' && !adminExpanded) {
+      setAdminExpanded(true)
+    }
+  }, [currentScreen])
+
   const handleToggleTheme = () => {
     const next = theme === 'dark' ? 'light' : 'dark'
     setThemeState(next)
@@ -98,11 +108,8 @@ export default function Sidebar() {
   }
 
   const handleAdminSubClick = (tab: string) => {
+    setPendingAdminTab(tab)
     setScreen('admin')
-    // Dispatch custom event for AdminPanel to switch tab
-    setTimeout(() => {
-      window.dispatchEvent(new CustomEvent('admin-tab-change', { detail: tab }))
-    }, 50)
   }
 
   return (
@@ -166,7 +173,7 @@ export default function Sidebar() {
                 <button
                   onClick={() => {
                     setScreen(item.key!)
-                    setAdminExpanded(!adminExpanded)
+                    setAdminExpanded(true)
                   }}
                   className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm transition-all ${
                     isActive
@@ -176,15 +183,15 @@ export default function Sidebar() {
                 >
                   <item.icon className="w-4 h-4" />
                   {item.label}
-                  {isActive && <ChevronLeft className={`w-3 h-3 mr-auto transition-transform ${adminExpanded ? 'rotate-90' : ''}`} />}
+                  <ChevronLeft className={`w-3 h-3 mr-auto transition-transform ${adminExpanded && isActive ? 'rotate-90' : ''}`} />
                 </button>
 
                 {/* Admin Sub-navigation */}
                 {adminExpanded && isActive && (
                   <div className="mr-4 mt-1 space-y-0.5 animate-fade-in">
                     {adminSubItems.filter(sub => {
-                      // Only show super-admin to actual super admin (no permissions)
-                      if (sub.key === 'admin-super') {
+                      // Only show super-admin, admin-team, admin-financial to actual super admin (no permissions)
+                      if (sub.key === 'admin-super' || sub.key === 'admin-team' || sub.key === 'admin-financial') {
                         return user?.role === 'admin' && !user?.permissions
                       }
                       return true
