@@ -20,6 +20,7 @@ import {
   Trash2,
   X,
   Check,
+  Shield,
 } from 'lucide-react'
 
 const CRYPTO_NETWORKS = [
@@ -47,7 +48,7 @@ const getMethodTitle = (m: any) => {
 }
 
 export default function WithdrawForm() {
-  const { user, updateUser } = useAuthStore()
+  const { user, updateUser, setScreen } = useAuthStore()
   const [methods, setMethods] = useState<any[]>([])
   const [selectedMethod, setSelectedMethod] = useState<any>(null)
   const [step, setStep] = useState<'select' | 'details'>('select')
@@ -55,6 +56,10 @@ export default function WithdrawForm() {
   const [loading, setLoading] = useState(false)
   const [loadingMethods, setLoadingMethods] = useState(true)
   const [feePercentage, setFeePercentage] = useState(0.1)
+  // PIN dialog state
+  const [showPinDialog, setShowPinDialog] = useState(false)
+  const [pinCode, setPinCode] = useState('')
+  const [pinLoading, setPinLoading] = useState(false)
   // Add/Edit method dialog
   const [showAddMethod, setShowAddMethod] = useState(false)
   const [editMethodData, setEditMethodData] = useState<any>(null)
@@ -174,6 +179,34 @@ export default function WithdrawForm() {
       toast.error('رصيدك غير كافي')
       return
     }
+
+    let toAddress = ''
+    let network = 'TRC20'
+    let methodType = selectedMethod?.type || 'blockchain'
+    let paymentMethodName = getMethodTitle(selectedMethod)
+
+    if (selectedMethod?.category === 'crypto') {
+      toAddress = selectedMethod.walletAddress || ''
+      network = selectedMethod.network || 'TRC20'
+    } else if (selectedMethod?.type === 'bank_deposit') {
+      toAddress = `بنكي: ${selectedMethod.beneficiaryName || ''} - ${selectedMethod.accountNumber || ''}`
+      paymentMethodName = selectedMethod.accountName || 'إيداع لمحفظة'
+    } else if (selectedMethod?.type === 'atm_transfer') {
+      toAddress = `صراف: ${selectedMethod.recipientName || ''} - ${selectedMethod.recipientPhone || ''} - ${selectedMethod.network || ''}`
+    }
+
+    if (!toAddress) {
+      toast.error('بيانات طريقة السحب غير مكتملة')
+      return
+    }
+
+    // Show PIN dialog instead of directly submitting
+    setShowPinDialog(true)
+    setPinCode('')
+  }
+
+  // Execute the actual withdrawal after PIN verification
+  const executeWithdrawal = async () => {
     setLoading(true)
     try {
       let toAddress = ''
@@ -189,12 +222,6 @@ export default function WithdrawForm() {
         paymentMethodName = selectedMethod.accountName || 'إيداع لمحفظة'
       } else if (selectedMethod?.type === 'atm_transfer') {
         toAddress = `صراف: ${selectedMethod.recipientName || ''} - ${selectedMethod.recipientPhone || ''} - ${selectedMethod.network || ''}`
-      }
-
-      if (!toAddress) {
-        toast.error('بيانات طريقة السحب غير مكتملة')
-        setLoading(false)
-        return
       }
 
       const res = await fetch('/api/withdrawals/create', {
@@ -213,6 +240,8 @@ export default function WithdrawForm() {
       const data = await res.json()
       if (data.success) {
         toast.success('تم إنشاء طلب السحب بنجاح. سيتم مراجعته قريباً.')
+        setShowPinDialog(false)
+        setPinCode('')
         resetForm()
         // Refresh balance
         try {
@@ -229,6 +258,37 @@ export default function WithdrawForm() {
       toast.error('حدث خطأ في الاتصال')
     } finally {
       setLoading(false)
+    }
+  }
+
+  // Verify PIN and proceed with withdrawal
+  const handlePinSubmit = async () => {
+    if (pinCode.length < 4) return
+    setPinLoading(true)
+    try {
+      // Verify PIN
+      const pinRes = await fetch('/api/auth/verify-pin', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId: user?.id, pin: pinCode }),
+      })
+      const pinData = await pinRes.json()
+      if (!pinData.success) {
+        if (!pinData.hasPin) {
+          toast.error('يرجى إعداد رمز PIN أولاً')
+          setScreen('set-pin')
+          setShowPinDialog(false)
+        } else {
+          toast.error(pinData.message || 'رمز PIN غير صحيح')
+        }
+        return
+      }
+      // PIN verified, proceed with withdrawal
+      await executeWithdrawal()
+    } catch {
+      toast.error('خطأ في التحقق')
+    } finally {
+      setPinLoading(false)
     }
   }
 
@@ -506,6 +566,41 @@ export default function WithdrawForm() {
               </button>
               <button onClick={resetMethodForm} className="flex-1 h-11 bg-white/10 hover:bg-white/20 text-foreground font-medium rounded-xl transition-all">إلغاء</button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* PIN Verification Dialog */}
+      {showPinDialog && (
+        <div className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4">
+          <div className="glass-card p-6 space-y-4 w-full max-w-sm animate-scale-in" onClick={e => e.stopPropagation()}>
+            <div className="text-center space-y-3">
+              <div className="w-14 h-14 mx-auto rounded-2xl bg-gold/10 flex items-center justify-center">
+                <Shield className="w-7 h-7 text-gold" />
+              </div>
+              <h3 className="text-lg font-bold gold-text">أدخل رمز PIN</h3>
+              <p className="text-sm text-muted-foreground">أدخل رمز الحماية لتأكيد عملية السحب</p>
+            </div>
+            <input
+              type="password"
+              value={pinCode}
+              onChange={(e) => setPinCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+              placeholder="• • • •"
+              className="w-full h-14 rounded-xl glass-input px-4 text-sm tracking-widest text-center text-2xl"
+              dir="ltr"
+              maxLength={6}
+              autoFocus
+            />
+            <button
+              onClick={handlePinSubmit}
+              disabled={pinLoading || pinCode.length < 4}
+              className="w-full h-12 gold-gradient text-gray-900 font-bold rounded-xl hover:opacity-90 transition-all disabled:opacity-50"
+            >
+              {pinLoading ? <Loader2 className="w-5 h-5 animate-spin mx-auto" /> : 'تأكيد'}
+            </button>
+            <button onClick={() => { setShowPinDialog(false); setPinCode('') }} className="w-full h-10 bg-white/10 text-foreground rounded-xl text-sm hover:bg-white/20 transition-colors">
+              إلغاء
+            </button>
           </div>
         </div>
       )}

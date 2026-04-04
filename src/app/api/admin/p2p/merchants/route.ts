@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { userOperations, merchantApplicationOperations, notificationOperations } from '@/lib/db-firebase'
+import { sendPushNotification } from '@/lib/push-notification'
 
 const ADMIN_EMAIL = 'mshay2024m@gmail.com'
 
@@ -108,6 +109,7 @@ export async function POST(req: NextRequest) {
         type: 'p2p',
         read: false,
       })
+      sendPushNotification(application.userId, 'تم قبول طلب التوثيق', 'تم الموافقة على حسابك كتاجر P2P. يمكنك الآن إنشاء إعلانات.', 'success').catch(() => {})
 
       return NextResponse.json({ success: true, message: 'تم قبول طلب التاجر بنجاح' })
     }
@@ -127,6 +129,7 @@ export async function POST(req: NextRequest) {
         type: 'p2p',
         read: false,
       })
+      sendPushNotification(application.userId, 'تم رفض طلب التوثيق', 'تم رفض طلب توثيق التاجر. يمكنك إعادة التقديم.', 'error').catch(() => {})
 
       return NextResponse.json({ success: true, message: 'تم رفض طلب التاجر' })
     }

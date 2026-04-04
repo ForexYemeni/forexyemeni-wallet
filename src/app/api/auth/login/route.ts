@@ -130,6 +130,7 @@ export async function POST(request: NextRequest) {
       createdAt: u.createdAt,
       merchantId: u.merchantId || null,
       affiliateCode: u.affiliateCode || null,
+      hasPin: !!u.pinHash,
       permissions: parsePermissions(u.permissions),
       pendingConfirmation: u.pendingConfirmation || null,
     })

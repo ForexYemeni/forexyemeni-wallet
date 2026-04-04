@@ -267,3 +267,178 @@ Add balance adjustment (add/withdraw) and merchant status management to the admi
 ### Files Changed:
 - `src/components/admin/AdminPanel.tsx` - ~190 lines added (state, handlers, badge, buttons, 2 dialogs)
 - `src/app/api/admin/users/route.ts` - Updated POST handler with balanceAdjustment and merchantId support
+
+---
+## Task ID: 1 - PIN System Backend Implementation
+
+### Work Task
+Implement the PIN system backend for ForexYemeni Wallet. This includes PIN setup, verification, reset request flow, admin approval/rejection of reset requests, login integration (hasPin field), and withdrawal PIN verification.
+
+### Work Summary
+
+#### 1. New API: `/api/auth/set-pin` (POST)
+- Accepts `userId` and `pin` (4-6 digits)
+- Validates PIN format with regex `/^\d{4,6}$/`
+- Hashes PIN with bcrypt (salt rounds: 10)
+- Updates user's `pinHash` field in Firestore
+- Sends success notification to user
+
+#### 2. New API: `/api/auth/verify-pin` (POST)
+- Accepts `userId` and `pin`
+- Returns error with `hasPin: false` if user has no PIN set
+- Verifies PIN against stored hash with `bcrypt.compare`
+- Returns 401 if PIN is incorrect
+
+#### 3. New API: `/api/auth/request-pin-reset` (POST + GET)
+- **POST**: User requests PIN reset
+  - Validates user exists and has a PIN
+  - Checks rate limit: no re-request within 5 minutes (stored in `pendingPinReset` collection keyed by userId)
+  - Creates pending reset request in `pendingPinReset` Firestore collection
+  - Notifies user (info) and all admins (warning + push notification)
+- **GET**: Admin checks pending requests
+  - Without `userId` query param: returns all pending requests (sorted by requestedAt desc in JS to avoid composite index)
+  - With `userId` query param: returns whether that user has a pending request
+
+#### 4. Login Route Update (`/api/auth/login/route.ts`)
+- Added `hasPin: !!u.pinHash` to `getUserResponse` function output
+- Clients can check `!user.hasPin` and redirect to PIN setup screen
+
+#### 5. Store Update (`/src/lib/store.ts`)
+- Added `hasPin?: boolean` to `User` interface
+- Updated `setAuth` screen routing logic: if user has no PIN (`!user.hasPin`), redirect to `'set-pin'` screen
+- Priority: force-change-password > set-pin > admin > p2p > dashboard
+
+#### 6. Admin Users Route Update (`/api/admin/users/route.ts`)
+- Added `approvePinReset` and `rejectPinReset` to POST handler destructuring
+- **Approve**: Deletes pendingPinReset document, clears user's `pinHash` (set to null), notifies user with success message
+- **Reject**: Deletes pendingPinReset document, notifies user with rejection message
+- Added imports for `notificationOperations` and `getDb`
+
+#### 7. Withdrawal Create Route Update (`/api/withdrawals/create/route.ts`)
+- Added `pin` to request body destructuring
+- Added PIN verification flow before processing withdrawal:
+  1. If user has no `pinHash` → returns 400 with `needsPin: true`
+  2. If no `pin` provided → returns 400 with `needsPin: true`
+  3. Verifies PIN with `bcrypt.compare` → returns 401 if incorrect
+
+### Files Changed:
+- `src/app/api/auth/set-pin/route.ts` - **NEW** - PIN setup endpoint
+- `src/app/api/auth/verify-pin/route.ts` - **NEW** - PIN verification endpoint
+- `src/app/api/auth/request-pin-reset/route.ts` - **NEW** - PIN reset request + admin list endpoint
+- `src/app/api/auth/login/route.ts` - Added `hasPin` to user response
+- `src/lib/store.ts` - Added `hasPin` to User interface, updated screen routing
+- `src/app/api/admin/users/route.ts` - Added PIN reset approve/reject handling
+- `src/app/api/withdrawals/create/route.ts` - Added PIN verification before withdrawal
+
+---
+## Task ID: 2 - PIN System Frontend & Notification Enhancements
+
+### Work Task
+Implement the PIN system frontend components and admin notification enhancements for ForexYemeni Wallet, including PIN setup screen, withdrawal PIN verification dialog, and admin PIN reset management panel.
+
+### Work Summary
+
+#### 1. New Component: `/src/components/auth/SetPinScreen.tsx`
+- Full-screen PIN setup component matching ForceChangePassword design pattern
+- Gold gradient header with Shield icon and glow effect
+- Title: "إعداد رمز الحماية (PIN)" with descriptive subtitle
+- Two password inputs: PIN entry (4-6 digits) and confirm PIN
+- Eye toggle for show/hide PIN visibility
+- Real-time requirements checklist (4-6 digits ✓, match ✓) with Check/X icons
+- Validation: regex `/^\d{4,6}$/` for PIN, equality check for confirmation
+- Submit button calls POST `/api/auth/set-pin` with `{ userId, pin }`
+- On success: updates auth state with `hasPin: true` and clears `mustChangePassword`
+- Logout button at bottom (PIN is mandatory, no skip)
+- Uses `glass-card`, `glass-input`, `gold-gradient`, `gold-text`, `animate-slide-up` theme classes
+
+#### 2. Updated: `/src/app/page.tsx`
+- Added dynamic import for `SetPinScreen` component (SSR disabled)
+- Added routing: `if (isAuthenticated && currentScreen === 'set-pin') return <SetPinScreen />`
+- Placed immediately after the force-change-password screen check
+
+#### 3. Updated: `/src/components/wallet/WithdrawForm.tsx`
+- Added `Shield` to lucide-react imports
+- Added `setScreen` from `useAuthStore` (for redirecting to set-pin when needed)
+- Added 3 new state variables: `showPinDialog`, `pinCode`, `pinLoading`
+- **Refactored `handleSubmit`**: Now validates withdrawal data and shows PIN dialog instead of directly calling API
+- **New `executeWithdrawal`**: Extracted the actual withdrawal API call into separate function, called after PIN verification
+- **New `handlePinSubmit`**: 
+  - Verifies PIN via POST `/api/auth/verify-pin`
+  - If user has no PIN (`!hasPin`): redirects to `'set-pin'` screen via `setScreen`
+  - If PIN incorrect: shows error toast
+  - If PIN valid: calls `executeWithdrawal()`
+- **PIN Dialog JSX**: Full-screen overlay (z-50) with glass-card design:
+  - Shield icon with gold accent background
+  - "أدخل رمز PIN" title with subtitle
+  - Password input with centered, wide tracking text
+  - Confirm button (disabled until 4+ digits)
+  - Cancel button to dismiss dialog
+  - Auto-focus on PIN input
+
+#### 4. Updated: `/src/components/admin/AdminPanel.tsx`
+- Added `pinResetRequests` state: `useState<any[]>([])`
+- Added `fetchPinResetRequests` function: fetches pending requests from GET `/api/auth/request-pin-reset`
+- Called in initial load alongside `fetchStats()` and `fetchUsers()`
+- Added `handlePinResetAction` handler: sends approve/reject via POST `/api/admin/users`
+- **PIN Reset Banner** in Users tab: Shown when `pinResetRequests.length > 0`
+  - Orange-themed glass card with AlertTriangle icon
+  - Shows count of pending requests in title
+  - Lists up to 5 requests with user name/email and timestamp
+  - Each request has "تصريح" (approve) and "رفض" (reject) buttons
+  - Buttons disabled during loading state
+
+#### 5. Updated: `/src/app/api/admin/users/route.ts`
+- Added `sendPushNotification` import from `@/lib/push-notification`
+- Added push notifications for PIN reset approval and rejection:
+  - On approve: sends push "تم الموافقة على إعادة تعيين PIN" with instruction to set new PIN
+  - On reject: sends push "تم رفض طلب إعادة تعيين PIN" with guidance to contact admin
+
+### Files Changed:
+- `src/components/auth/SetPinScreen.tsx` - **NEW** - PIN setup screen component
+- `src/app/page.tsx` - Added import and routing for SetPinScreen
+- `src/components/wallet/WithdrawForm.tsx` - Added PIN verification dialog and flow
+- `src/components/admin/AdminPanel.tsx` - Added PIN reset request management
+- `src/app/api/admin/users/route.ts` - Added push notifications for PIN reset actions
+
+---
+## Task ID: 3 - Comprehensive Notification System Completion
+
+### Work Task
+Add missing notifications across the ForexYemeni Wallet admin and user API routes. Ensure all critical actions (deposits, withdrawals, merchant applications, user management, KYC) trigger both in-app notifications and push notifications.
+
+### Work Summary
+
+#### Files Already Complete (No Changes Needed):
+1. **`/api/deposits/create/route.ts`** — Already notifies admin about new deposits (in-app + push)
+2. **`/api/admin/deposits/route.ts`** — Already has notifications for reviewing, confirmed, rejected (in-app + push)
+3. **`/api/withdrawals/create/route.ts`** — Already notifies admin about new withdrawal requests (in-app + push)
+4. **`/api/admin/withdrawals/route.ts`** — Already has notifications for approved, processing, rejected (in-app + push)
+5. **`/api/admin/kyc/route.ts`** — Already has notifications for approved, rejected (in-app + push)
+
+#### Files Modified:
+
+**1. `/api/p2p/merchant/route.ts`** — Added admin notifications for new merchant applications
+- Added imports: `sendPushNotification`, `getDb`
+- After creating a merchant application (`action === 'apply'`), now queries all admin users via Firestore (`where('role', '==', 'admin')`) and sends:
+  - In-app notification: "طلب تاجر جديد" (New merchant request) with applicant name
+  - Push notification: same info via FCM
+- Wrapped in try-catch to prevent notification failures from blocking the application flow
+
+**2. `/api/admin/p2p/merchants/route.ts`** — Added push notifications for merchant approval/rejection
+- Added import: `sendPushNotification`
+- **Approve action**: Added push notification "تم قبول طلب التوثيق" with success type (in-app notification already existed)
+- **Reject action**: Added push notification "تم رفض طلب التوثيق" with error type (in-app notification already existed)
+- Both push notifications use `.catch(() => {})` to avoid blocking
+
+**3. `/api/admin/users/route.ts`** — Added 4 new notification triggers
+- **Account suspension** (`status === 'suspended'`): In-app + push notification "تم تعليق حسابك" (error type)
+- **Account reactivation** (`status === 'active'`): In-app + push notification "تم تفعيل حسابك" (success type)
+- **Balance adjustment** (`balanceAdjustment !== 0`): In-app + push notification showing add/withdraw amount and new balance (success/warning type)
+- **Merchant removal** (`merchantId === null`): In-app + push notification "تم إزالة حالة التاجر" (warning type)
+- All wrapped in try-catch to prevent notification failures from affecting the update operation
+- Note: `sendPushNotification` and `notificationOperations` were already imported from previous PIN system work
+
+### Files Changed:
+- `src/app/api/p2p/merchant/route.ts` — Added admin notifications for new merchant applications (+20 lines)
+- `src/app/api/admin/p2p/merchants/route.ts` — Added push notifications for merchant approve/reject (+2 lines)
+- `src/app/api/admin/users/route.ts` — Added 4 notification triggers for user management (+53 lines)

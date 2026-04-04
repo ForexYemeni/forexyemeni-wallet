@@ -14,6 +14,7 @@ export interface User {
   balance: number
   frozenBalance: number
   mustChangePassword: boolean
+  hasPin?: boolean
   pendingConfirmation?: string | null
   createdAt: string
   merchantId?: string | null
@@ -53,11 +54,13 @@ export const useAuthStore = create<AuthState>()(
         isAuthenticated: true,
         currentScreen: mustChangePassword
           ? 'force-change-password'
-          : (user.role === 'admin' || (user.permissions && Object.values(user.permissions).some(v => v)))
-            ? 'admin'
-            : user.merchantId
-              ? 'p2p'
-              : 'dashboard',
+          : !user.hasPin
+            ? 'set-pin'
+            : (user.role === 'admin' || (user.permissions && Object.values(user.permissions).some(v => v)))
+              ? 'admin'
+              : user.merchantId
+                ? 'p2p'
+                : 'dashboard',
         // Clear stale withdrawal confirmation from previous sessions
         pendingWithdrawalConfirmation: user?.pendingConfirmation || null,
       }),

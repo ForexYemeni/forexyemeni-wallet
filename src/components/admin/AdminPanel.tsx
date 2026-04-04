@@ -246,6 +246,8 @@ export default function AdminPanel() {
   // Remove merchant dialog state
   const [removeMerchantDialogUser, setRemoveMerchantDialogUser] = useState<AdminUser | null>(null)
   const [removeMerchantLoading, setRemoveMerchantLoading] = useState(false)
+  // PIN reset requests state
+  const [pinResetRequests, setPinResetRequests] = useState<any[]>([])
 
   // Track which tabs have been loaded to avoid re-fetching
   const [loadedTabs, setLoadedTabs] = useState<Set<string>>(new Set())
@@ -267,7 +269,7 @@ export default function AdminPanel() {
       const initLoad = async () => {
         setLoading(true)
         try {
-          await Promise.all([fetchStats(), fetchUsers()])
+          await Promise.all([fetchStats(), fetchUsers(), fetchPinResetRequests()])
         } finally {
           setLoading(false)
         }
@@ -282,6 +284,14 @@ export default function AdminPanel() {
       const res = await fetch('/api/admin/users')
       const data = await res.json()
       if (data.success) setUsers(data.users || [])
+    } catch { /* silent */ }
+  }
+
+  const fetchPinResetRequests = async () => {
+    try {
+      const res = await fetch('/api/auth/request-pin-reset')
+      const data = await res.json()
+      if (data.success) setPinResetRequests(data.requests || [])
     } catch { /* silent */ }
   }
 
@@ -771,6 +781,29 @@ export default function AdminPanel() {
     }
   }
 
+  // ===== PIN RESET APPROVAL HANDLER =====
+  const handlePinResetAction = async (userId: string, action: 'approve' | 'reject') => {
+    setActionLoading(userId)
+    try {
+      const res = await fetch('/api/admin/users', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId, [action === 'approve' ? 'approvePinReset' : 'rejectPinReset']: true }),
+      })
+      const data = await res.json()
+      if (data.success) {
+        toast.success(action === 'approve' ? 'تم التصريح بإعادة تعيين PIN' : 'تم رفض الطلب')
+        fetchPinResetRequests()
+      } else {
+        toast.error(data.message)
+      }
+    } catch {
+      toast.error('خطأ')
+    } finally {
+      setActionLoading(null)
+    }
+  }
+
   // ===== REMOVE MERCHANT STATUS HANDLER =====
   const handleRemoveMerchant = async () => {
     if (!removeMerchantDialogUser || !confirm('هل أنت متأكد من إزالة حالة التاجر؟ سيتم تحويل الحساب إلى مستخدم عادي.')) return
@@ -1117,6 +1150,44 @@ export default function AdminPanel() {
           {/* ===================== USERS TAB ===================== */}
           {effectiveActiveTab === 'users' && (
             <div className="space-y-3">
+              {/* PIN Reset Requests Banner */}
+              {pinResetRequests.length > 0 && (
+                <div className="glass-card p-4 rounded-xl border border-orange-500/20 bg-orange-500/5">
+                  <div className="flex items-center justify-between mb-2">
+                    <div className="flex items-center gap-2">
+                      <AlertTriangle className="w-4 h-4 text-orange-400" />
+                      <span className="text-sm font-bold text-orange-400">طلبات إعادة تعيين PIN ({pinResetRequests.length})</span>
+                    </div>
+                  </div>
+                  <div className="space-y-2">
+                    {pinResetRequests.slice(0, 5).map((req: any) => (
+                      <div key={req.userId} className="flex items-center justify-between p-2.5 rounded-lg bg-white/5">
+                        <div>
+                          <p className="text-xs font-medium">{req.userFullName || req.userEmail}</p>
+                          <p className="text-[10px] text-muted-foreground">{new Date(req.requestedAt).toLocaleString('ar-SA')}</p>
+                        </div>
+                        <div className="flex gap-1">
+                          <button
+                            onClick={() => handlePinResetAction(req.userId, 'approve')}
+                            disabled={actionLoading === req.userId}
+                            className="text-[10px] px-2 py-1.5 rounded-md bg-green-500/10 text-green-400 hover:bg-green-500/20"
+                          >
+                            تصريح
+                          </button>
+                          <button
+                            onClick={() => handlePinResetAction(req.userId, 'reject')}
+                            disabled={actionLoading === req.userId}
+                            className="text-[10px] px-2 py-1.5 rounded-md bg-red-500/10 text-red-400 hover:bg-red-500/20"
+                          >
+                            رفض
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
               <div className="relative">
                 <Search className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                 <Input

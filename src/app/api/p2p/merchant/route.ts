@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { userOperations, merchantApplicationOperations, merchantOperations, notificationOperations } from '@/lib/db-firebase'
+import { sendPushNotification } from '@/lib/push-notification'
+import { getDb } from '@/lib/firebase'
 
 // GET: get merchant application status for user
 export async function GET(req: NextRequest) {
@@ -150,6 +152,24 @@ export async function POST(req: NextRequest) {
         type: 'p2p',
         read: false,
       })
+
+      // Notify admins about new merchant application
+      try {
+        const db = getDb()
+        const adminsSnapshot = await db.collection('users').where('role', '==', 'admin').limit(10).get()
+        for (const adminDoc of adminsSnapshot.docs) {
+          await notificationOperations.create({
+            userId: adminDoc.id,
+            title: 'طلب تاجر جديد',
+            message: `طلب توثيق تاجر جديد من ${user.fullName || user.email}`,
+            type: 'warning',
+            read: false,
+          })
+          sendPushNotification(adminDoc.id, 'طلب تاجر جديد', `طلب توثيق من ${user.fullName || user.email}`, 'warning').catch(() => {})
+        }
+      } catch (err) {
+        console.error('Error notifying admins about merchant application:', err)
+      }
 
       return NextResponse.json({
         success: true,

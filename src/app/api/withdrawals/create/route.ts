@@ -8,7 +8,7 @@ const ADMIN_EMAIL = 'mshay2024m@gmail.com'
 
 export async function POST(request: NextRequest) {
   try {
-    const { userId, amount, toAddress, method = 'blockchain', network, paymentMethodId, paymentMethodName } = await request.json()
+    const { userId, amount, toAddress, method = 'blockchain', network, paymentMethodId, paymentMethodName, pin } = await request.json()
 
     if (!userId || !amount || !toAddress) {
       return NextResponse.json(
@@ -29,6 +29,29 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         { success: false, message: 'المستخدم غير موجود' },
         { status: 404 }
+      )
+    }
+
+    // PIN verification required for withdrawals
+    if (!user.pinHash) {
+      return NextResponse.json(
+        { success: false, message: 'يرجى إعداد رمز PIN أولاً قبل إجراء السحب', needsPin: true },
+        { status: 400 }
+      )
+    }
+
+    if (!pin) {
+      return NextResponse.json(
+        { success: false, message: 'رمز PIN مطلوب لإجراء السحب', needsPin: true },
+        { status: 400 }
+      )
+    }
+
+    const isPinValid = await bcrypt.compare(pin, user.pinHash)
+    if (!isPinValid) {
+      return NextResponse.json(
+        { success: false, message: 'رمز PIN غير صحيح' },
+        { status: 401 }
       )
     }
 

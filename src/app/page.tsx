@@ -11,6 +11,7 @@ const LoginForm = dynamic(() => import('@/components/auth/LoginForm'), { ssr: fa
 const RegisterForm = dynamic(() => import('@/components/auth/RegisterForm'), { ssr: false })
 const ForgotPasswordForm = dynamic(() => import('@/components/auth/ForgotPasswordForm'), { ssr: false })
 const ForceChangePassword = dynamic(() => import('@/components/auth/ForceChangePassword'), { ssr: false })
+const SetPinScreen = dynamic(() => import('@/components/auth/SetPinScreen'), { ssr: false })
 const DeviceLockedScreen = dynamic(() => import('@/components/auth/DeviceLockedScreen'), { ssr: false })
 const Dashboard = dynamic(() => import('@/components/wallet/Dashboard'), { ssr: false })
 const DepositForm = dynamic(() => import('@/components/wallet/DepositForm'), { ssr: false })
@@ -353,6 +354,10 @@ export default function Home() {
   // Force change password screen
   if (isAuthenticated && currentScreen === 'force-change-password') {
     return <ForceChangePassword />
+  }
+
+  if (isAuthenticated && currentScreen === 'set-pin') {
+    return <SetPinScreen />
   }
 
   // Withdrawal confirmation dialog (blocking)
