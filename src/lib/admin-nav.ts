@@ -1,37 +1,32 @@
 /**
- * Direct admin navigation bridge.
- * Works regardless of mount timing — uses a module-level handler
- * so Sidebar/BottomNav can call AdminPanel's tab setter directly.
+ * Admin navigation bridge.
+ * Uses window.location.hash for reliable cross-chunk communication.
+ * Next.js dynamic imports can create separate module instances,
+ * but window.location.hash is always shared.
  */
-
-type TabHandler = ((tab: string) => void) | null
-let _handler: TabHandler = null
-let _pendingTab: string | null = null
-
-/** Called by AdminPanel on mount */
-export function registerAdminTabHandler(handler: (tab: string) => void) {
-  _handler = handler
-  // If a navigation was queued before mount, execute it now
-  if (_pendingTab) {
-    handler(_pendingTab)
-    _pendingTab = null
-  }
-}
-
-/** Called by AdminPanel on unmount */
-export function unregisterAdminTabHandler() {
-  _handler = null
-}
 
 /**
  * Called by Sidebar / BottomNav when user clicks an admin sub-item.
- * If AdminPanel is already mounted → calls handler directly (instant).
- * If not yet mounted → queues the tab and fires when AdminPanel registers.
+ * Sets the hash and navigates to admin screen.
  */
 export function navigateToAdminTab(tab: string) {
-  if (_handler) {
-    _handler(tab)
-  } else {
-    _pendingTab = tab
+  // Set hash BEFORE changing screen so AdminPanel can read it on mount
+  window.location.hash = `admin-${tab}`
+  console.log('[admin-nav] navigateToAdminTab:', tab, '| hash:', window.location.hash)
+}
+
+/**
+ * Called by AdminPanel on mount to read and clear the pending tab.
+ * Returns the tab name or null.
+ */
+export function consumePendingAdminTab(): string | null {
+  const hash = window.location.hash
+  if (hash.startsWith('#admin-')) {
+    const tab = hash.replace('#admin-', '')
+    // Clear hash after reading
+    history.replaceState(null, '', window.location.pathname + window.location.search)
+    console.log('[admin-nav] consumePendingAdminTab:', tab)
+    return tab
   }
+  return null
 }

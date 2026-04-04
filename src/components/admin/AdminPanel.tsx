@@ -1,8 +1,8 @@
 'use client'
 
-import { useState, useEffect, useRef, lazy, Suspense } from 'react'
+import { useState, useEffect, useRef, useCallback, lazy, Suspense } from 'react'
 import { useAuthStore } from '@/lib/store'
-import { registerAdminTabHandler, unregisterAdminTabHandler } from '@/lib/admin-nav'
+import { consumePendingAdminTab } from '@/lib/admin-nav'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -196,21 +196,25 @@ export default function AdminPanel() {
   const AdminFinancial = lazy(() => import('@/components/admin/AdminFinancial'))
   const [chatUnreadCount, setChatUnreadCount] = useState(0)
 
-  // Register direct tab handler for sidebar/bottom-nav navigation
-  useEffect(() => {
-    registerAdminTabHandler((tab: string) => {
-      setActiveTab(tab as any)
+  // On mount + hash change, check for pending admin tab
+  const applyTabFromHash = useCallback(() => {
+    const pendingTab = consumePendingAdminTab()
+    if (pendingTab) {
+      console.log('[AdminPanel] Applying tab:', pendingTab)
+      setActiveTab(pendingTab as any)
       setLoadedTabs(prev => {
         const next = new Set(prev)
-        next.add(tab)
+        next.add(pendingTab)
         return next
       })
-      // Also fetch data for this tab
-      fetchTabData(tab)
-    })
-    return () => unregisterAdminTabHandler()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }
   }, [])
+
+  useEffect(() => {
+    applyTabFromHash()
+    window.addEventListener('hashchange', applyTabFromHash)
+    return () => window.removeEventListener('hashchange', applyTabFromHash)
+  }, [applyTabFromHash])
 
   // Re-fetch data when tab changes
   useEffect(() => {
