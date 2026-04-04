@@ -86,6 +86,13 @@ export default function Sidebar() {
   const [theme, setThemeState] = useState<Theme>('dark')
   const [adminExpanded, setAdminExpanded] = useState(false)
 
+  // Auto-expand admin sub-items when admin screen is active
+  useEffect(() => {
+    if (currentScreen === 'admin' && !adminExpanded) {
+      setAdminExpanded(true)
+    }
+  }, [currentScreen])
+
   const isAdmin = user?.role === 'admin' || (user?.permissions && Object.values(user.permissions).some(v => v))
   const isMerchant = !!user?.merchantId && !isAdmin
 
@@ -163,14 +170,16 @@ export default function Sidebar() {
       <nav className="flex-1 overflow-y-auto p-3 space-y-1">
         {items.map((item) => {
           const isActive = currentScreen === item.key
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const navItem = item as any
 
-          if (item.section) {
+          if (navItem.section) {
             return (
-              <div key={item.section}>
+              <div key={navItem.section}>
                 <button
                   onClick={() => {
                     setScreen(item.key!)
-                    setAdminExpanded(!adminExpanded)
+                    setAdminExpanded(true)
                   }}
                   className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm transition-all ${
                     isActive
@@ -180,7 +189,7 @@ export default function Sidebar() {
                 >
                   <item.icon className="w-4 h-4" />
                   {item.label}
-                  {isActive && <ChevronLeft className={`w-3 h-3 mr-auto transition-transform ${adminExpanded ? 'rotate-90' : ''}`} />}
+                  <ChevronLeft className={`w-3 h-3 mr-auto transition-transform ${adminExpanded && isActive ? 'rotate-90' : ''}`} />
                 </button>
 
                 {/* Admin Sub-navigation */}
