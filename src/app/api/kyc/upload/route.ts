@@ -1,5 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { userOperations, kycRecordOperations } from '@/lib/db-firebase'
+import { userOperations, kycRecordOperations, notificationOperations } from '@/lib/db-firebase'
+import { sendPushNotification } from '@/lib/push-notification'
+
+const ADMIN_EMAIL = 'mshay2024m@gmail.com'
 
 export async function POST(request: NextRequest) {
   try {
@@ -66,6 +69,18 @@ export async function POST(request: NextRequest) {
     } else if (type === 'selfie') {
       await userOperations.update({ id: userId }, { kycSelfie: storageUrl })
     }
+
+    // Notify admin about new KYC upload
+    try {
+      const admin = await userOperations.findUnique({ email: ADMIN_EMAIL })
+      if (admin) {
+        const typeLabel = type === 'id_photo' ? 'صورة الهوية' : 'الصورة الشخصية'
+        const title = 'طلب توثيق جديد'
+        const message = `${typeLabel} جديدة من ${user.fullName || user.email}`
+        await notificationOperations.create({ userId: admin.id, title, message, type: 'info' })
+        sendPushNotification(admin.id, title, message, 'info').catch(() => {})
+      }
+    } catch {}
 
     return NextResponse.json({
       success: true,

@@ -1,5 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { userOperations, depositOperations } from '@/lib/db-firebase'
+import { userOperations, depositOperations, notificationOperations } from '@/lib/db-firebase'
+import { sendPushNotification } from '@/lib/push-notification'
+import { getDb } from '@/lib/firebase'
+
+const ADMIN_EMAIL = 'mshay2024m@gmail.com'
 
 export async function POST(request: NextRequest) {
   try {
@@ -48,6 +52,17 @@ export async function POST(request: NextRequest) {
       screenshot: screenshot || null,
       status: 'pending',
     })
+
+    // Notify admin about new deposit request
+    try {
+      const admin = await userOperations.findUnique({ email: ADMIN_EMAIL })
+      if (admin) {
+        const title = 'طلب إيداع جديد'
+        const message = `طلب إيداع بقيمة ${amount} USDT من ${user.fullName || user.email}`
+        await notificationOperations.create({ userId: admin.id, title, message, type: 'info' })
+        sendPushNotification(admin.id, title, message, 'info').catch(() => {})
+      }
+    } catch {}
 
     return NextResponse.json({
       success: true,

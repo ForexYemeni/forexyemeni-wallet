@@ -1,7 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { userOperations, withdrawalOperations } from '@/lib/db-firebase'
+import { userOperations, withdrawalOperations, notificationOperations } from '@/lib/db-firebase'
 import { getDb, nowTimestamp } from '@/lib/firebase'
+import { sendPushNotification } from '@/lib/push-notification'
 import bcrypt from 'bcryptjs'
+
+const ADMIN_EMAIL = 'mshay2024m@gmail.com'
 
 export async function POST(request: NextRequest) {
   try {
@@ -65,6 +68,17 @@ export async function POST(request: NextRequest) {
       paymentMethodId: paymentMethodId || null,
       status: 'pending',
     })
+
+    // Notify admin about new withdrawal request
+    try {
+      const admin = await userOperations.findUnique({ email: ADMIN_EMAIL })
+      if (admin) {
+        const title = 'طلب سحب جديد'
+        const message = `طلب سحب بقيمة ${amount} USDT من ${user.fullName || user.email}`
+        await notificationOperations.create({ userId: admin.id, title, message, type: 'warning' })
+        sendPushNotification(admin.id, title, message, 'warning').catch(() => {})
+      }
+    } catch {}
 
     return NextResponse.json({
       success: true,
