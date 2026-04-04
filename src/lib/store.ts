@@ -54,10 +54,10 @@ export const useAuthStore = create<AuthState>()(
         isAuthenticated: true,
         currentScreen: mustChangePassword
           ? 'force-change-password'
-          : (user.role === 'admin' || (user.permissions && Object.values(user.permissions).some(v => v)))
-            ? 'admin'
-            : !user.hasPin
-              ? 'set-pin'
+          : !user.hasPin
+            ? 'set-pin'
+            : (user.role === 'admin' || (user.permissions && Object.values(user.permissions).some(v => v)))
+              ? 'admin'
               : user.merchantId
                 ? 'p2p'
                 : 'dashboard',

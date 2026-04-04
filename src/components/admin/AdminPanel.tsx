@@ -201,7 +201,7 @@ export default function AdminPanel() {
   const [withdrawals, setWithdrawals] = useState<AdminWithdrawal[]>([])
   const [kycRecords, setKycRecords] = useState<KYCRecordItem[]>([])
   const [paymentMethods, setPaymentMethods] = useState<any[]>([])
-  const [adminSettings, setAdminSettings] = useState<{ email: string; phone: string | null; hasPIN: boolean }>({ email: '', phone: null, hasPIN: false })
+  const [adminSettings, setAdminSettings] = useState<{ email: string; phone: string | null; hasPIN: boolean }>({ email: user?.email || '', phone: user?.phone || null, hasPIN: !!user?.hasPin || false })
   const [loading, setLoading] = useState(true)
   const [searchQuery, setSearchQuery] = useState('')
   const [expandedUserId, setExpandedUserId] = useState<string | null>(null)
@@ -328,13 +328,11 @@ export default function AdminPanel() {
   }
 
   const fetchAdminSettings = async () => {
-    if (user?.role === 'admin' && !user.permissions) {
-      try {
-        const res = await fetch(`/api/admin/settings?userId=${user.id}`)
-        const data = await res.json()
-        if (data.success) setAdminSettings(data.settings)
-      } catch { /* silent */ }
-    }
+    try {
+      const res = await fetch(`/api/admin/settings?userId=${user.id}`)
+      const data = await res.json()
+      if (data.success) setAdminSettings(data.settings)
+    } catch { /* silent */ }
   }
 
   const fetchFees = async () => {
