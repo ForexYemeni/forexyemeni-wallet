@@ -892,19 +892,19 @@ export default function SuperAdminPanel() {
                   <div className="grid grid-cols-2 gap-3">
                     <div className="p-2.5 rounded-lg bg-white/5">
                       <p className="text-[10px] text-muted-foreground">إجمالي الأرصدة</p>
-                      <p className="text-sm font-bold gold-text">{financialSummary.totalBalances.toLocaleString()} USDT</p>
+                      <p className="text-sm font-bold gold-text">{(financialSummary.totalBalances || 0).toLocaleString()} USDT</p>
                     </div>
                     <div className="p-2.5 rounded-lg bg-green-500/5">
                       <p className="text-[10px] text-muted-foreground">إيداعات مكتملة</p>
-                      <p className="text-sm font-bold text-green-400">{financialSummary.completedDeposits.toLocaleString()} USDT</p>
+                      <p className="text-sm font-bold text-green-400">{(financialSummary.completedDeposits || 0).toLocaleString()} USDT</p>
                     </div>
                     <div className="p-2.5 rounded-lg bg-red-500/5">
                       <p className="text-[10px] text-muted-foreground">سحوبات مكتملة</p>
-                      <p className="text-sm font-bold text-red-400">{financialSummary.completedWithdrawals.toLocaleString()} USDT</p>
+                      <p className="text-sm font-bold text-red-400">{(financialSummary.completedWithdrawals || 0).toLocaleString()} USDT</p>
                     </div>
                     <div className="p-2.5 rounded-lg bg-yellow-500/5">
                       <p className="text-[10px] text-muted-foreground">معاملات معلّقة</p>
-                      <p className="text-sm font-bold text-yellow-400">{(financialSummary.pendingDeposits + financialSummary.pendingWithdrawals).toLocaleString()} USDT</p>
+                      <p className="text-sm font-bold text-yellow-400">{((financialSummary.pendingDeposits || 0) + (financialSummary.pendingWithdrawals || 0)).toLocaleString()} USDT</p>
                     </div>
                   </div>
                 </div>
@@ -1460,32 +1460,32 @@ export default function SuperAdminPanel() {
                   <div className="grid grid-cols-2 gap-3">
                     <div className="p-3 rounded-lg bg-white/5">
                       <p className="text-[10px] text-muted-foreground mb-1">إجمالي أرصدة المستخدمين</p>
-                      <p className="text-lg font-bold gold-text">{financialSummary.totalBalances.toLocaleString()}</p>
+                      <p className="text-lg font-bold gold-text">{(financialSummary.totalBalances || 0).toLocaleString()}</p>
                       <p className="text-[10px] text-muted-foreground">USDT</p>
                     </div>
                     <div className="p-3 rounded-lg bg-green-500/5">
                       <p className="text-[10px] text-muted-foreground mb-1">إجمالي الإيداعات المكتملة</p>
-                      <p className="text-lg font-bold text-green-400">{financialSummary.completedDeposits.toLocaleString()}</p>
+                      <p className="text-lg font-bold text-green-400">{(financialSummary.completedDeposits || 0).toLocaleString()}</p>
                       <p className="text-[10px] text-muted-foreground">USDT</p>
                     </div>
                     <div className="p-3 rounded-lg bg-red-500/5">
                       <p className="text-[10px] text-muted-foreground mb-1">إجمالي السحوبات المكتملة</p>
-                      <p className="text-lg font-bold text-red-400">{financialSummary.completedWithdrawals.toLocaleString()}</p>
+                      <p className="text-lg font-bold text-red-400">{(financialSummary.completedWithdrawals || 0).toLocaleString()}</p>
                       <p className="text-[10px] text-muted-foreground">USDT</p>
                     </div>
                     <div className="p-3 rounded-lg bg-yellow-500/5">
                       <p className="text-[10px] text-muted-foreground mb-1">إيداعات معلّقة</p>
-                      <p className="text-lg font-bold text-yellow-400">{financialSummary.pendingDeposits.toLocaleString()}</p>
+                      <p className="text-lg font-bold text-yellow-400">{(financialSummary.pendingDeposits || 0).toLocaleString()}</p>
                       <p className="text-[10px] text-muted-foreground">USDT</p>
                     </div>
                     <div className="p-3 rounded-lg bg-orange-500/5">
                       <p className="text-[10px] text-muted-foreground mb-1">سحوبات معلّقة</p>
-                      <p className="text-lg font-bold text-orange-400">{financialSummary.pendingWithdrawals.toLocaleString()}</p>
+                      <p className="text-lg font-bold text-orange-400">{(financialSummary.pendingWithdrawals || 0).toLocaleString()}</p>
                       <p className="text-[10px] text-muted-foreground">USDT</p>
                     </div>
                     <div className="p-3 rounded-lg bg-purple-500/5">
                       <p className="text-[10px] text-muted-foreground mb-1">إجمالي صفقات P2P</p>
-                      <p className="text-lg font-bold text-purple-400">{financialSummary.totalP2PTrades.toLocaleString()}</p>
+                      <p className="text-lg font-bold text-purple-400">{(financialSummary.totalP2PTrades || 0).toLocaleString()}</p>
                       <p className="text-[10px] text-muted-foreground">صفقة</p>
                     </div>
                   </div>

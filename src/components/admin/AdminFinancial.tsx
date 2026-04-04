@@ -29,8 +29,8 @@ interface SystemHealth {
 
 // ===================== HELPERS =====================
 
-const formatUSDT = (value: number) =>
-  value.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+const formatUSDT = (value: number | undefined) =>
+  (value || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 
 // ===================== MAIN COMPONENT =====================
 
@@ -66,11 +66,11 @@ export default function AdminFinancial() {
   // ===================== DERIVED VALUES =====================
 
   const netPosition = financialSummary
-    ? financialSummary.completedDeposits - financialSummary.completedWithdrawals
+    ? (financialSummary.completedDeposits || 0) - (financialSummary.completedWithdrawals || 0)
     : 0
 
   const totalHeld = financialSummary
-    ? financialSummary.totalBalances + financialSummary.pendingDeposits + financialSummary.pendingWithdrawals
+    ? (financialSummary.totalBalances || 0) + (financialSummary.pendingDeposits || 0) + (financialSummary.pendingWithdrawals || 0)
     : 0
 
   // ===================== RENDER =====================
@@ -182,7 +182,7 @@ export default function AdminFinancial() {
                 </div>
                 <span className="text-xs text-muted-foreground">صفقات P2P</span>
               </div>
-              <p className="text-xl font-bold text-purple-400">{financialSummary.totalP2PTrades.toLocaleString()}</p>
+              <p className="text-xl font-bold text-purple-400">{(financialSummary.totalP2PTrades || 0).toLocaleString()}</p>
               <p className="text-xs text-muted-foreground mt-1">صفقة</p>
             </div>
           </div>
