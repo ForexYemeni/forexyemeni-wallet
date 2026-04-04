@@ -379,8 +379,8 @@ export default function WithdrawForm() {
               {amount && parseFloat(amount) > 0 && (
                 <div className="space-y-2 p-3 rounded-xl bg-white/5">
                   <div className="flex items-center justify-between text-sm">
-                    <span className="text-muted-foreground">الرسوم ({feePercentage}%)</span>
-                    <span className="text-red-400">-{fee} USDT</span>
+                    <span className="text-muted-foreground">الرسوم ({feePercentage}%) → حساب الإدارة</span>
+                    <span className="text-gold font-medium">-{fee} USDT</span>
                   </div>
                   <div className="flex items-center justify-between text-sm">
                     <span className="text-muted-foreground">الصافي للمستلم</span>
@@ -388,7 +388,7 @@ export default function WithdrawForm() {
                   </div>
                   <div className="flex items-center justify-between text-sm border-t border-white/5 pt-2">
                     <span className="text-muted-foreground">يُخصم من رصيدك</span>
-                    <span className="font-bold text-gold">{amount} USDT</span>
+                    <span className="font-bold">{amount} USDT</span>
                   </div>
                   {!hasEnoughBalance && (
                     <div className="flex items-center gap-2 text-red-400 text-xs pt-1">
@@ -404,7 +404,7 @@ export default function WithdrawForm() {
                 <div className="space-y-1 text-xs text-muted-foreground">
                   <p>• سيتم إرسال المبلغ إلى البيانات المحفوظة أعلاه</p>
                   <p>• السحبات تتم مراجعتها يدوياً خلال 24 ساعة</p>
-                  <p>• الرسوم: {feePercentage}% من المبلغ</p>
+                  <p>• الرسوم: {feePercentage}% من المبلغ (تُضاف لحساب الإدارة)</p>
                 </div>
               </div>
 

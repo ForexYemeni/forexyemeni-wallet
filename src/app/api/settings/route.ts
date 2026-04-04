@@ -13,8 +13,8 @@ export async function GET() {
 
     // Create default if not exists
     const defaults = {
-      depositFee: 0,
-      withdrawalFee: 0.1,
+      depositFee: 3,
+      withdrawalFee: 3,
       updatedAt: nowTimestamp(),
     }
     await db.collection('systemSettings').doc('fees').set(defaults)

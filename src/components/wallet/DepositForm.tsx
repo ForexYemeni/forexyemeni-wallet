@@ -296,8 +296,8 @@ export default function DepositForm() {
               {amount && parseFloat(amount) > 0 && feePercentage > 0 && (
                 <div className="p-3 rounded-xl bg-white/5 text-xs space-y-1">
                   <div className="flex justify-between"><span className="text-muted-foreground">المبلغ المدفوع</span><span>{parseFloat(amount).toFixed(2)} USDT</span></div>
-                  <div className="flex justify-between"><span className="text-muted-foreground">الرسوم ({feePercentage}%)</span><span className="text-red-400">-{depositFee} USDT</span></div>
-                  <div className="border-t border-white/5 pt-1 mt-1 flex justify-between"><span className="text-muted-foreground">المبلغ الصافي الذي سيُضاف</span><span className="text-green-400 font-bold">{netAmount} USDT</span></div>
+                  <div className="flex justify-between"><span className="text-muted-foreground">الرسوم ({feePercentage}%) → حساب الإدارة</span><span className="text-gold font-medium">-{depositFee} USDT</span></div>
+                  <div className="border-t border-white/5 pt-1 mt-1 flex justify-between"><span className="text-muted-foreground">المبلغ الصافي الذي سيُضاف لحسابك</span><span className="text-green-400 font-bold">{netAmount} USDT</span></div>
                 </div>
               )}
 

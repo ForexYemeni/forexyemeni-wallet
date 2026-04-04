@@ -966,13 +966,13 @@ export default function AdminPanel() {
                     </div>
                     {/* Fee breakdown */}
                     {(d.fee ?? 0) > 0 && (
-                      <div className="flex items-center justify-between p-2 rounded-lg bg-white/5 text-xs">
-                        <div className="flex items-center gap-3">
+                      <div className="p-2 rounded-lg bg-white/5 text-xs space-y-1">
+                        <div className="flex items-center justify-between">
                           <span className="text-muted-foreground">المبلغ المدفوع: <strong className="text-foreground">{(d.amount ?? 0).toFixed(2)} USDT</strong></span>
                         </div>
-                        <div className="flex items-center gap-3">
-                          <span className="text-muted-foreground">الرسوم: <strong className="text-red-400">{(d.fee ?? 0).toFixed(2)} USDT</strong></span>
-                          <span className="text-muted-foreground">الصافي: <strong className="text-green-400">{(d.netAmount ?? 0).toFixed(2)} USDT</strong></span>
+                        <div className="flex items-center justify-between">
+                          <span className="text-muted-foreground">المبلغ الصافي للمستخدم: <strong className="text-green-400">{(d.netAmount ?? 0).toFixed(2)} USDT</strong></span>
+                          <span className="text-muted-foreground">الرسوم → حساب الإدارة: <strong className="text-gold">{(d.fee ?? 0).toFixed(2)} USDT</strong></span>
                         </div>
                       </div>
                     )}
@@ -1108,9 +1108,13 @@ export default function AdminPanel() {
                               {copiedWithdrawalId === w.id ? <CheckIcon className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
                             </button>
                           </div>
-                          <div className="flex items-center justify-between p-2 rounded-lg bg-white/5 text-xs">
-                            <span className="text-muted-foreground">الرسوم: {(w.fee ?? 0).toFixed(2)} USDT</span>
-                            <span className="text-muted-foreground">الصافي للمستلم: <strong className="text-green-400">{(w.netAmount ?? ((w.amount ?? 0) - (w.fee ?? 0))).toFixed(2)} USDT</strong></span>
+                          <div className="p-2 rounded-lg bg-white/5 text-xs space-y-1">
+                            <div className="flex items-center justify-between">
+                              <span className="text-muted-foreground">الرسوم → حساب الإدارة: <strong className="text-gold">{(w.fee ?? 0).toFixed(2)} USDT</strong></span>
+                            </div>
+                            <div className="flex items-center justify-between">
+                              <span className="text-muted-foreground">الصافي للمستلم: <strong className="text-green-400">{(w.netAmount ?? ((w.amount ?? 0) - (w.fee ?? 0))).toFixed(2)} USDT</strong></span>
+                            </div>
                           </div>
                         </div>
                       </div>

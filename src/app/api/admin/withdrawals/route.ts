@@ -3,6 +3,8 @@ import { userOperations, withdrawalOperations, transactionOperations, notificati
 import { getDb, nowTimestamp } from '@/lib/firebase'
 import { sendPushNotification } from '@/lib/push-notification'
 
+const ADMIN_EMAIL = 'mshay2024m@gmail.com'
+
 // GET all withdrawals (admin)
 export async function GET(request: NextRequest) {
   try {
@@ -66,6 +68,7 @@ export async function POST(request: NextRequest) {
 
     if (status === 'processing') {
       const netAmount = withdrawal.netAmount ?? (withdrawal.amount - withdrawal.fee)
+      const withdrawalFee = withdrawal.fee ?? 0
 
       const user = await userOperations.findUnique({ id: withdrawal.userId })
       if (user) {
@@ -79,7 +82,7 @@ export async function POST(request: NextRequest) {
           amount: -(withdrawal.amount),
           balanceBefore: user.balance,
           balanceAfter: user.balance,
-          description: `سحب USDT إلى ${withdrawal.toAddress.substring(0, 10)}... (الصافي: ${netAmount.toFixed(2)})`,
+          description: `سحب USDT إلى ${withdrawal.toAddress.substring(0, 10)}... (الرسوم: ${withdrawalFee.toFixed(2)} USDT → حساب الإدارة, الصافي: ${netAmount.toFixed(2)})`,
           referenceId: withdrawal.id,
         })
 
@@ -87,6 +90,36 @@ export async function POST(request: NextRequest) {
         await userOperations.update({ id: withdrawal.userId }, {
           pendingConfirmation: withdrawalId,
         })
+      }
+
+      // Credit fee to admin's account
+      if (withdrawalFee > 0) {
+        try {
+          const admin = await userOperations.findUnique({ email: ADMIN_EMAIL })
+          if (admin) {
+            const adminBalanceBefore = admin.balance
+            const adminBalanceAfter = adminBalanceBefore + withdrawalFee
+            await userOperations.updateBalance(admin.id, adminBalanceAfter)
+
+            await transactionOperations.create({
+              userId: admin.id,
+              type: 'fee_income',
+              amount: withdrawalFee,
+              balanceBefore: adminBalanceBefore,
+              balanceAfter: adminBalanceAfter,
+              description: `رسوم سحب من ${user?.fullName || withdrawal.userId.substring(0, 8)} - سحب #${withdrawal.id.substring(0, 8)}`,
+              referenceId: withdrawal.id,
+            })
+
+            // Notify admin about fee income
+            const adminTitle = 'رسوم سحب'
+            const adminMessage = `تم إضافة ${withdrawalFee.toFixed(2)} USDT رسوم سحب من ${user?.fullName || 'مستخدم'}`
+            await notificationOperations.create({ userId: admin.id, title: adminTitle, message: adminMessage, type: 'success', read: false })
+            sendPushNotification(admin.id, adminTitle, adminMessage, 'success').catch(() => {})
+          }
+        } catch (adminErr) {
+          console.error('Error crediting admin fee:', adminErr)
+        }
       }
 
       const title = 'تم السحب'

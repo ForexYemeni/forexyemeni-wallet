@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import { userOperations, depositOperations, transactionOperations, notificationOperations } from '@/lib/db-firebase'
 import { sendPushNotification } from '@/lib/push-notification'
 
+const ADMIN_EMAIL = 'mshay2024m@gmail.com'
+
 // GET all deposits (admin)
 export async function GET(request: NextRequest) {
   try {
@@ -66,7 +68,7 @@ export async function POST(request: NextRequest) {
           amount: creditAmount,
           balanceBefore,
           balanceAfter,
-          description: `إيداع USDT${depositFee > 0 ? ` (الرسوم: ${depositFee.toFixed(2)} USDT)` : ''} - ${deposit.txId || deposit.id.substring(0, 8)}`,
+          description: `إيداع USDT${depositFee > 0 ? ` (الرسوم: ${depositFee.toFixed(2)} USDT → حساب الإدارة)` : ''} - ${deposit.txId || deposit.id.substring(0, 8)}`,
           referenceId: deposit.id,
         })
 
@@ -75,6 +77,36 @@ export async function POST(request: NextRequest) {
         const message = `تم تأكيد إيداعك بقيمة ${creditAmount.toFixed(2)} USDT${feeInfo}`
         await notificationOperations.create({ userId: deposit.userId, title, message, type: 'success', read: false })
         sendPushNotification(deposit.userId, title, message, 'success').catch(() => {})
+
+        // Credit fee to admin's account
+        if (depositFee > 0) {
+          try {
+            const admin = await userOperations.findUnique({ email: ADMIN_EMAIL })
+            if (admin) {
+              const adminBalanceBefore = admin.balance
+              const adminBalanceAfter = adminBalanceBefore + depositFee
+              await userOperations.updateBalance(admin.id, adminBalanceAfter)
+
+              await transactionOperations.create({
+                userId: admin.id,
+                type: 'fee_income',
+                amount: depositFee,
+                balanceBefore: adminBalanceBefore,
+                balanceAfter: adminBalanceAfter,
+                description: `رسوم إيداع من ${user.fullName || user.email} - إيداع #${deposit.id.substring(0, 8)}`,
+                referenceId: deposit.id,
+              })
+
+              // Notify admin about fee income
+              const adminTitle = 'رسوم إيداع'
+              const adminMessage = `تم إضافة ${depositFee.toFixed(2)} USDT رسوم إيداع من ${user.fullName || user.email}`
+              await notificationOperations.create({ userId: admin.id, title: adminTitle, message: adminMessage, type: 'success', read: false })
+              sendPushNotification(admin.id, adminTitle, adminMessage, 'success').catch(() => {})
+            }
+          } catch (adminErr) {
+            console.error('Error crediting admin fee:', adminErr)
+          }
+        }
       }
     }
 
