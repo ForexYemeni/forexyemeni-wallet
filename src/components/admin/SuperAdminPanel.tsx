@@ -11,6 +11,7 @@ import {
   KeyRound, Fingerprint, Ban, ChevronDown, ChevronUp,
   Activity, Server, Clock, Zap, Info, AlertCircle,
   MessageSquare, Phone, Mail, ExternalLink,
+  UserCog, DollarSign, FileText, Search, UserPlus, UserMinus, Wrench, ChevronLeft,
 } from 'lucide-react'
 
 // ===================== TYPES =====================
@@ -67,11 +68,62 @@ interface LoginAttempt {
   createdAt: string
 }
 
+interface FinancialSummary {
+  totalBalances: number
+  completedDeposits: number
+  completedWithdrawals: number
+  pendingDeposits: number
+  pendingWithdrawals: number
+  totalP2PTrades: number
+}
+
+interface AdminMember {
+  id: string
+  email: string
+  name?: string
+  role: string
+  permissions?: AdminPermission
+  status: string
+  createdAt?: string
+  lastLogin?: string
+}
+
+interface AdminPermission {
+  manageUsers: boolean
+  approveDeposits: boolean
+  approveWithdrawals: boolean
+  approveKYC: boolean
+  manageSettings: boolean
+}
+
+interface SystemHealth {
+  pendingDeposits: number
+  pendingWithdrawals: number
+  pendingKYC: number
+  unresolvedDisputes: number
+}
+
+interface AuditLogEntry {
+  id: string
+  adminId: string
+  adminEmail?: string
+  actionType: string
+  targetType: string
+  targetId: string
+  targetName: string
+  details: string
+  createdAt: string
+}
+
 interface DashboardData {
   settings: SystemSettings
   recentLoginAttempts: LoginAttempt[]
   activeSessionsCount: number
   collectionCounts: Record<string, number>
+  financialSummary?: FinancialSummary
+  adminTeam?: AdminMember[]
+  recentAuditLogs?: AuditLogEntry[]
+  systemHealth?: SystemHealth
 }
 
 // ===================== DEFAULT SETTINGS =====================
@@ -100,9 +152,44 @@ const DEFAULT_SETTINGS: SystemSettings = {
   suspiciousAccounts: [],
 }
 
+// ===================== ACTION LABELS =====================
+
+const ACTION_LABELS: Record<string, string> = {
+  settings_change: 'تغيير إعدادات',
+  user_suspend: 'تعليق مستخدم',
+  user_activate: 'تفعيل مستخدم',
+  balance_add: 'إضافة رصيد',
+  balance_deduct: 'خصم رصيد',
+  deposit_approve: 'موافقة إيداع',
+  deposit_reject: 'رفض إيداع',
+  withdrawal_approve: 'موافقة سحب',
+  withdrawal_reject: 'رفض سحب',
+  kyc_approve: 'موافقة تحقق',
+  kyc_reject: 'رفض تحقق',
+  admin_promote: 'ترقية مدير',
+  admin_demote: 'خفض مدير',
+  user_delete: 'حذف مستخدم',
+  system_cleanup: 'تنظيف النظام',
+  broadcast: 'بث إشعار',
+  permissions_change: 'تغيير صلاحيات',
+  toggle_maintenance: 'تبديل الصيانة',
+  announcement_create: 'إنشاء إعلان',
+  announcement_delete: 'حذف إعلان',
+  ban_ip: 'حظر IP',
+  unban_ip: 'إلغاء حظر IP',
+}
+
+const PERMISSION_LABELS: Record<keyof AdminPermission, string> = {
+  manageUsers: 'إدارة المستخدمين',
+  approveDeposits: 'الموافقة على الإيداعات',
+  approveWithdrawals: 'الموافقة على السحوبات',
+  approveKYC: 'الموافقة على التحقق',
+  manageSettings: 'إدارة الإعدادات',
+}
+
 // ===================== MAIN COMPONENT =====================
 
-type SectionKey = 'overview' | 'settings' | 'announcements' | 'security' | 'data'
+type SectionKey = 'overview' | 'settings' | 'announcements' | 'security' | 'data' | 'admin-team' | 'financial' | 'audit-log'
 
 export default function SuperAdminPanel() {
   const { user } = useAuthStore()
@@ -123,6 +210,35 @@ export default function SuperAdminPanel() {
   const [banIpInput, setBanIpInput] = useState('')
   const [expandedSection, setExpandedSection] = useState<string | null>(null)
 
+  // Admin Team Management
+  const [adminTeam, setAdminTeam] = useState<AdminMember[]>([])
+  const [showPermissionsDialog, setShowPermissionsDialog] = useState(false)
+  const [editingAdmin, setEditingAdmin] = useState<AdminMember | null>(null)
+  const [permissionsForm, setPermissionsForm] = useState<AdminPermission>({ manageUsers: false, approveDeposits: false, approveWithdrawals: false, approveKYC: false, manageSettings: false })
+  const [permissionsLoading, setPermissionsLoading] = useState(false)
+
+  // Financial Summary
+  const [financialSummary, setFinancialSummary] = useState<FinancialSummary | null>(null)
+
+  // System Health
+  const [systemHealth, setSystemHealth] = useState<SystemHealth | null>(null)
+
+  // Audit Logs
+  const [auditLogs, setAuditLogs] = useState<AuditLogEntry[]>([])
+
+  // Quick User Operations
+  const [showUserSearchDialog, setShowUserSearchDialog] = useState(false)
+  const [userSearchQuery, setUserSearchQuery] = useState('')
+  const [userSearchResults, setUserSearchResults] = useState<any[]>([])
+  const [userSearchLoading, setUserSearchLoading] = useState(false)
+  const [selectedUser, setSelectedUser] = useState<any>(null)
+  const [quickOperationAmount, setQuickOperationAmount] = useState('')
+  const [quickOperationNote, setQuickOperationNote] = useState('')
+  const [quickOpLoading, setQuickOpLoading] = useState(false)
+
+  // Data Cleanup
+  const [cleanupLoading, setCleanupLoading] = useState<string | null>(null)
+
   // ===================== FETCH DATA =====================
 
   const fetchData = useCallback(async () => {
@@ -135,6 +251,10 @@ export default function SuperAdminPanel() {
         setDashboardData(data.data)
         setSettings(data.data?.settings || DEFAULT_SETTINGS)
         setLoginAttempts(data.data?.recentLoginAttempts || [])
+        setAdminTeam(data.data?.adminTeam || [])
+        setFinancialSummary(data.data?.financialSummary || null)
+        setSystemHealth(data.data?.systemHealth || null)
+        setAuditLogs(data.data?.recentAuditLogs || [])
       } else {
         toast.error(data.message || 'خطأ في تحميل البيانات')
       }
@@ -349,6 +469,271 @@ export default function SuperAdminPanel() {
     } catch { /* silent */ }
   }
 
+  // ===================== ADMIN TEAM HANDLERS =====================
+
+  const handleOpenPermissionsDialog = (admin: AdminMember) => {
+    setEditingAdmin(admin)
+    setPermissionsForm({
+      manageUsers: admin.permissions?.manageUsers || false,
+      approveDeposits: admin.permissions?.approveDeposits || false,
+      approveWithdrawals: admin.permissions?.approveWithdrawals || false,
+      approveKYC: admin.permissions?.approveKYC || false,
+      manageSettings: admin.permissions?.manageSettings || false,
+    })
+    setShowPermissionsDialog(true)
+  }
+
+  const handleUpdatePermissions = async () => {
+    if (!user?.id || !editingAdmin) return
+    setPermissionsLoading(true)
+    try {
+      const res = await fetch('/api/admin/super-admin', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          adminId: user.id,
+          action: 'manage_admin',
+          subAction: 'update_permissions',
+          targetUserId: editingAdmin.id,
+          permissions: permissionsForm,
+        }),
+      })
+      const data = await res.json()
+      if (data.success) {
+        toast.success('تم تحديث الصلاحيات')
+        setShowPermissionsDialog(false)
+        setEditingAdmin(null)
+        fetchData()
+      } else {
+        toast.error(data.message)
+      }
+    } catch {
+      toast.error('خطأ في تحديث الصلاحيات')
+    } finally {
+      setPermissionsLoading(false)
+    }
+  }
+
+  const handleDemoteAdmin = async (adminId: string, adminEmail: string) => {
+    if (!user?.id) return
+    if (adminId === user.id) {
+      toast.error('لا يمكنك خفض نفسك')
+      return
+    }
+    if (!confirm(`هل أنت متأكد من خفض المدير ${adminEmail}؟ سيتم تحويله إلى مستخدم عادي.`)) return
+    try {
+      const res = await fetch('/api/admin/super-admin', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          adminId: user.id,
+          action: 'manage_admin',
+          subAction: 'demote_admin',
+          targetUserId: adminId,
+        }),
+      })
+      const data = await res.json()
+      if (data.success) {
+        toast.success('تم خفض المدير')
+        fetchData()
+      } else {
+        toast.error(data.message)
+      }
+    } catch {
+      toast.error('خطأ')
+    }
+  }
+
+  const handlePromoteToAdmin = async (userId: string, userEmail: string) => {
+    if (!user?.id) return
+    if (!confirm(`هل تريد ترقية المستخدم ${userEmail} إلى مدير؟`)) return
+    try {
+      const res = await fetch('/api/admin/super-admin', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          adminId: user.id,
+          action: 'manage_admin',
+          subAction: 'promote_to_admin',
+          targetUserId: userId,
+          permissions: { manageUsers: false, approveDeposits: true, approveWithdrawals: true, approveKYC: true, manageSettings: false },
+        }),
+      })
+      const data = await res.json()
+      if (data.success) {
+        toast.success('تم ترقية المستخدم إلى مدير')
+        setShowUserSearchDialog(false)
+        setSelectedUser(null)
+        setUserSearchQuery('')
+        setUserSearchResults([])
+        fetchData()
+      } else {
+        toast.error(data.message)
+      }
+    } catch {
+      toast.error('خطأ')
+    }
+  }
+
+  // ===================== QUICK USER OPERATIONS =====================
+
+  const handleSearchUser = async () => {
+    if (!user?.id || !userSearchQuery.trim()) return
+    setUserSearchLoading(true)
+    try {
+      const res = await fetch('/api/admin/super-admin', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          adminId: user.id,
+          action: 'quick_user_operation',
+          subAction: 'search_user',
+          query: userSearchQuery.trim(),
+        }),
+      })
+      const data = await res.json()
+      if (data.success) {
+        setUserSearchResults(data.results || [])
+        if (!data.results?.length) toast.info('لم يتم العثور على نتائج')
+      } else {
+        toast.error(data.message)
+      }
+    } catch {
+      toast.error('خطأ في البحث')
+    } finally {
+      setUserSearchLoading(false)
+    }
+  }
+
+  const handleQuickCredit = async () => {
+    if (!user?.id || !selectedUser || !quickOperationAmount || parseFloat(quickOperationAmount) <= 0) {
+      toast.error('يرجى إدخال مبلغ صحيح')
+      return
+    }
+    if (!confirm(`هل تريد إضافة ${quickOperationAmount} USDT إلى حساب ${selectedUser.email}؟`)) return
+    setQuickOpLoading(true)
+    try {
+      const res = await fetch('/api/admin/super-admin', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          adminId: user.id,
+          action: 'quick_user_operation',
+          subAction: 'quick_credit',
+          userId: selectedUser.id,
+          amount: parseFloat(quickOperationAmount),
+          note: quickOperationNote.trim(),
+        }),
+      })
+      const data = await res.json()
+      if (data.success) {
+        toast.success(`تم إضافة ${quickOperationAmount} USDT`)
+        setSelectedUser(null)
+        setQuickOperationAmount('')
+        setQuickOperationNote('')
+        fetchData()
+      } else {
+        toast.error(data.message)
+      }
+    } catch {
+      toast.error('خطأ في العملية')
+    } finally {
+      setQuickOpLoading(false)
+    }
+  }
+
+  const handleQuickDebit = async () => {
+    if (!user?.id || !selectedUser || !quickOperationAmount || parseFloat(quickOperationAmount) <= 0) {
+      toast.error('يرجى إدخال مبلغ صحيح')
+      return
+    }
+    if (!confirm(`هل تريد خصم ${quickOperationAmount} USDT من حساب ${selectedUser.email}؟`)) return
+    setQuickOpLoading(true)
+    try {
+      const res = await fetch('/api/admin/super-admin', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          adminId: user.id,
+          action: 'quick_user_operation',
+          subAction: 'quick_debit',
+          userId: selectedUser.id,
+          amount: parseFloat(quickOperationAmount),
+          note: quickOperationNote.trim(),
+        }),
+      })
+      const data = await res.json()
+      if (data.success) {
+        toast.success(`تم خصم ${quickOperationAmount} USDT`)
+        setSelectedUser(null)
+        setQuickOperationAmount('')
+        setQuickOperationNote('')
+        fetchData()
+      } else {
+        toast.error(data.message)
+      }
+    } catch {
+      toast.error('خطأ في العملية')
+    } finally {
+      setQuickOpLoading(false)
+    }
+  }
+
+  // ===================== CLEANUP HANDLERS =====================
+
+  const handleCleanup = async (target: string, label: string) => {
+    if (!user?.id) return
+    if (!confirm(`هل تريد تنظيف ${label}؟`)) return
+    setCleanupLoading(target)
+    try {
+      const res = await fetch('/api/admin/super-admin', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          adminId: user.id,
+          action: 'cleanup_data',
+          target,
+        }),
+      })
+      const data = await res.json()
+      if (data.success) {
+        toast.success(`تم تنظيف ${label} (${data.deletedCount || 0} عنصر)`)
+        fetchData()
+      } else {
+        toast.error(data.message)
+      }
+    } catch {
+      toast.error('خطأ في التنظيف')
+    } finally {
+      setCleanupLoading(null)
+    }
+  }
+
+  // ===================== AUDIT LOG HANDLERS =====================
+
+  const handleLoadMoreAuditLogs = async () => {
+    if (!user?.id) return
+    try {
+      const res = await fetch('/api/admin/super-admin', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          adminId: user.id,
+          action: 'get_audit_logs',
+          limit: 200,
+        }),
+      })
+      const data = await res.json()
+      if (data.success) {
+        setAuditLogs(data.logs || [])
+      } else {
+        toast.error(data.message)
+      }
+    } catch {
+      toast.error('خطأ في تحميل السجل')
+    }
+  }
+
   // ===================== SECTION TABS =====================
 
   const sections: { key: SectionKey; label: string; icon: any }[] = [
@@ -357,6 +742,9 @@ export default function SuperAdminPanel() {
     { key: 'announcements', label: 'الإعلانات', icon: Megaphone },
     { key: 'security', label: 'الأمان', icon: Lock },
     { key: 'data', label: 'البيانات', icon: Database },
+    { key: 'admin-team', label: 'فريق الإدارة', icon: UserCog },
+    { key: 'financial', label: 'الملخص المالي', icon: DollarSign },
+    { key: 'audit-log', label: 'سجل التدقيق', icon: FileText },
   ]
 
   const collectionCounts = dashboardData?.collectionCounts || {}
@@ -466,6 +854,73 @@ export default function SuperAdminPanel() {
                 </div>
               </div>
 
+              {/* System Health Cards */}
+              {systemHealth && (
+                <div className="glass-card p-4 rounded-xl space-y-3">
+                  <h3 className="text-sm font-bold flex items-center gap-2">
+                    <Activity className="w-4 h-4 text-orange-400" />
+                    صحة النظام
+                  </h3>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="flex items-center justify-between p-2.5 rounded-lg bg-yellow-500/5">
+                      <span className="text-xs text-muted-foreground">إيداعات معلّقة</span>
+                      <span className="text-sm font-bold text-yellow-400">{systemHealth.pendingDeposits}</span>
+                    </div>
+                    <div className="flex items-center justify-between p-2.5 rounded-lg bg-orange-500/5">
+                      <span className="text-xs text-muted-foreground">سحوبات معلّقة</span>
+                      <span className="text-sm font-bold text-orange-400">{systemHealth.pendingWithdrawals}</span>
+                    </div>
+                    <div className="flex items-center justify-between p-2.5 rounded-lg bg-blue-500/5">
+                      <span className="text-xs text-muted-foreground">تحقق KYC معلّق</span>
+                      <span className="text-sm font-bold text-blue-400">{systemHealth.pendingKYC}</span>
+                    </div>
+                    <div className="flex items-center justify-between p-2.5 rounded-lg bg-red-500/5">
+                      <span className="text-xs text-muted-foreground">نزاعات غير محلولة</span>
+                      <span className="text-sm font-bold text-red-400">{systemHealth.unresolvedDisputes}</span>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Financial Mini Cards */}
+              {financialSummary && (
+                <div className="glass-card p-4 rounded-xl space-y-3">
+                  <h3 className="text-sm font-bold flex items-center gap-2">
+                    <DollarSign className="w-4 h-4 text-gold" />
+                    ملخص مالي سريع
+                  </h3>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="p-2.5 rounded-lg bg-white/5">
+                      <p className="text-[10px] text-muted-foreground">إجمالي الأرصدة</p>
+                      <p className="text-sm font-bold gold-text">{financialSummary.totalBalances.toLocaleString()} USDT</p>
+                    </div>
+                    <div className="p-2.5 rounded-lg bg-green-500/5">
+                      <p className="text-[10px] text-muted-foreground">إيداعات مكتملة</p>
+                      <p className="text-sm font-bold text-green-400">{financialSummary.completedDeposits.toLocaleString()} USDT</p>
+                    </div>
+                    <div className="p-2.5 rounded-lg bg-red-500/5">
+                      <p className="text-[10px] text-muted-foreground">سحوبات مكتملة</p>
+                      <p className="text-sm font-bold text-red-400">{financialSummary.completedWithdrawals.toLocaleString()} USDT</p>
+                    </div>
+                    <div className="p-2.5 rounded-lg bg-yellow-500/5">
+                      <p className="text-[10px] text-muted-foreground">معاملات معلّقة</p>
+                      <p className="text-sm font-bold text-yellow-400">{(financialSummary.pendingDeposits + financialSummary.pendingWithdrawals).toLocaleString()} USDT</p>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Admin Team Count */}
+              <div className="glass-card p-4 rounded-xl">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <UserCog className="w-4 h-4 text-gold" />
+                    <span className="text-xs text-muted-foreground">فريق الإدارة</span>
+                  </div>
+                  <span className="text-sm font-bold gold-text">{adminTeam.length} مدير</span>
+                </div>
+              </div>
+
               {/* Platform Status Cards */}
               <div className="glass-card p-4 rounded-xl space-y-3">
                 <h3 className="text-sm font-bold flex items-center gap-2">
@@ -554,6 +1009,16 @@ export default function SuperAdminPanel() {
                     className="flex items-center justify-center gap-2 p-3 rounded-xl text-xs font-medium bg-blue-500/10 text-blue-400 hover:bg-blue-500/20 transition-all">
                     <Megaphone className="w-4 h-4" />
                     إرسال إشعار عام
+                  </button>
+                  <button onClick={() => setShowUserSearchDialog(true)}
+                    className="flex items-center justify-center gap-2 p-3 rounded-xl text-xs font-medium bg-purple-500/10 text-purple-400 hover:bg-purple-500/20 transition-all">
+                    <Search className="w-4 h-4" />
+                    بحث مستخدم
+                  </button>
+                  <button onClick={() => setActiveSection('data')}
+                    className="flex items-center justify-center gap-2 p-3 rounded-xl text-xs font-medium bg-amber-500/10 text-amber-400 hover:bg-amber-500/20 transition-all">
+                    <Wrench className="w-4 h-4" />
+                    تنظيف البيانات
                   </button>
                 </div>
               </div>
@@ -841,6 +1306,329 @@ export default function SuperAdminPanel() {
                   </div>
                 </div>
               </div>
+
+              {/* Cleanup Tools */}
+              <div className="glass-card p-4 rounded-xl space-y-3">
+                <h3 className="text-sm font-bold flex items-center gap-2">
+                  <Wrench className="w-4 h-4 text-amber-400" />
+                  أدوات التنظيف
+                </h3>
+                <p className="text-[10px] text-muted-foreground">تنظيف البيانات القديمة والمؤقتة لتحسين أداء النظام</p>
+                <div className="space-y-2">
+                  <button onClick={() => handleCleanup('expired_otp', 'رموز التحقق المنتهية')} disabled={cleanupLoading !== null}
+                    className="w-full flex items-center justify-between p-3 rounded-lg bg-white/5 hover:bg-white/10 transition-colors disabled:opacity-50">
+                    <div className="flex items-center gap-2">
+                      <Trash2 className="w-3.5 h-3.5 text-red-400" />
+                      <span className="text-xs">تنظيف رموز التحقق المنتهية</span>
+                    </div>
+                    {cleanupLoading === 'expired_otp' ? <RefreshCw className="w-3.5 h-3.5 animate-spin text-gold" /> : <ChevronLeft className="w-3.5 h-3.5 text-muted-foreground" />}
+                  </button>
+                  <button onClick={() => handleCleanup('old_notifications', 'الإشعارات المقروءة القديمة')} disabled={cleanupLoading !== null}
+                    className="w-full flex items-center justify-between p-3 rounded-lg bg-white/5 hover:bg-white/10 transition-colors disabled:opacity-50">
+                    <div className="flex items-center gap-2">
+                      <Trash2 className="w-3.5 h-3.5 text-blue-400" />
+                      <span className="text-xs">تنظيف الإشعارات المقروءة القديمة</span>
+                    </div>
+                    {cleanupLoading === 'old_notifications' ? <RefreshCw className="w-3.5 h-3.5 animate-spin text-gold" /> : <ChevronLeft className="w-3.5 h-3.5 text-muted-foreground" />}
+                  </button>
+                  <button onClick={() => handleCleanup('old_login_attempts', 'محاولات الدخول القديمة')} disabled={cleanupLoading !== null}
+                    className="w-full flex items-center justify-between p-3 rounded-lg bg-white/5 hover:bg-white/10 transition-colors disabled:opacity-50">
+                    <div className="flex items-center gap-2">
+                      <Trash2 className="w-3.5 h-3.5 text-purple-400" />
+                      <span className="text-xs">تنظيف محاولات الدخول القديمة</span>
+                    </div>
+                    {cleanupLoading === 'old_login_attempts' ? <RefreshCw className="w-3.5 h-3.5 animate-spin text-gold" /> : <ChevronLeft className="w-3.5 h-3.5 text-muted-foreground" />}
+                  </button>
+                  <button onClick={() => handleCleanup('pending_pin_resets', 'طلبات إعادة تعيين PIN')} disabled={cleanupLoading !== null}
+                    className="w-full flex items-center justify-between p-3 rounded-lg bg-white/5 hover:bg-white/10 transition-colors disabled:opacity-50">
+                    <div className="flex items-center gap-2">
+                      <Trash2 className="w-3.5 h-3.5 text-orange-400" />
+                      <span className="text-xs">تنظيف طلبات إعادة تعيين PIN المنتهية</span>
+                    </div>
+                    {cleanupLoading === 'pending_pin_resets' ? <RefreshCw className="w-3.5 h-3.5 animate-spin text-gold" /> : <ChevronLeft className="w-3.5 h-3.5 text-muted-foreground" />}
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* ===================== ADMIN TEAM ===================== */}
+          {activeSection === 'admin-team' && (
+            <div className="space-y-4">
+              {/* Admin Team Header */}
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <span className="text-xs text-muted-foreground">{adminTeam.length} مدير</span>
+                </div>
+                <button onClick={() => setShowUserSearchDialog(true)} className="flex items-center gap-1.5 px-3 h-9 rounded-lg gold-gradient text-gray-900 hover:opacity-90 transition-all text-xs font-medium">
+                  <UserPlus className="w-3.5 h-3.5" />
+                  إضافة مدير جديد
+                </button>
+              </div>
+
+              {adminTeam.length === 0 ? (
+                <div className="glass-card p-8 text-center">
+                  <UserCog className="w-10 h-10 text-muted-foreground/30 mx-auto mb-3" />
+                  <p className="text-muted-foreground text-sm">لا يوجد مديرون آخرين</p>
+                  <p className="text-muted-foreground/60 text-xs mt-1">أضف مديرين جدد لإدارة المنصة</p>
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  {adminTeam.map((admin) => {
+                    const isSelf = admin.id === user?.id
+                    const permKeys = Object.keys(PERMISSION_LABELS) as (keyof AdminPermission)[]
+                    const activePerms = permKeys.filter(k => admin.permissions?.[k])
+
+                    return (
+                      <div key={admin.id} className={`glass-card p-4 rounded-xl ${isSelf ? 'border border-gold/20' : ''}`}>
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="flex items-start gap-3 flex-1">
+                            {/* Avatar placeholder */}
+                            <div className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 ${isSelf ? 'bg-gold/10' : 'bg-white/10'}`}>
+                              <UserCog className={`w-5 h-5 ${isSelf ? 'text-gold' : 'text-muted-foreground'}`} />
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-2 mb-1">
+                                <span className="text-sm font-medium truncate" dir="ltr">{admin.email}</span>
+                                {isSelf && (
+                                  <span className="text-[10px] px-2 py-0.5 rounded-full bg-gold/10 text-gold font-medium">أنت</span>
+                                )}
+                                {admin.status === 'active' ? (
+                                  <span className="text-[10px] px-2 py-0.5 rounded-full bg-green-500/10 text-green-400">نشط</span>
+                                ) : (
+                                  <span className="text-[10px] px-2 py-0.5 rounded-full bg-gray-500/10 text-gray-400">{admin.status}</span>
+                                )}
+                              </div>
+                              {admin.name && (
+                                <p className="text-[10px] text-muted-foreground">{admin.name}</p>
+                              )}
+                              {/* Permissions Badges */}
+                              <div className="flex flex-wrap gap-1 mt-2">
+                                {activePerms.map(k => (
+                                  <span key={k} className="text-[9px] px-1.5 py-0.5 rounded-full bg-blue-500/10 text-blue-400">
+                                    {PERMISSION_LABELS[k]}
+                                  </span>
+                                ))}
+                                {activePerms.length === 0 && (
+                                  <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-gray-500/10 text-gray-400">لا توجد صلاحيات</span>
+                                )}
+                              </div>
+                              {/* Last Login */}
+                              {admin.lastLogin && (
+                                <p className="text-[9px] text-muted-foreground/60 mt-1.5">
+                                  آخر دخول: {new Date(admin.lastLogin).toLocaleString('ar-YE')}
+                                </p>
+                              )}
+                            </div>
+                          </div>
+                          {/* Actions */}
+                          <div className="flex flex-col gap-1 flex-shrink-0">
+                            {!isSelf && (
+                              <>
+                                <button onClick={() => handleOpenPermissionsDialog(admin)}
+                                  className="flex items-center gap-1 px-2 py-1.5 rounded-lg bg-blue-500/10 text-blue-400 hover:bg-blue-500/20 text-[10px] transition-colors">
+                                  <Settings className="w-3 h-3" />
+                                  الصلاحيات
+                                </button>
+                                <button onClick={() => handleDemoteAdmin(admin.id, admin.email)}
+                                  className="flex items-center gap-1 px-2 py-1.5 rounded-lg bg-red-500/10 text-red-400 hover:bg-red-500/20 text-[10px] transition-colors">
+                                  <UserMinus className="w-3 h-3" />
+                                  خفض
+                                </button>
+                              </>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* ===================== FINANCIAL ===================== */}
+          {activeSection === 'financial' && (
+            <div className="space-y-4">
+              {/* Financial Summary Cards */}
+              <div className="glass-card p-4 rounded-xl space-y-3">
+                <h3 className="text-sm font-bold flex items-center gap-2">
+                  <DollarSign className="w-4 h-4 text-gold" />
+                  الملخص المالي
+                </h3>
+                {financialSummary ? (
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="p-3 rounded-lg bg-white/5">
+                      <p className="text-[10px] text-muted-foreground mb-1">إجمالي أرصدة المستخدمين</p>
+                      <p className="text-lg font-bold gold-text">{financialSummary.totalBalances.toLocaleString()}</p>
+                      <p className="text-[10px] text-muted-foreground">USDT</p>
+                    </div>
+                    <div className="p-3 rounded-lg bg-green-500/5">
+                      <p className="text-[10px] text-muted-foreground mb-1">إجمالي الإيداعات المكتملة</p>
+                      <p className="text-lg font-bold text-green-400">{financialSummary.completedDeposits.toLocaleString()}</p>
+                      <p className="text-[10px] text-muted-foreground">USDT</p>
+                    </div>
+                    <div className="p-3 rounded-lg bg-red-500/5">
+                      <p className="text-[10px] text-muted-foreground mb-1">إجمالي السحوبات المكتملة</p>
+                      <p className="text-lg font-bold text-red-400">{financialSummary.completedWithdrawals.toLocaleString()}</p>
+                      <p className="text-[10px] text-muted-foreground">USDT</p>
+                    </div>
+                    <div className="p-3 rounded-lg bg-yellow-500/5">
+                      <p className="text-[10px] text-muted-foreground mb-1">إيداعات معلّقة</p>
+                      <p className="text-lg font-bold text-yellow-400">{financialSummary.pendingDeposits.toLocaleString()}</p>
+                      <p className="text-[10px] text-muted-foreground">USDT</p>
+                    </div>
+                    <div className="p-3 rounded-lg bg-orange-500/5">
+                      <p className="text-[10px] text-muted-foreground mb-1">سحوبات معلّقة</p>
+                      <p className="text-lg font-bold text-orange-400">{financialSummary.pendingWithdrawals.toLocaleString()}</p>
+                      <p className="text-[10px] text-muted-foreground">USDT</p>
+                    </div>
+                    <div className="p-3 rounded-lg bg-purple-500/5">
+                      <p className="text-[10px] text-muted-foreground mb-1">إجمالي صفقات P2P</p>
+                      <p className="text-lg font-bold text-purple-400">{financialSummary.totalP2PTrades.toLocaleString()}</p>
+                      <p className="text-[10px] text-muted-foreground">صفقة</p>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="text-center py-6">
+                    <DollarSign className="w-8 h-8 text-muted-foreground/30 mx-auto mb-2" />
+                    <p className="text-xs text-muted-foreground">لا تتوفر بيانات مالية</p>
+                  </div>
+                )}
+              </div>
+
+              {/* System Health */}
+              {systemHealth && (
+                <div className="glass-card p-4 rounded-xl space-y-3">
+                  <h3 className="text-sm font-bold flex items-center gap-2">
+                    <Activity className="w-4 h-4 text-orange-400" />
+                    صحة النظام
+                  </h3>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="p-3 rounded-lg bg-yellow-500/5 flex items-center justify-between">
+                      <div>
+                        <p className="text-[10px] text-muted-foreground">إيداعات معلّقة</p>
+                        <p className="text-lg font-bold text-yellow-400">{systemHealth.pendingDeposits}</p>
+                      </div>
+                      <CreditCard className="w-5 h-5 text-yellow-400/30" />
+                    </div>
+                    <div className="p-3 rounded-lg bg-orange-500/5 flex items-center justify-between">
+                      <div>
+                        <p className="text-[10px] text-muted-foreground">سحوبات معلّقة</p>
+                        <p className="text-lg font-bold text-orange-400">{systemHealth.pendingWithdrawals}</p>
+                      </div>
+                      <Activity className="w-5 h-5 text-orange-400/30" />
+                    </div>
+                    <div className="p-3 rounded-lg bg-blue-500/5 flex items-center justify-between">
+                      <div>
+                        <p className="text-[10px] text-muted-foreground">تحقق KYC معلّق</p>
+                        <p className="text-lg font-bold text-blue-400">{systemHealth.pendingKYC}</p>
+                      </div>
+                      <KeyRound className="w-5 h-5 text-blue-400/30" />
+                    </div>
+                    <div className="p-3 rounded-lg bg-red-500/5 flex items-center justify-between">
+                      <div>
+                        <p className="text-[10px] text-muted-foreground">نزاعات غير محلولة</p>
+                        <p className="text-lg font-bold text-red-400">{systemHealth.unresolvedDisputes}</p>
+                      </div>
+                      <AlertTriangle className="w-5 h-5 text-red-400/30" />
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Quick Actions */}
+              <div className="glass-card p-4 rounded-xl space-y-3">
+                <h3 className="text-sm font-bold flex items-center gap-2">
+                  <Zap className="w-4 h-4 text-gold" />
+                  إجراءات سريعة
+                </h3>
+                <div className="grid grid-cols-2 gap-2">
+                  <button onClick={() => setShowUserSearchDialog(true)}
+                    className="flex items-center justify-center gap-2 p-3 rounded-xl text-xs font-medium bg-purple-500/10 text-purple-400 hover:bg-purple-500/20 transition-all">
+                    <Search className="w-4 h-4" />
+                    بحث وإضافة رصيد
+                  </button>
+                  <button onClick={() => setActiveSection('audit-log')}
+                    className="flex items-center justify-center gap-2 p-3 rounded-xl text-xs font-medium bg-cyan-500/10 text-cyan-400 hover:bg-cyan-500/20 transition-all">
+                    <FileText className="w-4 h-4" />
+                    سجل التدقيق
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* ===================== AUDIT LOG ===================== */}
+          {activeSection === 'audit-log' && (
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <span className="text-xs text-muted-foreground">{auditLogs.length} سجل</span>
+                </div>
+                <button onClick={handleLoadMoreAuditLogs}
+                  className="flex items-center gap-1.5 px-3 h-9 rounded-lg bg-blue-500/10 text-blue-400 hover:bg-blue-500/20 transition-colors text-xs font-medium">
+                  <RefreshCw className="w-3.5 h-3.5" />
+                  تحميل المزيد
+                </button>
+              </div>
+
+              {auditLogs.length === 0 ? (
+                <div className="glass-card p-8 text-center">
+                  <FileText className="w-10 h-10 text-muted-foreground/30 mx-auto mb-3" />
+                  <p className="text-muted-foreground text-sm">لا توجد سجلات تدقيق</p>
+                  <p className="text-muted-foreground/60 text-xs mt-1">ستظهر هنا جميع العمليات التي يقوم بها المديرون</p>
+                </div>
+              ) : (
+                <div className="glass-card rounded-xl overflow-hidden">
+                  <div className="space-y-0 max-h-[600px] overflow-y-auto">
+                    {auditLogs.map((log) => {
+                      const actionLabel = ACTION_LABELS[log.actionType] || log.actionType
+                      const isDanger = ['user_delete', 'user_suspend', 'admin_demote', 'deposit_reject', 'withdrawal_reject', 'kyc_reject'].includes(log.actionType)
+                      const isSuccess = ['deposit_approve', 'withdrawal_approve', 'kyc_approve', 'admin_promote', 'balance_add', 'user_activate'].includes(log.actionType)
+                      const isWarning = ['settings_change', 'system_cleanup', 'broadcast', 'ban_ip'].includes(log.actionType)
+
+                      const colorClass = isDanger ? 'bg-red-500/10 text-red-400' : isSuccess ? 'bg-green-500/10 text-green-400' : isWarning ? 'bg-yellow-500/10 text-yellow-400' : 'bg-blue-500/10 text-blue-400'
+
+                      return (
+                        <div key={log.id} className="flex items-start justify-between p-3 bg-white/5 border-b border-white/5 last:border-b-0">
+                          <div className="flex items-start gap-3 flex-1 min-w-0">
+                            <div className={`w-2 h-2 rounded-full flex-shrink-0 mt-1.5 ${isDanger ? 'bg-red-400' : isSuccess ? 'bg-green-400' : isWarning ? 'bg-yellow-400' : 'bg-blue-400'}`} />
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-2 mb-0.5 flex-wrap">
+                                <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium ${colorClass}`}>
+                                  {actionLabel}
+                                </span>
+                                {log.targetName && (
+                                  <span className="text-[10px] text-muted-foreground truncate" dir="ltr">{log.targetName}</span>
+                                )}
+                              </div>
+                              <p className="text-[10px] text-muted-foreground leading-relaxed">{log.details}</p>
+                              <div className="flex items-center gap-2 mt-1">
+                                <span className="text-[9px] text-muted-foreground/60" dir="ltr">{log.adminEmail || log.adminId}</span>
+                                <span className="text-[9px] text-muted-foreground/40">•</span>
+                                <span className="text-[9px] text-muted-foreground/60">
+                                  {log.createdAt ? new Date(log.createdAt).toLocaleString('ar-YE', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : ''}
+                                </span>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {auditLogs.length > 0 && (
+                <div className="text-center">
+                  <button onClick={handleLoadMoreAuditLogs}
+                    className="flex items-center gap-1.5 px-4 py-2 mx-auto rounded-lg bg-white/5 text-xs text-muted-foreground hover:bg-white/10 transition-colors">
+                    <RefreshCw className="w-3.5 h-3.5" />
+                    تحميل المزيد من السجلات (200)
+                  </button>
+                </div>
+              )}
             </div>
           )}
         </div>
@@ -955,6 +1743,169 @@ export default function SuperAdminPanel() {
               </button>
               <button onClick={() => setShowBanIpDialog(false)} className="w-full h-10 bg-white/10 hover:bg-white/20 text-foreground rounded-xl text-sm">إلغاء</button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Permissions Dialog */}
+      {showPermissionsDialog && editingAdmin && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={() => setShowPermissionsDialog(false)}>
+          <div className="glass-card bg-background/95 backdrop-blur-xl border-blue-500/20 w-full max-w-md rounded-2xl p-6 space-y-4 animate-scale-in" onClick={e => e.stopPropagation()}>
+            <div className="text-center space-y-2">
+              <div className="w-14 h-14 rounded-2xl bg-blue-500/10 flex items-center justify-center mx-auto">
+                <UserCog className="w-7 h-7 text-blue-400" />
+              </div>
+              <h3 className="text-lg font-bold text-blue-400">إدارة الصلاحيات</h3>
+              <p className="text-xs text-muted-foreground" dir="ltr">{editingAdmin.email}</p>
+            </div>
+            <div className="space-y-2">
+              {(Object.keys(PERMISSION_LABELS) as (keyof AdminPermission)[]).map((key) => (
+                <button key={key} onClick={() => setPermissionsForm(prev => ({ ...prev, [key]: !prev[key] }))}
+                  className="w-full flex items-center justify-between p-3 rounded-lg bg-white/5 hover:bg-white/10 transition-colors">
+                  <span className="text-xs">{PERMISSION_LABELS[key]}</span>
+                  {permissionsForm[key] ? (
+                    <Check className="w-4 h-4 text-green-400" />
+                  ) : (
+                    <X className="w-4 h-4 text-muted-foreground/40" />
+                  )}
+                </button>
+              ))}
+            </div>
+            <div className="space-y-2 pt-2">
+              <button onClick={handleUpdatePermissions} disabled={permissionsLoading}
+                className="w-full h-11 gold-gradient text-gray-900 font-bold rounded-xl hover:opacity-90 transition-all disabled:opacity-50">
+                {permissionsLoading ? <RefreshCw className="w-4 h-4 animate-spin mx-auto" /> : 'حفظ الصلاحيات'}
+              </button>
+              <button onClick={() => { setShowPermissionsDialog(false); setEditingAdmin(null) }} className="w-full h-10 bg-white/10 hover:bg-white/20 text-foreground rounded-xl text-sm">إلغاء</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* User Search Dialog */}
+      {showUserSearchDialog && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-end sm:items-center justify-center p-0 sm:p-4" onClick={() => { setShowUserSearchDialog(false); setSelectedUser(null); setUserSearchResults([]); setUserSearchQuery('') }}>
+          <div className="glass-card bg-background/95 backdrop-blur-xl border-purple-500/20 w-full sm:max-w-md sm:rounded-2xl rounded-t-2xl p-6 space-y-4 animate-scale-in max-h-[85vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
+            <div className="text-center space-y-2">
+              <div className="w-14 h-14 rounded-2xl bg-purple-500/10 flex items-center justify-center mx-auto">
+                <Search className="w-7 h-7 text-purple-400" />
+              </div>
+              <h3 className="text-lg font-bold text-purple-400">بحث عن مستخدم</h3>
+              <p className="text-xs text-muted-foreground">ابحث عن مستخدم لإضافة رصيد أو ترقيته</p>
+            </div>
+
+            {!selectedUser ? (
+              <div className="space-y-3">
+                {/* Search Input */}
+                <div className="flex gap-2">
+                  <input
+                    value={userSearchQuery}
+                    onChange={(e) => setUserSearchQuery(e.target.value)}
+                    onKeyDown={(e) => e.key === 'Enter' && handleSearchUser()}
+                    className="flex-1 h-10 rounded-lg glass-input px-3 text-sm" placeholder="بريد إلكتروني أو اسم..." dir="ltr"
+                  />
+                  <button onClick={handleSearchUser} disabled={userSearchLoading || !userSearchQuery.trim()}
+                    className="h-10 px-4 rounded-lg gold-gradient text-gray-900 font-bold text-xs hover:opacity-90 transition-all disabled:opacity-50">
+                    {userSearchLoading ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Search className="w-4 h-4" />}
+                  </button>
+                </div>
+
+                {/* Search Results */}
+                {userSearchResults.length > 0 && (
+                  <div className="space-y-1.5 max-h-64 overflow-y-auto">
+                    {userSearchResults.map((u: any) => (
+                      <button key={u.id} onClick={() => setSelectedUser(u)}
+                        className="w-full flex items-center justify-between p-3 rounded-lg bg-white/5 hover:bg-white/10 transition-colors text-right">
+                        <div className="flex items-center gap-2 min-w-0">
+                          <div className="w-8 h-8 rounded-lg bg-white/10 flex items-center justify-center flex-shrink-0">
+                            <Users className="w-4 h-4 text-muted-foreground" />
+                          </div>
+                          <div className="min-w-0">
+                            <p className="text-xs font-medium truncate" dir="ltr">{u.email}</p>
+                            <p className="text-[10px] text-muted-foreground">{u.name || u.fullName || '—'}</p>
+                          </div>
+                        </div>
+                        <div className="text-left flex-shrink-0">
+                          <p className="text-xs font-bold gold-text">{(u.balance || 0).toLocaleString()}</p>
+                          <p className="text-[9px] text-muted-foreground">USDT</p>
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {/* Selected User Info */}
+                <div className="p-3 rounded-lg bg-white/5 border border-purple-500/10">
+                  <div className="flex items-center justify-between">
+                    <div className="min-w-0">
+                      <p className="text-xs font-medium truncate" dir="ltr">{selectedUser.email}</p>
+                      <p className="text-[10px] text-muted-foreground">{selectedUser.name || selectedUser.fullName || '—'}</p>
+                    </div>
+                    <div className="text-left flex-shrink-0">
+                      <p className="text-sm font-bold gold-text">{(selectedUser.balance || 0).toLocaleString()} USDT</p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Amount Input */}
+                <div className="space-y-1">
+                  <label className="text-xs text-muted-foreground">المبلغ (USDT)</label>
+                  <input
+                    type="number"
+                    value={quickOperationAmount}
+                    onChange={(e) => setQuickOperationAmount(e.target.value)}
+                    className="w-full h-10 rounded-lg glass-input px-3 text-sm font-mono" placeholder="0.00" min="0" step="0.01" dir="ltr"
+                  />
+                </div>
+
+                {/* Note Input */}
+                <div className="space-y-1">
+                  <label className="text-xs text-muted-foreground">ملاحظة (اختياري)</label>
+                  <input
+                    value={quickOperationNote}
+                    onChange={(e) => setQuickOperationNote(e.target.value)}
+                    className="w-full h-10 rounded-lg glass-input px-3 text-sm" placeholder="سبب العملية..."
+                  />
+                </div>
+
+                {/* Credit/Debit Buttons */}
+                <div className="grid grid-cols-2 gap-2 pt-1">
+                  <button onClick={handleQuickCredit} disabled={quickOpLoading || !quickOperationAmount || parseFloat(quickOperationAmount) <= 0}
+                    className="flex items-center justify-center gap-2 p-3 rounded-xl text-xs font-medium bg-green-500/10 text-green-400 hover:bg-green-500/20 transition-all disabled:opacity-50">
+                    {quickOpLoading ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
+                    إضافة رصيد
+                  </button>
+                  <button onClick={handleQuickDebit} disabled={quickOpLoading || !quickOperationAmount || parseFloat(quickOperationAmount) <= 0}
+                    className="flex items-center justify-center gap-2 p-3 rounded-xl text-xs font-medium bg-red-500/10 text-red-400 hover:bg-red-500/20 transition-all disabled:opacity-50">
+                    {quickOpLoading ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
+                    خصم رصيد
+                  </button>
+                </div>
+
+                {/* Promote to Admin */}
+                {selectedUser.role !== 'admin' && (
+                  <button onClick={() => handlePromoteToAdmin(selectedUser.id, selectedUser.email)}
+                    className="w-full flex items-center justify-center gap-2 p-3 rounded-xl text-xs font-medium bg-gold/10 text-gold hover:bg-gold/20 transition-all">
+                    <UserPlus className="w-4 h-4" />
+                    ترقية إلى مدير
+                  </button>
+                )}
+
+                {/* Back Button */}
+                <button onClick={() => { setSelectedUser(null); setUserSearchResults([]); setUserSearchQuery('') }}
+                  className="w-full h-10 bg-white/10 hover:bg-white/20 text-foreground rounded-xl text-sm">
+                  العودة للبحث
+                </button>
+              </div>
+            )}
+
+            {/* Close Button */}
+            <button onClick={() => { setShowUserSearchDialog(false); setSelectedUser(null); setUserSearchResults([]); setUserSearchQuery('') }}
+              className="w-full h-10 bg-white/5 hover:bg-white/10 text-muted-foreground rounded-xl text-sm">
+              إغلاق
+            </button>
           </div>
         </div>
       )}

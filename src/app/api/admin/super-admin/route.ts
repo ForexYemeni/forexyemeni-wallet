@@ -5,6 +5,24 @@ import { logAudit } from '@/lib/audit-log'
 
 const ADMIN_EMAIL = 'mshay2024m@gmail.com'
 
+// ===================== TYPES =====================
+interface AdminPermissions {
+  manageUsers?: boolean
+  approveDeposits?: boolean
+  approveWithdrawals?: boolean
+  approveKYC?: boolean
+  manageSettings?: boolean
+}
+
+interface AuditLogFilters {
+  actionType?: string
+  adminId?: string
+  startDate?: string
+  endDate?: string
+  limit?: number
+  targetType?: string
+}
+
 // ===================== DEFAULT SETTINGS =====================
 const DEFAULT_SETTINGS = {
   maintenanceMode: false,
@@ -57,6 +75,82 @@ async function verifySuperAdmin(adminId: string): Promise<{ authorized: boolean;
     return { authorized: false, user, message: 'ليس لديك صلاحية المدير الرئيسي' }
   }
   return { authorized: true, user }
+}
+
+// ===================== HELPER: Parse permissions string =====================
+function parsePermissions(permissions: string | null | undefined): AdminPermissions | null {
+  if (!permissions) return null
+  try {
+    if (typeof permissions === 'string') return JSON.parse(permissions) as AdminPermissions
+    return permissions as AdminPermissions
+  } catch {
+    return null
+  }
+}
+
+function stringifyPermissions(permissions: AdminPermissions): string {
+  return JSON.stringify(permissions)
+}
+
+// ===================== HELPER: Sum collection amounts =====================
+async function sumFieldFromCollection(collection: string, statusField: string, statusValue: string, amountField: string): Promise<number> {
+  const db = getDb()
+  let total = 0
+  let snapshot = await db.collection(collection).where(statusField, '==', statusValue).limit(500).get()
+  while (snapshot.size > 0) {
+    for (const doc of snapshot.docs) {
+      total += doc.data()[amountField] || 0
+    }
+    if (snapshot.size < 500) break
+    // Firestore doesn't support offset, so we use startAfter for pagination
+    const lastDoc = snapshot.docs[snapshot.size - 1]
+    snapshot = await db.collection(collection)
+      .where(statusField, '==', statusValue)
+      .startAfter(lastDoc)
+      .limit(500)
+      .get()
+  }
+  return total
+}
+
+// ===================== HELPER: Delete old documents from collection =====================
+async function deleteOldDocuments(collection: string, dateField: string, olderThanMs: number): Promise<number> {
+  const db = getDb()
+  const cutoffDate = new Date(Date.now() - olderThanMs).toISOString()
+  let deletedCount = 0
+
+  // Fetch documents and filter by date in application layer since Firestore
+  // doesn't support < queries easily without indexes
+  let snapshot = await db.collection(collection).limit(500).get()
+  let batch = db.batch()
+  let opsInBatch = 0
+
+  while (snapshot.size > 0) {
+    let hasMore = false
+    for (const doc of snapshot.docs) {
+      const docDate = doc.data()[dateField]
+      if (docDate && new Date(docDate as string).getTime() < new Date(cutoffDate).getTime()) {
+        batch.delete(doc.ref)
+        deletedCount++
+        opsInBatch++
+        if (opsInBatch >= 499) {
+          await batch.commit()
+          batch = db.batch()
+          opsInBatch = 0
+        }
+      }
+    }
+    if (snapshot.size < 500) break
+    const lastDoc = snapshot.docs[snapshot.size - 1]
+    snapshot = await db.collection(collection).startAfter(lastDoc).limit(500).get()
+    hasMore = snapshot.size > 0
+  }
+
+  if (opsInBatch > 0) {
+    await batch.commit()
+  }
+
+  return deletedCount
 }
 
 // ===================== GET — Fetch all super admin settings + dashboard data =====================
@@ -157,6 +251,107 @@ export async function GET(request: NextRequest) {
 
     const totalRecords = Object.values(collectionCounts).reduce((sum, count) => sum + count, 0)
 
+    // 5. Financial Summary (NEW)
+    let financialSummary = {
+      totalUserBalances: 0,
+      completedDepositsTotal: 0,
+      completedWithdrawalsTotal: 0,
+      pendingDepositsTotal: 0,
+      pendingWithdrawalsTotal: 0,
+      totalP2PTrades: 0,
+    }
+    try {
+      // Sum all user balances
+      const usersSnapshot = await db.collection('users').limit(5000).get()
+      let totalBalances = 0
+      for (const doc of usersSnapshot.docs) {
+        totalBalances += doc.data().balance || 0
+      }
+      financialSummary.totalUserBalances = totalBalances
+
+      // Sum completed deposits
+      financialSummary.completedDepositsTotal = await sumFieldFromCollection('deposits', 'status', 'completed', 'amount')
+
+      // Sum completed withdrawals
+      financialSummary.completedWithdrawalsTotal = await sumFieldFromCollection('withdrawals', 'status', 'completed', 'amount')
+
+      // Sum pending deposits
+      financialSummary.pendingDepositsTotal = await sumFieldFromCollection('deposits', 'status', 'pending', 'amount')
+
+      // Sum pending withdrawals
+      financialSummary.pendingWithdrawalsTotal = await sumFieldFromCollection('withdrawals', 'status', 'pending', 'amount')
+
+      // Count P2P trades
+      const p2pSnapshot = await db.collection('p2pTrades').limit(5000).get()
+      financialSummary.totalP2PTrades = p2pSnapshot.size
+    } catch (err) {
+      console.error('[SuperAdmin GET] Error reading financial summary:', err)
+    }
+
+    // 6. Admin Team (NEW)
+    let adminTeam: Array<Record<string, unknown>> = []
+    try {
+      const adminsSnapshot = await db.collection('users').where('role', '==', 'admin').limit(100).get()
+      adminTeam = adminsSnapshot.docs.map(doc => {
+        const data = doc.data()
+        return {
+          id: doc.id,
+          email: data.email || '',
+          name: data.fullName || '',
+          role: data.role || 'admin',
+          permissions: parsePermissions(data.permissions),
+          status: data.status || 'active',
+          lastLogin: data.lastLogin || null,
+          createdAt: data.createdAt || '',
+        }
+      })
+    } catch (err) {
+      console.error('[SuperAdmin GET] Error reading admin team:', err)
+    }
+
+    // 7. Recent Audit Logs (NEW - last 20)
+    let recentAuditLogs: Array<Record<string, unknown>> = []
+    try {
+      const auditSnapshot = await db.collection('auditLog').limit(100).get()
+      recentAuditLogs = auditSnapshot.docs
+        .map(doc => ({ id: doc.id, ...doc.data() } as Record<string, unknown>))
+        .sort((a, b) => new Date(b.createdAt as string).getTime() - new Date(a.createdAt as string).getTime())
+        .slice(0, 20)
+    } catch (err) {
+      console.error('[SuperAdmin GET] Error reading audit logs:', err)
+    }
+
+    // 8. System Health (NEW)
+    let systemHealth = {
+      pendingDeposits: 0,
+      pendingWithdrawals: 0,
+      pendingKYC: 0,
+      unresolvedDisputes: 0,
+    }
+    try {
+      const [pendingDepSnapshot, pendingWithSnapshot, pendingKYCSnapshot, disputesSnapshot] = await Promise.all([
+        db.collection('deposits').where('status', '==', 'pending').limit(1).get(),
+        db.collection('withdrawals').where('status', '==', 'pending').limit(1).get(),
+        db.collection('kycRecords').where('status', '==', 'pending').limit(1).get(),
+        db.collection('p2pTrades').where('status', '==', 'disputed').limit(1).get(),
+      ])
+
+      // For accurate counts, we need to read all matching docs
+      const [allPendingDep, allPendingWith, allPendingKYC, allDisputes] = await Promise.all([
+        db.collection('deposits').where('status', '==', 'pending').limit(5000).get(),
+        db.collection('withdrawals').where('status', '==', 'pending').limit(5000).get(),
+        db.collection('kycRecords').where('status', '==', 'pending').limit(5000).get(),
+        db.collection('p2pTrades').where('status', '==', 'disputed').limit(5000).get(),
+      ])
+
+      systemHealth.pendingDeposits = allPendingDep.size
+      systemHealth.pendingWithdrawals = allPendingWith.size
+      systemHealth.pendingKYC = allPendingKYC.size
+      systemHealth.unresolvedDisputes = allDisputes.size
+    } catch (err) {
+      console.error('[SuperAdmin GET] Error reading system health:', err)
+    }
+
     return NextResponse.json({
       success: true,
       data: {
@@ -165,6 +360,10 @@ export async function GET(request: NextRequest) {
         activeSessionsCount,
         collectionCounts,
         totalRecords,
+        financialSummary,
+        adminTeam,
+        recentAuditLogs,
+        systemHealth,
       },
     })
   } catch (error: unknown) {
@@ -581,6 +780,697 @@ export async function POST(request: NextRequest) {
         message: newMode ? 'تم تفعيل وضع الصيانة' : 'تم إلغاء وضع الصيانة',
         data: { maintenanceMode: newMode },
       })
+    }
+
+    // ===================== 11. GET FINANCIAL SUMMARY =====================
+    if (action === 'get_financial_summary') {
+      try {
+        // Sum all user balances
+        const usersSnapshot = await db.collection('users').limit(5000).get()
+        let totalUserBalances = 0
+        for (const doc of usersSnapshot.docs) {
+          totalUserBalances += doc.data().balance || 0
+        }
+
+        // Sum completed deposits
+        const completedDepositsTotal = await sumFieldFromCollection('deposits', 'status', 'completed', 'amount')
+
+        // Sum completed withdrawals
+        const completedWithdrawalsTotal = await sumFieldFromCollection('withdrawals', 'status', 'completed', 'amount')
+
+        // Sum pending withdrawals
+        const pendingWithdrawalsTotal = await sumFieldFromCollection('withdrawals', 'status', 'pending', 'amount')
+
+        // Sum pending deposits
+        const pendingDepositsTotal = await sumFieldFromCollection('deposits', 'status', 'pending', 'amount')
+
+        // Count total P2P trades
+        const p2pSnapshot = await db.collection('p2pTrades').limit(5000).get()
+        const totalP2PTrades = p2pSnapshot.size
+
+        const financialData = {
+          totalUserBalances,
+          completedDepositsTotal,
+          completedWithdrawalsTotal,
+          pendingWithdrawalsTotal,
+          pendingDepositsTotal,
+          totalP2PTrades,
+          totalUsers: usersSnapshot.size,
+        }
+
+        await logAudit(
+          adminId,
+          'settings_change',
+          'financial_report',
+          'system',
+          'التقرير المالي',
+          'عرض ملخص مالي شامل'
+        ).catch(() => {})
+
+        return NextResponse.json({
+          success: true,
+          message: 'تم جلب الملخص المالي بنجاح',
+          data: financialData,
+        })
+      } catch (error: unknown) {
+        const errorMsg = error instanceof Error ? error.message : 'حدث خطأ أثناء جلب الملخص المالي'
+        console.error('[SuperAdmin] get_financial_summary error:', error)
+        return NextResponse.json({ success: false, message: errorMsg }, { status: 500 })
+      }
+    }
+
+    // ===================== 12. MANAGE ADMIN =====================
+    if (action === 'manage_admin') {
+      const { subAction } = body
+
+      if (!subAction) {
+        return NextResponse.json({ success: false, message: 'الإجراء الفرعي مطلوب' }, { status: 400 })
+      }
+
+      // --- 12a. List Admins ---
+      if (subAction === 'list_admins') {
+        try {
+          const adminsSnapshot = await db.collection('users').where('role', '==', 'admin').limit(100).get()
+
+          if (adminsSnapshot.empty) {
+            return NextResponse.json({
+              success: true,
+              message: 'لا يوجد مدراء',
+              data: [],
+            })
+          }
+
+          const admins = adminsSnapshot.docs.map(doc => {
+            const data = doc.data()
+            return {
+              id: doc.id,
+              email: data.email || '',
+              name: data.fullName || '',
+              role: data.role || 'admin',
+              permissions: parsePermissions(data.permissions),
+              status: data.status || 'active',
+              createdAt: data.createdAt || '',
+              lastLogin: data.lastLogin || null,
+            }
+          })
+
+          return NextResponse.json({
+            success: true,
+            message: 'تم جلب قائمة المدراء بنجاح',
+            data: admins,
+          })
+        } catch (error: unknown) {
+          const errorMsg = error instanceof Error ? error.message : 'حدث خطأ أثناء جلب قائمة المدراء'
+          console.error('[SuperAdmin] list_admins error:', error)
+          return NextResponse.json({ success: false, message: errorMsg }, { status: 500 })
+        }
+      }
+
+      // --- 12b. Update Permissions ---
+      if (subAction === 'update_permissions') {
+        const { targetUserId, permissions } = body
+        if (!targetUserId) {
+          return NextResponse.json({ success: false, message: 'معرف المستخدم مطلوب' }, { status: 400 })
+        }
+        if (!permissions || typeof permissions !== 'object') {
+          return NextResponse.json({ success: false, message: 'صلاحيات غير صالحة' }, { status: 400 })
+        }
+
+        try {
+          const targetUser = await userOperations.findUnique({ id: targetUserId })
+          if (!targetUser) {
+            return NextResponse.json({ success: false, message: 'المستخدم غير موجود' }, { status: 404 })
+          }
+          if (targetUser.role !== 'admin') {
+            return NextResponse.json({ success: false, message: 'المستخدم ليس مديراً' }, { status: 400 })
+          }
+
+          const newPermissions: AdminPermissions = {
+            manageUsers: Boolean(permissions.manageUsers),
+            approveDeposits: Boolean(permissions.approveDeposits),
+            approveWithdrawals: Boolean(permissions.approveWithdrawals),
+            approveKYC: Boolean(permissions.approveKYC),
+            manageSettings: Boolean(permissions.manageSettings),
+          }
+
+          await db.collection('users').doc(targetUserId).update({
+            permissions: stringifyPermissions(newPermissions),
+            updatedAt: nowTimestamp(),
+          })
+
+          await logAudit(
+            adminId,
+            'permissions_change',
+            'user',
+            targetUserId,
+            targetUser.email,
+            `تحديث صلاحيات المدير: ${targetUser.email} - ${JSON.stringify(newPermissions)}`
+          ).catch(() => {})
+
+          return NextResponse.json({
+            success: true,
+            message: 'تم تحديث الصلاحيات بنجاح',
+            data: { permissions: newPermissions },
+          })
+        } catch (error: unknown) {
+          const errorMsg = error instanceof Error ? error.message : 'حدث خطأ أثناء تحديث الصلاحيات'
+          console.error('[SuperAdmin] update_permissions error:', error)
+          return NextResponse.json({ success: false, message: errorMsg }, { status: 500 })
+        }
+      }
+
+      // --- 12c. Demote Admin ---
+      if (subAction === 'demote_admin') {
+        const { targetUserId } = body
+        if (!targetUserId) {
+          return NextResponse.json({ success: false, message: 'معرف المستخدم مطلوب' }, { status: 400 })
+        }
+
+        // Cannot demote self
+        if (targetUserId === adminId) {
+          return NextResponse.json({ success: false, message: 'لا يمكنك إزالة صلاحياتك الخاصة' }, { status: 400 })
+        }
+
+        try {
+          const targetUser = await userOperations.findUnique({ id: targetUserId })
+          if (!targetUser) {
+            return NextResponse.json({ success: false, message: 'المستخدم غير موجود' }, { status: 404 })
+          }
+          if (targetUser.role !== 'admin') {
+            return NextResponse.json({ success: false, message: 'المستخدم ليس مديراً' }, { status: 400 })
+          }
+
+          await db.collection('users').doc(targetUserId).update({
+            role: 'user',
+            permissions: null,
+            updatedAt: nowTimestamp(),
+          })
+
+          await logAudit(
+            adminId,
+            'user_demote',
+            'user',
+            targetUserId,
+            targetUser.email,
+            `إزالة صلاحية الإدارة من: ${targetUser.email}`
+          ).catch(() => {})
+
+          return NextResponse.json({
+            success: true,
+            message: 'تم إزالة صلاحية الإدارة بنجاح',
+          })
+        } catch (error: unknown) {
+          const errorMsg = error instanceof Error ? error.message : 'حدث خطأ أثناء إزالة الصلاحية'
+          console.error('[SuperAdmin] demote_admin error:', error)
+          return NextResponse.json({ success: false, message: errorMsg }, { status: 500 })
+        }
+      }
+
+      // --- 12d. Promote to Admin ---
+      if (subAction === 'promote_to_admin') {
+        const { targetUserId, permissions: promotePermissions } = body
+        if (!targetUserId) {
+          return NextResponse.json({ success: false, message: 'معرف المستخدم مطلوب' }, { status: 400 })
+        }
+
+        try {
+          const targetUser = await userOperations.findUnique({ id: targetUserId })
+          if (!targetUser) {
+            return NextResponse.json({ success: false, message: 'المستخدم غير موجود' }, { status: 404 })
+          }
+          if (targetUser.role === 'admin') {
+            return NextResponse.json({ success: false, message: 'المستخدم مدير بالفعل' }, { status: 400 })
+          }
+
+          const newPermissions: AdminPermissions = promotePermissions
+            ? {
+                manageUsers: Boolean(promotePermissions.manageUsers),
+                approveDeposits: Boolean(promotePermissions.approveDeposits),
+                approveWithdrawals: Boolean(promotePermissions.approveWithdrawals),
+                approveKYC: Boolean(promotePermissions.approveKYC),
+                manageSettings: Boolean(promotePermissions.manageSettings),
+              }
+            : {
+                manageUsers: false,
+                approveDeposits: true,
+                approveWithdrawals: true,
+                approveKYC: true,
+                manageSettings: false,
+              }
+
+          await db.collection('users').doc(targetUserId).update({
+            role: 'admin',
+            permissions: stringifyPermissions(newPermissions),
+            updatedAt: nowTimestamp(),
+          })
+
+          await logAudit(
+            adminId,
+            'user_promote',
+            'user',
+            targetUserId,
+            targetUser.email,
+            `ترقية مستخدم إلى مدير: ${targetUser.email}`
+          ).catch(() => {})
+
+          return NextResponse.json({
+            success: true,
+            message: 'تم ترقية المستخدم إلى مدير بنجاح',
+            data: { permissions: newPermissions },
+          })
+        } catch (error: unknown) {
+          const errorMsg = error instanceof Error ? error.message : 'حدث خطأ أثناء الترقية'
+          console.error('[SuperAdmin] promote_to_admin error:', error)
+          return NextResponse.json({ success: false, message: errorMsg }, { status: 500 })
+        }
+      }
+
+      return NextResponse.json({ success: false, message: 'إجراء فرعي غير معروف' }, { status: 400 })
+    }
+
+    // ===================== 13. CLEANUP DATA =====================
+    if (action === 'cleanup_data') {
+      const { target } = body
+
+      if (!target) {
+        return NextResponse.json({ success: false, message: 'هدف التنظيف مطلوب' }, { status: 400 })
+      }
+
+      const validTargets = ['expired_otp', 'old_notifications', 'old_login_attempts', 'pending_pin_resets']
+      if (!validTargets.includes(target)) {
+        return NextResponse.json({
+          success: false,
+          message: `هدف التنظيف غير صالح. الأهداف المتاحة: ${validTargets.join(', ')}`,
+        }, { status: 400 })
+      }
+
+      try {
+        let deletedCount = 0
+
+        if (target === 'expired_otp') {
+          // Delete OTP codes older than 24 hours
+          deletedCount = await deleteOldDocuments('otpCodes', 'createdAt', 24 * 60 * 60 * 1000)
+        } else if (target === 'old_notifications') {
+          // Delete read notifications older than 30 days
+          const db2 = getDb()
+          const cutoffDate = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString()
+
+          // First filter read notifications
+          let snapshot = await db2.collection('notifications')
+            .where('read', '==', true)
+            .limit(500)
+            .get()
+
+          while (snapshot.size > 0) {
+            const batch = db2.batch()
+            let hasMore = false
+            let lastDoc: FirebaseFirestore.QueryDocumentSnapshot | null = null
+            for (const doc of snapshot.docs) {
+              const createdAt = doc.data().createdAt
+              if (createdAt && new Date(createdAt as string).getTime() < new Date(cutoffDate).getTime()) {
+                batch.delete(doc.ref)
+                deletedCount++
+              }
+              lastDoc = doc
+            }
+            await batch.commit()
+            if (lastDoc && snapshot.size >= 500) {
+              snapshot = await db2.collection('notifications')
+                .where('read', '==', true)
+                .startAfter(lastDoc)
+                .limit(500)
+                .get()
+              hasMore = snapshot.size > 0
+            } else {
+              break
+            }
+            if (!hasMore) break
+          }
+        } else if (target === 'old_login_attempts') {
+          // Delete login attempts older than 7 days
+          deletedCount = await deleteOldDocuments('loginAttempts', 'createdAt', 7 * 24 * 60 * 60 * 1000)
+        } else if (target === 'pending_pin_resets') {
+          // Delete pendingPinReset entries older than 24 hours
+          // These are stored as a field in user documents or as a separate collection
+          // Let's check for a pendingPinResets collection first, then fall back to user documents
+          try {
+            const snapshot = await db.collection('pendingPinResets').limit(1).get()
+            if (!snapshot.empty) {
+              deletedCount = await deleteOldDocuments('pendingPinResets', 'createdAt', 24 * 60 * 60 * 1000)
+            } else {
+              // Look for users with pendingPinReset field older than 24 hours
+              const cutoffDate = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()
+              const usersSnapshot = await db.collection('users')
+                .where('pendingPinReset', '!=', null)
+                .limit(500)
+                .get()
+
+              const batch = db.batch()
+              for (const doc of usersSnapshot.docs) {
+                const pendingPinReset = doc.data().pendingPinReset
+                if (pendingPinReset) {
+                  // pendingPinReset could be a boolean or a timestamp string
+                  if (typeof pendingPinReset === 'string') {
+                    if (new Date(pendingPinReset).getTime() < new Date(cutoffDate).getTime()) {
+                      batch.update(doc.ref, { pendingPinReset: null, updatedAt: nowTimestamp() })
+                      deletedCount++
+                    }
+                  } else {
+                    // If it's a boolean true, clear it (assume it's old enough)
+                    batch.update(doc.ref, { pendingPinReset: null, updatedAt: nowTimestamp() })
+                    deletedCount++
+                  }
+                }
+              }
+              if (deletedCount > 0) {
+                await batch.commit()
+              }
+            }
+          } catch {
+            // Collection might not exist, that's ok
+          }
+        }
+
+        await logAudit(
+          adminId,
+          'system_cleanup',
+          'cleanup',
+          target,
+          target,
+          `تنظيف البيانات: ${target} (${deletedCount} عنصر محذوف)`
+        ).catch(() => {})
+
+        return NextResponse.json({
+          success: true,
+          message: `تم تنظيف "${target}" بنجاح`,
+          data: { target, deletedCount },
+        })
+      } catch (error: unknown) {
+        const errorMsg = error instanceof Error ? error.message : 'حدث خطأ أثناء تنظيف البيانات'
+        console.error('[SuperAdmin] cleanup_data error:', error)
+        return NextResponse.json({ success: false, message: errorMsg }, { status: 500 })
+      }
+    }
+
+    // ===================== 14. GET AUDIT LOGS =====================
+    if (action === 'get_audit_logs') {
+      const { filters } = body as { filters?: AuditLogFilters }
+
+      try {
+        let query: FirebaseFirestore.Query = db.collection('auditLog')
+        const limit = Math.min(Math.max(filters?.limit || 50, 1), 200)
+
+        // Apply filters — Firestore composite index limitations mean we apply simple filters in the query
+        // and do complex ones in JS
+        if (filters?.actionType) {
+          query = query.where('actionType', '==', filters.actionType)
+        }
+        if (filters?.adminId) {
+          query = query.where('adminId', '==', filters.adminId)
+        }
+        if (filters?.targetType) {
+          query = query.where('targetType', '==', filters.targetType)
+        }
+
+        query = query.limit(limit)
+
+        const snapshot = await query.get()
+        let logs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Record<string, unknown>))
+
+        // Apply date filters in JS (to avoid composite index issues)
+        if (filters?.startDate) {
+          const start = new Date(filters.startDate).getTime()
+          logs = logs.filter(log => {
+            const createdAt = log.createdAt as string
+            return createdAt && new Date(createdAt).getTime() >= start
+          })
+        }
+        if (filters?.endDate) {
+          const end = new Date(filters.endDate).getTime()
+          logs = logs.filter(log => {
+            const createdAt = log.createdAt as string
+            return createdAt && new Date(createdAt).getTime() <= end
+          })
+        }
+
+        // Sort by createdAt descending
+        logs.sort((a, b) => new Date(b.createdAt as string).getTime() - new Date(a.createdAt as string).getTime())
+
+        // Re-apply limit after JS filtering
+        logs = logs.slice(0, limit)
+
+        return NextResponse.json({
+          success: true,
+          message: 'تم جلب سجل التدقيق بنجاح',
+          data: {
+            logs,
+            total: logs.length,
+            appliedFilters: filters || {},
+          },
+        })
+      } catch (error: unknown) {
+        const errorMsg = error instanceof Error ? error.message : 'حدث خطأ أثناء جلب سجل التدقيق'
+        console.error('[SuperAdmin] get_audit_logs error:', error)
+        return NextResponse.json({ success: false, message: errorMsg }, { status: 500 })
+      }
+    }
+
+    // ===================== 15. QUICK USER OPERATION =====================
+    if (action === 'quick_user_operation') {
+      const { subAction } = body
+
+      if (!subAction) {
+        return NextResponse.json({ success: false, message: 'الإجراء الفرعي مطلوب' }, { status: 400 })
+      }
+
+      // --- 15a. Search User ---
+      if (subAction === 'search_user') {
+        const { query: searchQuery } = body
+        if (!searchQuery || typeof searchQuery !== 'string') {
+          return NextResponse.json({ success: false, message: 'كلمة البحث مطلوبة' }, { status: 400 })
+        }
+
+        try {
+          const searchTerm = searchQuery.trim().toLowerCase()
+          if (searchTerm.length < 2) {
+            return NextResponse.json({ success: false, message: 'كلمة البحث قصيرة جداً (حرفين على الأقل)' }, { status: 400 })
+          }
+
+          // Fetch users and filter by partial match on email or name
+          const usersSnapshot = await db.collection('users').limit(500).get()
+          const allUsers = usersSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as Array<Record<string, any>>
+
+          const matchedUsers = allUsers.filter((u: Record<string, any>) => {
+            const email = (u.email || '').toLowerCase()
+            const fullName = (u.fullName || '').toLowerCase()
+            return email.includes(searchTerm) || fullName.includes(searchTerm)
+          }).slice(0, 10).map((u: Record<string, any>) => ({
+            id: u.id,
+            email: u.email || '',
+            name: u.fullName || '',
+            role: u.role || 'user',
+            status: u.status || 'active',
+            balance: u.balance || 0,
+            createdAt: u.createdAt || '',
+          }))
+
+          return NextResponse.json({
+            success: true,
+            message: `تم العثور على ${matchedUsers.length} مستخدم`,
+            data: matchedUsers,
+          })
+        } catch (error: unknown) {
+          const errorMsg = error instanceof Error ? error.message : 'حدث خطأ أثناء البحث'
+          console.error('[SuperAdmin] search_user error:', error)
+          return NextResponse.json({ success: false, message: errorMsg }, { status: 500 })
+        }
+      }
+
+      // --- 15b. Get User Details ---
+      if (subAction === 'get_user_details') {
+        const { userId } = body
+        if (!userId) {
+          return NextResponse.json({ success: false, message: 'معرف المستخدم مطلوب' }, { status: 400 })
+        }
+
+        try {
+          const targetUser = await userOperations.findUnique({ id: userId })
+          if (!targetUser) {
+            return NextResponse.json({ success: false, message: 'المستخدم غير موجود' }, { status: 404 })
+          }
+
+          // Fetch additional user data in parallel
+          const [depositsSnapshot, withdrawalsSnapshot, transactionsSnapshot] = await Promise.all([
+            db.collection('deposits').where('userId', '==', userId).limit(50).get(),
+            db.collection('withdrawals').where('userId', '==', userId).limit(50).get(),
+            db.collection('transactions').where('userId', '==', userId).limit(50).get(),
+          ])
+
+          const userDetails = {
+            ...targetUser,
+            permissions: parsePermissions(targetUser.permissions),
+            recentDeposits: depositsSnapshot.docs.map(d => ({ id: d.id, ...d.data() })),
+            recentWithdrawals: withdrawalsSnapshot.docs.map(w => ({ id: w.id, ...w.data() })),
+            recentTransactions: transactionsSnapshot.docs.map(t => ({ id: t.id, ...t.data() })),
+            depositCount: depositsSnapshot.size,
+            withdrawalCount: withdrawalsSnapshot.size,
+            transactionCount: transactionsSnapshot.size,
+          }
+
+          return NextResponse.json({
+            success: true,
+            message: 'تم جلب تفاصيل المستخدم بنجاح',
+            data: userDetails,
+          })
+        } catch (error: unknown) {
+          const errorMsg = error instanceof Error ? error.message : 'حدث خطأ أثناء جلب تفاصيل المستخدم'
+          console.error('[SuperAdmin] get_user_details error:', error)
+          return NextResponse.json({ success: false, message: errorMsg }, { status: 500 })
+        }
+      }
+
+      // --- 15c. Quick Credit ---
+      if (subAction === 'quick_credit') {
+        const { userId, amount, reason } = body
+        if (!userId) {
+          return NextResponse.json({ success: false, message: 'معرف المستخدم مطلوب' }, { status: 400 })
+        }
+        if (!amount || typeof amount !== 'number' || amount <= 0) {
+          return NextResponse.json({ success: false, message: 'المبلغ مطلوب ويجب أن يكون رقماً موجباً' }, { status: 400 })
+        }
+
+        try {
+          const targetUser = await userOperations.findUnique({ id: userId })
+          if (!targetUser) {
+            return NextResponse.json({ success: false, message: 'المستخدم غير موجود' }, { status: 404 })
+          }
+
+          const balanceBefore = targetUser.balance || 0
+          const balanceAfter = balanceBefore + amount
+
+          await db.collection('users').doc(userId).update({
+            balance: balanceAfter,
+            updatedAt: nowTimestamp(),
+          })
+
+          // Create a transaction record
+          await db.collection('transactions').add({
+            id: generateId(),
+            userId,
+            type: 'admin_credit',
+            amount,
+            balanceBefore,
+            balanceAfter,
+            description: reason || `إيداع إداري بواسطة المدير الرئيسي`,
+            createdAt: nowTimestamp(),
+          })
+
+          await logAudit(
+            adminId,
+            'balance_add',
+            'user',
+            userId,
+            targetUser.email,
+            `إضافة رصيد: ${amount} للمستخدم ${targetUser.email}. الرصيد السابق: ${balanceBefore}, الرصيد الجديد: ${balanceAfter}. السبب: ${reason || 'إيداع إداري'}`
+          ).catch(() => {})
+
+          // Send notification to user
+          await notificationOperations.create({
+            userId,
+            title: 'إيداع في حسابك',
+            message: `تم إيداع مبلغ ${amount} في حسابك ${reason ? `- ${reason}` : ''}`,
+            type: 'success',
+            read: false,
+          }).catch(() => {})
+
+          return NextResponse.json({
+            success: true,
+            message: `تم إضافة ${amount} إلى حساب المستخدم بنجاح`,
+            data: { balanceBefore, balanceAfter, amount },
+          })
+        } catch (error: unknown) {
+          const errorMsg = error instanceof Error ? error.message : 'حدث خطأ أثناء إضافة الرصيد'
+          console.error('[SuperAdmin] quick_credit error:', error)
+          return NextResponse.json({ success: false, message: errorMsg }, { status: 500 })
+        }
+      }
+
+      // --- 15d. Quick Debit ---
+      if (subAction === 'quick_debit') {
+        const { userId, amount, reason } = body
+        if (!userId) {
+          return NextResponse.json({ success: false, message: 'معرف المستخدم مطلوب' }, { status: 400 })
+        }
+        if (!amount || typeof amount !== 'number' || amount <= 0) {
+          return NextResponse.json({ success: false, message: 'المبلغ مطلوب ويجب أن يكون رقماً موجباً' }, { status: 400 })
+        }
+
+        try {
+          const targetUser = await userOperations.findUnique({ id: userId })
+          if (!targetUser) {
+            return NextResponse.json({ success: false, message: 'المستخدم غير موجود' }, { status: 404 })
+          }
+
+          const balanceBefore = targetUser.balance || 0
+
+          // Check sufficient balance
+          if (balanceBefore < amount) {
+            return NextResponse.json({
+              success: false,
+              message: `رصيد المستخدم غير كافي. الرصيد الحالي: ${balanceBefore}, المبلغ المطلوب: ${amount}`,
+            }, { status: 400 })
+          }
+
+          const balanceAfter = balanceBefore - amount
+
+          await db.collection('users').doc(userId).update({
+            balance: balanceAfter,
+            updatedAt: nowTimestamp(),
+          })
+
+          // Create a transaction record
+          await db.collection('transactions').add({
+            id: generateId(),
+            userId,
+            type: 'admin_debit',
+            amount,
+            balanceBefore,
+            balanceAfter,
+            description: reason || `خصم إداري بواسطة المدير الرئيسي`,
+            createdAt: nowTimestamp(),
+          })
+
+          await logAudit(
+            adminId,
+            'balance_withdraw',
+            'user',
+            userId,
+            targetUser.email,
+            `خصم رصيد: ${amount} من المستخدم ${targetUser.email}. الرصيد السابق: ${balanceBefore}, الرصيد الجديد: ${balanceAfter}. السبب: ${reason || 'خصم إداري'}`
+          ).catch(() => {})
+
+          // Send notification to user
+          await notificationOperations.create({
+            userId,
+            title: 'خصم من حسابك',
+            message: `تم خصم مبلغ ${amount} من حسابك ${reason ? `- ${reason}` : ''}`,
+            type: 'warning',
+            read: false,
+          }).catch(() => {})
+
+          return NextResponse.json({
+            success: true,
+            message: `تم خصم ${amount} من حساب المستخدم بنجاح`,
+            data: { balanceBefore, balanceAfter, amount },
+          })
+        } catch (error: unknown) {
+          const errorMsg = error instanceof Error ? error.message : 'حدث خطأ أثناء خصم الرصيد'
+          console.error('[SuperAdmin] quick_debit error:', error)
+          return NextResponse.json({ success: false, message: errorMsg }, { status: 500 })
+        }
+      }
+
+      return NextResponse.json({ success: false, message: 'إجراء فرعي غير معروف' }, { status: 400 })
     }
 
     return NextResponse.json({ success: false, message: 'إجراء غير معروف' }, { status: 400 })
