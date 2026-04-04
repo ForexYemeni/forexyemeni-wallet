@@ -27,6 +27,8 @@ import {
   Gift,
   Repeat,
   Activity,
+  UserCog,
+  DollarSign,
 } from 'lucide-react'
 import { useState, useEffect } from 'react'
 
@@ -74,6 +76,8 @@ const adminSubItems = [
   { key: 'admin-reports', label: 'التقارير المالية', icon: BarChart3, tab: 'reports' },
   { key: 'admin-monitor', label: 'مراقبة النظام', icon: Activity, tab: 'system-monitor' },
   { key: 'admin-settings', label: 'إعدادات النظام', icon: Sliders, tab: 'admin-settings' },
+  { key: 'admin-team', label: '👥 فريق الإدارة', icon: UserCog, tab: 'admin-team' },
+  { key: 'admin-financial', label: '💰 الملخص المالي', icon: DollarSign, tab: 'admin-financial' },
   { key: 'admin-super', label: '🛡️ تحكم خارق', icon: Shield, tab: 'super-admin' },
 ]
 
@@ -183,8 +187,8 @@ export default function Sidebar() {
                 {adminExpanded && isActive && (
                   <div className="mr-4 mt-1 space-y-0.5 animate-fade-in">
                     {adminSubItems.filter(sub => {
-                      // Only show super-admin to actual super admin (no permissions)
-                      if (sub.key === 'admin-super') {
+                      // Only show super-admin, admin-team, admin-financial to actual super admin (no permissions)
+                      if (sub.key === 'admin-super' || sub.key === 'admin-team' || sub.key === 'admin-financial') {
                         return user?.role === 'admin' && !user?.permissions
                       }
                       return true

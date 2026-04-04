@@ -184,13 +184,15 @@ export default function AdminPanel() {
   const { user, setScreen } = useAuthStore()
   const AdminFaqManager = lazy(() => import('@/components/admin/AdminFaqManager'))
   const AdminReferralSettings = lazy(() => import('@/components/admin/AdminReferralSettings'))
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'users' | 'deposits' | 'withdrawals' | 'kyc' | 'payment-methods' | 'admin-settings' | 'faq-bot' | 'chats' | 'referral-settings' | 'p2p' | 'audit-log' | 'reports' | 'system-monitor' | 'super-admin'>('dashboard')
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'users' | 'deposits' | 'withdrawals' | 'kyc' | 'payment-methods' | 'admin-settings' | 'faq-bot' | 'chats' | 'referral-settings' | 'p2p' | 'audit-log' | 'reports' | 'system-monitor' | 'admin-team' | 'admin-financial' | 'super-admin'>('dashboard')
   const AdminChat = lazy(() => import('@/components/admin/AdminChat'))
   const AdminP2P = lazy(() => import('@/components/admin/AdminP2P'))
   const AdminAuditLog = lazy(() => import('@/components/admin/AdminAuditLog'))
   const AdminReports = lazy(() => import('@/components/admin/AdminReports'))
   const AdminSystemMonitor = lazy(() => import('@/components/admin/AdminSystemMonitor'))
   const SuperAdminPanel = lazy(() => import('@/components/admin/SuperAdminPanel'))
+  const AdminTeam = lazy(() => import('@/components/admin/AdminTeam'))
+  const AdminFinancial = lazy(() => import('@/components/admin/AdminFinancial'))
   const [chatUnreadCount, setChatUnreadCount] = useState(0)
 
   // Listen for sidebar sub-navigation tab changes
@@ -902,7 +904,9 @@ export default function AdminPanel() {
       { key: 'audit-log' as const, label: 'سجل العمليات', icon: Clock, count: 0, perm: null as string | null },
       { key: 'reports' as const, label: 'التقارير المالية', icon: BarChart3, count: 0, perm: null as string | null },
       { key: 'system-monitor' as const, label: 'مراقبة النظام', icon: Activity, count: 0, perm: null as string | null },
-      { key: 'super-admin' as const, label: 'تحكم خارق', icon: Shield, count: 0, perm: null as string | null },
+      { key: 'admin-team' as const, label: '👥 فريق الإدارة', icon: Users, count: 0, perm: null as string | null },
+      { key: 'admin-financial' as const, label: '💰 الملخص المالي', icon: CreditCard, count: 0, perm: null as string | null },
+      { key: 'super-admin' as const, label: '🛡️ تحكم خارق', icon: Shield, count: 0, perm: null as string | null },
     ] : []),
   ]
 
@@ -1780,6 +1784,32 @@ export default function AdminPanel() {
               </div>
             }>
               <AdminSystemMonitor />
+            </Suspense>
+          )}
+
+          {/* ===================== ADMIN TEAM TAB ===================== */}
+          {effectiveActiveTab === 'admin-team' && (
+            <Suspense fallback={
+              <div className="space-y-3">
+                {[...Array(3)].map((_, i) => (
+                  <div key={i} className="glass-card p-4 shimmer h-28 rounded-xl" />
+                ))}
+              </div>
+            }>
+              <AdminTeam />
+            </Suspense>
+          )}
+
+          {/* ===================== ADMIN FINANCIAL TAB ===================== */}
+          {effectiveActiveTab === 'admin-financial' && (
+            <Suspense fallback={
+              <div className="space-y-3">
+                {[...Array(3)].map((_, i) => (
+                  <div key={i} className="glass-card p-4 shimmer h-24 rounded-xl" />
+                ))}
+              </div>
+            }>
+              <AdminFinancial />
             </Suspense>
           )}
 
