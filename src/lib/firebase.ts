@@ -4,7 +4,7 @@ import { getFirestore, Firestore } from 'firebase-admin/firestore'
 let app: App
 let db: Firestore
 
-function initializeFirebase(): { app: App; db: Firestore } {
+export function initializeFirebase(): { app: App; db: Firestore } {
   if (!app) {
     const serviceAccount = process.env.FIREBASE_SERVICE_ACCOUNT
     if (serviceAccount) {
