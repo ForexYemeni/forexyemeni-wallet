@@ -33,7 +33,6 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
       },
     })
   } catch (error: any) {
-    console.error('[P2P Order Detail GET]', error)
     return NextResponse.json({ success: false, message: 'خطأ في جلب تفاصيل الطلب' }, { status: 500 })
   }
 }
@@ -345,7 +344,6 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
 
     return NextResponse.json({ success: false, message: 'إجراء غير معروف' }, { status: 400 })
   } catch (error: any) {
-    console.error('[P2P Order Detail POST]', error)
     return NextResponse.json({ success: false, message: 'خطأ في تنفيذ الإجراء' }, { status: 500 })
   }
 }

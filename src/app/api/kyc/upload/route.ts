@@ -88,7 +88,7 @@ export async function POST(request: NextRequest) {
           user.email,
           type,
           userId
-        ).catch((emailErr) => console.error('Error sending admin KYC email:', emailErr))
+        )
       }
     } catch {}
 

@@ -31,7 +31,6 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
       },
     })
   } catch (error: any) {
-    console.error('[Trade Detail GET]', error)
     return NextResponse.json({ success: false, message: 'خطأ' }, { status: 500 })
   }
 }
@@ -203,7 +202,6 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
 
     return NextResponse.json({ success: false, message: 'إجراء غير صالح' }, { status: 400 })
   } catch (error: any) {
-    console.error('[Trade Detail POST]', error)
     return NextResponse.json({ success: false, message: 'خطأ في تنفيذ الإجراء' }, { status: 500 })
   }
 }

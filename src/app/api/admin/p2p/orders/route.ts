@@ -62,7 +62,6 @@ export async function GET(req: NextRequest) {
       total: enriched.length,
     })
   } catch (error: any) {
-    console.error('[Admin P2P Orders GET]', error)
     return NextResponse.json({ success: false, message: 'خطأ في جلب قائمة الطلبات' }, { status: 500 })
   }
 }
@@ -224,7 +223,6 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({ success: false, message: 'إجراء غير معروف' }, { status: 400 })
   } catch (error: any) {
-    console.error('[Admin P2P Orders POST]', error)
     return NextResponse.json({ success: false, message: 'خطأ في حل النزاع' }, { status: 500 })
   }
 }

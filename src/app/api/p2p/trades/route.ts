@@ -25,7 +25,6 @@ export async function GET(req: NextRequest) {
 
     return NextResponse.json({ success: true, trades: enriched })
   } catch (error: any) {
-    console.error('[Trades GET]', error)
     return NextResponse.json({ success: false, message: 'خطأ في جلب الصفقات' }, { status: 500 })
   }
 }
@@ -106,7 +105,6 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({ success: true, trade })
   } catch (error: any) {
-    console.error('[Trades POST]', error)
     return NextResponse.json({ success: false, message: 'خطأ في إنشاء الصفقة' }, { status: 500 })
   }
 }

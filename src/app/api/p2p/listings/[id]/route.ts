@@ -34,7 +34,6 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
       },
     })
   } catch (error: any) {
-    console.error('[Listing Detail GET]', error)
     return NextResponse.json({ success: false, message: 'خطأ' }, { status: 500 })
   }
 }
@@ -96,7 +95,6 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
 
     return NextResponse.json({ success: false, message: 'إجراء غير صالح' }, { status: 400 })
   } catch (error: any) {
-    console.error('[Listing Detail POST]', error)
     return NextResponse.json({ success: false, message: 'خطأ في تحديث الإعلان' }, { status: 500 })
   }
 }
@@ -120,7 +118,6 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
     await p2pListingOperations.delete(id)
     return NextResponse.json({ success: true, message: 'تم حذف الإعلان' })
   } catch (error: any) {
-    console.error('[Listing DELETE]', error)
     return NextResponse.json({ success: false, message: 'خطأ في حذف الإعلان' }, { status: 500 })
   }
 }

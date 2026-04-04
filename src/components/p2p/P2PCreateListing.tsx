@@ -52,7 +52,6 @@ export default function P2PCreateListing({ onCreated, onBack }: P2PCreateListing
 
     setLoading(true)
     try {
-      console.log('[P2PCreateListing] Creating listing:', { type, amount, price, paymentMethods, network, userId: user.id })
       const res = await fetch('/api/p2p/listings', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'x-user-id': user.id },
@@ -68,7 +67,6 @@ export default function P2PCreateListing({ onCreated, onBack }: P2PCreateListing
         }),
       })
       const data = await res.json()
-      console.log('[P2PCreateListing] Response:', data)
       if (data.success) {
         toast.success('تم إنشاء الإعلان بنجاح')
         onCreated()
@@ -76,7 +74,6 @@ export default function P2PCreateListing({ onCreated, onBack }: P2PCreateListing
         toast.error(data.message || 'خطأ في إنشاء الإعلان')
       }
     } catch (err) {
-      console.error('[P2PCreateListing] Error:', err)
       toast.error('خطأ في الاتصال، يرجى المحاولة مرة أخرى')
     } finally {
       setLoading(false)

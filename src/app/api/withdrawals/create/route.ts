@@ -115,7 +115,7 @@ export async function POST(request: NextRequest) {
           network || 'TRC20',
           toAddress,
           withdrawal.id
-        ).catch((emailErr) => console.error('Error sending admin withdrawal email:', emailErr))
+        )
       }
     } catch {}
 

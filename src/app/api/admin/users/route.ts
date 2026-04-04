@@ -132,7 +132,6 @@ export async function POST(request: NextRequest) {
           }
         }
       } catch (err) {
-        console.error('[RemoveMerchant] Error updating merchantApplications:', err)
       }
 
       // 3. Check old merchants collection
@@ -142,7 +141,6 @@ export async function POST(request: NextRequest) {
           await merchantDoc.ref.update({ status: 'removed' })
         }
       } catch (err) {
-        console.error('[RemoveMerchant] Error updating old merchants:', err)
       }
 
       // 4. Pause all P2P listings for this merchant
@@ -157,7 +155,6 @@ export async function POST(request: NextRequest) {
           if (listings.docs.length > 0) await batch.commit()
         }
       } catch (err) {
-        console.error('[RemoveMerchant] Error updating P2P listings:', err)
       }
 
       // 5. Notify user
@@ -255,7 +252,6 @@ export async function POST(request: NextRequest) {
         await sendPushNotification(userId, 'تم إزالة حالة التاجر', 'تم تحويل حسابك إلى مستخدم عادي.', 'warning')
       }
     } catch (notifErr) {
-      console.error('Error sending user notification:', notifErr)
     }
 
     return NextResponse.json({ success: true, user })

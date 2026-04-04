@@ -117,7 +117,6 @@ export async function GET(request: NextRequest) {
     })
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : 'حدث خطأ أثناء جلب محاولات الدخول'
-    console.error('[SuperAdmin LoginAttempts GET]', error)
     return NextResponse.json({ success: false, message }, { status: 500 })
   }
 }
@@ -186,7 +185,6 @@ export async function POST(request: NextRequest) {
     })
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : 'حدث خطأ أثناء مسح محاولات الدخول'
-    console.error('[SuperAdmin LoginAttempts POST]', error)
     return NextResponse.json({ success: false, message }, { status: 500 })
   }
 }

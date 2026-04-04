@@ -30,7 +30,6 @@ export async function GET(req: NextRequest) {
 
     return NextResponse.json({ success: true, disputes: enriched })
   } catch (error: any) {
-    console.error('[Disputes GET]', error)
     return NextResponse.json({ success: false, message: 'خطأ في جلب النزاعات' }, { status: 500 })
   }
 }
@@ -107,7 +106,6 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({ success: true, message: 'تم حل النزاع بنجاح' })
   } catch (error: any) {
-    console.error('[Disputes POST]', error)
     return NextResponse.json({ success: false, message: 'خطأ في حل النزاع' }, { status: 500 })
   }
 }

@@ -48,7 +48,6 @@ async function playNativeSound(title: string, body: string): Promise<boolean> {
 
     return true
   } catch (error) {
-    console.error('[Native Sound Error]', error)
     return false
   }
 }
@@ -86,7 +85,6 @@ function preloadAudioFiles() {
       // Store reference
       audioElements[key as keyof typeof audioElements] = audio
     } catch (error) {
-      console.warn(`[Audio] Failed to preload ${key} sound:`, error)
     }
   }
 }
@@ -143,7 +141,6 @@ async function getAudioContext(): Promise<AudioContext | null> {
     }
     return audioContext
   } catch (error) {
-    console.error('[AudioContext Error]', error)
     return null
   }
 }
@@ -194,7 +191,6 @@ async function playWebAudioBeep(frequencies: number[], type: OscillatorType = 's
       osc.stop(now + i * 0.12 + 0.25)
     })
   } catch (error) {
-    console.error('[Web Audio Error]', error)
   }
 }
 

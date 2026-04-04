@@ -58,7 +58,6 @@ export async function POST(request: NextRequest) {
       const emailSent = await sendPasswordResetEmail(email, otp)
 
       if (!emailSent) {
-        console.log('[ADMIN-FORGOT-PASSWORD] Email not sent - OTP for ' + email + ': ' + otp)
       }
 
       return NextResponse.json({
@@ -108,7 +107,6 @@ export async function POST(request: NextRequest) {
     const emailSent = await sendPasswordResetEmail(email, otp)
 
     if (!emailSent) {
-      console.log('[FORGOT-PASSWORD] Email not sent - OTP for ' + email + ': ' + otp)
     }
 
     return NextResponse.json({

@@ -93,7 +93,6 @@ export async function GET(req: NextRequest) {
       application: null,
     })
   } catch (error: any) {
-    console.error('[Merchant GET]', error)
     return NextResponse.json({ success: false, message: 'خطأ في جلب حالة طلب التاجر' }, { status: 500 })
   }
 }
@@ -168,7 +167,6 @@ export async function POST(req: NextRequest) {
           sendPushNotification(adminDoc.id, 'طلب تاجر جديد', `طلب توثيق من ${user.fullName || user.email}`, 'warning').catch(() => {})
         }
       } catch (err) {
-        console.error('Error notifying admins about merchant application:', err)
       }
 
       return NextResponse.json({
@@ -180,7 +178,6 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({ success: false, message: 'إجراء غير معروف' }, { status: 400 })
   } catch (error: any) {
-    console.error('[Merchant POST]', error)
     return NextResponse.json({ success: false, message: 'خطأ في إرسال طلب التوثيق' }, { status: 500 })
   }
 }

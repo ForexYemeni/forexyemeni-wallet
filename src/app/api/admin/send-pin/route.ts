@@ -38,7 +38,6 @@ export async function POST(request: NextRequest) {
     const emailSent = await sendPinRecoveryEmail(user.email, user.fullName || user.email, pin)
 
     if (!emailSent) {
-      console.log('[ADMIN-SEND-PIN] Email not sent - PIN for ' + user.email + ': ' + pin)
     }
 
     // Notify user/merchant via push notification

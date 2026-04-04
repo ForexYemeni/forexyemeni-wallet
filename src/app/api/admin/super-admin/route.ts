@@ -203,7 +203,6 @@ export async function GET(request: NextRequest) {
         }
       }
     } catch (err) {
-      console.error('[SuperAdmin GET] Error reading settings:', err)
     }
 
     // 2. Fetch recent login attempts (last 50)
@@ -214,7 +213,6 @@ export async function GET(request: NextRequest) {
         .map(doc => ({ id: doc.id, ...doc.data() } as Record<string, unknown>))
         .sort((a, b) => new Date(b.createdAt as string).getTime() - new Date(a.createdAt as string).getTime())
     } catch (err) {
-      console.error('[SuperAdmin GET] Error reading login attempts:', err)
     }
 
     // 3. Active sessions count
@@ -223,7 +221,6 @@ export async function GET(request: NextRequest) {
       const sessionsSnapshot = await db.collection('userDevices').limit(500).get()
       activeSessionsCount = sessionsSnapshot.size
     } catch (err) {
-      console.error('[SuperAdmin GET] Error reading sessions:', err)
     }
 
     // 4. Total data size estimate (count of all collections)
@@ -285,7 +282,6 @@ export async function GET(request: NextRequest) {
       const p2pSnapshot = await db.collection('p2pTrades').limit(5000).get()
       financialSummary.totalP2PTrades = p2pSnapshot.size
     } catch (err) {
-      console.error('[SuperAdmin GET] Error reading financial summary:', err)
     }
 
     // 6. Admin Team (NEW)
@@ -306,7 +302,6 @@ export async function GET(request: NextRequest) {
         }
       })
     } catch (err) {
-      console.error('[SuperAdmin GET] Error reading admin team:', err)
     }
 
     // 7. Recent Audit Logs (NEW - last 20)
@@ -318,7 +313,6 @@ export async function GET(request: NextRequest) {
         .sort((a, b) => new Date(b.createdAt as string).getTime() - new Date(a.createdAt as string).getTime())
         .slice(0, 20)
     } catch (err) {
-      console.error('[SuperAdmin GET] Error reading audit logs:', err)
     }
 
     // 8. System Health (NEW)
@@ -349,7 +343,6 @@ export async function GET(request: NextRequest) {
       systemHealth.pendingKYC = allPendingKYC.size
       systemHealth.unresolvedDisputes = allDisputes.size
     } catch (err) {
-      console.error('[SuperAdmin GET] Error reading system health:', err)
     }
 
     return NextResponse.json({
@@ -368,7 +361,6 @@ export async function GET(request: NextRequest) {
     })
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : 'حدث خطأ أثناء جلب الإعدادات'
-    console.error('[SuperAdmin GET]', error)
     return NextResponse.json({ success: false, message }, { status: 500 })
   }
 }
@@ -731,7 +723,6 @@ export async function POST(request: NextRequest) {
           })
           sentCount++
         } catch (err) {
-          console.error(`[Broadcast] Error sending to user ${userId}:`, err)
         }
       }
 
@@ -834,7 +825,6 @@ export async function POST(request: NextRequest) {
         })
       } catch (error: unknown) {
         const errorMsg = error instanceof Error ? error.message : 'حدث خطأ أثناء جلب الملخص المالي'
-        console.error('[SuperAdmin] get_financial_summary error:', error)
         return NextResponse.json({ success: false, message: errorMsg }, { status: 500 })
       }
     }
@@ -881,7 +871,6 @@ export async function POST(request: NextRequest) {
           })
         } catch (error: unknown) {
           const errorMsg = error instanceof Error ? error.message : 'حدث خطأ أثناء جلب قائمة المدراء'
-          console.error('[SuperAdmin] list_admins error:', error)
           return NextResponse.json({ success: false, message: errorMsg }, { status: 500 })
         }
       }
@@ -934,7 +923,6 @@ export async function POST(request: NextRequest) {
           })
         } catch (error: unknown) {
           const errorMsg = error instanceof Error ? error.message : 'حدث خطأ أثناء تحديث الصلاحيات'
-          console.error('[SuperAdmin] update_permissions error:', error)
           return NextResponse.json({ success: false, message: errorMsg }, { status: 500 })
         }
       }
@@ -981,7 +969,6 @@ export async function POST(request: NextRequest) {
           })
         } catch (error: unknown) {
           const errorMsg = error instanceof Error ? error.message : 'حدث خطأ أثناء إزالة الصلاحية'
-          console.error('[SuperAdmin] demote_admin error:', error)
           return NextResponse.json({ success: false, message: errorMsg }, { status: 500 })
         }
       }
@@ -1040,7 +1027,6 @@ export async function POST(request: NextRequest) {
           })
         } catch (error: unknown) {
           const errorMsg = error instanceof Error ? error.message : 'حدث خطأ أثناء الترقية'
-          console.error('[SuperAdmin] promote_to_admin error:', error)
           return NextResponse.json({ success: false, message: errorMsg }, { status: 500 })
         }
       }
@@ -1167,7 +1153,6 @@ export async function POST(request: NextRequest) {
         })
       } catch (error: unknown) {
         const errorMsg = error instanceof Error ? error.message : 'حدث خطأ أثناء تنظيف البيانات'
-        console.error('[SuperAdmin] cleanup_data error:', error)
         return NextResponse.json({ success: false, message: errorMsg }, { status: 500 })
       }
     }
@@ -1230,7 +1215,6 @@ export async function POST(request: NextRequest) {
         })
       } catch (error: unknown) {
         const errorMsg = error instanceof Error ? error.message : 'حدث خطأ أثناء جلب سجل التدقيق'
-        console.error('[SuperAdmin] get_audit_logs error:', error)
         return NextResponse.json({ success: false, message: errorMsg }, { status: 500 })
       }
     }
@@ -1281,7 +1265,6 @@ export async function POST(request: NextRequest) {
           })
         } catch (error: unknown) {
           const errorMsg = error instanceof Error ? error.message : 'حدث خطأ أثناء البحث'
-          console.error('[SuperAdmin] search_user error:', error)
           return NextResponse.json({ success: false, message: errorMsg }, { status: 500 })
         }
       }
@@ -1324,7 +1307,6 @@ export async function POST(request: NextRequest) {
           })
         } catch (error: unknown) {
           const errorMsg = error instanceof Error ? error.message : 'حدث خطأ أثناء جلب تفاصيل المستخدم'
-          console.error('[SuperAdmin] get_user_details error:', error)
           return NextResponse.json({ success: false, message: errorMsg }, { status: 500 })
         }
       }
@@ -1390,7 +1372,6 @@ export async function POST(request: NextRequest) {
           })
         } catch (error: unknown) {
           const errorMsg = error instanceof Error ? error.message : 'حدث خطأ أثناء إضافة الرصيد'
-          console.error('[SuperAdmin] quick_credit error:', error)
           return NextResponse.json({ success: false, message: errorMsg }, { status: 500 })
         }
       }
@@ -1465,7 +1446,6 @@ export async function POST(request: NextRequest) {
           })
         } catch (error: unknown) {
           const errorMsg = error instanceof Error ? error.message : 'حدث خطأ أثناء خصم الرصيد'
-          console.error('[SuperAdmin] quick_debit error:', error)
           return NextResponse.json({ success: false, message: errorMsg }, { status: 500 })
         }
       }
@@ -1476,7 +1456,6 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ success: false, message: 'إجراء غير معروف' }, { status: 400 })
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : 'حدث خطأ أثناء تنفيذ الإجراء'
-    console.error('[SuperAdmin POST]', error)
     return NextResponse.json({ success: false, message }, { status: 500 })
   }
 }

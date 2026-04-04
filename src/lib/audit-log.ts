@@ -94,6 +94,5 @@ export async function logAudit(
     })
   } catch (error) {
     // Audit logging should never fail the main operation
-    console.error('[AUDIT LOG ERROR]', error instanceof Error ? error.message : String(error))
   }
 }

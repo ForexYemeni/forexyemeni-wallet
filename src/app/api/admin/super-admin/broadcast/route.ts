@@ -104,7 +104,6 @@ export async function POST(request: NextRequest) {
         })
         notificationCount++
       } catch (err) {
-        console.error(`[Broadcast] Error creating notification for user ${userId}:`, err)
       }
 
       // Attempt to send FCM push notification
@@ -114,7 +113,6 @@ export async function POST(request: NextRequest) {
           pushSentCount += pushResult.count
         }
       } catch (err) {
-        console.error(`[Broadcast] Error sending push to user ${userId}:`, err)
       }
     }
 
@@ -139,7 +137,6 @@ export async function POST(request: NextRequest) {
     })
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : 'حدث خطأ أثناء إرسال الإشعار'
-    console.error('[SuperAdmin Broadcast POST]', error)
     return NextResponse.json({ success: false, message }, { status: 500 })
   }
 }

@@ -54,7 +54,6 @@ export async function POST(request: NextRequest) {
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : String(e)
       results.deposits_error = -1
-      console.error('Error deleting deposits:', msg)
     }
 
     // 2. Delete all withdrawals
@@ -74,7 +73,6 @@ export async function POST(request: NextRequest) {
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : String(e)
       results.withdrawals_error = -1
-      console.error('Error deleting withdrawals:', msg)
     }
 
     // 3. Delete all transactions
@@ -94,7 +92,6 @@ export async function POST(request: NextRequest) {
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : String(e)
       results.transactions_error = -1
-      console.error('Error deleting transactions:', msg)
     }
 
     // 4. Delete all notifications
@@ -114,7 +111,6 @@ export async function POST(request: NextRequest) {
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : String(e)
       results.notifications_error = -1
-      console.error('Error deleting notifications:', msg)
     }
 
     // 5. Delete all KYC records
@@ -134,7 +130,6 @@ export async function POST(request: NextRequest) {
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : String(e)
       results.kycRecords_error = -1
-      console.error('Error deleting KYC records:', msg)
     }
 
     // 6. Delete all OTP codes
@@ -154,7 +149,6 @@ export async function POST(request: NextRequest) {
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : String(e)
       results.otpCodes_error = -1
-      console.error('Error deleting OTP codes:', msg)
     }
 
     // 7. Delete user payment methods
@@ -174,7 +168,6 @@ export async function POST(request: NextRequest) {
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : String(e)
       results.userPaymentMethods_error = -1
-      console.error('Error deleting user payment methods:', msg)
     }
 
     // 8. Delete user device records
@@ -194,7 +187,6 @@ export async function POST(request: NextRequest) {
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : String(e)
       results.userDevices_error = -1
-      console.error('Error deleting user devices:', msg)
     }
 
     // 9. Delete pending device auth records
@@ -214,7 +206,6 @@ export async function POST(request: NextRequest) {
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : String(e)
       results.pendingDeviceAuth_error = -1
-      console.error('Error deleting pending device auth:', msg)
     }
 
     // 10. Delete all non-admin users (keep admin accounts)
@@ -240,7 +231,6 @@ export async function POST(request: NextRequest) {
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : String(e)
       results.users_error = -1
-      console.error('Error deleting users:', msg)
     }
 
     // 11. Reset admin balance to 0 (optional clean start)
@@ -257,7 +247,6 @@ export async function POST(request: NextRequest) {
       }
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : String(e)
-      console.error('Error resetting admin balance:', msg)
     }
 
     return NextResponse.json({

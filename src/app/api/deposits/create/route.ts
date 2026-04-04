@@ -85,7 +85,7 @@ export async function POST(request: NextRequest) {
           netAmount,
           network || 'TRC20',
           deposit.id
-        ).catch((emailErr) => console.error('Error sending admin deposit email:', emailErr))
+        )
       }
     } catch {}
 

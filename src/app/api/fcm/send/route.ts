@@ -98,7 +98,6 @@ export async function POST(request: NextRequest) {
     })
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : 'حدث خطأ'
-    console.error('[FCM Send Error]', message)
     return NextResponse.json({ success: false, message }, { status: 500 })
   }
 }

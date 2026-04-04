@@ -28,7 +28,6 @@ export async function GET(req: NextRequest) {
 
     return NextResponse.json({ success: true, orders: enriched })
   } catch (error: any) {
-    console.error('[P2P Orders GET]', error)
     return NextResponse.json({ success: false, message: 'خطأ في جلب قائمة الطلبات' }, { status: 500 })
   }
 }
@@ -149,7 +148,6 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({ success: false, message: 'إجراء غير معروف' }, { status: 400 })
   } catch (error: any) {
-    console.error('[P2P Orders POST]', error)
     return NextResponse.json({ success: false, message: 'خطأ في معالجة الطلب' }, { status: 500 })
   }
 }

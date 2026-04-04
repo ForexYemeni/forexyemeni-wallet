@@ -26,21 +26,17 @@ export async function registerFCMPushNotifications(): Promise<boolean> {
 
     // Request permission
     const permResult = await PushNotifications.requestPermissions()
-    console.log('[FCM] Permission result:', permResult.receive)
 
     if (permResult.receive !== 'granted') {
-      console.log('[FCM] Permission denied')
       return false
     }
 
     // Register for push notifications
     await PushNotifications.register()
-    console.log('[FCM] Registered successfully')
 
     // Get FCM token
     const tokenResult = await PushNotifications.getToken()
     currentFcmToken = tokenResult.value
-    console.log('[FCM] Token received:', currentFcmToken?.substring(0, 20) + '...')
 
     // Send token to our server
     if (currentFcmToken) {
@@ -53,7 +49,6 @@ export async function registerFCMPushNotifications(): Promise<boolean> {
 
     // Listen for registration updates
     PushNotifications.addListener('registration', async (token) => {
-      console.log('[FCM] New token:', token.value?.substring(0, 20) + '...')
       currentFcmToken = token.value
       const user = useAuthStore.getState().user
       if (user?.id && currentFcmToken) {
@@ -64,7 +59,6 @@ export async function registerFCMPushNotifications(): Promise<boolean> {
 
     // Listen for push notifications received (app in foreground)
     PushNotifications.addListener('pushNotificationReceived', async (notification) => {
-      console.log('[FCM] Notification received in foreground:', notification)
 
       // Get actual notification title/body from FCM payload
       const title = notification.title || notification.data?.title || '🔔 إشعار جديد'
@@ -76,7 +70,6 @@ export async function registerFCMPushNotifications(): Promise<boolean> {
         const { playNotificationSound } = await import('@/lib/notification-sound')
         await playNotificationSound(notifType)
       } catch (error) {
-        console.warn('[FCM] Could not play foreground notification sound:', error)
       }
 
       try {
@@ -86,13 +79,11 @@ export async function registerFCMPushNotifications(): Promise<boolean> {
 
     // Listen for push notification action (user tapped)
     PushNotifications.addListener('pushNotificationActionPerformed', (notification) => {
-      console.log('[FCM] Notification tapped:', notification)
       // The app will handle navigation based on notification data
     })
 
     return true
   } catch (error) {
-    console.error('[FCM] Registration failed:', error)
     return false
   }
 }
@@ -111,9 +102,7 @@ async function sendTokenToServer(userId: string, token: string): Promise<void> {
         deviceName: 'Android APK',
       }),
     })
-    console.log('[FCM] Token sent to server')
   } catch (error) {
-    console.error('[FCM] Failed to send token to server:', error)
   }
 }
 
@@ -138,7 +127,6 @@ export async function unregisterFCM(): Promise<void> {
     currentFcmToken = null
     fcmRegistered = false
   } catch (error) {
-    console.error('[FCM] Failed to unregister:', error)
   }
 }
 

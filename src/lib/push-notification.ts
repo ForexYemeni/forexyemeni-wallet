@@ -91,7 +91,6 @@ export async function sendPushNotification(
 
     return { sent: response.successCount > 0, count: response.successCount }
   } catch (error) {
-    console.error('[Push Notification Error]', error)
     return { sent: false, count: 0 }
   }
 }

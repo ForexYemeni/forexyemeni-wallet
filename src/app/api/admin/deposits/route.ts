@@ -62,7 +62,6 @@ export async function POST(request: NextRequest) {
       // Send email to user
       if (user) {
         sendUserDepositReviewingEmail(user.email, user.fullName || user.email, deposit.amount, deposit.id)
-          .catch((emailErr) => console.error('Error sending deposit reviewing email:', emailErr))
       }
     }
 
@@ -96,10 +95,8 @@ export async function POST(request: NextRequest) {
         // Send email to user/merchant
         if (user.role === 'merchant') {
           sendMerchantDepositConfirmedEmail(user.email, user.fullName || user.email, deposit.amount, creditAmount, deposit.id)
-            .catch((emailErr) => console.error('Error sending merchant deposit confirmed email:', emailErr))
         } else {
           sendUserDepositConfirmedEmail(user.email, user.fullName || user.email, deposit.amount, depositFee, creditAmount, deposit.id)
-            .catch((emailErr) => console.error('Error sending user deposit confirmed email:', emailErr))
         }
 
         // Credit fee to admin's account
@@ -128,7 +125,6 @@ export async function POST(request: NextRequest) {
               sendPushNotification(admin.id, adminTitle, adminMessage, 'success').catch(() => {})
             }
           } catch (adminErr) {
-            console.error('Error crediting admin fee:', adminErr)
           }
         }
 
@@ -141,10 +137,8 @@ export async function POST(request: NextRequest) {
           })
           const referralData = await referralRes.json()
           if (referralData.success && referralData.commissionsProcessed > 0) {
-            console.log(`Referral commissions processed: ${referralData.commissionsProcessed}`)
           }
         } catch (refErr) {
-          console.error('Error processing referral commissions:', refErr)
         }
       }
     }
@@ -160,10 +154,8 @@ export async function POST(request: NextRequest) {
       if (user) {
         if (user.role === 'merchant') {
           sendMerchantDepositRejectedEmail(user.email, user.fullName || user.email, deposit.amount, adminNote || '', deposit.id)
-            .catch((emailErr) => console.error('Error sending merchant deposit rejected email:', emailErr))
         } else {
           sendUserDepositRejectedEmail(user.email, user.fullName || user.email, deposit.amount, adminNote || '', deposit.id)
-            .catch((emailErr) => console.error('Error sending user deposit rejected email:', emailErr))
         }
       }
     }

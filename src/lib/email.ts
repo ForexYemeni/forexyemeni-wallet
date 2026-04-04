@@ -5,7 +5,6 @@ const EMAIL_SECRET = process.env.EMAIL_SECRET || 'fxwallet2024'
 
 async function sendEmailViaScript(to: string, subject: string, htmlContent: string): Promise<boolean> {
   if (!SCRIPT_URL) {
-    console.log('[EMAIL] Skipped - No GOOGLE_APPS_SCRIPT_URL. OTP for ' + to + ' NOT sent')
     return false
   }
 
@@ -28,19 +27,15 @@ async function sendEmailViaScript(to: string, subject: string, htmlContent: stri
     try {
       result = jsonMatch ? JSON.parse(jsonMatch[0]) : { success: false }
     } catch {
-      console.error('[EMAIL] Parse error:', responseText.substring(0, 200))
       return false
     }
 
     if (result.success) {
-      console.log('[EMAIL] Sent to ' + to)
       return true
     } else {
-      console.error('[EMAIL] Error:', result.error)
       return false
     }
   } catch (error) {
-    console.error('[EMAIL] Fetch error:', error instanceof Error ? error.message : String(error))
     return false
   }
 }

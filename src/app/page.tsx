@@ -54,7 +54,6 @@ class AdminErrorBoundary extends Component<
   }
 
   componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
-    console.warn('[AdminPanel Error]', error.message, errorInfo)
   }
 
   handleRetry = () => {
@@ -240,7 +239,6 @@ export default function Home() {
       const msg = extractErrorMessage(event)
 
       // Log all errors for debugging
-      console.error('[App Error]', msg || event.type, event)
 
       // Don't set error state for non-critical errors
       if (isNonCriticalError(msg)) {
@@ -290,7 +288,6 @@ export default function Home() {
     if (!mounted) return
     // If authenticated but no valid user, clear
     if (isAuthenticated && !user?.id) {
-      console.warn('[Auth] Invalid state: authenticated but no user. Clearing...')
       logout()
       return
     }

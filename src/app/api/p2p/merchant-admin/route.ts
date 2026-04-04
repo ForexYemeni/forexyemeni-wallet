@@ -35,7 +35,6 @@ export async function GET(req: NextRequest) {
 
     return NextResponse.json({ success: true, merchants: results })
   } catch (error: any) {
-    console.error('[Merchant Admin GET]', error)
     return NextResponse.json({ success: false, message: 'خطأ في جلب بيانات التجار' }, { status: 500 })
   }
 }
@@ -68,7 +67,6 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({ success: true, message: action === 'approve' ? 'تم قبول التاجر' : 'تم رفض التاجر' })
   } catch (error: any) {
-    console.error('[Merchant Admin POST]', error)
     return NextResponse.json({ success: false, message: 'خطأ في تحديث حالة التاجر' }, { status: 500 })
   }
 }

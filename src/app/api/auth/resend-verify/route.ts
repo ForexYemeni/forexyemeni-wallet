@@ -59,7 +59,6 @@ export async function POST(request: NextRequest) {
     const emailSent = await sendVerificationEmail(email, otp)
 
     if (!emailSent) {
-      console.log('[RESEND-VERIFY] Email not sent - OTP for ' + email + ': ' + otp)
     }
 
     return NextResponse.json({

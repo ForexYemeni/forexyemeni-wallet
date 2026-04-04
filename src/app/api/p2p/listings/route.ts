@@ -30,7 +30,6 @@ export async function GET(req: NextRequest) {
 
     return NextResponse.json({ success: true, listings: enriched })
   } catch (error: any) {
-    console.error('[Listings GET]', error)
     return NextResponse.json({ success: false, message: 'خطأ في جلب الإعلانات' }, { status: 500 })
   }
 }
@@ -93,7 +92,6 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({ success: true, listing })
   } catch (error: any) {
-    console.error('[Listings POST]', error)
     return NextResponse.json({ success: false, message: 'خطأ في إنشاء الإعلان' }, { status: 500 })
   }
 }

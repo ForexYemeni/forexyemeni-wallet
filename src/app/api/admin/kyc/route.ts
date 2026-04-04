@@ -50,7 +50,6 @@ export async function POST(request: NextRequest) {
           const kycUser = await userOperations.findUnique({ id: userId })
           if (kycUser) {
             sendUserKycApprovedEmail(kycUser.email, kycUser.fullName || kycUser.email)
-              .catch((emailErr) => console.error('Error sending KYC approved email:', emailErr))
           }
         } catch {}
       }
@@ -70,7 +69,6 @@ export async function POST(request: NextRequest) {
         const kycUser = await userOperations.findUnique({ id: userId })
         if (kycUser) {
           sendUserKycRejectedEmail(kycUser.email, kycUser.fullName || kycUser.email, adminNote || '')
-            .catch((emailErr) => console.error('Error sending KYC rejected email:', emailErr))
         }
       } catch {}
     }

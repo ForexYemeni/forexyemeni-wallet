@@ -80,7 +80,6 @@ export async function POST(request: NextRequest) {
           ? sendMerchantWithdrawalApprovedEmail
           : sendUserWithdrawalApprovedEmail
         sendWApproved(wUser.email, wUser.fullName || wUser.email, withdrawal.amount, netAmt, withdrawal.id)
-          .catch((emailErr) => console.error('Error sending withdrawal approved email:', emailErr))
       }
     }
 
@@ -116,7 +115,6 @@ export async function POST(request: NextRequest) {
           ? sendMerchantWithdrawalProcessingEmail
           : sendUserWithdrawalProcessingEmail
         sendWProcessing(user.email, user.fullName || user.email, netAmount, withdrawal.toAddress, withdrawal.id)
-          .catch((emailErr) => console.error('Error sending withdrawal processing email:', emailErr))
       }
 
       // Credit fee to admin's account
@@ -145,7 +143,6 @@ export async function POST(request: NextRequest) {
             sendPushNotification(admin.id, adminTitle, adminMessage, 'success').catch(() => {})
           }
         } catch (adminErr) {
-          console.error('Error crediting admin fee:', adminErr)
         }
       }
 
@@ -177,7 +174,6 @@ export async function POST(request: NextRequest) {
           ? sendMerchantWithdrawalRejectedEmail
           : sendUserWithdrawalRejectedEmail
         sendWRejected(user.email, user.fullName || user.email, withdrawal.amount, adminNote || '', withdrawal.id)
-          .catch((emailErr) => console.error('Error sending withdrawal rejected email:', emailErr))
       }
     }
 

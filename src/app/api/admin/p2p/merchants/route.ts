@@ -57,7 +57,6 @@ export async function GET(req: NextRequest) {
       totalCount: combined.length,
     })
   } catch (error: any) {
-    console.error('[Admin P2P Merchants GET]', error)
     return NextResponse.json({ success: false, message: 'خطأ في جلب طلبات التجار' }, { status: 500 })
   }
 }
@@ -136,7 +135,6 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({ success: false, message: 'إجراء غير صالح' }, { status: 400 })
   } catch (error: any) {
-    console.error('[Admin P2P Merchants POST]', error)
     return NextResponse.json({ success: false, message: 'خطأ في تحديث حالة طلب التاجر' }, { status: 500 })
   }
 }

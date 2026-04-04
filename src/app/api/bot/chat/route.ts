@@ -61,7 +61,6 @@ export async function POST(request: NextRequest) {
 
       reply = completion.choices?.[0]?.message?.content || 'عذراً، حدث خطأ في معالجة سؤالك. يرجى المحاولة مرة أخرى أو التواصل مع الدعم الفني.'
     } catch (aiError) {
-      console.error('AI SDK Error:', aiError)
       // Fallback: simple pattern matching
       reply = getFallbackReply(message)
     }

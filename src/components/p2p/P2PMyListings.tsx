@@ -41,7 +41,6 @@ export default function P2PMyListings() {
 
     // Fast path: user already has merchantId in store from login
     if (user.merchantId) {
-      console.log('[P2PMyListings] User has merchantId:', user.merchantId, '— skipping API check')
       setIsMerchant(true)
       setCheckingMerchant(false)
       return
@@ -54,7 +53,6 @@ export default function P2PMyListings() {
       try {
         const res = await fetch(`/api/p2p/merchant?userId=${user.id}`)
         const data = await res.json()
-        console.log('[P2PMyListings] Merchant check response:', data)
         if (data.success && data.hasApplication && data.application?.status === 'approved') {
           setIsMerchant(true)
           if (!user?.merchantId) {
@@ -62,10 +60,8 @@ export default function P2PMyListings() {
           }
         } else {
           setIsMerchant(false)
-          console.log('[P2PMyListings] User is not an approved merchant. Application status:', data.application?.status || 'none')
         }
       } catch (err) {
-        console.error('[P2PMyListings] Merchant check failed:', err)
         setMerchantCheckFailed(true)
         // Don't set isMerchant to false on API error - let the user retry
       } finally {
