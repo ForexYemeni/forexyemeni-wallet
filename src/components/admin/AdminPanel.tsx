@@ -903,11 +903,10 @@ export default function AdminPanel() {
   const allowedTabKeys = tabs.map(t => t.key)
   const effectiveActiveTab = allowedTabKeys.includes(activeTab) ? activeTab : allowedTabKeys[0] || 'dashboard'
 
-  // Only hide the main admin (role=admin without permissions) from user list
-  // Promoted admins (role=admin WITH permissions) are visible
+  // NEVER show admin accounts in users list — admin is not a user
   const filteredUsers = users
     .filter(u => {
-      if (u.role === 'admin' && !u.permissions) return false
+      if (u.role === 'admin') return false
       return true
     })
     .filter(u =>
@@ -1395,26 +1394,22 @@ export default function AdminPanel() {
                                 حذف
                               </button>
                             )}
-                            {/* Add balance — main admin only */}
-                            {!hasPermissions && (
-                              <button
-                                onClick={() => { setBalanceDialogUser(u); setBalanceAction('add'); setBalanceAmount('') }}
-                                className="flex items-center justify-center gap-1 text-xs py-2.5 rounded-lg bg-green-500/10 text-green-400 hover:bg-green-500/20 transition-colors font-medium"
-                              >
-                                <Plus className="w-3.5 h-3.5" />
-                                إضافة رصيد
-                              </button>
-                            )}
-                            {/* Withdraw balance — main admin only */}
-                            {!hasPermissions && (
-                              <button
-                                onClick={() => { setBalanceDialogUser(u); setBalanceAction('withdraw'); setBalanceAmount('') }}
-                                className="flex items-center justify-center gap-1 text-xs py-2.5 rounded-lg bg-orange-500/10 text-orange-400 hover:bg-orange-500/20 transition-colors font-medium"
-                              >
-                                <ArrowUpRight className="w-3.5 h-3.5" />
-                                سحب رصيد
-                              </button>
-                            )}
+                            {/* Add balance */}
+                            <button
+                              onClick={() => { setBalanceDialogUser(u); setBalanceAction('add'); setBalanceAmount('') }}
+                              className="flex items-center justify-center gap-1 text-xs py-2.5 rounded-lg bg-green-500/10 text-green-400 hover:bg-green-500/20 transition-colors font-medium"
+                            >
+                              <Plus className="w-3.5 h-3.5" />
+                              إضافة رصيد
+                            </button>
+                            {/* Withdraw balance */}
+                            <button
+                              onClick={() => { setBalanceDialogUser(u); setBalanceAction('withdraw'); setBalanceAmount('') }}
+                              className="flex items-center justify-center gap-1 text-xs py-2.5 rounded-lg bg-orange-500/10 text-orange-400 hover:bg-orange-500/20 transition-colors font-medium"
+                            >
+                              <ArrowUpRight className="w-3.5 h-3.5" />
+                              سحب رصيد
+                            </button>
                             {/* Remove merchant — main admin only, merchants only */}
                             {!hasPermissions && u.merchantId && (
                               <button
