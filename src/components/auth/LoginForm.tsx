@@ -14,7 +14,7 @@ export default function LoginForm() {
   const [password, setPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
   const [loading, setLoading] = useState(false)
-  const { setAuth, setScreen, setPendingRegistration } = useAuthStore()
+  const { setAuth, setScreen, setPendingRegistration, clearForLock } = useAuthStore()
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -51,9 +51,9 @@ export default function LoginForm() {
         }
       } else if (data.lockedDevice) {
         toast.error(data.message, { duration: 8000 })
-        // Show locked device screen
+        // Clear ALL auth state and show locked device screen
+        clearForLock()
         setPendingRegistration({ email, fullName: '', password })
-        setScreen('device-locked')
       } else if (data.mustChangePassword) {
         toast.error('⚠️ كلمة المرور المؤقتة لم تعد صالحة. يجب تغييرها أولاً.', { duration: 5000 })
       } else if (data.needsVerification) {

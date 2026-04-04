@@ -1,10 +1,10 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import dynamic from 'next/dynamic'
 import { useAuthStore } from '@/lib/store'
 import { toast } from 'sonner'
-import { Loader2, Lock, Image as ImageIcon } from 'lucide-react'
+import { Loader2, Lock, Image as ImageIcon, RefreshCw, AlertTriangle } from 'lucide-react'
 
 // Lazy load ALL components — only loads what's needed
 const LoginForm = dynamic(() => import('@/components/auth/LoginForm'), { ssr: false })
@@ -33,11 +33,50 @@ interface PendingWithdrawal {
   walletName?: string
 }
 
+// Error Boundary component to catch client-side rendering errors
+function ErrorFallback({ error, resetErrorBoundary }: { error: Error; resetErrorBoundary: () => void }) {
+  return (
+    <div className="min-h-screen flex items-center justify-center bg-background p-4">
+      <div className="glass-card p-6 text-center space-y-4 w-full max-w-sm animate-scale-in">
+        <div className="w-16 h-16 mx-auto rounded-2xl bg-red-500/10 flex items-center justify-center">
+          <AlertTriangle className="w-8 h-8 text-red-400" />
+        </div>
+        <div>
+          <h2 className="text-lg font-bold text-red-400">حدث خطأ غير متوقع</h2>
+          <p className="text-sm text-muted-foreground mt-2">
+            يرجى تحديث الصفحة أو تسجيل الدخول مرة أخرى
+          </p>
+        </div>
+        <div className="space-y-2">
+          <button
+            onClick={resetErrorBoundary}
+            className="w-full h-11 gold-gradient text-gray-900 font-bold rounded-xl hover:opacity-90 transition-all flex items-center justify-center gap-2"
+          >
+            <RefreshCw className="w-4 h-4" />
+            إعادة المحاولة
+          </button>
+          <button
+            onClick={() => {
+              // Clear all cached state and reload
+              try { localStorage.removeItem('forexyemeni-auth') } catch {}
+              window.location.href = '/'
+            }}
+            className="w-full h-11 bg-white/10 text-foreground font-medium rounded-xl hover:bg-white/20 transition-all text-sm"
+          >
+            مسح البيانات وتحديث الصفحة
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 export default function Home() {
   const currentScreen = useAuthStore(s => s.currentScreen)
   const isAuthenticated = useAuthStore(s => s.isAuthenticated)
   const setScreen = useAuthStore(s => s.setScreen)
   const user = useAuthStore(s => s.user)
+  const logout = useAuthStore(s => s.logout)
   const setPendingWithdrawalConfirmation = useAuthStore(s => s.setPendingWithdrawalConfirmation)
   const updateUser = useAuthStore(s => s.updateUser)
   const [confirmPassword, setConfirmPassword] = useState('')
@@ -45,6 +84,62 @@ export default function Home() {
   const [pendingWithdrawal, setPendingWithdrawal] = useState<PendingWithdrawal | null>(null)
   const [loadingWithdrawal, setLoadingWithdrawal] = useState(true)
   const [showProofImage, setShowProofImage] = useState(false)
+
+  // Hydration safety: wait until client-side is mounted
+  const [mounted, setMounted] = useState(false)
+  // Error state
+  const [error, setError] = useState<Error | null>(null)
+
+  useEffect(() => {
+    setMounted(true)
+  }, [])
+
+  // Global error handler
+  useEffect(() => {
+    const handler = (event: Event | PromiseRejectionEvent) => {
+      const err = event instanceof PromiseRejectionEvent
+        ? new Error(String(event.reason))
+        : (event as ErrorEvent).error
+      console.error('[App Error]', err)
+      // Don't set error state for notification/audio errors (non-critical)
+      const msg = err?.message || ''
+      if (msg.includes('AudioContext') || msg.includes('Notification') || msg.includes('vibrate')) {
+        return
+      }
+      setError(err)
+    }
+    window.addEventListener('error', handler)
+    window.addEventListener('unhandledrejection', handler)
+    return () => {
+      window.removeEventListener('error', handler)
+      window.removeEventListener('unhandledrejection', handler)
+    }
+  }, [])
+
+  const resetError = useCallback(() => {
+    setError(null)
+    // Try clearing stale state
+    try {
+      const stored = localStorage.getItem('forexyemeni-auth')
+      if (stored) {
+        const parsed = JSON.parse(stored)
+        // If stored state has isAuthenticated: true but no valid user, clear it
+        if (parsed?.state?.isAuthenticated && !parsed?.state?.user?.id) {
+          localStorage.removeItem('forexyemeni-auth')
+          window.location.reload()
+          return
+        }
+      }
+    } catch {}
+  }, [])
+
+  // Validate stored auth state on mount
+  useEffect(() => {
+    if (mounted && isAuthenticated && !user?.id) {
+      console.warn('[Auth] Invalid state: authenticated but no user. Clearing...')
+      logout()
+    }
+  }, [mounted, isAuthenticated, user?.id, logout])
 
   // Fetch withdrawal data when confirmation is pending
   useEffect(() => {
@@ -56,12 +151,12 @@ export default function Home() {
           if (data.success && data.withdrawals?.length > 0) {
             const w = data.withdrawals[0]
             setPendingWithdrawal({
-              amount: w.amount,
+              amount: w.amount || 0,
               fee: w.fee || 0,
-              netAmount: w.netAmount || w.amount - (w.fee || 0),
+              netAmount: w.netAmount || (w.amount || 0) - (w.fee || 0),
               method: w.method || '',
               screenshot: w.screenshot || null,
-              status: w.status,
+              status: w.status || '',
               walletAddress: w.walletAddress,
               walletName: w.walletName,
             })
@@ -71,6 +166,20 @@ export default function Home() {
         .finally(() => setLoadingWithdrawal(false))
     }
   }, [isAuthenticated, user?.pendingConfirmation])
+
+  // Show loading until client hydration is complete
+  if (!mounted) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <Loader2 className="w-8 h-8 animate-spin text-gold" />
+      </div>
+    )
+  }
+
+  // Show error fallback if an error occurred
+  if (error) {
+    return <ErrorFallback error={error} resetErrorBoundary={resetError} />
+  }
 
   // Force change password screen
   if (isAuthenticated && currentScreen === 'force-change-password') {
@@ -126,7 +235,7 @@ export default function Home() {
               <div className="p-4 rounded-xl bg-white/5 border border-white/10 space-y-3">
                 <div className="flex items-center justify-between">
                   <span className="text-sm text-muted-foreground">مبلغ السحب</span>
-                  <span className="text-lg font-bold gold-text">{pendingWithdrawal.amount.toFixed(2)} USDT</span>
+                  <span className="text-lg font-bold gold-text">{(pendingWithdrawal.amount || 0).toFixed(2)} USDT</span>
                 </div>
                 {pendingWithdrawal.fee > 0 && (
                   <div className="flex items-center justify-between">
@@ -136,7 +245,7 @@ export default function Home() {
                 )}
                 <div className="border-t border-white/10 pt-2 flex items-center justify-between">
                   <span className="text-sm font-medium">المبلغ الصافي</span>
-                  <span className="text-lg font-bold text-green-400">{pendingWithdrawal.netAmount.toFixed(2)} USDT</span>
+                  <span className="text-lg font-bold text-green-400">{(pendingWithdrawal.netAmount || 0).toFixed(2)} USDT</span>
                 </div>
                 {pendingWithdrawal.method && (
                   <div className="flex items-center justify-between text-xs text-muted-foreground">
@@ -202,7 +311,7 @@ export default function Home() {
                 className="absolute -top-10 left-0 text-white text-sm hover:text-gold transition-colors"
                 onClick={() => setShowProofImage(false)}
               >
-                ✕ إغلاق
+                إغلاق
               </button>
               <img
                 src={pendingWithdrawal.screenshot}

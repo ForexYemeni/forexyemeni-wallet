@@ -33,6 +33,7 @@ interface AuthState {
   updateUser: (updates: Partial<User>) => void
   setPendingRegistration: (data: { email: string; fullName: string; password: string } | null) => void
   setPendingWithdrawalConfirmation: (id: string | null) => void
+  clearForLock: () => void
 }
 
 export const useAuthStore = create<AuthState>()(
@@ -55,6 +56,7 @@ export const useAuthStore = create<AuthState>()(
             : 'dashboard',
       }),
       logout: () => set({ user: null, token: null, isAuthenticated: false, currentScreen: 'login', pendingRegistration: null, pendingWithdrawalConfirmation: null }),
+      clearForLock: () => set({ user: null, token: null, isAuthenticated: false, currentScreen: 'device-locked', pendingRegistration: null, pendingWithdrawalConfirmation: null }),
       setScreen: (screen) => set({ currentScreen: screen }),
       updateBalance: (balance) => set((state) => ({ user: state.user ? { ...state.user, balance } : null })),
       updateUser: (updates) => set((state) => ({ user: state.user ? { ...state.user, ...updates } : null })),
