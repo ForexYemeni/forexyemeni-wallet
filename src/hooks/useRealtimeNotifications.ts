@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { useAuthStore } from '@/lib/store'
-import { playNotificationSound, playSuccessSound, showBrowserNotification, vibrate } from '@/lib/notification-sound'
+import { playNotificationSound, playSuccessSound, showBrowserNotification, vibrate, initAudioOnInteraction } from '@/lib/notification-sound'
 
 interface NotificationItem {
   id: string
@@ -16,10 +16,8 @@ interface NotificationItem {
 
 /**
  * Real-time notification listener hook.
- * Uses smart polling (5 seconds) to detect new notifications.
- * Plays sound + shows browser notification + vibrates on new items.
- * 
- * Designed to work in: Browser, PWA, and Capacitor (Android APK).
+ * Polls every 5 seconds to detect new notifications.
+ * Plays native sound (APK) or Web Audio (browser) on new items.
  */
 export function useRealtimeNotifications() {
   const user = useAuthStore(s => s.user)
@@ -48,22 +46,17 @@ export function useRealtimeNotifications() {
 
       if (newOnes.length === 0) return
 
-      // Get the latest notification to show
+      // Get the latest notification
       const latest = newOnes[0]
 
-      // Play sound based on type
+      // Play sound based on type (now async - supports native sound)
       if (latest.type === 'success') {
-        playSuccessSound()
-      } else if (latest.type === 'warning' || latest.type === 'error') {
-        playNotificationSound()
+        await playSuccessSound()
       } else {
-        playNotificationSound()
+        await playNotificationSound()
       }
 
-      // Vibrate for mobile
-      vibrate([200, 100, 200])
-
-      // Show browser notification
+      // Show browser notification (for non-APK)
       await showBrowserNotification(latest.title, latest.message)
 
       // Update last checked timestamp
@@ -75,7 +68,6 @@ export function useRealtimeNotifications() {
 
   useEffect(() => {
     if (!userId) {
-      // Cleanup when logged out
       if (pollingRef.current) {
         clearInterval(pollingRef.current)
         pollingRef.current = null
@@ -85,14 +77,8 @@ export function useRealtimeNotifications() {
       return
     }
 
-    // Request notification permission on first load (after user interaction)
-    const requestPermission = () => {
-      if ('Notification' in window && Notification.permission === 'default') {
-        Notification.requestPermission().catch(() => {})
-      }
-      document.removeEventListener('click', requestPermission)
-    }
-    document.addEventListener('click', requestPermission, { once: true })
+    // Initialize audio context on first interaction
+    initAudioOnInteraction()
 
     // Initial fetch to populate known IDs (don't play sound for existing)
     const initialize = async () => {
@@ -111,7 +97,7 @@ export function useRealtimeNotifications() {
         // Silent
       }
 
-      // Start polling after initial load
+      // Start polling every 5 seconds
       pollingRef.current = setInterval(checkForNewNotifications, 5000)
     }
 
@@ -128,7 +114,7 @@ export function useRealtimeNotifications() {
 
 /**
  * Hook to get unread notification count.
- * Polls every 8 seconds (slightly less frequent than real-time listener).
+ * Polls every 8 seconds.
  */
 export function useUnreadCount() {
   const user = useAuthStore(s => s.user)
