@@ -173,12 +173,22 @@ export default function SupportBot() {
                 <p className="text-[10px] text-emerald-100">مساعد ذكي - يجيب تلقائياً</p>
               </div>
             </div>
-            <button
-              onClick={() => setIsOpen(false)}
-              className="w-8 h-8 rounded-full hover:bg-white/20 flex items-center justify-center transition-colors"
-            >
-              <X className="w-4 h-4 text-white" />
-            </button>
+            <div className="flex items-center gap-1">
+              {/* Bot toggle button */}
+              <button
+                onClick={toggleBot}
+                className="w-8 h-8 rounded-full hover:bg-white/20 flex items-center justify-center transition-colors"
+                title="إيقاف الروبوت"
+              >
+                <Power className="w-4 h-4 text-white" />
+              </button>
+              <button
+                onClick={() => setIsOpen(false)}
+                className="w-8 h-8 rounded-full hover:bg-white/20 flex items-center justify-center transition-colors"
+              >
+                <X className="w-4 h-4 text-white" />
+              </button>
+            </div>
           </div>
 
           {/* Messages Area */}

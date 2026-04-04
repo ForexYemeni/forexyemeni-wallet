@@ -25,6 +25,7 @@ import {
   BarChart3,
   MessageSquare,
   Gift,
+  Repeat,
 } from 'lucide-react'
 import { useState, useEffect } from 'react'
 
@@ -32,6 +33,7 @@ const userNavItems = [
   { key: 'dashboard', label: 'الرئيسية', icon: Home },
   { key: 'deposit', label: 'إيداع', icon: ArrowDownLeft },
   { key: 'withdraw', label: 'سحب', icon: ArrowUpRight },
+  { key: 'p2p', label: 'P2P', icon: Repeat },
   { key: 'transactions', label: 'المعاملات', icon: Clock },
   { key: 'referral', label: 'الدعوات', icon: Gift },
   { key: 'kyc', label: 'التحقق (KYC)', icon: Shield },
@@ -58,6 +60,7 @@ const adminSubItems = [
   { key: 'admin-methods', label: 'طرق الدفع', icon: CreditCard, tab: 'payment-methods' },
   { key: 'admin-referral', label: 'برنامج الدعوات', icon: Gift, tab: 'referral-settings' },
   { key: 'admin-faq', label: 'البوت والأسئلة', icon: MessageSquare, tab: 'faq-bot' },
+  { key: 'admin-p2p', label: 'P2P والنزاعات', icon: Repeat, tab: 'p2p' },
   { key: 'admin-settings', label: 'إعدادات النظام', icon: Sliders, tab: 'admin-settings' },
 ]
 

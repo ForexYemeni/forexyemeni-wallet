@@ -1069,6 +1069,287 @@ export const chatOperations = {
   },
 }
 
+// ===================== P2P MERCHANT TYPES =====================
+
+export interface Merchant {
+  id: string
+  userId: string
+  status: 'pending' | 'approved' | 'rejected'
+  idPhoto: string
+  selfiePhoto: string
+  addressProof: string
+  fullName: string
+  phone: string
+  submittedAt: string
+  reviewedAt?: string | null
+  reviewNote?: string | null
+  reviewedBy?: string | null
+}
+
+export interface P2PListing {
+  id: string
+  merchantId: string
+  type: 'sell' | 'buy'
+  amount: number
+  price: number
+  currency: string
+  minAmount: number
+  maxAmount: number
+  paymentMethods: string[]
+  network: 'TRC20' | 'ERC20'
+  status: 'active' | 'paused' | 'completed' | 'cancelled'
+  totalTrades: number
+  successRate: number
+  createdAt: string
+  updatedAt: string
+}
+
+export interface P2PTrade {
+  id: string
+  listingId: string
+  buyerId: string
+  sellerId: string
+  amount: number
+  price: number
+  total: number
+  status: 'pending' | 'escrowed' | 'paid' | 'released' | 'disputed' | 'cancelled' | 'expired'
+  buyerPaymentMethod: string
+  buyerPaymentRef: string
+  escrowTxId: string
+  rating?: number | null
+  review?: string | null
+  disputeReason?: string | null
+  disputeResolvedBy?: string | null
+  disputeNote?: string | null
+  createdAt: string
+  updatedAt: string
+  completedAt?: string | null
+}
+
+// ===================== MERCHANT OPERATIONS =====================
+
+export const merchantOperations = {
+  async create(data: Omit<Merchant, 'id' | 'submittedAt' | 'status'>): Promise<Merchant> {
+    const db = getDb()
+    const id = generateId()
+    const merchant: Merchant = { ...data, id, status: 'pending', submittedAt: nowTimestamp() }
+    await db.collection('merchants').doc(id).set(merchant)
+    return merchant
+  },
+
+  async findPending(): Promise<Merchant[]> {
+    const db = getDb()
+    const snapshot = await db.collection('merchants').where('status', '==', 'pending').limit(100).get()
+    const results = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Merchant))
+    results.sort((a, b) => new Date(b.submittedAt).getTime() - new Date(a.submittedAt).getTime())
+    return results
+  },
+
+  async findAll(): Promise<Merchant[]> {
+    const db = getDb()
+    const snapshot = await db.collection('merchants').limit(200).get()
+    const results = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Merchant))
+    results.sort((a, b) => new Date(b.submittedAt).getTime() - new Date(a.submittedAt).getTime())
+    return results
+  },
+
+  async findByUser(userId: string): Promise<Merchant[]> {
+    const db = getDb()
+    const snapshot = await db.collection('merchants').where('userId', '==', userId).limit(10).get()
+    return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Merchant))
+  },
+
+  async findApprovedByUser(userId: string): Promise<Merchant | null> {
+    const db = getDb()
+    const snapshot = await db.collection('merchants')
+      .where('userId', '==', userId)
+      .where('status', '==', 'approved')
+      .limit(1)
+      .get()
+    if (snapshot.empty) return null
+    return { id: snapshot.docs[0].id, ...snapshot.docs[0].data() } as Merchant
+  },
+
+  async updateStatus(id: string, status: 'approved' | 'rejected', reviewNote?: string, reviewedBy?: string): Promise<void> {
+    const db = getDb()
+    await db.collection('merchants').doc(id).update({
+      status,
+      reviewNote: reviewNote || null,
+      reviewedBy: reviewedBy || null,
+      reviewedAt: nowTimestamp(),
+    })
+  },
+
+  async findUnique(id: string): Promise<Merchant | null> {
+    const db = getDb()
+    const doc = await db.collection('merchants').doc(id).get()
+    if (!doc.exists) return null
+    return { id: doc.id, ...doc.data() } as Merchant
+  },
+}
+
+// ===================== P2P LISTING OPERATIONS =====================
+
+export const p2pListingOperations = {
+  async create(data: Omit<P2PListing, 'id' | 'createdAt' | 'updatedAt' | 'totalTrades' | 'successRate'>): Promise<P2PListing> {
+    const db = getDb()
+    const id = generateId()
+    const now = nowTimestamp()
+    const listing: P2PListing = { ...data, id, totalTrades: 0, successRate: 100, createdAt: now, updatedAt: now }
+    await db.collection('p2pListings').doc(id).set(listing)
+    return listing
+  },
+
+  async findActive(filters?: { type?: string; network?: string; paymentMethod?: string }): Promise<P2PListing[]> {
+    const db = getDb()
+    let query: Query<DocumentData> = db.collection('p2pListings').where('status', '==', 'active').limit(100)
+    const snapshot = await query.get()
+    let results = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as P2PListing))
+    if (filters?.type) results = results.filter(l => l.type === filters.type)
+    if (filters?.network) results = results.filter(l => l.network === filters.network)
+    if (filters?.paymentMethod) results = results.filter(l => l.paymentMethods.includes(filters.paymentMethod!))
+    results.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+    return results
+  },
+
+  async findByMerchant(merchantId: string): Promise<P2PListing[]> {
+    const db = getDb()
+    const snapshot = await db.collection('p2pListings').where('merchantId', '==', merchantId).limit(50).get()
+    const results = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as P2PListing))
+    results.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+    return results
+  },
+
+  async findUnique(id: string): Promise<P2PListing | null> {
+    const db = getDb()
+    const doc = await db.collection('p2pListings').doc(id).get()
+    if (!doc.exists) return null
+    return { id: doc.id, ...doc.data() } as P2PListing
+  },
+
+  async update(id: string, data: Partial<P2PListing>): Promise<P2PListing> {
+    const db = getDb()
+    await db.collection('p2pListings').doc(id).update({ ...data, updatedAt: nowTimestamp() })
+    const doc = await db.collection('p2pListings').doc(id).get()
+    return { id: doc.id, ...doc.data() } as P2PListing
+  },
+
+  async pause(id: string): Promise<void> {
+    const db = getDb()
+    await db.collection('p2pListings').doc(id).update({ status: 'paused', updatedAt: nowTimestamp() })
+  },
+
+  async activate(id: string): Promise<void> {
+    const db = getDb()
+    await db.collection('p2pListings').doc(id).update({ status: 'active', updatedAt: nowTimestamp() })
+  },
+
+  async delete(id: string): Promise<void> {
+    const db = getDb()
+    await db.collection('p2pListings').doc(id).delete()
+  },
+
+  async incrementTrades(listingId: string, success: boolean): Promise<void> {
+    const db = getDb()
+    const doc = await db.collection('p2pListings').doc(listingId).get()
+    if (!doc.exists) return
+    const data = doc.data() as P2PListing
+    const totalTrades = (data.totalTrades || 0) + 1
+    const completedTrades = Math.round(((data.successRate || 100) / 100) * (data.totalTrades || 0)) + (success ? 1 : 0)
+    const successRate = totalTrades > 0 ? Math.round((completedTrades / totalTrades) * 100) : 100
+    await db.collection('p2pListings').doc(listingId).update({ totalTrades, successRate, updatedAt: nowTimestamp() })
+  },
+}
+
+// ===================== P2P TRADE OPERATIONS =====================
+
+export const p2pTradeOperations = {
+  async create(data: Omit<P2PTrade, 'id' | 'createdAt' | 'updatedAt'>): Promise<P2PTrade> {
+    const db = getDb()
+    const id = generateId()
+    const now = nowTimestamp()
+    const trade: P2PTrade = { ...data, id, createdAt: now, updatedAt: now }
+    await db.collection('p2pTrades').doc(id).set(trade)
+    return trade
+  },
+
+  async findActive(): Promise<P2PTrade[]> {
+    const db = getDb()
+    const snapshot = await db.collection('p2pTrades')
+      .where('status', 'in', ['pending', 'escrowed', 'paid'])
+      .limit(200).get()
+    return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as P2PTrade))
+  },
+
+  async findByUser(userId: string): Promise<P2PTrade[]> {
+    const db = getDb()
+    const snapshot = await db.collection('p2pTrades')
+      .where('buyerId', '==', userId)
+      .limit(100).get()
+    const asBuyer = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as P2PTrade))
+    const snapshot2 = await db.collection('p2pTrades')
+      .where('sellerId', '==', userId)
+      .limit(100).get()
+    const asSeller = snapshot2.docs.map(doc => ({ id: doc.id, ...doc.data() } as P2PTrade))
+    const all = [...asBuyer, ...asSeller]
+    all.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+    return all
+  },
+
+  async findUnique(id: string): Promise<P2PTrade | null> {
+    const db = getDb()
+    const doc = await db.collection('p2pTrades').doc(id).get()
+    if (!doc.exists) return null
+    return { id: doc.id, ...doc.data() } as P2PTrade
+  },
+
+  async updateStatus(id: string, status: P2PTrade['status'], extra?: Partial<P2PTrade>): Promise<P2PTrade> {
+    const db = getDb()
+    const updateData: any = { status, updatedAt: nowTimestamp() }
+    if (status === 'released' || status === 'cancelled' || status === 'expired') {
+      updateData.completedAt = nowTimestamp()
+    }
+    if (extra) Object.assign(updateData, extra)
+    await db.collection('p2pTrades').doc(id).update(updateData)
+    const doc = await db.collection('p2pTrades').doc(id).get()
+    return { id: doc.id, ...doc.data() } as P2PTrade
+  },
+
+  async addDispute(id: string, reason: string): Promise<void> {
+    const db = getDb()
+    await db.collection('p2pTrades').doc(id).update({
+      status: 'disputed',
+      disputeReason: reason,
+      updatedAt: nowTimestamp(),
+    })
+  },
+
+  async resolveDispute(id: string, resolvedBy: string, note: string): Promise<void> {
+    const db = getDb()
+    await db.collection('p2pTrades').doc(id).update({
+      disputeResolvedBy: resolvedBy,
+      disputeNote: note,
+      updatedAt: nowTimestamp(),
+    })
+  },
+
+  async findAllDisputed(): Promise<P2PTrade[]> {
+    const db = getDb()
+    const snapshot = await db.collection('p2pTrades').where('status', '==', 'disputed').limit(100).get()
+    const results = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as P2PTrade))
+    results.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+    return results
+  },
+
+  async findAll(): Promise<P2PTrade[]> {
+    const db = getDb()
+    const snapshot = await db.collection('p2pTrades').limit(200).get()
+    const results = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as P2PTrade))
+    results.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+    return results
+  },
+}
+
 // ===================== SEED (Create Admin + Firestore Indexes) =====================
 
 export async function seedDatabase() {
@@ -1108,4 +1389,297 @@ export async function seedDatabase() {
 
   await userOperations.create(admin)
   console.log('Admin user created successfully with email: mshay2024m@gmail.com')
+}
+
+// ===================== MERCHANT APPLICATION TYPES =====================
+
+export interface MerchantApplication {
+  id: string
+  userId: string
+  userFullName: string
+  userEmail: string
+  userPhone: string
+  idPhotoUrl: string
+  selfiePhotoUrl: string
+  addressProofUrl: string
+  status: 'pending' | 'approved' | 'rejected'
+  rejectionReason?: string | null
+  appliedAt: string
+  reviewedAt?: string | null
+  reviewedBy?: string | null
+}
+
+// ===================== P2P ORDER TYPES =====================
+
+export interface P2POrder {
+  id: string
+  merchantId: string
+  merchantName: string
+  merchantEmail: string
+  type: 'sell' | 'buy'
+  asset: string
+  network: string
+  amount: number
+  price: number
+  minAmount: number
+  maxAmount: number
+  paymentMethods: string[]
+  paymentDetails: string
+  status: 'open' | 'in_progress' | 'completed' | 'cancelled' | 'disputed'
+  buyerId?: string | null
+  buyerName?: string | null
+  buyerEmail?: string | null
+  buyerPaidAt?: string | null
+  buyerConfirmedAt?: string | null
+  sellerReleasedAt?: string | null
+  escrowAmount: number
+  p2pFee: number
+  totalAmount: number
+  createdAt: string
+  updatedAt: string
+  expiresAt: string
+}
+
+// ===================== P2P DISPUTE TYPES =====================
+
+export interface P2PDispute {
+  id: string
+  orderId: string
+  reporterId: string
+  reporterName: string
+  reporterType: string
+  reason: string
+  status: 'open' | 'resolved'
+  resolution?: string | null
+  resolvedBy?: string | null
+  resolvedAt?: string | null
+  createdAt: string
+}
+
+// ===================== MERCHANT APPLICATION OPERATIONS =====================
+
+export const merchantApplicationOperations = {
+  async create(data: Omit<MerchantApplication, 'id' | 'appliedAt' | 'status'>): Promise<MerchantApplication> {
+    const db = getDb()
+    const id = generateId()
+    const application: MerchantApplication = {
+      ...data,
+      id,
+      status: 'pending',
+      appliedAt: nowTimestamp(),
+    }
+    await db.collection('merchantApplications').doc(id).set(application)
+    return application
+  },
+
+  async findMany(options?: { status?: string }): Promise<MerchantApplication[]> {
+    const db = getDb()
+    let query: Query<DocumentData> = db.collection('merchantApplications')
+
+    if (options?.status && options.status !== 'all') {
+      query = query.where('status', '==', options.status)
+    }
+
+    const snapshot = await query.limit(100).get()
+    const results = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() } as MerchantApplication))
+    results.sort((a, b) => new Date(b.appliedAt).getTime() - new Date(a.appliedAt).getTime())
+    return results
+  },
+
+  async findByUser(userId: string): Promise<MerchantApplication[]> {
+    const db = getDb()
+    const snapshot = await db.collection('merchantApplications')
+      .where('userId', '==', userId)
+      .limit(10)
+      .get()
+    const results = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() } as MerchantApplication))
+    results.sort((a, b) => new Date(b.appliedAt).getTime() - new Date(a.appliedAt).getTime())
+    return results
+  },
+
+  async findById(id: string): Promise<MerchantApplication | null> {
+    const db = getDb()
+    const doc = await db.collection('merchantApplications').doc(id).get()
+    if (!doc.exists) return null
+    return { id: doc.id, ...doc.data() } as MerchantApplication
+  },
+
+  async update(id: string, data: Partial<MerchantApplication>): Promise<MerchantApplication> {
+    const db = getDb()
+    await db.collection('merchantApplications').doc(id).update(data)
+    const doc = await db.collection('merchantApplications').doc(id).get()
+    return { id: doc.id, ...doc.data() } as MerchantApplication
+  },
+
+  async approve(id: string, reviewedBy: string): Promise<MerchantApplication> {
+    const db = getDb()
+    await db.collection('merchantApplications').doc(id).update({
+      status: 'approved',
+      reviewedBy,
+      reviewedAt: nowTimestamp(),
+      rejectionReason: null,
+    })
+    const doc = await db.collection('merchantApplications').doc(id).get()
+    return { id: doc.id, ...doc.data() } as MerchantApplication
+  },
+
+  async reject(id: string, reviewedBy: string, rejectionReason: string): Promise<MerchantApplication> {
+    const db = getDb()
+    await db.collection('merchantApplications').doc(id).update({
+      status: 'rejected',
+      reviewedBy,
+      reviewedAt: nowTimestamp(),
+      rejectionReason,
+    })
+    const doc = await db.collection('merchantApplications').doc(id).get()
+    return { id: doc.id, ...doc.data() } as MerchantApplication
+  },
+}
+
+// ===================== P2P ORDER OPERATIONS =====================
+
+export const p2pOrderOperations = {
+  async create(data: Omit<P2POrder, 'id' | 'createdAt' | 'updatedAt'>): Promise<P2POrder> {
+    const db = getDb()
+    const id = generateId()
+    const now = nowTimestamp()
+    const order: P2POrder = { ...data, id, createdAt: now, updatedAt: now }
+    await db.collection('p2pOrders').doc(id).set(order)
+    return order
+  },
+
+  async findOpen(filters?: { type?: string; network?: string }): Promise<P2POrder[]> {
+    const db = getDb()
+    let query: Query<DocumentData> = db.collection('p2pOrders')
+      .where('status', '==', 'open')
+      .limit(100)
+
+    const snapshot = await query.get()
+    let results = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() } as P2POrder))
+
+    // Filter additional fields in JS to avoid composite index requirements
+    if (filters?.type) {
+      results = results.filter((o) => o.type === filters.type)
+    }
+    if (filters?.network) {
+      results = results.filter((o) => o.network === filters.network)
+    }
+
+    // Filter out expired orders
+    const now = new Date()
+    results = results.filter((o) => new Date(o.expiresAt) >= now)
+
+    results.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+    return results
+  },
+
+  async findById(id: string): Promise<P2POrder | null> {
+    const db = getDb()
+    const doc = await db.collection('p2pOrders').doc(id).get()
+    if (!doc.exists) return null
+    return { id: doc.id, ...doc.data() } as P2POrder
+  },
+
+  async findMerchantOrders(merchantId: string): Promise<P2POrder[]> {
+    const db = getDb()
+    const snapshot = await db.collection('p2pOrders')
+      .where('merchantId', '==', merchantId)
+      .limit(100)
+      .get()
+    const results = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() } as P2POrder))
+    results.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+    return results
+  },
+
+  async findBuyerOrders(buyerId: string): Promise<P2POrder[]> {
+    const db = getDb()
+    const snapshot = await db.collection('p2pOrders')
+      .where('buyerId', '==', buyerId)
+      .limit(100)
+      .get()
+    const results = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() } as P2POrder))
+    results.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+    return results
+  },
+
+  async updateStatus(id: string, status: P2POrder['status'], extra?: Partial<P2POrder>): Promise<P2POrder> {
+    const db = getDb()
+    const updateData: Partial<P2POrder> = { status, updatedAt: nowTimestamp() }
+    if (extra) Object.assign(updateData, extra)
+    await db.collection('p2pOrders').doc(id).update(updateData)
+    const doc = await db.collection('p2pOrders').doc(id).get()
+    return { id: doc.id, ...doc.data() } as P2POrder
+  },
+
+  async findDisputedOrders(): Promise<P2POrder[]> {
+    const db = getDb()
+    const snapshot = await db.collection('p2pOrders')
+      .where('status', '==', 'disputed')
+      .limit(100)
+      .get()
+    const results = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() } as P2POrder))
+    results.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+    return results
+  },
+
+  async findMany(options?: { status?: string }): Promise<P2POrder[]> {
+    const db = getDb()
+    let query: Query<DocumentData> = db.collection('p2pOrders')
+
+    if (options?.status && options.status !== 'all') {
+      query = query.where('status', '==', options.status)
+    }
+
+    query = query.limit(200)
+    const snapshot = await query.get()
+    const results = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() } as P2POrder))
+    results.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+    return results
+  },
+}
+
+// ===================== P2P DISPUTE OPERATIONS =====================
+
+export const p2pDisputeOperations = {
+  async create(data: Omit<P2PDispute, 'id' | 'createdAt' | 'status'>): Promise<P2PDispute> {
+    const db = getDb()
+    const id = generateId()
+    const dispute: P2PDispute = {
+      ...data,
+      id,
+      status: 'open',
+      createdAt: nowTimestamp(),
+    }
+    await db.collection('p2pDisputes').doc(id).set(dispute)
+    return dispute
+  },
+
+  async findByOrder(orderId: string): Promise<P2PDispute[]> {
+    const db = getDb()
+    const snapshot = await db.collection('p2pDisputes')
+      .where('orderId', '==', orderId)
+      .limit(20)
+      .get()
+    const results = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() } as P2PDispute))
+    results.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+    return results
+  },
+
+  async update(id: string, data: Partial<P2PDispute>): Promise<P2PDispute> {
+    const db = getDb()
+    await db.collection('p2pDisputes').doc(id).update(data)
+    const doc = await db.collection('p2pDisputes').doc(id).get()
+    return { id: doc.id, ...doc.data() } as P2PDispute
+  },
+
+  async findOpen(): Promise<P2PDispute[]> {
+    const db = getDb()
+    const snapshot = await db.collection('p2pDisputes')
+      .where('status', '==', 'open')
+      .limit(100)
+      .get()
+    const results = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() } as P2PDispute))
+    results.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+    return results
+  },
 }

@@ -1,0 +1,109 @@
+import { NextRequest, NextResponse } from 'next/server'
+import { userOperations, merchantApplicationOperations, notificationOperations } from '@/lib/db-firebase'
+
+// GET: get merchant application status for user
+export async function GET(req: NextRequest) {
+  try {
+    const userId = req.nextUrl.searchParams.get('userId')
+    if (!userId) {
+      return NextResponse.json({ success: false, message: 'معرف المستخدم مطلوب' }, { status: 400 })
+    }
+
+    const applications = await merchantApplicationOperations.findByUser(userId)
+
+    if (applications.length === 0) {
+      return NextResponse.json({
+        success: true,
+        hasApplication: false,
+        application: null,
+      })
+    }
+
+    // Return the latest application (sorted by appliedAt desc)
+    const latest = applications[0]
+
+    return NextResponse.json({
+      success: true,
+      hasApplication: true,
+      application: {
+        id: latest.id,
+        status: latest.status,
+        rejectionReason: latest.rejectionReason || null,
+        appliedAt: latest.appliedAt,
+        reviewedAt: latest.reviewedAt || null,
+      },
+    })
+  } catch (error: any) {
+    console.error('[Merchant GET]', error)
+    return NextResponse.json({ success: false, message: 'خطأ في جلب حالة طلب التاجر' }, { status: 500 })
+  }
+}
+
+// POST: submit merchant verification application
+export async function POST(req: NextRequest) {
+  try {
+    const { action, userId, idPhoto, selfiePhoto, addressProof } = await req.json()
+
+    if (!action || !userId) {
+      return NextResponse.json({ success: false, message: 'الإجراء ومعرف المستخدم مطلوبان' }, { status: 400 })
+    }
+
+    if (action === 'apply') {
+      // Validate required photos
+      if (!idPhoto || !selfiePhoto || !addressProof) {
+        return NextResponse.json(
+          { success: false, message: 'صورة الهوية والصورة الشخصية وإثبات العنوان مطلوبون' },
+          { status: 400 }
+        )
+      }
+
+      // Find user
+      const user = await userOperations.findUnique({ id: userId })
+      if (!user) {
+        return NextResponse.json({ success: false, message: 'المستخدم غير موجود' }, { status: 404 })
+      }
+
+      // Check if already has pending or approved application
+      const existing = await merchantApplicationOperations.findByUser(userId)
+      const hasPending = existing.find((a) => a.status === 'pending')
+      if (hasPending) {
+        return NextResponse.json({ success: false, message: 'لديك طلب معلق بالفعل، يرجى الانتظار حتى يتم المراجعة' }, { status: 400 })
+      }
+      const hasApproved = existing.find((a) => a.status === 'approved')
+      if (hasApproved) {
+        return NextResponse.json({ success: false, message: 'أنت تاجر موثق بالفعل' }, { status: 400 })
+      }
+
+      // Create application
+      const application = await merchantApplicationOperations.create({
+        userId,
+        userFullName: user.fullName || '',
+        userEmail: user.email,
+        userPhone: user.phone || '',
+        idPhotoUrl: idPhoto,
+        selfiePhotoUrl: selfiePhoto,
+        addressProofUrl: addressProof,
+      })
+
+      // Notify user
+      await notificationOperations.create({
+        userId,
+        title: 'تم إرسال طلب التوثيق',
+        message: 'تم إرسال طلب توثيق التاجر بنجاح. سيتم مراجعة الطلب والرد عليك قريباً.',
+        type: 'p2p',
+        read: false,
+      })
+
+      return NextResponse.json({
+        success: true,
+        message: 'تم إرسال طلب التوثيق بنجاح',
+        application,
+      })
+    }
+
+    return NextResponse.json({ success: false, message: 'إجراء غير معروف' }, { status: 400 })
+  } catch (error: any) {
+    console.error('[Merchant POST]', error)
+    return NextResponse.json({ success: false, message: 'خطأ في إرسال طلب التوثيق' }, { status: 500 })
+  }
+}

@@ -17,6 +17,7 @@ import {
   ChevronUp,
   X,
   Clock,
+  Repeat,
 } from 'lucide-react'
 import { useState, useEffect, useRef } from 'react'
 
@@ -29,6 +30,7 @@ const userNavItems = [
 
 // Extra items shown in the "More" popup menu
 const userExtraItems = [
+  { key: 'p2p', label: 'سوق P2P', icon: Repeat },
   { key: 'referral', label: 'برنامج الدعوات', icon: Gift },
   { key: 'chat', label: 'الدعم الفني', icon: MessageCircle },
   { key: 'kyc', label: 'التحقق (KYC)', icon: Shield },
