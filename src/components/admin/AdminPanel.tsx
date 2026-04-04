@@ -181,7 +181,7 @@ const ROLE_LABELS: Record<string, string> = {
 // ===================== MAIN COMPONENT =====================
 
 export default function AdminPanel() {
-  const { user, setScreen } = useAuthStore()
+  const { user, setScreen, pendingAdminTab, setPendingAdminTab } = useAuthStore()
   const AdminFaqManager = lazy(() => import('@/components/admin/AdminFaqManager'))
   const AdminReferralSettings = lazy(() => import('@/components/admin/AdminReferralSettings'))
   const [activeTab, setActiveTab] = useState<'dashboard' | 'users' | 'deposits' | 'withdrawals' | 'kyc' | 'payment-methods' | 'admin-settings' | 'faq-bot' | 'chats' | 'referral-settings' | 'p2p' | 'audit-log' | 'reports' | 'system-monitor' | 'admin-team' | 'admin-financial' | 'super-admin'>('dashboard')
@@ -196,14 +196,47 @@ export default function AdminPanel() {
   const [chatUnreadCount, setChatUnreadCount] = useState(0)
 
   // Listen for sidebar sub-navigation tab changes
+  // Store pending tab from events that arrive before AdminPanel is ready
+  const pendingAdminTabRef = useRef<string | null>(null)
+
+  // On mount, check if there's a pending admin tab from store (e.g. sidebar click)
+  useEffect(() => {
+    if (pendingAdminTab) {
+      setActiveTab(pendingAdminTab as any)
+      setLoadedTabs(prev => {
+        const next = new Set(prev)
+        next.add(pendingAdminTab)
+        return next
+      })
+      setPendingAdminTab(null) // Clear after consuming
+    }
+  }, [pendingAdminTab, setPendingAdminTab])
+
   useEffect(() => {
     const handler = (e: Event) => {
       const tab = (e as CustomEvent).detail
-      if (tab) setActiveTab(tab as any)
+      if (tab) {
+        // Apply immediately if component is ready, otherwise queue it
+        setActiveTab(tab as any)
+        setLoadedTabs(prev => {
+          const next = new Set(prev)
+          next.add(tab)
+          return next
+        })
+      }
     }
     window.addEventListener('admin-tab-change', handler)
     return () => window.removeEventListener('admin-tab-change', handler)
   }, [])
+
+  // On first mount, also check if there's a pending tab from URL or navigation
+  useEffect(() => {
+    // Re-fetch data when tab changes (even for already loaded tabs on explicit navigation)
+    if (user?.role === 'admin' || (user?.permissions && Object.values(user.permissions).some(v => v))) {
+      fetchTabData(activeTab)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTab])
   const [users, setUsers] = useState<AdminUser[]>([])
   const [deposits, setDeposits] = useState<AdminDeposit[]>([])
   const [withdrawals, setWithdrawals] = useState<AdminWithdrawal[]>([])

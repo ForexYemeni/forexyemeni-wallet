@@ -95,7 +95,7 @@ const adminSubItems = [
 ]
 
 export default function BottomNav() {
-  const { currentScreen, setScreen, user } = useAuthStore()
+  const { currentScreen, setScreen, user, setPendingAdminTab } = useAuthStore()
   const [theme, setThemeState] = useState<Theme>('dark')
   const [showMore, setShowMore] = useState(false)
   const moreRef = useRef<HTMLDivElement>(null)
@@ -136,10 +136,14 @@ export default function BottomNav() {
 
   const handleAdminSubClick = (tab: string) => {
     setScreen('admin')
+    setPendingAdminTab(tab)
     setShowAdminMenu(false)
-    setTimeout(() => {
+    // Also dispatch event as backup for already-mounted AdminPanel
+    const dispatch = () => {
       window.dispatchEvent(new CustomEvent('admin-tab-change', { detail: tab }))
-    }, 50)
+    }
+    dispatch()
+    setTimeout(dispatch, 100)
   }
 
   return (

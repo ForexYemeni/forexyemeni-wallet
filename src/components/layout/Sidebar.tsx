@@ -82,7 +82,7 @@ const adminSubItems = [
 ]
 
 export default function Sidebar() {
-  const { currentScreen, setScreen, user, logout } = useAuthStore()
+  const { currentScreen, setScreen, user, logout, setPendingAdminTab } = useAuthStore()
   const [theme, setThemeState] = useState<Theme>('dark')
   const [adminExpanded, setAdminExpanded] = useState(false)
 
@@ -110,10 +110,13 @@ export default function Sidebar() {
 
   const handleAdminSubClick = (tab: string) => {
     setScreen('admin')
-    // Dispatch custom event for AdminPanel to switch tab
-    setTimeout(() => {
+    setPendingAdminTab(tab)
+    // Also dispatch event as backup for already-mounted AdminPanel
+    const dispatch = () => {
       window.dispatchEvent(new CustomEvent('admin-tab-change', { detail: tab }))
-    }, 50)
+    }
+    dispatch()
+    setTimeout(dispatch, 100)
   }
 
   return (
