@@ -1,6 +1,7 @@
 'use client'
 
 import { useAuthStore } from '@/lib/store'
+import { navigateToAdminTab } from '@/lib/admin-nav'
 import { getTheme, setTheme, type Theme } from '@/lib/theme'
 import {
   Home,
@@ -82,7 +83,7 @@ const adminSubItems = [
 ]
 
 export default function Sidebar() {
-  const { currentScreen, setScreen, user, logout, setPendingAdminTab } = useAuthStore()
+  const { currentScreen, setScreen, user, logout } = useAuthStore()
   const [theme, setThemeState] = useState<Theme>('dark')
   const [adminExpanded, setAdminExpanded] = useState(false)
 
@@ -110,13 +111,7 @@ export default function Sidebar() {
 
   const handleAdminSubClick = (tab: string) => {
     setScreen('admin')
-    setPendingAdminTab(tab)
-    // Also dispatch event as backup for already-mounted AdminPanel
-    const dispatch = () => {
-      window.dispatchEvent(new CustomEvent('admin-tab-change', { detail: tab }))
-    }
-    dispatch()
-    setTimeout(dispatch, 100)
+    navigateToAdminTab(tab)
   }
 
   return (

@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef, lazy, Suspense } from 'react'
 import { useAuthStore } from '@/lib/store'
+import { registerAdminTabHandler, unregisterAdminTabHandler } from '@/lib/admin-nav'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -195,43 +196,24 @@ export default function AdminPanel() {
   const AdminFinancial = lazy(() => import('@/components/admin/AdminFinancial'))
   const [chatUnreadCount, setChatUnreadCount] = useState(0)
 
-  // Listen for sidebar sub-navigation tab changes
-  // Store pending tab from events that arrive before AdminPanel is ready
-  const pendingAdminTabRef = useRef<string | null>(null)
-
-  // On mount, check if there's a pending admin tab from store (e.g. sidebar click)
+  // Register direct tab handler for sidebar/bottom-nav navigation
   useEffect(() => {
-    if (pendingAdminTab) {
-      setActiveTab(pendingAdminTab as any)
+    registerAdminTabHandler((tab: string) => {
+      setActiveTab(tab as any)
       setLoadedTabs(prev => {
         const next = new Set(prev)
-        next.add(pendingAdminTab)
+        next.add(tab)
         return next
       })
-      setPendingAdminTab(null) // Clear after consuming
-    }
-  }, [pendingAdminTab, setPendingAdminTab])
-
-  useEffect(() => {
-    const handler = (e: Event) => {
-      const tab = (e as CustomEvent).detail
-      if (tab) {
-        // Apply immediately if component is ready, otherwise queue it
-        setActiveTab(tab as any)
-        setLoadedTabs(prev => {
-          const next = new Set(prev)
-          next.add(tab)
-          return next
-        })
-      }
-    }
-    window.addEventListener('admin-tab-change', handler)
-    return () => window.removeEventListener('admin-tab-change', handler)
+      // Also fetch data for this tab
+      fetchTabData(tab)
+    })
+    return () => unregisterAdminTabHandler()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  // On first mount, also check if there's a pending tab from URL or navigation
+  // Re-fetch data when tab changes
   useEffect(() => {
-    // Re-fetch data when tab changes (even for already loaded tabs on explicit navigation)
     if (user?.role === 'admin' || (user?.permissions && Object.values(user.permissions).some(v => v))) {
       fetchTabData(activeTab)
     }

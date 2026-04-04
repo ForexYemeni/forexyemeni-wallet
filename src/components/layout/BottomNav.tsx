@@ -1,6 +1,7 @@
 'use client'
 
 import { useAuthStore } from '@/lib/store'
+import { navigateToAdminTab } from '@/lib/admin-nav'
 import { getTheme, setTheme, type Theme } from '@/lib/theme'
 import {
   Home,
@@ -95,7 +96,7 @@ const adminSubItems = [
 ]
 
 export default function BottomNav() {
-  const { currentScreen, setScreen, user, setPendingAdminTab } = useAuthStore()
+  const { currentScreen, setScreen, user } = useAuthStore()
   const [theme, setThemeState] = useState<Theme>('dark')
   const [showMore, setShowMore] = useState(false)
   const moreRef = useRef<HTMLDivElement>(null)
@@ -136,14 +137,8 @@ export default function BottomNav() {
 
   const handleAdminSubClick = (tab: string) => {
     setScreen('admin')
-    setPendingAdminTab(tab)
     setShowAdminMenu(false)
-    // Also dispatch event as backup for already-mounted AdminPanel
-    const dispatch = () => {
-      window.dispatchEvent(new CustomEvent('admin-tab-change', { detail: tab }))
-    }
-    dispatch()
-    setTimeout(dispatch, 100)
+    navigateToAdminTab(tab)
   }
 
   return (
