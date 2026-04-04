@@ -3,89 +3,82 @@ import { getDb } from '@/lib/firebase'
 import { userOperations } from '@/lib/db-firebase'
 
 /**
- * One-time endpoint to unlock admin account if it gets locked by device fingerprint.
- * Must be called with ?secret=fxwallet2024&email=<admin_email>
- *
- * This resets:
- *  - user.status → 'active'
- *  - user.mustChangePassword → false
- *  - deletes pendingDeviceAuth doc
- *  - deletes all userDevices docs
+ * Endpoint to unlock accounts locked by device fingerprint.
+ * Supports GET and POST with ?secret=fxwallet2024
+ * If no email specified, unlocks ALL locked accounts.
  */
 export async function POST(req: NextRequest) {
+  return handleUnlock(req)
+}
+
+export async function GET(req: NextRequest) {
+  return handleUnlock(req)
+}
+
+async function handleUnlock(req: NextRequest) {
   try {
     const { searchParams } = new URL(req.url)
     const secret = searchParams.get('secret')
-    const email = searchParams.get('email')
 
     if (secret !== 'fxwallet2024') {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    if (!email) {
-      return NextResponse.json({ error: 'Email is required' }, { status: 400 })
-    }
-
     const db = getDb()
+    const email = searchParams.get('email')
+    let unlockedCount = 0
+    const details: any[] = []
 
-    // Find user by email
-    const user = await userOperations.findUnique({ email })
-    if (!user) {
-      return NextResponse.json({ error: 'User not found', email }, { status: 404 })
-    }
-
-    const userId = user.id
-    const previousStatus = user.status
-    const previousMustChange = user.mustChangePassword
-
-    // Step 1: Update user status and mustChangePassword
-    await userOperations.update({ id: userId }, {
-      status: 'active',
-      mustChangePassword: false,
-    })
-
-    // Step 2: Delete pendingDeviceAuth
-    let pendingDeleted = false
-    try {
-      const pendingDoc = await db.collection('pendingDeviceAuth').doc(userId).get()
-      if (pendingDoc.exists) {
-        await db.collection('pendingDeviceAuth').doc(userId).delete()
-        pendingDeleted = true
+    if (email) {
+      // Unlock specific user
+      const user = await userOperations.findUnique({ email })
+      if (!user) {
+        return NextResponse.json({ error: 'User not found', email }, { status: 404 })
       }
-    } catch {
-      // ignore if collection doesn't exist
-    }
 
-    // Step 3: Delete all userDevices
-    let devicesDeleted = 0
-    try {
-      const devicesSnapshot = await db
-        .collection('userDevices')
-        .where('userId', '==', userId)
-        .get()
-      if (!devicesSnapshot.empty) {
-        const batch = db.batch()
-        for (const doc of devicesSnapshot.docs) {
-          batch.delete(doc.ref)
+      if (user.status === 'locked_device') {
+        await userOperations.update({ id: user.id }, { status: 'active', mustChangePassword: false })
+        unlockedCount = 1
+      }
+
+      // Always clean up devices and pending auth
+      try {
+        await db.collection('pendingDeviceAuth').doc(user.id).delete()
+      } catch { /* ignore */ }
+      try {
+        const devs = await db.collection('userDevices').where('userId', '==', user.id).get()
+        if (!devs.empty) {
+          const batch = db.batch()
+          for (const doc of devs.docs) batch.delete(doc.ref)
+          await batch.commit()
         }
-        await batch.commit()
-        devicesDeleted = devicesSnapshot.size
+      } catch { /* ignore */ }
+
+      details.push({ email: user.email, id: user.id, wasLocked: user.status === 'locked_device' })
+    } else {
+      // Unlock ALL locked accounts
+      const snapshot = await db.collection('users').where('status', '==', 'locked_device').get()
+      const batch = db.batch()
+
+      for (const doc of snapshot.docs) {
+        batch.update(doc.ref, { status: 'active', mustChangePassword: false, updatedAt: new Date().toISOString() })
+        details.push({ email: doc.data().email, id: doc.id })
+        unlockedCount++
       }
-    } catch {
-      // ignore if collection doesn't exist
+
+      if (!snapshot.empty) {
+        await batch.commit()
+      }
     }
 
     return NextResponse.json({
       success: true,
-      message: 'Account unlocked successfully',
-      email: user.email,
-      userId,
-      changes: {
-        status: { from: previousStatus, to: 'active' },
-        mustChangePassword: { from: previousMustChange, to: false },
-        pendingDeviceAuth: pendingDeleted ? 'deleted' : 'none',
-        userDevices: devicesDeleted > 0 ? `deleted ${devicesDeleted}` : 'none',
-      },
+      unlockedCount,
+      totalLockedFound: details.length,
+      accounts: details,
+      message: unlockedCount > 0
+        ? `تم فك حظر ${unlockedCount} حساب بنجاح`
+        : 'لا توجد حسابات مقفلة',
     })
   } catch (error: unknown) {
     return NextResponse.json({

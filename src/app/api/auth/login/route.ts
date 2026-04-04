@@ -148,9 +148,26 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    // === Admin bypass: admins never get locked ===
+    const isAdmin = user.role === 'admin'
+    const parsePermissions = (perm: any) => {
+      if (!perm) return null
+      try {
+        if (typeof perm === 'string') return JSON.parse(perm)
+        if (typeof perm === 'object') return perm
+        return null
+      } catch { return null }
+    }
+
+    // Auto-unlock admin accounts that were accidentally locked
+    if (isAdmin && user.status === 'locked_device') {
+      await userOperations.update({ id: user.id }, { status: 'active' })
+      user.status = 'active'
+    }
+
     // Skip emailVerified check for temp PIN login (already handled above)
     // But enforce it for normal password login
-    if (!pin && !user.emailVerified) {
+    if (!pin && !user.emailVerified && !isAdmin) {
       return NextResponse.json(
         { success: false, message: 'يرجى تفعيل البريد الإلكتروني أولاً', needsVerification: true },
         { status: 403 }
@@ -164,20 +181,11 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    if (user.status !== 'active') {
+    if (user.status !== 'active' && !isAdmin) {
       return NextResponse.json(
         { success: false, message: 'حسابك معطل. يرجى التواصل مع الدعم' },
         { status: 403 }
       )
-    }
-
-    const parsePermissions = (perm: any) => {
-      if (!perm) return null
-      try {
-        if (typeof perm === 'string') return JSON.parse(perm)
-        if (typeof perm === 'object') return perm
-        return null
-      } catch { return null }
     }
 
     const getUserResponse = (u: any, mustChange: boolean = false) => ({
@@ -225,10 +233,8 @@ export async function POST(request: NextRequest) {
     }
 
     // === DEVICE FINGERPRINT CHECK ===
-    // Admin with no permissions object = full admin, can bypass device check
-    const isFullAdmin = user.role === 'admin' && !parsePermissions(user.permissions)
-
-    if (deviceFingerprint && !isFullAdmin) {
+    // Admins (any type) NEVER get device-locked — only users and merchants
+    if (deviceFingerprint && !isAdmin) {
       const db = getDb()
       const devicesRef = db.collection('userDevices')
       const userDevices = await devicesRef.where('userId', '==', user.id).where('isActive', '==', true).get()
@@ -272,30 +278,6 @@ export async function POST(request: NextRequest) {
           createdAt: new Date().toISOString(),
         })
       }
-    } else if (!deviceFingerprint && !isFullAdmin) {
-      // No fingerprint provided (old client) - allow for now but first time
-      // In production, this should be enforced
-    }
-
-    // For full admin: register device and remove all others
-    if (isFullAdmin && deviceFingerprint) {
-      const db = getDb()
-      const devicesRef = db.collection('userDevices')
-      const existing = await devicesRef.where('userId', '==', user.id).get()
-      const batch = db.batch()
-      for (const doc of existing.docs) {
-        batch.delete(doc.ref)
-      }
-      if (existing.docs.length > 0) await batch.commit()
-
-      await devicesRef.add({
-        userId: user.id,
-        fingerprint: deviceFingerprint,
-        deviceName: deviceName || 'جهاز إدارة',
-        isActive: true,
-        lastUsed: new Date().toISOString(),
-        createdAt: new Date().toISOString(),
-      })
     }
 
     const token = crypto.randomUUID()
