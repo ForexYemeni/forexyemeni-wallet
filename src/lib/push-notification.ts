@@ -47,17 +47,25 @@ export async function sendPushNotification(
         body,
       },
       android: {
+        // High priority ensures immediate delivery even when device is in Doze
+        priority: 'high' as const,
+        // TTL: 24 hours — retry delivery if device is offline
+        ttl: 86400,
         notification: {
           channelId: 'forexyemeni_notifications',
           sound: 'notification',
-          priority: 'high',
-          defaultSound: true,
+          priority: 'high' as const,
+          // Use notification sound explicitly (no defaultSound override)
+          defaultSound: false,
           defaultVibrateTimings: true,
+          notificationCount: 1,
         },
         data: {
           type: type || 'info',
           userId,
           click_action: 'OPEN_NOTIFICATIONS',
+          title,
+          body,
           ...(data || {}),
         },
       },

@@ -44,19 +44,23 @@ export async function POST(request: NextRequest) {
       notification: {
         title,
         body: message,
-        sound: 'notification',
       },
       android: {
+        priority: 'high' as const,
+        ttl: 86400,
         notification: {
           channelId: 'forexyemeni_notifications',
           sound: 'notification',
           priority: 'high' as const,
-          defaultSound: true,
+          defaultSound: false,
           defaultVibrateTimings: true,
+          notificationCount: 1,
         },
         data: {
           type: type || 'info',
           userId,
+          title,
+          body: message,
           ...data,
         },
       },
@@ -64,6 +68,7 @@ export async function POST(request: NextRequest) {
         payload: {
           aps: {
             sound: 'notification.wav',
+            'content-available': 1,
           },
         },
       },
