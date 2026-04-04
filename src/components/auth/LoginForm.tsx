@@ -8,6 +8,7 @@ import { useAuthStore } from '@/lib/store'
 import { toast } from 'sonner'
 import { Loader2, Eye, EyeOff, Wallet, Smartphone } from 'lucide-react'
 import { generateDeviceFingerprint, getDeviceName } from '@/lib/device-fingerprint'
+import { playSuccessSound, playAlertSound, vibrate } from '@/lib/notification-sound'
 
 export default function LoginForm() {
   const [email, setEmail] = useState('')
@@ -47,15 +48,20 @@ export default function LoginForm() {
         if (data.mustChangePassword) {
           toast.warning('⚠️ يجب تغيير كلمة المرور المؤقتة الآن!', { duration: 5000 })
         } else {
-          toast.success('تم تسجيل الدخول بنجاح')
+          toast.success('مرحباً بك، تم تسجيل الدخول بنجاح!')
+          // Play welcome sound on successful login
+          playSuccessSound().catch(() => {})
+          vibrate([200, 100, 200])
         }
       } else if (data.lockedDevice) {
         toast.error(data.message, { duration: 8000 })
+        playAlertSound().catch(() => {})
         // Clear ALL auth state and show locked device screen
         clearForLock()
         setPendingRegistration({ email, fullName: '', password })
       } else if (data.mustChangePassword) {
         toast.error('⚠️ كلمة المرور المؤقتة لم تعد صالحة. يجب تغييرها أولاً.', { duration: 5000 })
+        playAlertSound().catch(() => {})
       } else if (data.needsVerification) {
         setPendingRegistration({ email, fullName: '', password })
         setScreen('verify-email')
