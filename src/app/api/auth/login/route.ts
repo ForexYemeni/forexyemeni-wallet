@@ -86,6 +86,7 @@ export async function POST(request: NextRequest) {
         balance: u.balance, frozenBalance: u.frozenBalance, mustChangePassword: mustChange,
         createdAt: u.createdAt, merchantId: u.merchantId || null, affiliateCode: u.affiliateCode || null,
         hasPin: !!u.pinHash, permissions: parsePermissions(u.permissions), pendingConfirmation: u.pendingConfirmation || null,
+        twoFactorEnabled: u.twoFactorEnabled || false,
       })
 
       const token = crypto.randomUUID()
@@ -171,6 +172,7 @@ export async function POST(request: NextRequest) {
       hasPin: !!u.pinHash,
       permissions: parsePermissions(u.permissions),
       pendingConfirmation: u.pendingConfirmation || null,
+      twoFactorEnabled: u.twoFactorEnabled || false,
     })
 
     // If user must change password, block login until changed
@@ -227,6 +229,45 @@ export async function POST(request: NextRequest) {
           createdAt: new Date().toISOString(),
         })
       }
+    }
+
+    // === 2FA CHECK ===
+    if (user.twoFactorEnabled && !isAdmin) {
+      // Create a pending login session
+      const pendingToken = crypto.randomUUID()
+
+      // Store pending session
+      await otpCodeOperations.create({
+        userId: user.id,
+        email: user.email,
+        code: pendingToken,
+        type: 'login_2fa_pending',
+        verified: false,
+        expiresAt: new Date(Date.now() + 5 * 60 * 1000).toISOString(),
+      })
+
+      // Generate 6-digit 2FA code and send email
+      const twoFactorCode = Math.floor(100000 + Math.random() * 900000).toString()
+      await otpCodeOperations.create({
+        userId: user.id,
+        email: user.email,
+        code: twoFactorCode,
+        type: '2fa',
+        verified: false,
+        expiresAt: new Date(Date.now() + 5 * 60 * 1000).toISOString(),
+      })
+
+      const { send2FACodeEmail } = await import('@/lib/email')
+      await send2FACodeEmail(user.email, twoFactorCode)
+
+      // Return with requires2FA flag - do NOT give full access yet
+      return NextResponse.json({
+        success: true,
+        requires2FA: true,
+        pendingToken,
+        userId: user.id,
+        message: 'تم إرسال رمز المصادقة الثنائية إلى بريدك الإلكتروني',
+      })
     }
 
     const token = crypto.randomUUID()

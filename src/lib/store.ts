@@ -16,6 +16,7 @@ export interface User {
   mustChangePassword: boolean
   hasPin?: boolean
   pendingConfirmation?: string | null
+  twoFactorEnabled?: boolean
   createdAt: string
   merchantId?: string | null
   affiliateCode?: string | null

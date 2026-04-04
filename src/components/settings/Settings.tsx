@@ -24,6 +24,7 @@ import {
   LogOut,
   Bell,
   Shield,
+  ShieldCheck,
   ChevronLeft,
   Loader2,
   Eye,
@@ -39,10 +40,11 @@ import {
   type NotificationCategory,
 } from '@/lib/notification-settings'
 import { playNotificationSound } from '@/lib/notification-sound'
+import TwoFactorSettings from '@/components/auth/TwoFactorSettings'
 
 export default function SettingsPage() {
   const { user, logout, updateUser, setScreen } = useAuthStore()
-  const [activeTab, setActiveTab] = useState<'profile' | 'password' | 'notifications' | 'about'>('profile')
+  const [activeTab, setActiveTab] = useState<'profile' | 'password' | 'security' | 'notifications' | 'about'>('profile')
   const [fullName, setFullName] = useState(user?.fullName || '')
   const [loading, setLoading] = useState(false)
   const [currentPassword, setCurrentPassword] = useState('')
@@ -50,6 +52,7 @@ export default function SettingsPage() {
   const [showCurrentPassword, setShowCurrentPassword] = useState(false)
   const [showNewPassword, setShowNewPassword] = useState(false)
   const [logoutDialogOpen, setLogoutDialogOpen] = useState(false)
+  const [show2FASettings, setShow2FASettings] = useState(false)
 
   // Notification sound settings
   const [soundSettings, setSoundSettings] = useState<NotificationSoundSettings>(() => getNotificationSoundSettings())
@@ -130,8 +133,9 @@ export default function SettingsPage() {
   const tabs = [
     { key: 'profile', label: 'الملف الشخصي', icon: User },
     { key: 'password', label: 'كلمة المرور', icon: Lock },
+    { key: 'security', label: 'الأمان', icon: Shield },
     { key: 'notifications', label: 'الإشعارات', icon: Bell },
-    { key: 'about', label: 'حول', icon: Shield },
+    { key: 'about', label: 'حول', icon: Settings },
   ]
 
   return (
@@ -259,6 +263,46 @@ export default function SettingsPage() {
             </Button>
           </form>
         </div>
+      )}
+
+      {/* Security Tab */}
+      {activeTab === 'security' && !show2FASettings && (
+        <div className="glass-card p-5 space-y-4 animate-fade-in">
+          <h3 className="text-sm font-bold">الأمان والحماية</h3>
+
+          {/* 2FA Status Card */}
+          <button
+            onClick={() => setShow2FASettings(true)}
+            className="w-full flex items-center justify-between p-4 rounded-xl bg-white/5 hover:bg-white/10 transition-colors"
+          >
+            <div className="flex items-center gap-3">
+              <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${
+                user?.twoFactorEnabled ? 'bg-green-500/10' : 'bg-white/5'
+              }`}>
+                {user?.twoFactorEnabled ? (
+                  <ShieldCheck className="w-5 h-5 text-green-400" />
+                ) : (
+                  <Shield className="w-5 h-5 text-muted-foreground" />
+                )}
+              </div>
+              <div className="text-right">
+                <p className="text-sm font-bold">المصادقة الثنائية</p>
+                <p className="text-xs text-muted-foreground">
+                  {user?.twoFactorEnabled ? 'مفعلة - حسابك محمي' : 'غير مفعلة - قم بتفعيلها للحماية'}
+                </p>
+              </div>
+            </div>
+            <ChevronLeft className="w-4 h-4 text-muted-foreground" />
+          </button>
+
+          <p className="text-xs text-muted-foreground leading-relaxed">
+            المصادقة الثنائية تضيف طبقة حماية إضافية لحسابك. عند تفعيلها، سيتم إرسال رمز تحقق إلى بريدك الإلكتروني في كل مرة تسجل الدخول.
+          </p>
+        </div>
+      )}
+
+      {activeTab === 'security' && show2FASettings && (
+        <TwoFactorSettings onClose={() => setShow2FASettings(false)} />
       )}
 
       {/* Notifications Tab */}

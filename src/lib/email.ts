@@ -756,6 +756,30 @@ export async function sendMerchantWithdrawalRejectedEmail(
   return sendEmailViaScript(merchantEmail, 'تم رفض طلب السحب - فوركس يمني', html)
 }
 
+// ===================== 2FA EMAIL FUNCTIONS =====================
+
+export async function send2FACodeEmail(to: string, code: string): Promise<boolean> {
+  const html = buildOtpEmail(
+    'رمز المصادقة الثنائية',
+    'أدخل الرمز أدناه لإكمال تسجيل الدخول إلى حسابك في محفظة فوركس يمني.',
+    code,
+    '#d4af37',
+    'هذا الرمز صالح لمدة 5 دقائق فقط. لا تشاركه مع أي شخص.'
+  )
+  return sendEmailViaScript(to, 'رمز المصادقة الثنائية - فوركس يمني', html)
+}
+
+export async function send2FASetupEmail(to: string, code: string): Promise<boolean> {
+  const html = buildOtpEmail(
+    'تفعيل المصادقة الثنائية',
+    'أدخل الرمز أدناه لتفعيل المصادقة الثنائية على حسابك في محفظة فوركس يمني.',
+    code,
+    '#22c55e',
+    'هذا الرمز صالح لمدة 5 دقائق فقط. لا تشاركه مع أي شخص.'
+  )
+  return sendEmailViaScript(to, 'تفعيل المصادقة الثنائية - فوركس يمني', html)
+}
+
 // ===================== PIN RECOVERY EMAIL =====================
 
 export async function sendPinRecoveryEmail(

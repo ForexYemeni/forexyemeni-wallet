@@ -57,6 +57,7 @@ import {
   Store,
   KeyRound,
   RotateCcw,
+  ShieldOff,
 } from 'lucide-react'
 
 // ===================== TYPES =====================
@@ -76,6 +77,7 @@ interface AdminUser {
   country: string | null
   createdAt: string
   merchantId?: string | null
+  twoFactorEnabled?: boolean | null
 }
 
 interface AdminDeposit {
@@ -886,6 +888,35 @@ export default function AdminPanel() {
     }
   }
 
+  // ===== ADMIN DISABLE 2FA =====
+  const handleAdminDisable2FA = async (targetUser: AdminUser) => {
+    if (!confirm(`هل أنت متأكد من تعطيل المصادقة الثنائية للمستخدم ${targetUser.email}؟\nهذا الإجراء لا يمكن التراجع عنه.`)) return
+    setActionLoading(targetUser.id)
+    try {
+      const res = await fetch('/api/auth/2fa', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          userId: user?.id,
+          action: 'admin_disable',
+          targetUserId: targetUser.id,
+          adminToken: useAuthStore.getState().token,
+        }),
+      })
+      const data = await res.json()
+      if (data.success) {
+        toast.success('تم تعطيل المصادقة الثنائية للمستخدم')
+        fetchUsers()
+      } else {
+        toast.error(data.message)
+      }
+    } catch {
+      toast.error('خطأ في تعطيل المصادقة الثنائية')
+    } finally {
+      setActionLoading(null)
+    }
+  }
+
   // Determine if user has specific permissions
   const hasPermissions = user?.permissions && Object.keys(user.permissions).length > 0
 
@@ -1448,6 +1479,17 @@ export default function AdminPanel() {
                               >
                                 {actionLoading === u.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RotateCcw className="w-3.5 h-3.5" />}
                                 إعادة تعيين PIN
+                              </button>
+                            )}
+                            {/* Disable 2FA — only if user has 2FA enabled */}
+                            {u.twoFactorEnabled && u.role !== 'admin' && (
+                              <button
+                                onClick={() => handleAdminDisable2FA(u)}
+                                disabled={actionLoading === u.id}
+                                className="flex items-center justify-center gap-1 text-xs py-2.5 rounded-lg bg-yellow-500/10 text-yellow-400 hover:bg-yellow-500/20 transition-colors font-medium"
+                              >
+                                {actionLoading === u.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <ShieldOff className="w-3.5 h-3.5" />}
+                                تعطيل 2FA
                               </button>
                             )}
                           </div>

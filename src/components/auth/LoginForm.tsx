@@ -9,12 +9,14 @@ import { toast } from 'sonner'
 import { Loader2, Eye, EyeOff, Wallet, Smartphone } from 'lucide-react'
 import { generateDeviceFingerprint, getDeviceName } from '@/lib/device-fingerprint'
 import { playSuccessSound, playAlertSound, vibrate } from '@/lib/notification-sound'
+import TwoFactorVerify from '@/components/auth/TwoFactorVerify'
 
 export default function LoginForm() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
   const [loading, setLoading] = useState(false)
+  const [twoFAPending, setTwoFAPending] = useState<{ userId: string; pendingToken: string } | null>(null)
   const { setAuth, setScreen, setPendingRegistration, clearForLock } = useAuthStore()
 
   const handleLogin = async (e: React.FormEvent) => {
@@ -43,7 +45,10 @@ export default function LoginForm() {
       })
       const data = await res.json()
 
-      if (data.success) {
+      if (data.success && data.requires2FA) {
+        setTwoFAPending({ userId: data.userId, pendingToken: data.pendingToken })
+        toast.info(data.message, { duration: 5000 })
+      } else if (data.success) {
         setAuth(data.user, data.token, data.mustChangePassword)
         if (data.mustChangePassword) {
           toast.warning('⚠️ يجب تغيير كلمة المرور المؤقتة الآن!', { duration: 5000 })
@@ -74,6 +79,30 @@ export default function LoginForm() {
     } finally {
       setLoading(false)
     }
+  }
+
+  const handle2FASuccess = (token: string, userData: any) => {
+    setTwoFAPending(null)
+    setAuth(userData, token)
+    toast.success('مرحباً بك، تم تسجيل الدخول بنجاح!')
+    playSuccessSound('general').catch(() => {})
+    vibrate([200, 100, 200])
+  }
+
+  const handle2FABack = () => {
+    setTwoFAPending(null)
+  }
+
+  // Show 2FA verification screen
+  if (twoFAPending) {
+    return (
+      <TwoFactorVerify
+        userId={twoFAPending.userId}
+        pendingToken={twoFAPending.pendingToken}
+        onSuccess={handle2FASuccess}
+        onBack={handle2FABack}
+      />
+    )
   }
 
   return (

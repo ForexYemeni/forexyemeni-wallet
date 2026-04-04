@@ -27,6 +27,8 @@ export interface User {
   pinHash?: string | null
   pendingConfirmation?: string | null
   permissions?: string | null
+  twoFactorEnabled?: boolean | null
+  backupCodes?: string[] | null
   createdAt: string
   updatedAt: string
 }
