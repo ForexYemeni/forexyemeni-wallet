@@ -2043,6 +2043,91 @@ export default function AdminPanel() {
           </div>
         </div>
       )}
+
+      {/* ===================== BALANCE ADJUSTMENT DIALOG ===================== */}
+      {balanceDialogUser && (
+        <div className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4" onClick={() => setBalanceDialogUser(null)}>
+          <div className="glass-card p-6 space-y-4 w-full max-w-sm animate-scale-in" onClick={e => e.stopPropagation()} dir="rtl">
+            <div className="text-center space-y-2">
+              <div className={`w-14 h-14 mx-auto rounded-2xl flex items-center justify-center ${balanceAction === 'add' ? 'bg-green-500/10' : 'bg-orange-500/10'}`}>
+                {balanceAction === 'add' ? <ArrowDownLeft className="w-7 h-7 text-green-400" /> : <ArrowUpRight className="w-7 h-7 text-orange-400" />}
+              </div>
+              <h3 className="text-lg font-bold">{balanceAction === 'add' ? 'إضافة رصيد' : 'سحب رصيد'}</h3>
+              <p className="text-sm text-muted-foreground">{balanceDialogUser.fullName || balanceDialogUser.email}</p>
+              <p className="text-xs text-muted-foreground">الرصيد الحالي: <span className="gold-text font-bold">{(balanceDialogUser.balance ?? 0).toFixed(2)} USDT</span></p>
+            </div>
+            <div className="space-y-3">
+              <input
+                type="number"
+                value={balanceAmount}
+                onChange={(e) => setBalanceAmount(e.target.value)}
+                placeholder="المبلغ (USDT)"
+                className="w-full h-12 rounded-xl glass-input px-4 text-sm"
+                dir="ltr"
+                min="0"
+                step="0.01"
+              />
+              {balanceAmount && parseFloat(balanceAmount) > 0 && (
+                <p className="text-xs text-center">
+                  الرصيد بعد العملية: <span className={`font-bold ${balanceAction === 'add' ? 'text-green-400' : 'text-orange-400'}`}>
+                    {((balanceDialogUser.balance ?? 0) + (balanceAction === 'add' ? parseFloat(balanceAmount) : -parseFloat(balanceAmount))).toFixed(2)} USDT
+                  </span>
+                </p>
+              )}
+              <button
+                onClick={handleAdjustBalance}
+                disabled={balanceLoading || !balanceAmount || parseFloat(balanceAmount) <= 0}
+                className={`w-full h-12 font-bold rounded-xl hover:opacity-90 transition-all disabled:opacity-50 ${
+                  balanceAction === 'add' ? 'bg-green-500 text-white' : 'bg-orange-500 text-white'
+                }`}
+              >
+                {balanceLoading ? <Loader2 className="w-5 h-5 animate-spin mx-auto" /> : balanceAction === 'add' ? 'تأكيد الإضافة' : 'تأكيد السحب'}
+              </button>
+              <button
+                onClick={() => setBalanceDialogUser(null)}
+                className="w-full h-10 bg-white/10 text-foreground rounded-xl text-sm"
+              >
+                إلغاء
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ===================== REMOVE MERCHANT CONFIRMATION DIALOG ===================== */}
+      {removeMerchantDialogUser && (
+        <div className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4" onClick={() => setRemoveMerchantDialogUser(null)}>
+          <div className="glass-card p-6 space-y-4 w-full max-w-sm animate-scale-in" onClick={e => e.stopPropagation()} dir="rtl">
+            <div className="text-center space-y-3">
+              <div className="w-14 h-14 mx-auto rounded-2xl bg-orange-500/10 flex items-center justify-center">
+                <AlertTriangle className="w-7 h-7 text-orange-400" />
+              </div>
+              <h3 className="text-lg font-bold text-orange-400">إزالة حالة التاجر</h3>
+              <p className="text-sm text-muted-foreground">
+                سيتم تحويل حساب <strong>{removeMerchantDialogUser.fullName || removeMerchantDialogUser.email}</strong> من تاجر إلى مستخدم عادي.
+              </p>
+              <div className="p-3 rounded-xl bg-red-500/5 border border-red-500/10">
+                <p className="text-xs text-red-400">⚠️ سيتم حذف جميع إعلانات P2P المرتبطة بهذا التاجر ولن يتمكن من إنشاء إعلانات جديدة.</p>
+              </div>
+            </div>
+            <div className="space-y-2">
+              <button
+                onClick={handleRemoveMerchant}
+                disabled={removeMerchantLoading}
+                className="w-full h-12 bg-orange-500 text-white font-bold rounded-xl hover:opacity-90 transition-all disabled:opacity-50"
+              >
+                {removeMerchantLoading ? <Loader2 className="w-5 h-5 animate-spin mx-auto" /> : 'تأكيد إزالة التاجر'}
+              </button>
+              <button
+                onClick={() => setRemoveMerchantDialogUser(null)}
+                className="w-full h-10 bg-white/10 text-foreground rounded-xl text-sm"
+              >
+                إلغاء
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
@@ -2275,249 +2360,6 @@ function PaymentMethodsManager({ methods, onRefresh }: { methods: any[]; onRefre
         </div>
       )}
 
-      {/* ===== ROLE CHANGE DIALOG ===== */}
-      {roleDialogUser && (
-        <div className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4" onClick={() => setRoleDialogUser(null)}>
-          <div className="glass-card p-6 space-y-4 w-full max-w-sm animate-scale-in" onClick={e => e.stopPropagation()} dir="rtl">
-            <div className="text-center space-y-2">
-              <div className="w-14 h-14 mx-auto rounded-2xl bg-gold/10 flex items-center justify-center">
-                <Crown className="w-7 h-7 text-gold" />
-              </div>
-              <h3 className="text-lg font-bold">{roleDialogUser.role === 'admin' ? 'إزالة صلاحيات المدير' : 'ترقية إلى مدير'}</h3>
-              <p className="text-sm text-muted-foreground">{roleDialogUser.fullName || roleDialogUser.email}</p>
-            </div>
-            <button onClick={confirmRoleChange} disabled={actionLoading === roleDialogUser.id} className="w-full h-12 gold-gradient text-gray-900 font-bold rounded-xl hover:opacity-90 transition-all disabled:opacity-50">
-              {actionLoading === roleDialogUser.id ? <Loader2 className="w-5 h-5 animate-spin mx-auto" /> : 'تأكيد'}
-            </button>
-            <button onClick={() => setRoleDialogUser(null)} className="w-full h-10 bg-white/10 text-foreground rounded-xl text-sm">إلغاء</button>
-          </div>
-        </div>
-      )}
-
-      {/* ===== DELETE USER DIALOG ===== */}
-      {deleteDialogUser && (
-        <div className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4" onClick={closeDeleteDialog}>
-          <div className="glass-card p-6 space-y-4 w-full max-w-sm animate-scale-in" onClick={e => e.stopPropagation()} dir="rtl">
-            <div className="text-center space-y-2">
-              <div className="w-14 h-14 mx-auto rounded-2xl bg-red-500/10 flex items-center justify-center">
-                <Trash2 className="w-7 h-7 text-red-400" />
-              </div>
-              <h3 className="text-lg font-bold text-red-400">حذف المستخدم</h3>
-              <p className="text-sm text-muted-foreground">
-                سيتم حذف حساب <strong>{deleteDialogUser.fullName || deleteDialogUser.email}</strong> نهائياً.
-              </p>
-            </div>
-            {deleteStep === 'confirm' && (
-              <div className="space-y-2">
-                <button onClick={handleSendDeleteOtp} disabled={deleteLoading} className="w-full h-12 bg-red-500 text-white font-bold rounded-xl hover:bg-red-600 transition-all disabled:opacity-50">
-                  {deleteLoading ? <Loader2 className="w-5 h-5 animate-spin mx-auto" /> : 'إرسال رمز التحقق'}
-                </button>
-                <button onClick={closeDeleteDialog} className="w-full h-10 bg-white/10 text-foreground rounded-xl text-sm">إلغاء</button>
-              </div>
-            )}
-            {deleteStep === 'otp' && (
-              <div className="space-y-3">
-                <input type="text" maxLength={6} value={deleteOtp} onChange={(e) => setDeleteOtp(e.target.value.replace(/\D/g, ''))} placeholder="رمز التحقق" className="w-full h-12 rounded-xl glass-input px-4 text-sm text-center tracking-[0.3em] font-mono" dir="ltr" />
-                <button onClick={handleVerifyDeleteOtp} disabled={deleteLoading || deleteOtp.length < 4} className="w-full h-12 bg-red-500 text-white font-bold rounded-xl hover:bg-red-600 transition-all disabled:opacity-50">
-                  {deleteLoading ? <Loader2 className="w-5 h-5 animate-spin mx-auto" /> : 'تحقق'}
-                </button>
-                <button onClick={closeDeleteDialog} className="w-full h-10 bg-white/10 text-foreground rounded-xl text-sm">إلغاء</button>
-              </div>
-            )}
-            {deleteStep === 'password' && (
-              <div className="space-y-3">
-                <input type="password" value={deletePassword} onChange={(e) => setDeletePassword(e.target.value)} placeholder="أدخل كلمة المرور للتأكيد" className="w-full h-12 rounded-xl glass-input px-4 text-sm" dir="ltr" />
-                <button onClick={handleConfirmDelete} disabled={deleteLoading || !deletePassword} className="w-full h-12 bg-red-500 text-white font-bold rounded-xl hover:bg-red-600 transition-all disabled:opacity-50">
-                  {deleteLoading ? <Loader2 className="w-5 h-5 animate-spin mx-auto" /> : 'تأكيد الحذف'}
-                </button>
-                <button onClick={closeDeleteDialog} className="w-full h-10 bg-white/10 text-foreground rounded-xl text-sm">إلغاء</button>
-              </div>
-            )}
-          </div>
-        </div>
-      )}
-
-      {/* ===== DEVICE MANAGEMENT DIALOG ===== */}
-      {deviceDialogUser && (
-        <div className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4" onClick={() => setDeviceDialogUser(null)}>
-          <div className="glass-card p-6 space-y-4 w-full max-w-sm animate-scale-in" onClick={e => e.stopPropagation()} dir="rtl">
-            <div className="text-center space-y-2">
-              <div className="w-14 h-14 mx-auto rounded-2xl bg-purple-500/10 flex items-center justify-center">
-                <Settings className="w-7 h-7 text-purple-400" />
-              </div>
-              <h3 className="text-lg font-bold">إدارة الأجهزة</h3>
-              <p className="text-sm text-muted-foreground">{deviceDialogUser.fullName || deviceDialogUser.email}</p>
-            </div>
-            <div className="space-y-2 max-h-48 overflow-y-auto">
-              {deviceLoading ? (
-                <div className="flex justify-center py-4"><Loader2 className="w-5 h-5 animate-spin" /></div>
-              ) : deviceList.length === 0 ? (
-                <p className="text-xs text-center text-muted-foreground py-4">لا توجد أجهزة مسجلة</p>
-              ) : (
-                deviceList.map((d: any) => (
-                  <div key={d.id} className="flex items-center justify-between p-2 rounded-lg bg-white/5 text-xs">
-                    <div>
-                      <p className="font-medium">{d.deviceName || 'جهاز'}</p>
-                      <p className="text-muted-foreground">{d.lastUsed ? new Date(d.lastUsed).toLocaleDateString('ar-SA') : ''}</p>
-                    </div>
-                    <button onClick={() => { if(confirm('إزالة هذا الجهاز؟')) { handleRemoveAllDevices() } }} className="text-red-400 hover:text-red-300">حذف</button>
-                  </div>
-                ))
-              )}
-            </div>
-            {pendingDevice && (
-              <div className="p-3 rounded-lg bg-yellow-500/5 border border-yellow-500/10">
-                <p className="text-xs text-yellow-400 mb-2">جهاز معلق بانتظار التصريح:</p>
-                <p className="text-[10px] text-muted-foreground">{pendingDevice.deviceName} - {pendingDevice.requestedAt ? new Date(pendingDevice.requestedAt).toLocaleString('ar-SA') : ''}</p>
-                <button onClick={handleAuthorizeDevice} disabled={deviceLoading} className="w-full mt-2 h-9 bg-green-500 text-white text-xs font-bold rounded-lg hover:bg-green-600 disabled:opacity-50">
-                  {deviceLoading ? 'جاري...' : 'تصريح'}
-                </button>
-              </div>
-            )}
-            <button onClick={() => handleRemoveAllDevices()} disabled={deviceLoading} className="w-full h-10 bg-red-500/10 text-red-400 rounded-xl text-xs font-medium hover:bg-red-500/20 transition-all disabled:opacity-50">
-              {deviceLoading ? 'جاري...' : 'إزالة جميع الأجهزة'}
-            </button>
-            <button onClick={() => setDeviceDialogUser(null)} className="w-full h-10 bg-white/10 text-foreground rounded-xl text-sm">إغلاق</button>
-          </div>
-        </div>
-      )}
-
-      {/* ===== WITHDRAWAL PROOF DIALOG ===== */}
-      {proofDialogWithdrawal && (
-        <div className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4" onClick={() => setProofDialogWithdrawal(null)}>
-          <div className="glass-card p-6 space-y-4 w-full max-w-sm animate-scale-in" onClick={e => e.stopPropagation()} dir="rtl">
-            <h3 className="text-lg font-bold gold-text">رفع إثبات الدفع</h3>
-            <p className="text-sm text-muted-foreground">سحب: {proofDialogWithdrawal.amount} USDT</p>
-            <input ref={proofInputRef} type="file" accept="image/*" capture="environment" className="w-full text-sm" />
-            <button onClick={handleUploadProof} disabled={proofLoading} className="w-full h-12 gold-gradient text-gray-900 font-bold rounded-xl hover:opacity-90 transition-all disabled:opacity-50">
-              {proofLoading ? <Loader2 className="w-5 h-5 animate-spin mx-auto" /> : 'رفع الإثبات'}
-            </button>
-            <button onClick={() => setProofDialogWithdrawal(null)} className="w-full h-10 bg-white/10 text-foreground rounded-xl text-sm">إلغاء</button>
-          </div>
-        </div>
-      )}
-
-      {/* ===== KYC REJECTION DIALOG ===== */}
-      {kycRejectDialog && (
-        <div className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4" onClick={() => setKycRejectDialog(null)}>
-          <div className="glass-card p-6 space-y-4 w-full max-w-sm animate-scale-in" onClick={e => e.stopPropagation()} dir="rtl">
-            <h3 className="text-lg font-bold text-red-400">سبب الرفض</h3>
-            <p className="text-xs text-muted-foreground">سحب: {kycRejectDialog.amount} USDT</p>
-            <textarea value={kycRejectReason} onChange={(e) => setKycRejectReason(e.target.value)} placeholder="أدخل سبب الرفض..." className="w-full h-24 rounded-xl glass-input px-4 py-3 text-sm resize-none" />
-            <button onClick={handleRejectWithReason} disabled={kycRejectLoading || !kycRejectReason.trim()} className="w-full h-12 bg-red-500 text-white font-bold rounded-xl hover:bg-red-600 transition-all disabled:opacity-50">
-              {kycRejectLoading ? <Loader2 className="w-5 h-5 animate-spin mx-auto" /> : 'رفض السحب'}
-            </button>
-            <button onClick={() => setKycRejectDialog(null)} className="w-full h-10 bg-white/10 text-foreground rounded-xl text-sm">إلغاء</button>
-          </div>
-        </div>
-      )}
-
-      {/* ===== REJECT WITHDRAWAL DIALOG ===== */}
-      {rejectDialog && (
-        <div className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4" onClick={() => setRejectDialog(null)}>
-          <div className="glass-card p-6 space-y-4 w-full max-w-sm animate-scale-in" onClick={e => e.stopPropagation()} dir="rtl">
-            <h3 className="text-lg font-bold text-red-400">سبب رفض السحب</h3>
-            <p className="text-xs text-muted-foreground">سحب: {rejectDialog.amount} USDT</p>
-            <textarea value={rejectReason} onChange={(e) => setRejectReason(e.target.value)} placeholder="أدخل سبب الرفض..." className="w-full h-24 rounded-xl glass-input px-4 py-3 text-sm resize-none" />
-            <button onClick={handleRejectWithReason} disabled={rejectLoading || !rejectReason.trim()} className="w-full h-12 bg-red-500 text-white font-bold rounded-xl hover:bg-red-600 transition-all disabled:opacity-50">
-              {rejectLoading ? <Loader2 className="w-5 h-5 animate-spin mx-auto" /> : 'تأكيد الرفض'}
-            </button>
-            <button onClick={() => setRejectDialog(null)} className="w-full h-10 bg-white/10 text-foreground rounded-xl text-sm">إلغاء</button>
-          </div>
-        </div>
-      )}
-
-      {/* ===== FULL IMAGE PREVIEW ===== */}
-      {previewImage && (
-        <div className="fixed inset-0 bg-black/90 z-50 flex items-center justify-center p-4" onClick={() => setPreviewImage(null)}>
-          <img src={previewImage} alt="preview" className="max-w-full max-h-[80vh] rounded-xl" onClick={e => e.stopPropagation()} />
-        </div>
-      )}
-
-      {/* ===== BALANCE ADJUSTMENT DIALOG ===== */}
-      {balanceDialogUser && (
-        <div className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4" onClick={() => setBalanceDialogUser(null)}>
-          <div className="glass-card p-6 space-y-4 w-full max-w-sm animate-scale-in" onClick={e => e.stopPropagation()} dir="rtl">
-            <div className="text-center space-y-2">
-              <div className={`w-14 h-14 mx-auto rounded-2xl flex items-center justify-center ${balanceAction === 'add' ? 'bg-green-500/10' : 'bg-orange-500/10'}`}>
-                {balanceAction === 'add' ? <ArrowDownLeft className="w-7 h-7 text-green-400" /> : <ArrowUpRight className="w-7 h-7 text-orange-400" />}
-              </div>
-              <h3 className="text-lg font-bold">{balanceAction === 'add' ? 'إضافة رصيد' : 'سحب رصيد'}</h3>
-              <p className="text-sm text-muted-foreground">{balanceDialogUser.fullName || balanceDialogUser.email}</p>
-              <p className="text-xs text-muted-foreground">الرصيد الحالي: <span className="gold-text font-bold">{(balanceDialogUser.balance ?? 0).toFixed(2)} USDT</span></p>
-            </div>
-            <div className="space-y-3">
-              <input
-                type="number"
-                value={balanceAmount}
-                onChange={(e) => setBalanceAmount(e.target.value)}
-                placeholder="المبلغ (USDT)"
-                className="w-full h-12 rounded-xl glass-input px-4 text-sm"
-                dir="ltr"
-                min="0"
-                step="0.01"
-              />
-              {balanceAmount && parseFloat(balanceAmount) > 0 && (
-                <p className="text-xs text-center">
-                  الرصيد بعد العملية: <span className={`font-bold ${balanceAction === 'add' ? 'text-green-400' : 'text-orange-400'}`}>
-                    {((balanceDialogUser.balance ?? 0) + (balanceAction === 'add' ? parseFloat(balanceAmount) : -parseFloat(balanceAmount))).toFixed(2)} USDT
-                  </span>
-                </p>
-              )}
-              <button
-                onClick={handleAdjustBalance}
-                disabled={balanceLoading || !balanceAmount || parseFloat(balanceAmount) <= 0}
-                className={`w-full h-12 font-bold rounded-xl hover:opacity-90 transition-all disabled:opacity-50 ${
-                  balanceAction === 'add' ? 'bg-green-500 text-white' : 'bg-orange-500 text-white'
-                }`}
-              >
-                {balanceLoading ? <Loader2 className="w-5 h-5 animate-spin mx-auto" /> : balanceAction === 'add' ? 'تأكيد الإضافة' : 'تأكيد السحب'}
-              </button>
-              <button
-                onClick={() => setBalanceDialogUser(null)}
-                className="w-full h-10 bg-white/10 text-foreground rounded-xl text-sm"
-              >
-                إلغاء
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* ===== REMOVE MERCHANT CONFIRMATION DIALOG ===== */}
-      {removeMerchantDialogUser && (
-        <div className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4" onClick={() => setRemoveMerchantDialogUser(null)}>
-          <div className="glass-card p-6 space-y-4 w-full max-w-sm animate-scale-in" onClick={e => e.stopPropagation()} dir="rtl">
-            <div className="text-center space-y-3">
-              <div className="w-14 h-14 mx-auto rounded-2xl bg-orange-500/10 flex items-center justify-center">
-                <AlertTriangle className="w-7 h-7 text-orange-400" />
-              </div>
-              <h3 className="text-lg font-bold text-orange-400">إزالة حالة التاجر</h3>
-              <p className="text-sm text-muted-foreground">
-                سيتم تحويل حساب <strong>{removeMerchantDialogUser.fullName || removeMerchantDialogUser.email}</strong> من تاجر إلى مستخدم عادي.
-              </p>
-              <div className="p-3 rounded-xl bg-red-500/5 border border-red-500/10">
-                <p className="text-xs text-red-400">⚠️ سيتم حذف جميع إعلانات P2P المرتبطة بهذا التاجر ولن يتمكن من إنشاء إعلانات جديدة.</p>
-              </div>
-            </div>
-            <div className="space-y-2">
-              <button
-                onClick={handleRemoveMerchant}
-                disabled={removeMerchantLoading}
-                className="w-full h-12 bg-orange-500 text-white font-bold rounded-xl hover:opacity-90 transition-all disabled:opacity-50"
-              >
-                {removeMerchantLoading ? <Loader2 className="w-5 h-5 animate-spin mx-auto" /> : 'تأكيد إزالة التاجر'}
-              </button>
-              <button
-                onClick={() => setRemoveMerchantDialogUser(null)}
-                className="w-full h-10 bg-white/10 text-foreground rounded-xl text-sm"
-              >
-                إلغاء
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   )
 }
