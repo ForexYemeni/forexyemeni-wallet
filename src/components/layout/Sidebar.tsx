@@ -13,22 +13,11 @@ import {
   Wallet,
   Clock,
   ChevronLeft,
-  Users,
-  UserCog,
-  DollarSign,
-  ArrowDownCircle,
-  ArrowUpCircle,
-  FileCheck,
-  MessageCircle,
-  CreditCard,
-  Sliders,
-  Sun,
-  Moon,
-  BarChart3,
-  MessageSquare,
   Gift,
   Repeat,
-  Activity,
+  MessageCircle,
+  Sun,
+  Moon,
 } from 'lucide-react'
 import { useState, useEffect } from 'react'
 
@@ -54,37 +43,15 @@ const merchantNavItems = [
 ]
 
 const adminNavItems = [
-  { key: 'admin', label: 'لوحة التحكم', icon: LayoutDashboard, section: 'إدارة' },
-  { key: 'dashboard', label: 'الرئيسية', icon: Home, section: null },
-  { key: 'notifications', label: 'الإشعارات', icon: Bell, section: null },
-  { key: 'settings', label: 'الإعدادات', icon: Settings, section: null },
-]
-
-// Sub-nav items shown when admin is selected — for quick access
-const adminSubItems = [
-  { key: 'admin-dashboard', label: 'الإحصائيات', icon: BarChart3, tab: 'dashboard' },
-  { key: 'admin-users', label: 'المستخدمون', icon: Users, tab: 'users' },
-  { key: 'admin-deposits', label: 'الإيداعات', icon: ArrowDownCircle, tab: 'deposits' },
-  { key: 'admin-withdrawals', label: 'السحوبات', icon: ArrowUpCircle, tab: 'withdrawals' },
-  { key: 'admin-kyc', label: 'التوثيق', icon: FileCheck, tab: 'kyc' },
-  { key: 'admin-chats', label: 'المحادثات', icon: MessageCircle, tab: 'chats' },
-  { key: 'admin-methods', label: 'طرق الدفع', icon: CreditCard, tab: 'payment-methods' },
-  { key: 'admin-referral', label: 'برنامج الدعوات', icon: Gift, tab: 'referral-settings' },
-  { key: 'admin-faq', label: 'البوت والأسئلة', icon: MessageSquare, tab: 'faq-bot' },
-  { key: 'admin-p2p', label: 'P2P والنزاعات', icon: Repeat, tab: 'p2p' },
-  { key: 'admin-audit', label: 'سجل العمليات', icon: Clock, tab: 'audit-log' },
-  { key: 'admin-reports', label: 'التقارير المالية', icon: BarChart3, tab: 'reports' },
-  { key: 'admin-monitor', label: 'مراقبة النظام', icon: Activity, tab: 'system-monitor' },
-  { key: 'admin-settings', label: 'إعدادات النظام', icon: Sliders, tab: 'admin-settings' },
-  { key: 'admin-team', label: '👥 فريق الإدارة', icon: UserCog, tab: 'admin-team' },
-  { key: 'admin-financial', label: '💰 الملخص المالي', icon: DollarSign, tab: 'admin-financial' },
-  { key: 'admin-super', label: '🛡️ تحكم خارق', icon: Shield, tab: 'super-admin' },
+  { key: 'admin', label: 'لوحة التحكم', icon: LayoutDashboard },
+  { key: 'dashboard', label: 'الرئيسية', icon: Home },
+  { key: 'notifications', label: 'الإشعارات', icon: Bell },
+  { key: 'settings', label: 'الإعدادات', icon: Settings },
 ]
 
 export default function Sidebar() {
-  const { currentScreen, setScreen, user, logout, setPendingAdminTab } = useAuthStore()
+  const { currentScreen, setScreen, user, logout } = useAuthStore()
   const [theme, setThemeState] = useState<Theme>('dark')
-  const [adminExpanded, setAdminExpanded] = useState(false)
 
   const isAdmin = user?.role === 'admin' || (user?.permissions && Object.values(user.permissions).some(v => v))
   const isMerchant = !!user?.merchantId && !isAdmin
@@ -95,21 +62,10 @@ export default function Sidebar() {
     setThemeState(getTheme())
   }, [])
 
-  useEffect(() => {
-    if (currentScreen === 'admin' && !adminExpanded) {
-      setAdminExpanded(true)
-    }
-  }, [currentScreen])
-
   const handleToggleTheme = () => {
     const next = theme === 'dark' ? 'light' : 'dark'
     setThemeState(next)
     setTheme(next)
-  }
-
-  const handleAdminSubClick = (tab: string) => {
-    setPendingAdminTab(tab)
-    setScreen('admin')
   }
 
   return (
@@ -166,51 +122,6 @@ export default function Sidebar() {
       <nav className="flex-1 overflow-y-auto p-3 space-y-1">
         {items.map((item) => {
           const isActive = currentScreen === item.key
-
-          if (item.section) {
-            return (
-              <div key={item.section}>
-                <button
-                  onClick={() => {
-                    setScreen(item.key!)
-                    setAdminExpanded(true)
-                  }}
-                  className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm transition-all ${
-                    isActive
-                      ? 'bg-gold/10 text-gold font-medium'
-                      : 'text-muted-foreground hover:text-foreground hover:bg-white/5'
-                  }`}
-                >
-                  <item.icon className="w-4 h-4" />
-                  {item.label}
-                  <ChevronLeft className={`w-3 h-3 mr-auto transition-transform ${adminExpanded && isActive ? 'rotate-90' : ''}`} />
-                </button>
-
-                {/* Admin Sub-navigation */}
-                {adminExpanded && isActive && (
-                  <div className="mr-4 mt-1 space-y-0.5 animate-fade-in">
-                    {adminSubItems.filter(sub => {
-                      // Only show super-admin, admin-team, admin-financial to actual super admin (no permissions)
-                      if (sub.key === 'admin-super' || sub.key === 'admin-team' || sub.key === 'admin-financial') {
-                        return user?.role === 'admin' && !user?.permissions
-                      }
-                      return true
-                    }).map((sub) => (
-                      <button
-                        key={sub.key}
-                        onClick={() => handleAdminSubClick(sub.tab)}
-                        className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs text-muted-foreground hover:text-foreground hover:bg-white/5 transition-all"
-                      >
-                        <sub.icon className="w-3.5 h-3.5" />
-                        {sub.label}
-                      </button>
-                    ))}
-                  </div>
-                )}
-              </div>
-            )
-          }
-
           return (
             <button
               key={item.key}

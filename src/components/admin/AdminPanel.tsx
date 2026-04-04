@@ -181,16 +181,10 @@ const ROLE_LABELS: Record<string, string> = {
 // ===================== MAIN COMPONENT =====================
 
 export default function AdminPanel() {
-  const { user, setScreen, pendingAdminTab, setPendingAdminTab } = useAuthStore()
+  const { user, setScreen } = useAuthStore()
   const AdminFaqManager = lazy(() => import('@/components/admin/AdminFaqManager'))
   const AdminReferralSettings = lazy(() => import('@/components/admin/AdminReferralSettings'))
-
-  // Use pendingAdminTab from store as initial tab if available
-  const allTabKeys = ['dashboard', 'users', 'deposits', 'withdrawals', 'kyc', 'payment-methods', 'admin-settings', 'faq-bot', 'chats', 'referral-settings', 'p2p', 'audit-log', 'reports', 'system-monitor', 'admin-team', 'admin-financial', 'super-admin'] as const
-  type TabKey = typeof allTabKeys[number]
-  const initialTab: TabKey = (pendingAdminTab && allTabKeys.includes(pendingAdminTab as TabKey)) ? pendingAdminTab as TabKey : 'dashboard'
-
-  const [activeTab, setActiveTab] = useState<TabKey>(initialTab)
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'users' | 'deposits' | 'withdrawals' | 'kyc' | 'payment-methods' | 'admin-settings' | 'faq-bot' | 'chats' | 'referral-settings' | 'p2p' | 'audit-log' | 'reports' | 'system-monitor' | 'admin-team' | 'admin-financial' | 'super-admin'>('dashboard')
   const AdminChat = lazy(() => import('@/components/admin/AdminChat'))
   const AdminP2P = lazy(() => import('@/components/admin/AdminP2P'))
   const AdminAuditLog = lazy(() => import('@/components/admin/AdminAuditLog'))
@@ -200,22 +194,6 @@ export default function AdminPanel() {
   const AdminTeam = lazy(() => import('@/components/admin/AdminTeam'))
   const AdminFinancial = lazy(() => import('@/components/admin/AdminFinancial'))
   const [chatUnreadCount, setChatUnreadCount] = useState(0)
-
-  // Track which tabs have been loaded to avoid re-fetching
-  const [loadedTabs, setLoadedTabs] = useState<Set<string>>(new Set())
-
-  // Apply pending admin tab from store (sidebar navigation)
-  useEffect(() => {
-    if (pendingAdminTab && allTabKeys.includes(pendingAdminTab as TabKey)) {
-      setActiveTab(pendingAdminTab as TabKey)
-      setPendingAdminTab(null)
-      setLoadedTabs(prev => {
-        const next = new Set(prev)
-        next.add(pendingAdminTab)
-        return next
-      })
-    }
-  }, [pendingAdminTab])
 
   // Fetch data when switching tabs (lazy load)
   const [users, setUsers] = useState<AdminUser[]>([])
@@ -270,6 +248,9 @@ export default function AdminPanel() {
   const [removeMerchantLoading, setRemoveMerchantLoading] = useState(false)
   // PIN reset requests state
   const [pinResetRequests, setPinResetRequests] = useState<any[]>([])
+
+  // Track which tabs have been loaded to avoid re-fetching
+  const [loadedTabs, setLoadedTabs] = useState<Set<string>>(new Set())
 
   // Fetch data when switching tabs (lazy load)
   useEffect(() => {
