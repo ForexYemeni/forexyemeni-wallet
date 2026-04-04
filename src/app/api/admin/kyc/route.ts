@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { userOperations, kycRecordOperations, notificationOperations } from '@/lib/db-firebase'
+import { sendPushNotification } from '@/lib/push-notification'
 
 // GET all KYC records (admin)
 export async function GET() {
@@ -38,12 +39,10 @@ export async function POST(request: NextRequest) {
       if (pendingRecords === 0) {
         await userOperations.update({ id: userId }, { kycStatus: 'approved' })
 
-        await notificationOperations.create({
-          userId,
-          title: 'تم قبول التحقق',
-          message: 'تم قبول جميع مستندات التحقق الخاصة بك',
-          type: 'success',
-        })
+        const title = 'تم قبول التحقق'
+        const message = 'تم قبول جميع مستندات التحقق الخاصة بك'
+        await notificationOperations.create({ userId, title, message, type: 'success' })
+        sendPushNotification(userId, title, message, 'success').catch(() => {})
       }
     }
 
@@ -51,12 +50,10 @@ export async function POST(request: NextRequest) {
       await userOperations.update({ id: userId }, { kycStatus: 'rejected' })
 
       const reason = adminNote ? ` (${adminNote})` : ''
-      await notificationOperations.create({
-        userId,
-        title: 'تم رفض التحقق',
-        message: `تم رفض أحد مستندات التحقق. يرجى إعادة الرفع.${reason}`,
-        type: 'warning',
-      })
+      const title = 'تم رفض التحقق'
+      const message = `تم رفض أحد مستندات التحقق. يرجى إعادة الرفع.${reason}`
+      await notificationOperations.create({ userId, title, message, type: 'warning' })
+      sendPushNotification(userId, title, message, 'warning').catch(() => {})
     }
 
     return NextResponse.json({ success: true, kycRecord: updatedRecord })

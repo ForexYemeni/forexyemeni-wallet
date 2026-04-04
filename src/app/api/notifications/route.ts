@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { notificationOperations } from '@/lib/db-firebase'
+import { sendPushNotification } from '@/lib/push-notification'
 
 export async function GET(request: NextRequest) {
   try {
@@ -54,6 +55,9 @@ export async function POST(request: NextRequest) {
       message,
       type,
     })
+
+    // Also send push notification (FCM) if user has registered tokens
+    sendPushNotification(userId, title, message, type).catch(() => {})
 
     return NextResponse.json({
       success: true,

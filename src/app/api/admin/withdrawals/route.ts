@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { userOperations, withdrawalOperations, transactionOperations, notificationOperations } from '@/lib/db-firebase'
 import { getDb, nowTimestamp } from '@/lib/firebase'
+import { sendPushNotification } from '@/lib/push-notification'
 
 // GET all withdrawals (admin)
 export async function GET(request: NextRequest) {
@@ -56,12 +57,10 @@ export async function POST(request: NextRequest) {
     const updatedWithdrawal = await withdrawalOperations.update(withdrawalId, updateData)
 
     if (status === 'approved') {
-      await notificationOperations.create({
-        userId: withdrawal.userId,
-        title: 'تم قبول السحب - قيد المراجعة',
-        message: `تم قبول سحبك بقيمة ${withdrawal.amount} USDT. جاري معالجة الدفع.`,
-        type: 'info',
-      })
+      const title = 'تم قبول السحب - قيد المراجعة'
+      const message = `تم قبول سحبك بقيمة ${withdrawal.amount} USDT. جاري معالجة الدفع.`
+      await notificationOperations.create({ userId: withdrawal.userId, title, message, type: 'info' })
+      sendPushNotification(withdrawal.userId, title, message, 'info').catch(() => {})
     }
 
     if (status === 'processing') {
@@ -86,12 +85,10 @@ export async function POST(request: NextRequest) {
         })
       }
 
-      await notificationOperations.create({
-        userId: withdrawal.userId,
-        title: 'تم السحب',
-        message: `تم سحب ${withdrawal.amount} USDT بنجاح. يرجى تأكيد الاستلام.`,
-        type: 'success',
-      })
+      const title = 'تم السحب'
+      const message = `تم سحب ${withdrawal.amount} USDT بنجاح. يرجى تأكيد الاستلام.`
+      await notificationOperations.create({ userId: withdrawal.userId, title, message, type: 'success' })
+      sendPushNotification(withdrawal.userId, title, message, 'success').catch(() => {})
     }
 
     if (status === 'rejected') {
@@ -105,12 +102,10 @@ export async function POST(request: NextRequest) {
       }
 
       const reason = adminNote ? ` (${adminNote})` : ''
-      await notificationOperations.create({
-        userId: withdrawal.userId,
-        title: 'تم رفض السحب',
-        message: `تم رفض طلب سحبك بقيمة ${withdrawal.amount} USDT. تم إعادة المبلغ إلى رصيدك.${reason}`,
-        type: 'warning',
-      })
+      const title = 'تم رفض السحب'
+      const message = `تم رفض طلب سحبك بقيمة ${withdrawal.amount} USDT. تم إعادة المبلغ إلى رصيدك.${reason}`
+      await notificationOperations.create({ userId: withdrawal.userId, title, message, type: 'warning' })
+      sendPushNotification(withdrawal.userId, title, message, 'warning').catch(() => {})
     }
 
     return NextResponse.json({ success: true, withdrawal: updatedWithdrawal })

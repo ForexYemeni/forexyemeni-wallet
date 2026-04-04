@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { userOperations, depositOperations, transactionOperations, notificationOperations } from '@/lib/db-firebase'
+import { sendPushNotification } from '@/lib/push-notification'
 
 // GET all deposits (admin)
 export async function GET(request: NextRequest) {
@@ -41,12 +42,10 @@ export async function POST(request: NextRequest) {
     })
 
     if (status === 'reviewing') {
-      await notificationOperations.create({
-        userId: deposit.userId,
-        title: 'طلبك قيد المراجعة',
-        message: `تم بدء مراجعة إيداعك بقيمة ${deposit.amount} USDT`,
-        type: 'info',
-      })
+      const title = 'طلبك قيد المراجعة'
+      const message = `تم بدء مراجعة إيداعك بقيمة ${deposit.amount} USDT`
+      await notificationOperations.create({ userId: deposit.userId, title, message, type: 'info' })
+      sendPushNotification(deposit.userId, title, message, 'info').catch(() => {})
     }
 
     if (status === 'confirmed') {
@@ -67,23 +66,19 @@ export async function POST(request: NextRequest) {
           referenceId: deposit.id,
         })
 
-        await notificationOperations.create({
-          userId: deposit.userId,
-          title: 'تم تأكيد الإيداع',
-          message: `تم تأكيد إيداعك بقيمة ${deposit.amount} USDT`,
-          type: 'success',
-        })
+        const title = 'تم تأكيد الإيداع'
+        const message = `تم تأكيد إيداعك بقيمة ${deposit.amount} USDT`
+        await notificationOperations.create({ userId: deposit.userId, title, message, type: 'success' })
+        sendPushNotification(deposit.userId, title, message, 'success').catch(() => {})
       }
     }
 
     if (status === 'rejected') {
       const reason = adminNote ? ` (${adminNote})` : ''
-      await notificationOperations.create({
-        userId: deposit.userId,
-        title: 'تم رفض الإيداع',
-        message: `تم رفض إيداعك بقيمة ${deposit.amount} USDT${reason}`,
-        type: 'warning',
-      })
+      const title = 'تم رفض الإيداع'
+      const message = `تم رفض إيداعك بقيمة ${deposit.amount} USDT${reason}`
+      await notificationOperations.create({ userId: deposit.userId, title, message, type: 'warning' })
+      sendPushNotification(deposit.userId, title, message, 'warning').catch(() => {})
     }
 
     return NextResponse.json({ success: true, deposit: updatedDeposit })

@@ -1,10 +1,27 @@
 'use client'
 
 import { useAuthStore } from '@/lib/store'
-import { Smartphone, Lock, MessageCircle, ArrowLeft } from 'lucide-react'
+import { Smartphone, Lock, MessageCircle, ArrowLeft, RefreshCw } from 'lucide-react'
+import { useState } from 'react'
 
 export default function DeviceLockedScreen() {
-  const { pendingRegistration, setScreen } = useAuthStore()
+  const { pendingRegistration, setScreen, setPendingRegistration } = useAuthStore()
+  const [checking, setChecking] = useState(false)
+
+  // Allow user to check if device has been approved
+  const handleRetry = async () => {
+    setChecking(true)
+    try {
+      // Just navigate to login — the login API will handle the rest
+      // If the admin approved the device, login will succeed
+      setPendingRegistration(null)
+      setScreen('login')
+    } catch {
+      setScreen('login')
+    } finally {
+      setChecking(false)
+    }
+  }
 
   return (
     <div className="animate-slide-up w-full max-w-sm mx-auto space-y-6 p-6">
@@ -47,13 +64,31 @@ export default function DeviceLockedScreen() {
         </div>
       </div>
 
-      <button
-        onClick={() => setScreen('login')}
-        className="w-full flex items-center justify-center gap-2 py-3 rounded-xl bg-white/5 hover:bg-white/10 transition-all text-sm text-muted-foreground"
-      >
-        <ArrowLeft className="w-4 h-4" />
-        العودة لتسجيل الدخول
-      </button>
+      <div className="space-y-3">
+        {/* If admin already approved the device, user can try to login again */}
+        <button
+          onClick={handleRetry}
+          disabled={checking}
+          className="w-full flex items-center justify-center gap-2 h-12 gold-gradient text-gray-900 font-bold rounded-xl hover:opacity-90 transition-all"
+        >
+          {checking ? (
+            <RefreshCw className="w-5 h-5 animate-spin" />
+          ) : (
+            <>
+              <RefreshCw className="w-4 h-4" />
+              إعادة محاولة تسجيل الدخول
+            </>
+          )}
+        </button>
+
+        <button
+          onClick={() => setScreen('login')}
+          className="w-full flex items-center justify-center gap-2 py-3 rounded-xl bg-white/5 hover:bg-white/10 transition-all text-sm text-muted-foreground"
+        >
+          <ArrowLeft className="w-4 h-4" />
+          العودة لتسجيل الدخول
+        </button>
+      </div>
     </div>
   )
 }

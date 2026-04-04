@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "979050323018",
+    "project_id": "forexyemeni-wallet-a4e94",
+    "storage_bucket": "forexyemeni-wallet-a4e94.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:979050323018:android:3c51766e0c4071897f5ab3",
+        "android_client_info": {
+          "package_name": "com.forexyemeni.wallet"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBU9mEl8JDG4WEFOUX7tMPNTYBZjakHAcU"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

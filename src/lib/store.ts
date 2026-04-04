@@ -54,6 +54,8 @@ export const useAuthStore = create<AuthState>()(
           : (user.role === 'admin' || (user.permissions && Object.values(user.permissions).some(v => v)))
             ? 'admin'
             : 'dashboard',
+        // Clear stale withdrawal confirmation from previous sessions
+        pendingWithdrawalConfirmation: user?.pendingConfirmation || null,
       }),
       logout: () => set({ user: null, token: null, isAuthenticated: false, currentScreen: 'login', pendingRegistration: null, pendingWithdrawalConfirmation: null }),
       clearForLock: () => set({ user: null, token: null, isAuthenticated: false, currentScreen: 'device-locked', pendingRegistration: null, pendingWithdrawalConfirmation: null }),

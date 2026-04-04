@@ -94,16 +94,22 @@ export default function Home() {
     setMounted(true)
   }, [])
 
-  // Global error handler
+  // Global error handler — only for critical errors
   useEffect(() => {
     const handler = (event: Event | PromiseRejectionEvent) => {
       const err = event instanceof PromiseRejectionEvent
         ? new Error(String(event.reason))
         : (event as ErrorEvent).error
       console.error('[App Error]', err)
-      // Don't set error state for notification/audio errors (non-critical)
-      const msg = err?.message || ''
-      if (msg.includes('AudioContext') || msg.includes('Notification') || msg.includes('vibrate')) {
+      // Don't set error state for non-critical errors
+      const msg = err?.message || String(event) || ''
+      const nonCriticalKeywords = [
+        'AudioContext', 'Notification', 'vibrate',
+        'fetch', 'network', 'Failed to fetch',
+        'service worker', 'push notification',
+        'Capacitor', 'FCM', 'token',
+      ]
+      if (nonCriticalKeywords.some(kw => msg.toLowerCase().includes(kw.toLowerCase()))) {
         return
       }
       setError(err)
@@ -133,20 +139,30 @@ export default function Home() {
     } catch {}
   }, [])
 
-  // Validate stored auth state on mount
+  // Validate stored auth state on mount — clear stale state
   useEffect(() => {
-    if (mounted && isAuthenticated && !user?.id) {
+    if (!mounted) return
+    // If authenticated but no valid user, clear
+    if (isAuthenticated && !user?.id) {
       console.warn('[Auth] Invalid state: authenticated but no user. Clearing...')
       logout()
+      return
     }
-  }, [mounted, isAuthenticated, user?.id, logout])
+    // If device-locked screen but no stored context, go to login
+    if (!isAuthenticated && currentScreen === 'device-locked') {
+      // Keep showing locked screen — user needs to go back to login manually
+    }
+  }, [mounted, isAuthenticated, user?.id, logout, currentScreen])
 
   // Fetch withdrawal data when confirmation is pending
   useEffect(() => {
     if (isAuthenticated && user?.pendingConfirmation) {
       setLoadingWithdrawal(true)
       fetch(`/api/admin/withdrawals?id=${user.pendingConfirmation}`)
-        .then(res => res.json())
+        .then(res => {
+          if (!res.ok) throw new Error('API error')
+          return res.json()
+        })
         .then(data => {
           if (data.success && data.withdrawals?.length > 0) {
             const w = data.withdrawals[0]
@@ -160,9 +176,17 @@ export default function Home() {
               walletAddress: w.walletAddress,
               walletName: w.walletName,
             })
+          } else {
+            // Invalid or expired confirmation — clear it
+            setPendingWithdrawalConfirmation(null)
+            updateUser({ pendingConfirmation: null } as any)
           }
         })
-        .catch(() => {})
+        .catch(() => {
+          // Failed to fetch confirmation data — clear stale state
+          setPendingWithdrawalConfirmation(null)
+          updateUser({ pendingConfirmation: null } as any)
+        })
         .finally(() => setLoadingWithdrawal(false))
     }
   }, [isAuthenticated, user?.pendingConfirmation])
