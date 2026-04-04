@@ -43,6 +43,12 @@ import {
   Settings,
   Upload,
   ImageOff,
+  TrendingUp,
+  Activity,
+  BarChart3,
+  ArrowDownCircle,
+  ArrowUpCircle,
+  FileCheck,
 } from 'lucide-react'
 
 // ===================== TYPES =====================
@@ -91,6 +97,43 @@ interface AdminWithdrawal {
   user: { id: string; email: string; fullName: string | null; phone: string | null }
 }
 
+interface AdminStats {
+  totalUsers: number
+  activeUsers: number
+  suspendedUsers: number
+  newUsersToday: number
+  newUsersThisWeek: number
+  newUsersThisMonth: number
+  kycApproved: number
+  kycPending: number
+  kycRejected: number
+  kycRecordsPending: number
+  depositsPending: number
+  depositsReviewing: number
+  depositsConfirmed: number
+  depositsRejected: number
+  totalDepositsAmount: number
+  totalDepositFees: number
+  depositsTodayCount: number
+  depositsTodayAmount: number
+  depositsThisWeekAmount: number
+  depositsThisMonthAmount: number
+  withdrawalsPending: number
+  withdrawalsApproved: number
+  withdrawalsProcessing: number
+  withdrawalsRejected: number
+  totalWithdrawalsAmount: number
+  totalWithdrawalFees: number
+  withdrawalsTodayCount: number
+  withdrawalsTodayAmount: number
+  withdrawalsThisWeekAmount: number
+  withdrawalsThisMonthAmount: number
+  totalFees: number
+  adminBalance: number
+  pendingActions: number
+  recentActivity: any[]
+}
+
 interface KYCRecordItem {
   id: string
   type: string
@@ -131,7 +174,7 @@ const ROLE_LABELS: Record<string, string> = {
 
 export default function AdminPanel() {
   const { user, setScreen } = useAuthStore()
-  const [activeTab, setActiveTab] = useState<'users' | 'deposits' | 'withdrawals' | 'kyc' | 'payment-methods' | 'admin-settings'>('users')
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'users' | 'deposits' | 'withdrawals' | 'kyc' | 'payment-methods' | 'admin-settings'>('dashboard')
 
   // Listen for sidebar sub-navigation tab changes
   useEffect(() => {
@@ -181,6 +224,9 @@ export default function AdminPanel() {
   const [proofLoading, setProofLoading] = useState(false)
   // Full image preview
   const [previewImage, setPreviewImage] = useState<string | null>(null)
+  // Stats state
+  const [stats, setStats] = useState<AdminStats | null>(null)
+  const [statsLoading, setStatsLoading] = useState(false)
 
   // Track which tabs have been loaded to avoid re-fetching
   const [loadedTabs, setLoadedTabs] = useState<Set<string>>(new Set())
@@ -196,14 +242,13 @@ export default function AdminPanel() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeTab])
 
-  // Initial load: fetch only users tab data (fast, no unnecessary calls)
+  // Initial load: fetch stats + users tab data
   useEffect(() => {
     if (user?.role === 'admin' || (user?.permissions && Object.values(user.permissions).some(v => v))) {
       const initLoad = async () => {
         setLoading(true)
         try {
-          // Only fetch users on initial load (the default tab)
-          await fetchUsers()
+          await Promise.all([fetchStats(), fetchUsers()])
         } finally {
           setLoading(false)
         }
@@ -271,8 +316,19 @@ export default function AdminPanel() {
     } catch { return {} }
   }
 
+  const fetchStats = async () => {
+    setStatsLoading(true)
+    try {
+      const res = await fetch('/api/admin/stats')
+      const data = await res.json()
+      if (data.success) setStats(data.stats)
+    } catch { /* silent */ }
+    finally { setStatsLoading(false) }
+  }
+
   const fetchTabData = (tab: string) => {
     switch (tab) {
+      case 'dashboard': fetchStats(); break
       case 'deposits': fetchDeposits(); break
       case 'withdrawals': fetchWithdrawals(); break
       case 'kyc': fetchKYC(); break
@@ -667,6 +723,7 @@ export default function AdminPanel() {
   const hasPermissions = user?.permissions && Object.keys(user.permissions).length > 0
 
   const allTabs = [
+    { key: 'dashboard' as const, label: 'الإحصائيات', icon: BarChart3, count: stats?.pendingActions || 0, perm: null as string | null },
     { key: 'users' as const, label: 'المستخدمون', icon: Users, count: users.length, perm: 'manageUsers' as const },
     { key: 'deposits' as const, label: 'الإيداعات', icon: ArrowDownLeft, count: deposits.filter(d => d.status === 'pending' || d.status === 'reviewing').length, perm: 'approveDeposits' as const },
     { key: 'withdrawals' as const, label: 'السحوبات', icon: ArrowUpRight, count: withdrawals.filter(w => w.status === 'pending' || w.status === 'approved').length, perm: 'approveWithdrawals' as const },
@@ -676,11 +733,11 @@ export default function AdminPanel() {
   ]
 
   const tabs = hasPermissions
-    ? allTabs.filter(tab => user.permissions?.[tab.perm])
+    ? allTabs.filter(tab => tab.perm === null || user.permissions?.[tab.perm])
     : allTabs
 
   const allowedTabKeys = tabs.map(t => t.key)
-  const effectiveActiveTab = allowedTabKeys.includes(activeTab) ? activeTab : allowedTabKeys[0] || 'users'
+  const effectiveActiveTab = allowedTabKeys.includes(activeTab) ? activeTab : allowedTabKeys[0] || 'dashboard'
 
   // Only hide the main admin (role=admin without permissions) from user list
   // Promoted admins (role=admin WITH permissions) are visible
@@ -739,6 +796,15 @@ export default function AdminPanel() {
           <p className="text-sm text-muted-foreground">إدارة المستخدمين والعمليات</p>
         </div>
         <div className="flex items-center gap-2">
+          {stats?.pendingActions ? (
+            <button
+              onClick={() => setActiveTab('dashboard')}
+              className="glass-card px-3 py-2 flex items-center gap-2 text-xs cursor-pointer hover:bg-white/10 transition-colors"
+            >
+              <Activity className="w-4 h-4 text-yellow-400" />
+              <span className="text-yellow-400 font-bold">{stats.pendingActions} عملية معلقة</span>
+            </button>
+          ) : null}
           <div className="glass-card px-3 py-2 flex items-center gap-2 text-xs">
             <Users className="w-4 h-4 text-gold" />
             <span>{users.length} مستخدم</span>
@@ -777,6 +843,210 @@ export default function AdminPanel() {
         </div>
       ) : (
         <>
+          {/* ===================== DASHBOARD / STATS TAB ===================== */}
+          {effectiveActiveTab === 'dashboard' && (
+            <div className="space-y-4">
+              {statsLoading ? (
+                <div className="space-y-3">
+                  {[...Array(4)].map((_, i) => (
+                    <div key={i} className="glass-card p-4 shimmer h-28 rounded-xl" />
+                  ))}
+                </div>
+              ) : stats ? (
+                <>
+                  {/* Admin Balance Card */}
+                  <div className="gold-gradient rounded-2xl p-5 text-gray-900 relative overflow-hidden">
+                    <div className="absolute top-0 left-0 w-32 h-32 bg-white/10 rounded-full -translate-x-1/2 -translate-y-1/2" />
+                    <div className="absolute bottom-0 right-0 w-24 h-24 bg-white/5 rounded-full translate-x-1/4 translate-y-1/4" />
+                    <div className="relative z-10">
+                      <p className="text-sm font-medium opacity-80">رصيد الإدارة</p>
+                      <p className="text-3xl font-bold mt-1">{stats.adminBalance.toFixed(2)} USDT</p>
+                      <div className="flex items-center gap-4 mt-3 text-sm">
+                        <div className="flex items-center gap-1">
+                          <TrendingUp className="w-4 h-4" />
+                          <span>إجمالي الرسوم: {stats.totalFees.toFixed(2)} USDT</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Quick Action Cards */}
+                  <div className="grid grid-cols-2 gap-3">
+                    {stats.depositsPending + stats.depositsReviewing > 0 && (
+                      <button onClick={() => setActiveTab('deposits')} className="glass-card p-4 rounded-xl text-right hover:bg-white/10 transition-colors group">
+                        <div className="flex items-center justify-between mb-2">
+                          <ArrowDownCircle className="w-6 h-6 text-blue-400 group-hover:scale-110 transition-transform" />
+                          <span className="text-2xl font-bold gold-text">{stats.depositsPending + stats.depositsReviewing}</span>
+                        </div>
+                        <p className="text-xs text-muted-foreground">إيداعات معلقة</p>
+                      </button>
+                    )}
+                    {stats.withdrawalsPending + stats.withdrawalsApproved > 0 && (
+                      <button onClick={() => setActiveTab('withdrawals')} className="glass-card p-4 rounded-xl text-right hover:bg-white/10 transition-colors group">
+                        <div className="flex items-center justify-between mb-2">
+                          <ArrowUpCircle className="w-6 h-6 text-orange-400 group-hover:scale-110 transition-transform" />
+                          <span className="text-2xl font-bold gold-text">{stats.withdrawalsPending + stats.withdrawalsApproved}</span>
+                        </div>
+                        <p className="text-xs text-muted-foreground">سحوبات معلقة</p>
+                      </button>
+                    )}
+                    {stats.kycRecordsPending > 0 && (
+                      <button onClick={() => setActiveTab('kyc')} className="glass-card p-4 rounded-xl text-right hover:bg-white/10 transition-colors group">
+                        <div className="flex items-center justify-between mb-2">
+                          <FileCheck className="w-6 h-6 text-purple-400 group-hover:scale-110 transition-transform" />
+                          <span className="text-2xl font-bold gold-text">{stats.kycRecordsPending}</span>
+                        </div>
+                        <p className="text-xs text-muted-foreground">توثيق معلق</p>
+                      </button>
+                    )}
+                    <div className="glass-card p-4 rounded-xl">
+                      <div className="flex items-center justify-between mb-2">
+                        <Users className="w-6 h-6 text-green-400" />
+                        <span className="text-2xl font-bold">{stats.activeUsers}</span>
+                      </div>
+                      <p className="text-xs text-muted-foreground">مستخدم نشط من {stats.totalUsers}</p>
+                    </div>
+                  </div>
+
+                  {/* Financial Summary */}
+                  <div className="glass-card p-4 rounded-xl space-y-4">
+                    <h3 className="text-sm font-bold gold-text flex items-center gap-2">
+                      <BarChart3 className="w-4 h-4" />
+                      الملخص المالي
+                    </h3>
+
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="p-3 rounded-lg bg-green-500/5 border border-green-500/10">
+                        <p className="text-[10px] text-muted-foreground mb-1">إجمالي الإيداعات المؤكدة</p>
+                        <p className="text-lg font-bold text-green-400">{stats.totalDepositsAmount.toFixed(2)}</p>
+                        <p className="text-[10px] text-muted-foreground">USDT ({stats.depositsConfirmed} عملية)</p>
+                      </div>
+                      <div className="p-3 rounded-lg bg-orange-500/5 border border-orange-500/10">
+                        <p className="text-[10px] text-muted-foreground mb-1">إجمالي السحوبات المنفذة</p>
+                        <p className="text-lg font-bold text-orange-400">{stats.totalWithdrawalsAmount.toFixed(2)}</p>
+                        <p className="text-[10px] text-muted-foreground">USDT ({stats.withdrawalsProcessing} عملية)</p>
+                      </div>
+                      <div className="p-3 rounded-lg bg-gold/5 border border-gold/10">
+                        <p className="text-[10px] text-muted-foreground mb-1">رسوم الإيداعات</p>
+                        <p className="text-lg font-bold gold-text">{stats.totalDepositFees.toFixed(2)}</p>
+                        <p className="text-[10px] text-muted-foreground">USDT</p>
+                      </div>
+                      <div className="p-3 rounded-lg bg-gold/5 border border-gold/10">
+                        <p className="text-[10px] text-muted-foreground mb-1">رسوم السحوبات</p>
+                        <p className="text-lg font-bold gold-text">{stats.totalWithdrawalFees.toFixed(2)}</p>
+                        <p className="text-[10px] text-muted-foreground">USDT</p>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Today's Summary */}
+                  <div className="glass-card p-4 rounded-xl space-y-3">
+                    <h3 className="text-sm font-bold text-foreground flex items-center gap-2">
+                      <Clock className="w-4 h-4 text-blue-400" />
+                      ملخص اليوم
+                    </h3>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="p-3 rounded-lg bg-white/5">
+                        <p className="text-[10px] text-muted-foreground">إيداعات اليوم</p>
+                        <p className="text-sm font-bold text-green-400">{stats.depositsTodayCount} عملية</p>
+                        <p className="text-[10px] text-muted-foreground">{stats.depositsTodayAmount.toFixed(2)} USDT</p>
+                      </div>
+                      <div className="p-3 rounded-lg bg-white/5">
+                        <p className="text-[10px] text-muted-foreground">سحوبات اليوم</p>
+                        <p className="text-sm font-bold text-orange-400">{stats.withdrawalsTodayCount} عملية</p>
+                        <p className="text-[10px] text-muted-foreground">{stats.withdrawalsTodayAmount.toFixed(2)} USDT</p>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Weekly Summary */}
+                  <div className="glass-card p-4 rounded-xl space-y-3">
+                    <h3 className="text-sm font-bold text-foreground flex items-center gap-2">
+                      <Activity className="w-4 h-4 text-purple-400" />
+                      ملخص الأسبوع
+                    </h3>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="p-3 rounded-lg bg-white/5">
+                        <p className="text-[10px] text-muted-foreground">إيداعات الأسبوع</p>
+                        <p className="text-sm font-bold">{stats.depositsThisWeekAmount.toFixed(2)} USDT</p>
+                      </div>
+                      <div className="p-3 rounded-lg bg-white/5">
+                        <p className="text-[10px] text-muted-foreground">سحوبات الأسبوع</p>
+                        <p className="text-sm font-bold">{stats.withdrawalsThisWeekAmount.toFixed(2)} USDT</p>
+                      </div>
+                      <div className="p-3 rounded-lg bg-white/5">
+                        <p className="text-[10px] text-muted-foreground">إيداعات الشهر</p>
+                        <p className="text-sm font-bold">{stats.depositsThisMonthAmount.toFixed(2)} USDT</p>
+                      </div>
+                      <div className="p-3 rounded-lg bg-white/5">
+                        <p className="text-[10px] text-muted-foreground">سحوبات الشهر</p>
+                        <p className="text-sm font-bold">{stats.withdrawalsThisMonthAmount.toFixed(2)} USDT</p>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* User Growth */}
+                  <div className="glass-card p-4 rounded-xl space-y-3">
+                    <h3 className="text-sm font-bold text-foreground flex items-center gap-2">
+                      <Users className="w-4 h-4 text-blue-400" />
+                      نمو المستخدمين
+                    </h3>
+                    <div className="grid grid-cols-3 gap-3">
+                      <div className="p-3 rounded-lg bg-white/5 text-center">
+                        <p className="text-lg font-bold text-blue-400">{stats.newUsersToday}</p>
+                        <p className="text-[10px] text-muted-foreground">اليوم</p>
+                      </div>
+                      <div className="p-3 rounded-lg bg-white/5 text-center">
+                        <p className="text-lg font-bold text-purple-400">{stats.newUsersThisWeek}</p>
+                        <p className="text-[10px] text-muted-foreground">هذا الأسبوع</p>
+                      </div>
+                      <div className="p-3 rounded-lg bg-white/5 text-center">
+                        <p className="text-lg font-bold text-gold">{stats.newUsersThisMonth}</p>
+                        <p className="text-[10px] text-muted-foreground">هذا الشهر</p>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* KYC Summary */}
+                  <div className="glass-card p-4 rounded-xl">
+                    <h3 className="text-sm font-bold text-foreground flex items-center gap-2 mb-3">
+                      <Shield className="w-4 h-4 text-green-400" />
+                      حالة التوثيق (KYC)
+                    </h3>
+                    <div className="flex gap-2">
+                      <div className="flex-1 p-2.5 rounded-lg bg-green-500/10 text-center">
+                        <p className="text-lg font-bold text-green-400">{stats.kycApproved}</p>
+                        <p className="text-[10px] text-green-400/70">مقبول</p>
+                      </div>
+                      <div className="flex-1 p-2.5 rounded-lg bg-yellow-500/10 text-center">
+                        <p className="text-lg font-bold text-yellow-400">{stats.kycPending}</p>
+                        <p className="text-[10px] text-yellow-400/70">معلق</p>
+                      </div>
+                      <div className="flex-1 p-2.5 rounded-lg bg-red-500/10 text-center">
+                        <p className="text-lg font-bold text-red-400">{stats.kycRejected}</p>
+                        <p className="text-[10px] text-red-400/70">مرفوض</p>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Refresh button */}
+                  <button
+                    onClick={fetchStats}
+                    disabled={statsLoading}
+                    className="w-full glass-card p-3 rounded-xl text-sm text-muted-foreground hover:text-foreground hover:bg-white/10 transition-colors flex items-center justify-center gap-2"
+                  >
+                    {statsLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Activity className="w-4 h-4" />}
+                    تحديث الإحصائيات
+                  </button>
+                </>
+              ) : (
+                <div className="glass-card p-8 text-center text-muted-foreground text-sm">
+                  تعذر تحميل الإحصائيات
+                </div>
+              )}
+            </div>
+          )}
+
           {/* ===================== USERS TAB ===================== */}
           {effectiveActiveTab === 'users' && (
             <div className="space-y-3">

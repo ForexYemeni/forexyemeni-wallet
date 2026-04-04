@@ -11,6 +11,7 @@ import {
   LayoutDashboard,
   Sun,
   Moon,
+  Bell,
 } from 'lucide-react'
 import { useState, useEffect } from 'react'
 
@@ -24,6 +25,7 @@ const userNavItems = [
 
 const adminNavItems = [
   { key: 'admin', label: 'الإدارة', icon: LayoutDashboard },
+  { key: 'notifications', label: 'الإشعارات', icon: Bell },
   { key: 'dashboard', label: 'الرئيسية', icon: Home },
   { key: 'settings', label: 'الإعدادات', icon: Settings },
 ]

@@ -21,6 +21,7 @@ import {
   Sliders,
   Sun,
   Moon,
+  BarChart3,
 } from 'lucide-react'
 import { useState, useEffect } from 'react'
 
@@ -43,6 +44,7 @@ const adminNavItems = [
 
 // Sub-nav items shown when admin is selected — for quick access
 const adminSubItems = [
+  { key: 'admin-dashboard', label: 'الإحصائيات', icon: BarChart3, tab: 'dashboard' },
   { key: 'admin-users', label: 'المستخدمون', icon: Users, tab: 'users' },
   { key: 'admin-deposits', label: 'الإيداعات', icon: ArrowDownCircle, tab: 'deposits' },
   { key: 'admin-withdrawals', label: 'السحوبات', icon: ArrowUpCircle, tab: 'withdrawals' },
