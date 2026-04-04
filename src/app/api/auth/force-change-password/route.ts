@@ -2,8 +2,6 @@ import { NextRequest, NextResponse } from 'next/server'
 import { userOperations } from '@/lib/db-firebase'
 import bcrypt from 'bcryptjs'
 
-const TEMP_ADMIN_PASSWORD = 'admin123admin123admin123'
-
 export async function POST(request: NextRequest) {
   try {
     const { userId, newPassword } = await request.json()
@@ -18,13 +16,6 @@ export async function POST(request: NextRequest) {
     if (newPassword.length < 8) {
       return NextResponse.json(
         { success: false, message: 'كلمة المرور الجديدة يجب أن تكون 8 أحرف على الأقل' },
-        { status: 400 }
-      )
-    }
-
-    if (newPassword === TEMP_ADMIN_PASSWORD) {
-      return NextResponse.json(
-        { success: false, message: 'لا يمكن استخدام كلمة المرور المؤقتة. اختر كلمة مرور مختلفة.' },
         { status: 400 }
       )
     }

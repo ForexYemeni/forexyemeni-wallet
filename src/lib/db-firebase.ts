@@ -1350,47 +1350,6 @@ export const p2pTradeOperations = {
   },
 }
 
-// ===================== SEED (Create Admin + Firestore Indexes) =====================
-
-export async function seedDatabase() {
-  const db = getDb()
-  const bcrypt = await import('bcryptjs')
-
-  // Check if admin already exists
-  const existingAdmin = await userOperations.findUnique({ email: 'mshay2024m@gmail.com' })
-  if (existingAdmin) {
-    console.log('Admin user already exists.')
-    return
-  }
-
-  const passwordHash = await bcrypt.default.hash('admin123admin123admin123', 12)
-
-  const admin: Omit<User, 'id' | 'createdAt' | 'updatedAt'> = {
-    email: 'mshay2024m@gmail.com',
-    passwordHash,
-    fullName: 'مدير النظام',
-    phone: null,
-    country: null,
-    role: 'admin',
-    status: 'active',
-    emailVerified: true,
-    phoneVerified: false,
-    kycStatus: 'none',
-    kycIdPhoto: null,
-    kycSelfie: null,
-    kycNotes: null,
-    balance: 0,
-    frozenBalance: 0,
-    mustChangePassword: true,
-    affiliateCode: 'ADMIN',
-    referredBy: null,
-    merchantId: null,
-  }
-
-  await userOperations.create(admin)
-  console.log('Admin user created successfully with email: mshay2024m@gmail.com')
-}
-
 // ===================== MERCHANT APPLICATION TYPES =====================
 
 export interface MerchantApplication {

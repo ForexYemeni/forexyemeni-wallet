@@ -8,8 +8,6 @@ import { useAuthStore } from '@/lib/store'
 import { toast } from 'sonner'
 import { Loader2, Eye, EyeOff, ShieldAlert, CheckCircle2 } from 'lucide-react'
 
-const TEMP_PASSWORD = 'admin123admin123admin123'
-
 export default function ForceChangePassword() {
   const { user, token, setAuth, logout } = useAuthStore()
   const [newPassword, setNewPassword] = useState('')
@@ -39,11 +37,6 @@ export default function ForceChangePassword() {
 
     if (!newPassword || !confirmPassword) {
       toast.error('يرجى ملء جميع الحقول')
-      return
-    }
-
-    if (newPassword === TEMP_PASSWORD) {
-      toast.error('لا يمكن استخدام كلمة المرور المؤقتة. اختر كلمة مرور مختلفة.')
       return
     }
 
@@ -208,7 +201,6 @@ export default function ForceChangePassword() {
                 { label: 'حرف كبير واحد (A-Z)', met: /[A-Z]/.test(newPassword) },
                 { label: 'رقم واحد (0-9)', met: /[0-9]/.test(newPassword) },
                 { label: 'رمز واحد (!@#$%)', met: /[^A-Za-z0-9]/.test(newPassword) },
-                { label: 'غير مساوية لكلمة المرور المؤقتة', met: newPassword.length > 0 && newPassword !== TEMP_PASSWORD },
               ].map((req, i) => (
                 <div key={i} className="flex items-center gap-2">
                   <div className={`w-4 h-4 rounded-full flex items-center justify-center text-[10px] ${
