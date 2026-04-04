@@ -28,6 +28,12 @@ const userNavItems = [
   { key: 'settings', label: 'المزيد', icon: Settings },
 ]
 
+const merchantNavItems = [
+  { key: 'p2p', label: 'P2P', icon: Repeat },
+  { key: 'p2p-trades', label: 'صفقاتي', icon: Clock },
+  { key: 'settings', label: 'المزيد', icon: Settings },
+]
+
 // Extra items shown in the "More" popup menu
 const userExtraItems = [
   { key: 'p2p', label: 'سوق P2P', icon: Repeat },
@@ -35,6 +41,14 @@ const userExtraItems = [
   { key: 'chat', label: 'الدعم الفني', icon: MessageCircle },
   { key: 'kyc', label: 'التحقق (KYC)', icon: Shield },
   { key: 'transactions', label: 'المعاملات', icon: Clock },
+  { key: 'notifications', label: 'الإشعارات', icon: Bell },
+  { key: 'settings', label: 'الإعدادات', icon: Settings },
+]
+
+const merchantExtraItems = [
+  { key: 'p2p', label: 'سوق P2P', icon: Repeat },
+  { key: 'p2p-trades', label: 'إعلاناتي وصفقاتي', icon: Clock },
+  { key: 'chat', label: 'الدعم الفني', icon: MessageCircle },
   { key: 'notifications', label: 'الإشعارات', icon: Bell },
   { key: 'settings', label: 'الإعدادات', icon: Settings },
 ]
@@ -53,7 +67,9 @@ export default function BottomNav() {
   const moreRef = useRef<HTMLDivElement>(null)
 
   const isAdmin = user?.role === 'admin' || (user?.permissions && Object.values(user.permissions).some(v => v))
-  const items = isAdmin ? adminNavItems : userNavItems
+  const isMerchant = !!user?.merchantId && !isAdmin
+  const items = isAdmin ? adminNavItems : isMerchant ? merchantNavItems : userNavItems
+  const extraItems = isMerchant ? merchantExtraItems : userExtraItems
 
   useEffect(() => {
     setThemeState(getTheme())
@@ -77,7 +93,8 @@ export default function BottomNav() {
   }
 
   const handleScreenClick = (key: string) => {
-    setScreen(key)
+    // p2p-trades redirects to p2p screen (trades are a sub-tab)
+    setScreen(key === 'p2p-trades' ? 'p2p' : key)
     setShowMore(false)
   }
 
@@ -87,8 +104,8 @@ export default function BottomNav() {
         <div className="flex items-center justify-around">
           {items.map((item) => {
             const isActive = currentScreen === item.key
-            // For non-admin users, "settings" is the "more" button
-            if (!isAdmin && item.key === 'settings') {
+            // For non-admin/non-merchant users, "settings" is the "more" button
+            if (!isAdmin && !isMerchant && item.key === 'settings') {
               const isInExtra = userExtraItems.some(e => e.key === currentScreen)
               return (
                 <button
@@ -142,10 +159,10 @@ export default function BottomNav() {
         >
           <div className="flex items-center gap-2 px-3 py-2 mb-1">
             <ChevronUp className="w-4 h-4 text-gold" />
-            <span className="text-xs font-medium gold-text">القائمة الكاملة</span>
+            <span className="text-xs font-medium gold-text">{isMerchant ? 'قائمة التاجر' : 'القائمة الكاملة'}</span>
           </div>
           <div className="space-y-0.5">
-            {userExtraItems.map((item) => {
+            {extraItems.map((item) => {
               const isActive = currentScreen === item.key
               return (
                 <button

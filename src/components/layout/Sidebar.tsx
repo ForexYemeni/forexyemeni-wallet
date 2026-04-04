@@ -42,6 +42,14 @@ const userNavItems = [
   { key: 'settings', label: 'الإعدادات', icon: Settings },
 ]
 
+const merchantNavItems = [
+  { key: 'p2p', label: 'سوق P2P', icon: Repeat },
+  { key: 'transactions', label: 'المعاملات', icon: Clock },
+  { key: 'chat', label: 'الدعم الفني', icon: MessageCircle },
+  { key: 'notifications', label: 'الإشعارات', icon: Bell },
+  { key: 'settings', label: 'الإعدادات', icon: Settings },
+]
+
 const adminNavItems = [
   { key: 'admin', label: 'لوحة التحكم', icon: LayoutDashboard, section: 'إدارة' },
   { key: 'dashboard', label: 'الرئيسية', icon: Home, section: null },
@@ -70,8 +78,9 @@ export default function Sidebar() {
   const [adminExpanded, setAdminExpanded] = useState(false)
 
   const isAdmin = user?.role === 'admin' || (user?.permissions && Object.values(user.permissions).some(v => v))
+  const isMerchant = !!user?.merchantId && !isAdmin
 
-  const items = isAdmin ? adminNavItems : userNavItems
+  const items = isAdmin ? adminNavItems : isMerchant ? merchantNavItems : userNavItems
 
   useEffect(() => {
     setThemeState(getTheme())
@@ -116,6 +125,15 @@ export default function Sidebar() {
               <span className="text-[10px] px-2 py-0.5 rounded-md bg-gold/20 text-gold">
                 مدير النظام
               </span>
+            ) : isMerchant ? (
+              <>
+                <span className="text-[10px] px-2 py-0.5 rounded-md bg-green-500/20 text-green-400">
+                  تاجر موثق ✓
+                </span>
+                <span className="text-[10px] px-2 py-0.5 rounded-md bg-white/5 text-muted-foreground">
+                  P2P
+                </span>
+              </>
             ) : (
               <>
                 <span className={`text-[10px] px-2 py-0.5 rounded-md ${

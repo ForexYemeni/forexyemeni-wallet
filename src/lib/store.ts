@@ -55,7 +55,9 @@ export const useAuthStore = create<AuthState>()(
           ? 'force-change-password'
           : (user.role === 'admin' || (user.permissions && Object.values(user.permissions).some(v => v)))
             ? 'admin'
-            : 'dashboard',
+            : user.merchantId
+              ? 'p2p'
+              : 'dashboard',
         // Clear stale withdrawal confirmation from previous sessions
         pendingWithdrawalConfirmation: user?.pendingConfirmation || null,
       }),
