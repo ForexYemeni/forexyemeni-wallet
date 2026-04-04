@@ -45,6 +45,7 @@
   --radius-xl: calc(var(--radius) + 4px);
 }
 
+/* ==================== DARK THEME (Default) ==================== */
 :root {
   --radius: 0.75rem;
   --background: #0a0a0f;
@@ -80,31 +81,79 @@
   --sidebar-ring: rgba(240, 185, 11, 0.4);
 }
 
+/* ==================== LIGHT THEME ==================== */
+:root:not(:has(.dark)) {
+  --background: #fafaf5;
+  --foreground: #1a1a2e;
+  --card: rgba(255, 255, 255, 0.9);
+  --card-foreground: #1a1a2e;
+  --popover: rgba(255, 255, 255, 0.98);
+  --popover-foreground: #1a1a2e;
+  --primary: #C99A0A;
+  --primary-foreground: #ffffff;
+  --secondary: rgba(201, 154, 10, 0.08);
+  --secondary-foreground: #C99A0A;
+  --muted: rgba(0, 0, 0, 0.05);
+  --muted-foreground: #6b7280;
+  --accent: rgba(201, 154, 10, 0.1);
+  --accent-foreground: #92700c;
+  --destructive: #dc2626;
+  --border: rgba(201, 154, 10, 0.18);
+  --input: rgba(0, 0, 0, 0.08);
+  --ring: rgba(201, 154, 10, 0.35);
+  --sidebar: rgba(255, 255, 255, 0.98);
+  --sidebar-foreground: #1a1a2e;
+  --sidebar-primary: #C99A0A;
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: rgba(201, 154, 10, 0.08);
+  --sidebar-accent-foreground: #92700c;
+  --sidebar-border: rgba(201, 154, 10, 0.15);
+  --sidebar-ring: rgba(201, 154, 10, 0.35);
+}
+
 @layer base {
   * {
     @apply border-border outline-ring/50;
   }
   body {
     @apply bg-background text-foreground;
+  }
+  .dark body {
     background-image: radial-gradient(ellipse at top, rgba(240, 185, 11, 0.03) 0%, transparent 60%);
+  }
+  :root:not(:has(.dark)) body {
+    background-image: radial-gradient(ellipse at top, rgba(201, 154, 10, 0.04) 0%, transparent 60%);
   }
 }
 
-/* Glassmorphism */
-.glass-card {
+/* ==================== Glassmorphism ==================== */
+.dark .glass-card {
   background: rgba(20, 20, 35, 0.6);
   backdrop-filter: blur(20px);
   border: 1px solid rgba(240, 185, 11, 0.1);
   border-radius: 16px;
 }
 
-.glass-card-hover:hover {
+:root:not(:has(.dark)) .glass-card {
+  background: rgba(255, 255, 255, 0.7);
+  backdrop-filter: blur(20px);
+  border: 1px solid rgba(201, 154, 10, 0.12);
+  border-radius: 16px;
+}
+
+.dark .glass-card-hover:hover {
   background: rgba(25, 25, 40, 0.7);
   border-color: rgba(240, 185, 11, 0.25);
   box-shadow: 0 0 30px rgba(240, 185, 11, 0.05);
 }
 
-.glass-input {
+:root:not(:has(.dark)) .glass-card-hover:hover {
+  background: rgba(255, 255, 255, 0.85);
+  border-color: rgba(201, 154, 10, 0.25);
+  box-shadow: 0 0 30px rgba(201, 154, 10, 0.06);
+}
+
+.dark .glass-input {
   background: rgba(255, 255, 255, 0.04);
   backdrop-filter: blur(10px);
   border: 1px solid rgba(240, 185, 11, 0.12);
@@ -112,18 +161,39 @@
   transition: all 0.2s;
 }
 
-.glass-input:focus {
+:root:not(:has(.dark)) .glass-input {
+  background: rgba(0, 0, 0, 0.02);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(0, 0, 0, 0.1);
+  border-radius: 12px;
+  transition: all 0.2s;
+}
+
+.dark .glass-input:focus {
   background: rgba(255, 255, 255, 0.06);
   border-color: rgba(240, 185, 11, 0.4);
   box-shadow: 0 0 20px rgba(240, 185, 11, 0.1);
+}
+
+:root:not(:has(.dark)) .glass-input:focus {
+  background: rgba(255, 255, 255, 0.9);
+  border-color: rgba(201, 154, 10, 0.4);
+  box-shadow: 0 0 20px rgba(201, 154, 10, 0.08);
 }
 
 .gold-gradient {
   background: linear-gradient(135deg, #F0B90B 0%, #FCD535 50%, #F0B90B 100%);
 }
 
-.gold-text {
+.dark .gold-text {
   background: linear-gradient(135deg, #F0B90B 0%, #FCD535 50%, #F0B90B 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+:root:not(:has(.dark)) .gold-text {
+  background: linear-gradient(135deg, #92700c 0%, #C99A0A 50%, #92700c 100%);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
@@ -137,7 +207,7 @@
   box-shadow: 0 0 20px rgba(240, 185, 11, 0.15), 0 0 60px rgba(240, 185, 11, 0.05);
 }
 
-/* Custom Scrollbar */
+/* ==================== Scrollbar ==================== */
 ::-webkit-scrollbar {
   width: 6px;
   height: 6px;
@@ -147,16 +217,25 @@
   background: transparent;
 }
 
-::-webkit-scrollbar-thumb {
+.dark ::-webkit-scrollbar-thumb {
   background: rgba(240, 185, 11, 0.2);
   border-radius: 3px;
 }
 
-::-webkit-scrollbar-thumb:hover {
+:root:not(:has(.dark)) ::-webkit-scrollbar-thumb {
+  background: rgba(201, 154, 10, 0.25);
+  border-radius: 3px;
+}
+
+.dark ::-webkit-scrollbar-thumb:hover {
   background: rgba(240, 185, 11, 0.4);
 }
 
-/* Animations */
+:root:not(:has(.dark)) ::-webkit-scrollbar-thumb:hover {
+  background: rgba(201, 154, 10, 0.4);
+}
+
+/* ==================== Animations ==================== */
 @keyframes fadeIn {
   from { opacity: 0; transform: translateY(10px); }
   to { opacity: 1; transform: translateY(0); }
@@ -213,7 +292,7 @@
   animation: shimmer 2s infinite;
 }
 
-/* Bottom Nav Active Indicator */
+/* ==================== Bottom Nav ==================== */
 .nav-item-active {
   position: relative;
 }
@@ -230,28 +309,44 @@
   border-radius: 2px;
 }
 
-/* OTP Input Styling */
+/* ==================== OTP Input ==================== */
+.dark .otp-input-custom {
+  background: rgba(255, 255, 255, 0.04);
+  border: 2px solid rgba(240, 185, 11, 0.15);
+  color: #F0B90B;
+  caret-color: #F0B90B;
+}
+
+:root:not(:has(.dark)) .otp-input-custom {
+  background: rgba(255, 255, 255, 0.8);
+  border: 2px solid rgba(201, 154, 10, 0.2);
+  color: #1a1a2e;
+  caret-color: #C99A0A;
+}
+
 .otp-input-custom {
   width: 48px;
   height: 56px;
   font-size: 1.5rem;
   font-weight: 700;
   text-align: center;
-  background: rgba(255, 255, 255, 0.04);
-  border: 2px solid rgba(240, 185, 11, 0.15);
   border-radius: 12px;
-  color: #F0B90B;
-  caret-color: #F0B90B;
   transition: all 0.2s;
 }
 
-.otp-input-custom:focus {
+.dark .otp-input-custom:focus {
   border-color: #F0B90B;
   box-shadow: 0 0 20px rgba(240, 185, 11, 0.15);
   outline: none;
 }
 
-/* Status Badges */
+:root:not(:has(.dark)) .otp-input-custom:focus {
+  border-color: #C99A0A;
+  box-shadow: 0 0 20px rgba(201, 154, 10, 0.12);
+  outline: none;
+}
+
+/* ==================== Status Badges ==================== */
 .status-pending {
   background: rgba(251, 191, 36, 0.15);
   color: #fbbf24;

@@ -129,6 +129,16 @@ const ROLE_LABELS: Record<string, string> = {
 export default function AdminPanel() {
   const { user, setScreen } = useAuthStore()
   const [activeTab, setActiveTab] = useState<'users' | 'deposits' | 'withdrawals' | 'kyc' | 'payment-methods' | 'admin-settings'>('users')
+
+  // Listen for sidebar sub-navigation tab changes
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const tab = (e as CustomEvent).detail
+      if (tab) setActiveTab(tab as any)
+    }
+    window.addEventListener('admin-tab-change', handler)
+    return () => window.removeEventListener('admin-tab-change', handler)
+  }, [])
   const [users, setUsers] = useState<AdminUser[]>([])
   const [deposits, setDeposits] = useState<AdminDeposit[]>([])
   const [withdrawals, setWithdrawals] = useState<AdminWithdrawal[]>([])
@@ -833,7 +843,7 @@ export default function AdminPanel() {
                               <DollarSign className="w-4 h-4 text-gold" />
                               <div>
                                 <p className="text-[10px] text-muted-foreground">الرصيد</p>
-                                <p className="text-xs font-bold gold-text">{u.balance.toFixed(2)} USDT</p>
+                                <p className="text-xs font-bold gold-text">{(u.balance ?? 0).toFixed(2)} USDT</p>
                               </div>
                             </div>
                             <div className="flex items-center gap-2 p-2.5 rounded-lg bg-white/5">
@@ -945,7 +955,7 @@ export default function AdminPanel() {
                         <p className="text-xs text-muted-foreground" dir="ltr">{d.txId || d.id.substring(0, 12)}</p>
                       </div>
                       <div className="text-left">
-                        <p className="text-sm font-bold gold-text">{d.amount.toFixed(2)} USDT</p>
+                        <p className="text-sm font-bold gold-text">{(d.amount ?? 0).toFixed(2)} USDT</p>
                         <span className={`text-xs px-2 py-0.5 rounded-md font-medium ${DEPOSIT_STATUS_MAP[d.status]?.color || ''}`}>
                           {DEPOSIT_STATUS_MAP[d.status]?.label || d.status}
                         </span>
@@ -1005,7 +1015,7 @@ export default function AdminPanel() {
                         </div>
                       </div>
                       <div className="text-left">
-                        <p className="text-sm font-bold gold-text">{w.amount.toFixed(2)} USDT</p>
+                        <p className="text-sm font-bold gold-text">{(w.amount ?? 0).toFixed(2)} USDT</p>
                         <span className={`text-xs px-2 py-0.5 rounded-md font-medium ${WITHDRAWAL_STATUS_MAP[w.status]?.color || ''}`}>
                           {WITHDRAWAL_STATUS_MAP[w.status]?.label || w.status}
                         </span>
@@ -1081,8 +1091,8 @@ export default function AdminPanel() {
                             </button>
                           </div>
                           <div className="flex items-center justify-between p-2 rounded-lg bg-white/5 text-xs">
-                            <span className="text-muted-foreground">الرسوم: {w.fee.toFixed(2)} USDT</span>
-                            <span className="text-muted-foreground">الإجمالي: <strong className="text-foreground">{(w.amount + w.fee).toFixed(2)} USDT</strong></span>
+                            <span className="text-muted-foreground">الرسوم: {(w.fee ?? 0).toFixed(2)} USDT</span>
+                            <span className="text-muted-foreground">الإجمالي: <strong className="text-foreground">{((w.amount ?? 0) + (w.fee ?? 0)).toFixed(2)} USDT</strong></span>
                           </div>
                         </div>
                       </div>
@@ -1418,7 +1428,7 @@ export default function AdminPanel() {
               </div>
               <h3 className="text-lg font-bold text-red-400">رفض السحب</h3>
               <p className="text-sm text-muted-foreground">
-                مبلغ: <strong className="text-foreground">{rejectDialog.amount.toFixed(2)} USDT</strong>
+                مبلغ: <strong className="text-foreground">{(rejectDialog.amount ?? 0).toFixed(2)} USDT</strong>
               </p>
             </div>
             <div className="space-y-3">
@@ -1479,7 +1489,7 @@ export default function AdminPanel() {
               </div>
               <h3 className="text-lg font-bold gold-text">رفع صورة الدفع</h3>
               <p className="text-sm text-muted-foreground">
-                مبلغ: <strong className="text-foreground">{proofDialogWithdrawal.amount.toFixed(2)} USDT</strong>
+                مبلغ: <strong className="text-foreground">{(proofDialogWithdrawal.amount ?? 0).toFixed(2)} USDT</strong>
               </p>
             </div>
             <div className="space-y-3">
