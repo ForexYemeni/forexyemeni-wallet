@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react'
 import { useAuthStore } from '@/lib/store'
 import { toast } from 'sonner'
 import { compressImage, fileToBase64 } from '@/lib/image-compress'
-import { Loader2, Upload, CheckCircle, XCircle, Clock, Camera, User, FileText, AlertTriangle } from 'lucide-react'
+import { Loader2, Upload, CheckCircle, XCircle, Clock, Camera, User, FileText, AlertTriangle, ShieldAlert, ChevronDown, ChevronUp } from 'lucide-react'
 
 export default function MerchantVerification({ onVerified }: { onVerified?: () => void }) {
   const { user } = useAuthStore()
@@ -16,6 +16,8 @@ export default function MerchantVerification({ onVerified }: { onVerified?: () =
   const [fullName, setFullName] = useState('')
   const [phone, setPhone] = useState('')
   const [loading, setLoading] = useState(false)
+  const [warningExpanded, setWarningExpanded] = useState(true)
+  const [confirmedWarning, setConfirmedWarning] = useState(false)
 
   useEffect(() => {
     if (user?.id) fetchStatus()
@@ -66,6 +68,11 @@ export default function MerchantVerification({ onVerified }: { onVerified?: () =
   }
 
   const handleSubmit = async () => {
+    if (!confirmedWarning) {
+      setConfirmedWarning(true)
+      toast.error('يرجى قراءة التنبيه أعلاه والموافقة عليه أولاً')
+      return
+    }
     if (!idPhoto || !selfiePhoto || !addressProof || !fullName.trim() || !phone.trim()) {
       toast.error('جميع الحقول مطلوبة')
       return
@@ -142,6 +149,59 @@ export default function MerchantVerification({ onVerified }: { onVerified?: () =
           <p className="text-xs text-muted-foreground">يمكنك إعادة التقديم بالأسفل</p>
         </div>
       )}
+
+      {/* Important Warning - Always visible */}
+      <div className={`rounded-xl border-2 transition-all ${confirmedWarning ? 'border-green-500/30 bg-green-500/5' : 'border-red-500/30 bg-red-500/5'}`}>
+        <button
+          onClick={() => setWarningExpanded(!warningExpanded)}
+          className="w-full flex items-center justify-between p-4 text-right"
+        >
+          <div className="flex items-center gap-2">
+            <ShieldAlert className={`w-5 h-5 ${confirmedWarning ? 'text-green-400' : 'text-red-400'}`} />
+            <span className={`text-sm font-bold ${confirmedWarning ? 'text-green-400' : 'text-red-400'}`}>
+              {confirmedWarning ? 'تمت قراءة التنبيه ✓' : 'تنبيه هام جداً - اقرأ قبل التقديم'}
+            </span>
+          </div>
+          {warningExpanded ? <ChevronUp className="w-4 h-4 text-muted-foreground" /> : <ChevronDown className="w-4 h-4 text-muted-foreground" />}
+        </button>
+
+        {warningExpanded && (
+          <div className="px-4 pb-4 space-y-3">
+            <div className="p-3 rounded-xl bg-black/20 space-y-2.5">
+              <p className="text-sm font-medium text-red-300">تحذير: بمجرد قبول طلب التاجر سيحدث الآتي:</p>
+              <div className="space-y-2 text-sm">
+                <div className="flex items-start gap-2">
+                  <span className="text-red-400 mt-0.5 flex-shrink-0">✕</span>
+                  <p>سيتم <strong className="text-red-400">إغلاق حسابك العادي</strong> (المستخدم) بالكامل ولن تتمكن من تسجيل الدخول به كعادي بعد ذلك.</p>
+                </div>
+                <div className="flex items-start gap-2">
+                  <span className="text-yellow-400 mt-0.5 flex-shrink-0">⟳</span>
+                  <p>سيتم فتح <strong className="text-yellow-400">حساب تاجر جديد</strong> منفصل تماماً عن حسابك الحالي بإعدادات مختلفة.</p>
+                </div>
+                <div className="flex items-start gap-2">
+                  <span className="text-red-400 mt-0.5 flex-shrink-0">✕</span>
+                  <p>لن تتمكن من إجراء عمليات <strong>إيداع أو سحب</strong> كـمستخدم عادي بعد التحويل إلى حساب التاجر.</p>
+                </div>
+                <div className="flex items-start gap-2">
+                  <span className="text-yellow-400 mt-0.5 flex-shrink-0">★</span>
+                  <p>حساب التاجر يُخصص <strong className="text-yellow-400">فقط</strong> لإنشاء وإدارة إعلانات بيع وشراء USDT عبر P2P.</p>
+                </div>
+              </div>
+            </div>
+            <label className="flex items-start gap-3 cursor-pointer p-3 rounded-xl bg-white/5 hover:bg-white/10 transition-colors">
+              <input
+                type="checkbox"
+                checked={confirmedWarning}
+                onChange={(e) => setConfirmedWarning(e.target.checked)}
+                className="mt-0.5 w-4 h-4 rounded border-white/20 accent-red-500"
+              />
+              <span className="text-xs text-muted-foreground leading-relaxed">
+                لقد قرأت التنبيه أعلاه وأفهم تماماً أن حسابي العادي سيتم إغلاقه عند قبول طلب التاجر، وأوافق على ذلك.
+              </span>
+            </label>
+          </div>
+        )}
+      </div>
 
       <div className="glass-card p-6 space-y-5">
         <div className="text-center space-y-2">

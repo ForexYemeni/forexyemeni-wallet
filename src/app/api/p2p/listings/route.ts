@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { userOperations, merchantOperations, p2pListingOperations } from '@/lib/db-firebase'
+import { userOperations, merchantOperations, merchantApplicationOperations, p2pListingOperations } from '@/lib/db-firebase'
 
 // GET: get active listings with filters
 export async function GET(req: NextRequest) {
@@ -10,13 +10,19 @@ export async function GET(req: NextRequest) {
 
     const listings = await p2pListingOperations.findActive({ type, network, paymentMethod })
 
-    // Attach merchant info
+    // Attach merchant info (check both merchant systems)
     const enriched = await Promise.all(listings.map(async (l) => {
-      const merchant = await merchantOperations.findUnique(l.merchantId)
-      const user = merchant ? await userOperations.findUnique({ id: merchant.userId }) : null
+      // Try old merchant system first
+      let merchant = await merchantOperations.findUnique(l.merchantId)
+      if (!merchant) {
+        // Try application system
+        merchant = await merchantApplicationOperations.findById(l.merchantId) as any
+      }
+      const merchantUserId = merchant?.userId
+      const user = merchantUserId ? await userOperations.findUnique({ id: merchantUserId }) : null
       return {
         ...l,
-        merchantName: merchant?.fullName || user?.fullName || 'تاجر',
+        merchantName: merchant?.fullName || merchant?.userFullName || user?.fullName || 'تاجر',
         merchantTrades: l.totalTrades,
         merchantRate: l.successRate,
       }
@@ -36,7 +42,34 @@ export async function POST(req: NextRequest) {
     if (!userId) return NextResponse.json({ success: false, message: 'غير مصرح' }, { status: 401 })
 
     const user = await userOperations.findUnique({ id: userId })
-    if (!user?.merchantId) {
+    if (!user) {
+      return NextResponse.json({ success: false, message: 'المستخدم غير موجود' }, { status: 404 })
+    }
+
+    // Check if user is an approved merchant (check multiple sources)
+    let effectiveMerchantId = user.merchantId
+
+    // If no merchantId on user, check if there's an approved application
+    if (!effectiveMerchantId) {
+      const applications = await merchantApplicationOperations.findByUser(userId)
+      const approvedApp = applications.find(a => a.status === 'approved')
+      if (approvedApp) {
+        effectiveMerchantId = approvedApp.id
+        // Also set it on the user document for future requests
+        await userOperations.update({ id: userId }, { merchantId: approvedApp.id })
+      }
+    }
+
+    // Also check the old merchant system
+    if (!effectiveMerchantId) {
+      const oldMerchant = await merchantOperations.findApprovedByUser(userId)
+      if (oldMerchant) {
+        effectiveMerchantId = oldMerchant.id
+        await userOperations.update({ id: userId }, { merchantId: oldMerchant.id })
+      }
+    }
+
+    if (!effectiveMerchantId) {
       return NextResponse.json({ success: false, message: 'يجب أن تكون تاجر موثق لإنشاء إعلان' }, { status: 403 })
     }
 
@@ -46,7 +79,7 @@ export async function POST(req: NextRequest) {
     }
 
     const listing = await p2pListingOperations.create({
-      merchantId: user.merchantId,
+      merchantId: effectiveMerchantId,
       type,
       amount,
       price,
