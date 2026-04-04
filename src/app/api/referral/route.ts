@@ -62,6 +62,14 @@ export async function GET(request: NextRequest) {
 
     // My referral stats
     if (action === 'my_stats') {
+      // Ensure user has an affiliate code (for users created before this feature)
+      if (!user.affiliateCode) {
+        const { generateAffiliateCode } = await import('@/lib/firebase')
+        const newCode = generateAffiliateCode()
+        await userOperations.update({ id: userId }, { affiliateCode: newCode })
+        user.affiliateCode = newCode
+      }
+
       const referrals = await referralOperations.findByReferrer(userId)
       const activeReferrals = referrals.filter(r => r.status === 'active')
       const totalEarnings = referrals.reduce((sum, r) => sum + (r.totalEarnings || 0), 0)

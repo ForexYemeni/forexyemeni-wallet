@@ -13,8 +13,10 @@ import {
   X,
   Check,
   CheckCheck,
-  Shield,
-  Clock,
+  Search,
+  Users,
+  MessageSquare,
+  UserCircle,
 } from 'lucide-react'
 
 // ===================== TYPES =====================
@@ -33,6 +35,13 @@ interface AdminChatItem {
   createdAt: string
   updatedAt: string
   user?: { id: string; fullName: string | null; email: string } | null
+}
+
+interface SimpleUser {
+  id: string
+  fullName: string | null
+  email: string
+  role: string
 }
 
 interface ChatMessageItem {
@@ -92,35 +101,32 @@ function AdminChatListItem({
   return (
     <button
       onClick={onClick}
-      className={`w-full p-4 rounded-xl text-right transition-all ${
+      className={`w-full p-3 rounded-xl text-right transition-all ${
         isSelected
           ? 'bg-gold/10 border border-gold/20'
           : 'hover:bg-white/5 border border-transparent'
       }`}
     >
       <div className="flex items-start gap-3">
-        <div className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 ${
+        <div className={`w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 ${
           isClosed ? 'bg-muted/30' : 'bg-gold/10'
         }`}>
           {isClosed ? (
-            <X className="w-5 h-5 text-muted-foreground" />
+            <X className="w-4 h-4 text-muted-foreground" />
           ) : (
-            <MessageCircle className="w-5 h-5 text-gold" />
+            <MessageCircle className="w-4 h-4 text-gold" />
           )}
         </div>
         <div className="flex-1 min-w-0">
           <div className="flex items-center justify-between gap-2">
-            <span className="text-sm font-medium truncate">{userName}</span>
+            <span className="text-xs font-medium truncate">{userName}</span>
             <span className="text-[10px] text-muted-foreground flex-shrink-0">
               {formatTime(chat.lastMessageAt)}
             </span>
           </div>
-          <p className="text-xs text-muted-foreground truncate mt-0.5" dir="ltr">
-            {chat.user?.email}
-          </p>
           <div className="flex items-center justify-between gap-2 mt-1">
-            <p className="text-xs text-muted-foreground truncate flex-1">
-              {chat.lastMessageBy === 'admin' ? 'أنت: ' : ''}{truncate(chat.lastMessage, 30)}
+            <p className="text-[11px] text-muted-foreground truncate flex-1">
+              {chat.lastMessageBy === 'admin' ? 'أنت: ' : ''}{truncate(chat.lastMessage, 25)}
             </p>
             {unreadCount > 0 && (
               <span className="min-w-5 h-5 bg-red-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center px-1.5 flex-shrink-0">
@@ -134,6 +140,40 @@ function AdminChatListItem({
   )
 }
 
+// ===================== USER LIST ITEM =====================
+
+function UserListItem({
+  u,
+  onClick,
+  hasChat,
+}: {
+  u: SimpleUser
+  onClick: () => void
+  hasChat: boolean
+}) {
+  return (
+    <button
+      onClick={onClick}
+      className="w-full p-3 rounded-xl text-right hover:bg-white/5 border border-transparent hover:border-gold/10 transition-all"
+    >
+      <div className="flex items-center gap-3">
+        <div className="w-9 h-9 rounded-xl bg-gold/10 flex items-center justify-center flex-shrink-0">
+          <UserCircle className="w-5 h-5 text-gold" />
+        </div>
+        <div className="flex-1 min-w-0">
+          <p className="text-xs font-medium truncate">{u.fullName || 'بدون اسم'}</p>
+          <p className="text-[10px] text-muted-foreground truncate" dir="ltr">{u.email}</p>
+        </div>
+        {hasChat && (
+          <span className="text-[10px] px-2 py-0.5 rounded-full bg-gold/10 text-gold flex-shrink-0">
+            محادثة موجودة
+          </span>
+        )}
+      </div>
+    </button>
+  )
+}
+
 // ===================== ADMIN MESSAGE BUBBLE =====================
 
 function AdminMessageBubble({ msg }: { msg: ChatMessageItem }) {
@@ -141,15 +181,11 @@ function AdminMessageBubble({ msg }: { msg: ChatMessageItem }) {
   return (
     <div className={`flex ${isAdmin ? 'justify-end' : 'justify-start'} animate-fade-in`}>
       <div className="max-w-[80%] md:max-w-[65%]">
-        {/* Label */}
         {isAdmin ? (
-          <p className="text-[10px] text-gold font-medium mb-1 ml-1 flex items-center gap-1 justify-end">
-            أنت
-          </p>
+          <p className="text-[10px] text-gold font-medium mb-1 ml-1">أنت</p>
         ) : (
           <p className="text-[10px] text-muted-foreground mb-1 mr-1">المستخدم</p>
         )}
-        {/* Bubble */}
         <div
           className={`px-4 py-2.5 rounded-2xl ${
             isAdmin
@@ -157,14 +193,10 @@ function AdminMessageBubble({ msg }: { msg: ChatMessageItem }) {
               : 'bg-white/5 border border-white/10 rounded-bl-md'
           }`}
         >
-          {msg.type === 'image' && msg.imageUrl && (
-            <img src={msg.imageUrl} alt="صورة" className="max-w-full rounded-xl mb-1" loading="lazy" />
-          )}
           {msg.message && (
             <p className="text-sm leading-relaxed whitespace-pre-wrap break-words">{msg.message}</p>
           )}
         </div>
-        {/* Time */}
         <div className={`flex items-center gap-1 mt-1 ${isAdmin ? 'ml-1 justify-end' : 'mr-1'}`}>
           <span className="text-[10px] text-muted-foreground/60">
             {formatMessageTime(msg.createdAt)}
@@ -197,7 +229,29 @@ export default function AdminChat() {
   const inputRef = useRef<HTMLInputElement>(null)
   const pollingRef = useRef<NodeJS.Timeout | null>(null)
 
-  // Fetch chats (for admin - all chats)
+  // Users list for admin to initiate chat
+  const [allUsers, setAllUsers] = useState<SimpleUser[]>([])
+  const [userSearch, setUserSearch] = useState('')
+  const [loadingUsers, setLoadingUsers] = useState(false)
+  const [viewMode, setViewMode] = useState<'chats' | 'users'>('chats')
+
+  // Fetch all users (for admin to pick and start chat)
+  const fetchUsers = useCallback(async () => {
+    setLoadingUsers(true)
+    try {
+      const res = await fetch('/api/admin/users-list')
+      const data = await res.json()
+      if (data.success) {
+        setAllUsers(data.users || [])
+      }
+    } catch {
+      // silent
+    } finally {
+      setLoadingUsers(false)
+    }
+  }, [])
+
+  // Fetch chats
   const fetchChats = useCallback(async () => {
     if (!user?.id) return
     try {
@@ -205,7 +259,6 @@ export default function AdminChat() {
       const data = await res.json()
       if (data.success) {
         const sorted = (data.chats || []).sort((a: AdminChatItem, b: AdminChatItem) => {
-          // Open chats with unread first, then by time
           const aUnread = a.adminUnreadCount || 0
           const bUnread = b.adminUnreadCount || 0
           if (aUnread > 0 && bUnread === 0) return -1
@@ -230,10 +283,7 @@ export default function AdminChat() {
       const data = await res.json()
       if (data.success) {
         setMessages(data.messages || [])
-        if (data.chat) {
-          setSelectedChatData(data.chat)
-        }
-        // Mark as read
+        if (data.chat) setSelectedChatData(data.chat)
         fetch(`/api/chats/${chatId}`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -250,7 +300,8 @@ export default function AdminChat() {
   // Initial load
   useEffect(() => {
     fetchChats()
-  }, [fetchChats])
+    fetchUsers()
+  }, [fetchChats, fetchUsers])
 
   // Fetch messages when chat selected
   useEffect(() => {
@@ -267,10 +318,8 @@ export default function AdminChat() {
   // Polling
   useEffect(() => {
     if (!selectedChatId || !user?.id) return
-
     pollingRef.current = setInterval(async () => {
       try {
-        // Poll chat list
         const chatsRes = await fetch(`/api/chats?userId=${user.id}&role=admin`)
         const chatsData = await chatsRes.json()
         if (chatsData.success) {
@@ -284,11 +333,8 @@ export default function AdminChat() {
           setChats(sorted)
         }
 
-        // Poll messages
         if (messages.length > 0) {
-          const msgRes = await fetch(
-            `/api/chats/${selectedChatId}?userId=${user.id}&role=admin&limit=50`
-          )
+          const msgRes = await fetch(`/api/chats/${selectedChatId}?userId=${user.id}&role=admin&limit=50`)
           const msgData = await msgRes.json()
           if (msgData.success && msgData.messages) {
             const existingIds = new Set(messages.map(m => m.id))
@@ -312,7 +358,34 @@ export default function AdminChat() {
     return () => {
       if (pollingRef.current) clearInterval(pollingRef.current)
     }
-  }, [selectedChatId, user?.id, messages.length, fetchChats])
+  }, [selectedChatId, user?.id, messages.length])
+
+  // Start chat with a user (admin initiates)
+  const handleStartChat = async (targetUser: SimpleUser) => {
+    if (!user?.id) return
+    try {
+      const res = await fetch('/api/chats', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'admin_start_chat',
+          userId: user.id,
+          targetUserId: targetUser.id,
+        }),
+      })
+      const data = await res.json()
+      if (data.success) {
+        setSelectedChatId(data.chat.id)
+        setViewMode('chats')
+        fetchChats()
+        toast.success(`تم فتح محادثة مع ${targetUser.fullName || targetUser.email}`)
+      } else {
+        toast.error(data.message || 'حدث خطأ')
+      }
+    } catch {
+      toast.error('حدث خطأ')
+    }
+  }
 
   // Send message
   const handleSend = async () => {
@@ -353,19 +426,13 @@ export default function AdminChat() {
       const res = await fetch(`/api/chats/${selectedChatId}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          action: 'close_chat',
-          userId: user.id,
-          role: 'admin',
-        }),
+        body: JSON.stringify({ action: 'close_chat', userId: user.id, role: 'admin' }),
       })
       const data = await res.json()
       if (data.success) {
         toast.success('تم إغلاق المحادثة')
         fetchChats()
-        if (selectedChatData) {
-          setSelectedChatData({ ...selectedChatData, status: 'closed' })
-        }
+        if (selectedChatData) setSelectedChatData({ ...selectedChatData, status: 'closed' })
       } else {
         toast.error(data.message)
       }
@@ -383,61 +450,138 @@ export default function AdminChat() {
     }
   }
 
-  // Get user info
-  const chatUser = selectedChatData?.user
+  // Filter users
+  const filteredUsers = allUsers
+    .filter(u => u.role !== 'admin' || u.id === user?.id) // Show all non-admin users
+    .filter(u =>
+      u.email.toLowerCase().includes(userSearch.toLowerCase()) ||
+      u.fullName?.includes(userSearch) ||
+      u.id.includes(userSearch)
+    )
+
+  // Set of user IDs that already have chats
+  const chatUserIds = new Set(chats.map(c => c.userId))
   const totalUnread = chats.reduce((sum, c) => sum + (c.adminUnreadCount || 0), 0)
+  const chatUser = selectedChatData?.user
 
   return (
     <div className="glass-card rounded-2xl overflow-hidden min-h-[60vh] max-h-[75vh] flex flex-col">
-      {loadingChats ? (
-        <div className="flex-1 flex items-center justify-center p-8">
-          <Loader2 className="w-8 h-8 animate-spin text-gold" />
+      {/* View Toggle & Header */}
+      <div className="p-3 border-b border-gold/10 flex items-center justify-between flex-shrink-0">
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => setViewMode('chats')}
+            className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+              viewMode === 'chats' ? 'bg-gold/10 text-gold border border-gold/20' : 'text-muted-foreground hover:text-foreground'
+            }`}
+          >
+            <span className="flex items-center gap-1.5">
+              <MessageSquare className="w-3.5 h-3.5" />
+              المحادثات ({chats.length})
+            </span>
+          </button>
+          <button
+            onClick={() => setViewMode('users')}
+            className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+              viewMode === 'users' ? 'bg-gold/10 text-gold border border-gold/20' : 'text-muted-foreground hover:text-foreground'
+            }`}
+          >
+            <span className="flex items-center gap-1.5">
+              <Users className="w-3.5 h-3.5" />
+              المستخدمون
+            </span>
+          </button>
         </div>
-      ) : chats.length === 0 ? (
-        <div className="flex-1 flex flex-col items-center justify-center p-8 space-y-4">
-          <div className="w-16 h-16 rounded-2xl bg-gold/10 flex items-center justify-center">
-            <MessageCircle className="w-8 h-8 text-gold" />
-          </div>
-          <div className="text-center space-y-2">
-            <p className="font-medium">لا توجد محادثات</p>
-            <p className="text-sm text-muted-foreground">ستظهر المحادثات الجديدة هنا</p>
-          </div>
-        </div>
-      ) : (
-        <div className="flex flex-col md:flex-row h-full">
-          {/* Chat List */}
-          <div className={`w-full md:w-80 border-b md:border-b-0 md:border-l border-gold/10 flex-shrink-0 ${
-            selectedChatId ? 'hidden md:block' : 'block'
-          }`}>
-            <div className="p-3 border-b border-gold/10 flex items-center justify-between">
-              <p className="text-xs text-muted-foreground font-medium">
-                المحادثات ({chats.length})
-              </p>
-              {totalUnread > 0 && (
-                <span className="min-w-5 h-5 bg-red-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center px-1.5">
-                  {totalUnread}
-                </span>
-              )}
-            </div>
-            <div className="overflow-y-auto max-h-[200px] md:max-h-[68vh]">
-              {chats.map(chat => (
-                <AdminChatListItem
-                  key={chat.id}
-                  chat={chat}
-                  isSelected={chat.id === selectedChatId}
-                  onClick={() => setSelectedChatId(chat.id)}
-                />
-              ))}
-            </div>
-          </div>
+        {totalUnread > 0 && (
+          <span className="min-w-5 h-5 bg-red-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center px-1.5">
+            {totalUnread}
+          </span>
+        )}
+      </div>
 
-          {/* Messages Area */}
-          <div className={`flex-1 flex flex-col min-h-0 ${
-            selectedChatId ? 'flex' : 'hidden md:flex'
-          }`}>
-            {/* Chat Header */}
-            {selectedChatData && (
-              <div className="p-4 border-b border-gold/10 flex items-center justify-between flex-shrink-0">
+      <div className="flex flex-col md:flex-row flex-1 min-h-0">
+        {/* Side Panel - Chat List or User List */}
+        <div className={`w-full md:w-80 border-b md:border-b-0 md:border-l border-gold/10 flex-shrink-0 flex flex-col ${
+          selectedChatId ? 'hidden md:flex' : 'flex'
+        }`}>
+          {viewMode === 'chats' ? (
+            <>
+              <div className="overflow-y-auto flex-1">
+                {loadingChats ? (
+                  <div className="flex justify-center py-8">
+                    <Loader2 className="w-6 h-6 animate-spin text-gold" />
+                  </div>
+                ) : chats.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center py-8 space-y-2">
+                    <MessageCircle className="w-8 h-8 text-muted-foreground/30" />
+                    <p className="text-xs text-muted-foreground">لا توجد محادثات بعد</p>
+                    <button
+                      onClick={() => setViewMode('users')}
+                      className="text-[10px] text-gold hover:underline"
+                    >
+                      اختر مستخدم لبدء محادثة
+                    </button>
+                  </div>
+                ) : (
+                  chats.map(chat => (
+                    <AdminChatListItem
+                      key={chat.id}
+                      chat={chat}
+                      isSelected={chat.id === selectedChatId}
+                      onClick={() => setSelectedChatId(chat.id)}
+                    />
+                  ))
+                )}
+              </div>
+            </>
+          ) : (
+            <>
+              {/* User Search */}
+              <div className="p-3 border-b border-gold/10">
+                <div className="relative">
+                  <Search className="absolute right-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
+                  <Input
+                    value={userSearch}
+                    onChange={e => setUserSearch(e.target.value)}
+                    placeholder="ابحث عن مستخدم..."
+                    className="h-9 text-xs pr-9 glass-input border-0"
+                    dir="rtl"
+                  />
+                </div>
+              </div>
+              <div className="overflow-y-auto flex-1">
+                {loadingUsers ? (
+                  <div className="flex justify-center py-8">
+                    <Loader2 className="w-6 h-6 animate-spin text-gold" />
+                  </div>
+                ) : filteredUsers.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center py-8 space-y-2">
+                    <Users className="w-8 h-8 text-muted-foreground/30" />
+                    <p className="text-xs text-muted-foreground">لا يوجد مستخدمون</p>
+                  </div>
+                ) : (
+                  filteredUsers.map(u => (
+                    <UserListItem
+                      key={u.id}
+                      u={u}
+                      onClick={() => handleStartChat(u)}
+                      hasChat={chatUserIds.has(u.id)}
+                    />
+                  ))
+                )}
+              </div>
+            </>
+          )}
+        </div>
+
+        {/* Messages Area */}
+        <div className={`flex-1 flex flex-col min-h-0 ${
+          selectedChatId ? 'flex' : 'hidden md:flex'
+        }`}>
+          {/* Chat Header */}
+          {selectedChatData ? (
+            <>
+              <div className="p-3 border-b border-gold/10 flex items-center justify-between flex-shrink-0">
                 <button
                   onClick={() => setSelectedChatId(null)}
                   className="md:hidden w-8 h-8 rounded-lg bg-white/5 flex items-center justify-center hover:bg-white/10 transition-colors"
@@ -475,30 +619,28 @@ export default function AdminChat() {
                   </span>
                 )}
               </div>
-            )}
 
-            {/* Messages */}
-            <div className="flex-1 overflow-y-auto p-4 space-y-3 min-h-0">
-              {loadingMessages ? (
-                <div className="flex justify-center py-8">
-                  <Loader2 className="w-6 h-6 animate-spin text-gold" />
-                </div>
-              ) : messages.length === 0 ? (
-                <div className="flex flex-col items-center justify-center py-12 space-y-2">
-                  <MessageCircle className="w-8 h-8 text-muted-foreground/30" />
-                  <p className="text-sm text-muted-foreground">لا توجد رسائل بعد</p>
-                </div>
-              ) : (
-                messages.map(msg => (
-                  <AdminMessageBubble key={msg.id} msg={msg} />
-                ))
-              )}
-              <div ref={messagesEndRef} />
-            </div>
+              {/* Messages */}
+              <div className="flex-1 overflow-y-auto p-4 space-y-3 min-h-0">
+                {loadingMessages ? (
+                  <div className="flex justify-center py-8">
+                    <Loader2 className="w-6 h-6 animate-spin text-gold" />
+                  </div>
+                ) : messages.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center py-12 space-y-2">
+                    <MessageCircle className="w-8 h-8 text-muted-foreground/30" />
+                    <p className="text-sm text-muted-foreground">ابدأ المحادثة بإرسال رسالة</p>
+                  </div>
+                ) : (
+                  messages.map(msg => (
+                    <AdminMessageBubble key={msg.id} msg={msg} />
+                  ))
+                )}
+                <div ref={messagesEndRef} />
+              </div>
 
-            {/* Input (admin can always send, even in closed chats) */}
-            {selectedChatData && (
-              <div className="p-4 border-t border-gold/10 flex-shrink-0">
+              {/* Input */}
+              <div className="p-3 border-t border-gold/10 flex-shrink-0">
                 <div className="flex items-center gap-2">
                   <Input
                     ref={inputRef}
@@ -524,10 +666,22 @@ export default function AdminChat() {
                   </Button>
                 </div>
               </div>
-            )}
-          </div>
+            </>
+          ) : (
+            <div className="flex-1 flex flex-col items-center justify-center p-8 space-y-4">
+              <div className="w-16 h-16 rounded-2xl bg-gold/10 flex items-center justify-center">
+                <MessageCircle className="w-8 h-8 text-gold" />
+              </div>
+              <div className="text-center space-y-2">
+                <p className="font-medium">اختر محادثة أو مستخدم</p>
+                <p className="text-sm text-muted-foreground">
+                  {viewMode === 'chats' ? 'اختر محادثة موجودة أو انتقل للمستخدمين' : 'اختر مستخدم لبدء محادثة جديدة'}
+                </p>
+              </div>
+            </div>
+          )}
         </div>
-      )}
+      </div>
     </div>
   )
 }

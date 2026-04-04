@@ -1,19 +1,13 @@
 'use client'
 
-import { useState, useEffect, useRef, useCallback } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useAuthStore } from '@/lib/store'
-import { toast } from 'sonner'
 import {
   MessageSquare,
   X,
   Send,
   Bot,
   Loader2,
-  ChevronDown,
-  ChevronUp,
-  HelpCircle,
-  Search,
-  BookOpen,
   User,
 } from 'lucide-react'
 
@@ -21,64 +15,28 @@ interface BotMessage {
   id: string
   type: 'bot' | 'user'
   text: string
-  faqItems?: FaqResult[]
   timestamp: string
 }
 
-interface FaqResult {
-  id: string
-  question: string
-  answer: string
-  category: string
-}
-
-const CATEGORY_MAP: Record<string, { label: string; icon: string }> = {
-  general: { label: 'عام', icon: '💬' },
-  deposit: { label: 'إيداع', icon: '📥' },
-  withdrawal: { label: 'سحب', icon: '📤' },
-  kyc: { label: 'توثيق', icon: '🛡️' },
-  account: { label: 'حساب', icon: '👤' },
-  fees: { label: 'رسوم', icon: '💰' },
-}
-
 export default function SupportBot() {
-  const { user, setScreen } = useAuthStore()
+  const { user } = useAuthStore()
   const [isOpen, setIsOpen] = useState(false)
   const [messages, setMessages] = useState<BotMessage[]>([])
   const [input, setInput] = useState('')
   const [loading, setLoading] = useState(false)
-  const [botEnabled, setBotEnabled] = useState(true)
-  const [greeting, setGreeting] = useState('مرحباً! كيف يمكنني مساعدتك اليوم؟')
-  const [initializing, setInitializing] = useState(false)
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
 
-  // Initialize bot settings
+  // Add welcome message on first open
   useEffect(() => {
-    if (!isOpen) return
-    setInitializing(true)
-    fetch('/api/faq', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ action: 'get_bot_settings' }),
-    })
-      .then(res => res.json())
-      .then(data => {
-        if (data.success) {
-          setBotEnabled(data.settings.isEnabled)
-          setGreeting(data.settings.greeting)
-          if (messages.length === 0) {
-            setMessages([{
-              id: 'init',
-              type: 'bot',
-              text: data.settings.greeting,
-              timestamp: new Date().toISOString(),
-            }])
-          }
-        }
-      })
-      .catch(() => {})
-      .finally(() => setInitializing(false))
+    if (isOpen && messages.length === 0) {
+      setMessages([{
+        id: 'init',
+        type: 'bot',
+        text: 'مرحباً! 👋 أنا مساعدك الذكي في محفظة فوركس يمني. كيف يمكنني مساعدتك اليوم؟',
+        timestamp: new Date().toISOString(),
+      }])
+    }
   }, [isOpen])
 
   // Auto-scroll
@@ -93,31 +51,35 @@ export default function SupportBot() {
     }
   }, [isOpen])
 
-  const searchFaq = useCallback(async (query: string) => {
-    if (!query.trim()) return
+  const handleSend = async () => {
+    if (!input.trim() || loading) return
+    const userText = input.trim()
+    setInput('')
     setLoading(true)
+
+    // Add user message
+    const userMsg: BotMessage = {
+      id: `user-${Date.now()}`,
+      type: 'user',
+      text: userText,
+      timestamp: new Date().toISOString(),
+    }
+    setMessages(prev => [...prev, userMsg])
+
     try {
-      const res = await fetch('/api/faq', {
+      // Call AI bot endpoint
+      const res = await fetch('/api/bot/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'search', query: query.trim() }),
+        body: JSON.stringify({ message: userText }),
       })
       const data = await res.json()
 
-      const userMsg: BotMessage = {
-        id: `user-${Date.now()}`,
-        type: 'user',
-        text: query.trim(),
-        timestamp: new Date().toISOString(),
-      }
-      setMessages(prev => [...prev, userMsg])
-
-      if (data.success && data.results && data.results.length > 0) {
+      if (data.success && data.reply) {
         const botMsg: BotMessage = {
           id: `bot-${Date.now()}`,
           type: 'bot',
-          text: `وجدت ${data.results.length} إجابة محتملة:`,
-          faqItems: data.results,
+          text: data.reply,
           timestamp: new Date().toISOString(),
         }
         setMessages(prev => [...prev, botMsg])
@@ -125,22 +87,23 @@ export default function SupportBot() {
         const botMsg: BotMessage = {
           id: `bot-${Date.now()}`,
           type: 'bot',
-          text: 'عذراً، لم أجد إجابة مطابقة لسؤالك. يمكنك تصفح الأسئلة الشائعة بالكامل أو التواصل مع الدعم.',
+          text: 'عذراً، حدث خطأ. يرجى المحاولة مرة أخرى أو التواصل مع الدعم الفني عبر المحادثة المباشرة.',
           timestamp: new Date().toISOString(),
         }
         setMessages(prev => [...prev, botMsg])
       }
     } catch {
-      toast.error('حدث خطأ في البحث')
+      const botMsg: BotMessage = {
+        id: `bot-${Date.now()}`,
+        type: 'bot',
+        text: 'عذراً، لم أتمكن من الاتصال. يرجى المحاولة مرة أخرى.',
+        timestamp: new Date().toISOString(),
+      }
+      setMessages(prev => [...prev, botMsg])
     } finally {
       setLoading(false)
-      setInput('')
+      inputRef.current?.focus()
     }
-  }, [])
-
-  const handleSend = () => {
-    if (!input.trim() || loading) return
-    searchFaq(input)
   }
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -150,29 +113,11 @@ export default function SupportBot() {
     }
   }
 
-  const handleCategoryClick = (category: string) => {
-    const categoryQuery: Record<string, string> = {
-      general: 'عام',
-      deposit: 'إيداع',
-      withdrawal: 'سحب',
-      kyc: 'توثيق',
-      account: 'حساب',
-      fees: 'رسوم',
-    }
-    setInput(categoryQuery[category] || '')
-    searchFaq(categoryQuery[category] || '')
-  }
-
-  const openFaqPage = () => {
-    setScreen('faq')
-    setIsOpen(false)
-  }
-
-  if (!user || !botEnabled) return null
+  if (!user) return null
 
   return (
     <>
-      {/* Floating Button - bottom-right, above the bottom nav */}
+      {/* Floating Button */}
       <button
         onClick={() => setIsOpen(!isOpen)}
         className="fixed bottom-24 md:bottom-6 right-6 z-50 w-14 h-14 rounded-full bg-emerald-500 hover:bg-emerald-600 text-white shadow-lg shadow-emerald-500/25 hover:shadow-emerald-500/40 transition-all duration-300 flex items-center justify-center group"
@@ -183,12 +128,11 @@ export default function SupportBot() {
         ) : (
           <MessageSquare className="w-6 h-6 group-hover:scale-110 transition-transform" />
         )}
-        {/* Pulse indicator */}
         {!isOpen && (
-          <span className="absolute -top-0.5 -left-0.5 w-4 h-4 bg-emerald-400 rounded-full animate-ping opacity-60" />
-        )}
-        {!isOpen && (
-          <span className="absolute -top-0.5 -left-0.5 w-4 h-4 bg-emerald-400 rounded-full" />
+          <>
+            <span className="absolute -top-0.5 -left-0.5 w-4 h-4 bg-emerald-400 rounded-full animate-ping opacity-60" />
+            <span className="absolute -top-0.5 -left-0.5 w-4 h-4 bg-emerald-400 rounded-full" />
+          </>
         )}
       </button>
 
@@ -206,7 +150,7 @@ export default function SupportBot() {
               </div>
               <div>
                 <h3 className="text-sm font-bold text-white">مساعد فوركس يمني</h3>
-                <p className="text-[10px] text-emerald-100">مساعد ذكي للأسئلة الشائعة</p>
+                <p className="text-[10px] text-emerald-100">مساعد ذكي - يجيب تلقائياً</p>
               </div>
             </div>
             <button
@@ -218,50 +162,31 @@ export default function SupportBot() {
           </div>
 
           {/* Messages Area */}
-          <div className="flex-1 bg-background/95 backdrop-blur-xl border border-emerald-500/20 border-t-0 overflow-y-auto max-h-[45vh] min-h-[200px]">
+          <div className="flex-1 bg-background/95 backdrop-blur-xl border border-emerald-500/20 border-t-0 overflow-y-auto max-h-[50vh] min-h-[250px]">
             <div className="p-4 space-y-3">
-              {initializing ? (
-                <div className="flex justify-center py-8">
-                  <Loader2 className="w-6 h-6 animate-spin text-emerald-500" />
+              {messages.map(msg => (
+                <div key={msg.id}>
+                  {msg.type === 'user' ? (
+                    <div className="flex justify-start mb-2">
+                      <div className="bg-emerald-500/15 border border-emerald-500/20 rounded-2xl rounded-tr-sm px-4 py-2.5 max-w-[85%]">
+                        <div className="flex items-start gap-2">
+                          <User className="w-4 h-4 text-emerald-400 mt-0.5 flex-shrink-0" />
+                          <p className="text-sm text-foreground">{msg.text}</p>
+                        </div>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="flex justify-end mb-2">
+                      <div className="bg-white/5 border border-white/10 rounded-2xl rounded-tl-sm px-4 py-2.5 max-w-[85%]">
+                        <div className="flex items-start gap-2">
+                          <Bot className="w-4 h-4 text-emerald-400 mt-0.5 flex-shrink-0" />
+                          <p className="text-sm text-muted-foreground leading-relaxed">{msg.text}</p>
+                        </div>
+                      </div>
+                    </div>
+                  )}
                 </div>
-              ) : (
-                messages.map(msg => (
-                  <div key={msg.id}>
-                    {/* User message */}
-                    {msg.type === 'user' && (
-                      <div className="flex justify-start mb-2">
-                        <div className="bg-emerald-500/15 border border-emerald-500/20 rounded-2xl rounded-tr-sm px-4 py-2.5 max-w-[85%]">
-                          <div className="flex items-start gap-2">
-                            <User className="w-4 h-4 text-emerald-400 mt-0.5 flex-shrink-0" />
-                            <p className="text-sm text-foreground">{msg.text}</p>
-                          </div>
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Bot message */}
-                    {msg.type === 'bot' && (
-                      <div className="flex justify-end mb-2">
-                        <div className="bg-white/5 border border-white/10 rounded-2xl rounded-tl-sm px-4 py-2.5 max-w-[85%]">
-                          <div className="flex items-start gap-2">
-                            <Bot className="w-4 h-4 text-emerald-400 mt-0.5 flex-shrink-0" />
-                            <p className="text-sm text-muted-foreground leading-relaxed">{msg.text}</p>
-                          </div>
-
-                          {/* FAQ results */}
-                          {msg.faqItems && msg.faqItems.length > 0 && (
-                            <div className="mt-3 space-y-2">
-                              {msg.faqItems.map((faq, idx) => (
-                                <FaqResultCard key={faq.id} faq={faq} index={idx} />
-                              ))}
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                ))
-              )}
+              ))}
 
               {/* Loading indicator */}
               {loading && (
@@ -280,52 +205,21 @@ export default function SupportBot() {
               )}
               <div ref={messagesEndRef} />
             </div>
-
-            {/* Quick Categories */}
-            {messages.length <= 1 && !loading && (
-              <div className="px-4 pb-3">
-                <p className="text-[10px] text-muted-foreground mb-2 flex items-center gap-1">
-                  <HelpCircle className="w-3 h-3" />
-                  تصفح حسب التصنيف:
-                </p>
-                <div className="flex flex-wrap gap-1.5">
-                  {Object.entries(CATEGORY_MAP).map(([key, val]) => (
-                    <button
-                      key={key}
-                      onClick={() => handleCategoryClick(key)}
-                      className="px-2.5 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-xs text-emerald-400 hover:bg-emerald-500/20 transition-colors"
-                    >
-                      {val.icon} {val.label}
-                    </button>
-                  ))}
-                </div>
-
-                <button
-                  onClick={openFaqPage}
-                  className="mt-3 w-full py-2 rounded-xl bg-white/5 border border-white/10 text-xs text-muted-foreground hover:text-foreground hover:bg-white/10 transition-all flex items-center justify-center gap-2"
-                >
-                  <BookOpen className="w-3.5 h-3.5" />
-                  عرض جميع الأسئلة الشائعة
-                </button>
-              </div>
-            )}
           </div>
 
           {/* Input Area */}
           <div className="bg-background/95 backdrop-blur-xl border border-emerald-500/20 border-t-0 rounded-b-2xl px-3 py-2.5">
             <div className="flex items-center gap-2">
-              <div className="relative flex-1">
-                <Search className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                <input
-                  ref={inputRef}
-                  type="text"
-                  value={input}
-                  onChange={(e) => setInput(e.target.value)}
-                  onKeyDown={handleKeyDown}
-                  placeholder="اكتب سؤالك هنا..."
-                  className="w-full h-10 pr-9 pl-3 rounded-xl bg-white/5 border border-white/10 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-emerald-500/40 transition-colors"
-                />
-              </div>
+              <input
+                ref={inputRef}
+                type="text"
+                value={input}
+                onChange={(e) => setInput(e.target.value)}
+                onKeyDown={handleKeyDown}
+                placeholder="اكتب سؤالك هنا..."
+                className="flex-1 h-10 px-3 rounded-xl bg-white/5 border border-white/10 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-emerald-500/40 transition-colors"
+                dir="rtl"
+              />
               <button
                 onClick={handleSend}
                 disabled={!input.trim() || loading}
@@ -338,40 +232,5 @@ export default function SupportBot() {
         </div>
       )}
     </>
-  )
-}
-
-// Sub-component for FAQ result cards in chat
-function FaqResultCard({ faq, index }: { faq: FaqResult; index: number }) {
-  const [expanded, setExpanded] = useState(false)
-  const catInfo = CATEGORY_MAP[faq.category]
-
-  return (
-    <div
-      className="rounded-xl bg-emerald-500/5 border border-emerald-500/15 overflow-hidden"
-      style={{ animationDelay: `${index * 100}ms` }}
-    >
-      <button
-        onClick={() => setExpanded(!expanded)}
-        className="w-full flex items-center gap-2 px-3 py-2 text-right hover:bg-emerald-500/10 transition-colors"
-      >
-        <span className="text-sm flex-1 text-emerald-300 font-medium">{faq.question}</span>
-        {expanded ? (
-          <ChevronUp className="w-3.5 h-3.5 text-emerald-400 flex-shrink-0" />
-        ) : (
-          <ChevronDown className="w-3.5 h-3.5 text-emerald-400 flex-shrink-0" />
-        )}
-      </button>
-      {expanded && (
-        <div className="px-3 pb-2.5 animate-fade-in">
-          <p className="text-xs text-muted-foreground leading-relaxed">{faq.answer}</p>
-          {catInfo && (
-            <span className="inline-block mt-1.5 text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400">
-              {catInfo.icon} {catInfo.label}
-            </span>
-          )}
-        </div>
-      )}
-    </div>
   )
 }

@@ -113,6 +113,58 @@ export async function POST(request: NextRequest) {
       })
     }
 
+    // === ADMIN START CHAT ===
+    if (action === 'admin_start_chat') {
+      const { userId, targetUserId } = body
+
+      if (!userId || !targetUserId) {
+        return NextResponse.json(
+          { success: false, message: 'معرف المستخدم والهدف مطلوبان' },
+          { status: 400 }
+        )
+      }
+
+      // Verify admin exists
+      const admin = await userOperations.findUnique({ id: userId })
+      if (!admin || (admin.role !== 'admin' && !admin.permissions)) {
+        return NextResponse.json(
+          { success: false, message: 'غير مصرح - المدير فقط' },
+          { status: 403 }
+        )
+      }
+
+      // Verify target user exists
+      const targetUser = await userOperations.findUnique({ id: targetUserId })
+      if (!targetUser) {
+        return NextResponse.json(
+          { success: false, message: 'المستخدم غير موجود' },
+          { status: 404 }
+        )
+      }
+
+      // Check if chat already exists between admin and this user
+      const existingChats = await chatOperations.findChats({ userId: admin.id, role: 'admin' })
+      const existingChat = existingChats.find(c => c.userId === targetUserId)
+
+      if (existingChat) {
+        // Return existing chat
+        return NextResponse.json({
+          success: true,
+          chat: existingChat,
+          existingChat: true,
+        })
+      }
+
+      // Create new chat with admin's welcome message
+      const welcomeMsg = 'مرحباً! كيف يمكننا مساعدتك؟'
+      const chat = await chatOperations.createChat(targetUserId, admin.id, welcomeMsg)
+      return NextResponse.json({
+        success: true,
+        chat,
+        existingChat: false,
+      })
+    }
+
     // === SEND MESSAGE (existing chat) ===
     if (action === 'send_message') {
       const { chatId, senderId, senderType, message, type } = body
