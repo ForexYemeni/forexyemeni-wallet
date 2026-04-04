@@ -1,4 +1,4 @@
-const CACHE_NAME = 'forexyemeni-v1'
+const CACHE_NAME = 'forexyemeni-v2'
 
 // Assets to pre-cache (shell)
 const PRECACHE_URLS = [
@@ -7,6 +7,9 @@ const PRECACHE_URLS = [
   '/logo.png',
   '/icon-192.png',
   '/icon-512.png',
+  '/sounds/notification.wav',
+  '/sounds/success.wav',
+  '/sounds/alert.wav',
 ]
 
 // Install: pre-cache essential assets

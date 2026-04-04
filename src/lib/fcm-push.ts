@@ -63,8 +63,22 @@ export async function registerFCMPushNotifications(): Promise<boolean> {
     })
 
     // Listen for push notifications received (app in foreground)
-    PushNotifications.addListener('pushNotificationReceived', (notification) => {
-      console.log('[FCM] Notification received:', notification)
+    PushNotifications.addListener('pushNotificationReceived', async (notification) => {
+      console.log('[FCM] Notification received in foreground:', notification)
+
+      // Play sound when notification received while app is in foreground
+      try {
+        const { playNotificationSound } = await import('@/lib/notification-sound')
+        const type = notification.data?.type || notification.data?.['google.notification.type']
+        if (type === 'success') {
+          await playNotificationSound() // Use notification sound for all types
+        } else {
+          await playNotificationSound()
+        }
+      } catch (error) {
+        console.warn('[FCM] Could not play foreground notification sound:', error)
+      }
+
       // Vibrate the device
       try {
         navigator.vibrate([200, 100, 200])

@@ -94,26 +94,93 @@ export default function Home() {
     setMounted(true)
   }, [])
 
-  // Global error handler — only for critical errors
+  // Global error handler — only for truly critical errors
+  // Many browser/runtime errors are non-critical and should be silently ignored
   useEffect(() => {
+    const nonCriticalKeywords = [
+      // Audio & Sound
+      'AudioContext', 'audiocontext', 'audio', 'NotAllowedError',
+      'AbortError', 'play()', 'Media',
+      // Notifications
+      'Notification', 'notification', 'vibrate',
+      // Network & Fetch
+      'fetch', 'network', 'Failed to fetch', 'NetworkError',
+      'net::ERR_', 'TypeError: Failed to fetch',
+      'ChunkLoadError', 'Loading chunk', 'Loading CSS chunk',
+      // Service Worker
+      'service worker', 'ServiceWorker',
+      // Push / FCM / Capacitor
+      'push notification', 'Capacitor', 'FCM', 'token',
+      'LocalNotifications', 'PushNotifications',
+      // DOM & Browser
+      'ResizeObserver', 'ResizeObserver loop',
+      'IntersectionObserver', 'MutationObserver',
+      'Script error', 'Script error.',
+      // Security & CORS
+      'SecurityError', 'CORS', 'cross-origin',
+      // Cancelled / Aborted
+      'cancelled', 'aborted', 'AbortController',
+      // Non-critical module errors
+      'Importing a module', 'import(',
+      // Hydration (Next.js)
+      'hydration', 'Hydration',
+      // Suppressed
+      'suppressed', 'non-critical',
+    ]
+
+    function isNonCriticalError(msg: string): boolean {
+      const lowerMsg = msg.toLowerCase()
+      if (nonCriticalKeywords.some(kw => lowerMsg.includes(kw.toLowerCase()))) {
+        return true
+      }
+      // Ignore empty or generic error messages
+      if (!msg || msg === 'undefined' || msg === 'null' || msg === '[object object]' || msg === '{}') {
+        return true
+      }
+      // Ignore errors that are just numeric codes
+      if (/^\d+$/.test(msg.trim())) {
+        return true
+      }
+      return false
+    }
+
+    function extractErrorMessage(event: Event | PromiseRejectionEvent): string {
+      try {
+        if (event instanceof PromiseRejectionEvent) {
+          const reason = event.reason
+          if (!reason) return ''
+          if (typeof reason === 'string') return reason
+          if (reason instanceof Error) return reason.message || reason.stack || ''
+          if (typeof reason === 'object') {
+            return reason.message || reason.error?.message || reason.name || String(reason)
+          }
+          return String(reason)
+        }
+        const errorEvent = event as ErrorEvent
+        return errorEvent.message || errorEvent.error?.message || ''
+      } catch {
+        return ''
+      }
+    }
+
     const handler = (event: Event | PromiseRejectionEvent) => {
-      const err = event instanceof PromiseRejectionEvent
-        ? new Error(String(event.reason))
-        : (event as ErrorEvent).error
-      console.error('[App Error]', err)
+      const msg = extractErrorMessage(event)
+
+      // Log all errors for debugging
+      console.error('[App Error]', msg || event.type, event)
+
       // Don't set error state for non-critical errors
-      const msg = err?.message || String(event) || ''
-      const nonCriticalKeywords = [
-        'AudioContext', 'Notification', 'vibrate',
-        'fetch', 'network', 'Failed to fetch',
-        'service worker', 'push notification',
-        'Capacitor', 'FCM', 'token',
-      ]
-      if (nonCriticalKeywords.some(kw => msg.toLowerCase().includes(kw.toLowerCase()))) {
+      if (isNonCriticalError(msg)) {
         return
       }
+
+      const err = event instanceof PromiseRejectionEvent
+        ? new Error(msg || 'Unhandled promise rejection')
+        : (event as ErrorEvent).error || new Error(msg || 'Unknown error')
+
       setError(err)
     }
+
     window.addEventListener('error', handler)
     window.addEventListener('unhandledrejection', handler)
     return () => {
