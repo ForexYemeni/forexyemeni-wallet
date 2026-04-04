@@ -13,14 +13,27 @@ import {
   Moon,
   Bell,
   Gift,
+  MessageCircle,
+  ChevronUp,
+  X,
+  Clock,
 } from 'lucide-react'
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 
 const userNavItems = [
   { key: 'dashboard', label: 'الرئيسية', icon: Home },
   { key: 'deposit', label: 'إيداع', icon: ArrowDownLeft },
   { key: 'withdraw', label: 'سحب', icon: ArrowUpRight },
-  { key: 'referral', label: 'الدعوات', icon: Gift },
+  { key: 'settings', label: 'المزيد', icon: Settings },
+]
+
+// Extra items shown in the "More" popup menu
+const userExtraItems = [
+  { key: 'referral', label: 'برنامج الدعوات', icon: Gift },
+  { key: 'chat', label: 'الدعم الفني', icon: MessageCircle },
+  { key: 'kyc', label: 'التحقق (KYC)', icon: Shield },
+  { key: 'transactions', label: 'المعاملات', icon: Clock },
+  { key: 'notifications', label: 'الإشعارات', icon: Bell },
   { key: 'settings', label: 'الإعدادات', icon: Settings },
 ]
 
@@ -34,19 +47,36 @@ const adminNavItems = [
 export default function BottomNav() {
   const { currentScreen, setScreen, user } = useAuthStore()
   const [theme, setThemeState] = useState<Theme>('dark')
+  const [showMore, setShowMore] = useState(false)
+  const moreRef = useRef<HTMLDivElement>(null)
 
   const isAdmin = user?.role === 'admin' || (user?.permissions && Object.values(user.permissions).some(v => v))
-
   const items = isAdmin ? adminNavItems : userNavItems
 
   useEffect(() => {
     setThemeState(getTheme())
   }, [])
 
+  // Close more menu on outside click
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (moreRef.current && !moreRef.current.contains(e.target as Node)) {
+        setShowMore(false)
+      }
+    }
+    if (showMore) document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [showMore])
+
   const handleToggleTheme = () => {
     const next = theme === 'dark' ? 'light' : 'dark'
     setThemeState(next)
     setTheme(next)
+  }
+
+  const handleScreenClick = (key: string) => {
+    setScreen(key)
+    setShowMore(false)
   }
 
   return (
@@ -55,10 +85,29 @@ export default function BottomNav() {
         <div className="flex items-center justify-around">
           {items.map((item) => {
             const isActive = currentScreen === item.key
+            // For non-admin users, "settings" is the "more" button
+            if (!isAdmin && item.key === 'settings') {
+              const isInExtra = userExtraItems.some(e => e.key === currentScreen)
+              return (
+                <button
+                  key="more-btn"
+                  onClick={() => setShowMore(!showMore)}
+                  className={`flex flex-col items-center gap-1 px-3 py-2 rounded-xl transition-all ${
+                    isInExtra
+                      ? 'text-gold bg-gold/10'
+                      : 'text-muted-foreground hover:text-foreground'
+                  }`}
+                >
+                  {showMore ? <X className="w-5 h-5" /> : <Settings className="w-5 h-5" />}
+                  <span className="text-[10px] font-medium">{showMore ? 'إغلاق' : 'المزيد'}</span>
+                </button>
+              )
+            }
+
             return (
               <button
                 key={item.key}
-                onClick={() => setScreen(item.key)}
+                onClick={() => handleScreenClick(item.key)}
                 className={`flex flex-col items-center gap-1 px-3 py-2 rounded-xl transition-all ${
                   isActive
                     ? 'text-gold bg-gold/10'
@@ -71,16 +120,49 @@ export default function BottomNav() {
             )
           })}
 
-          {/* Theme Toggle in Bottom Nav */}
+          {/* Theme Toggle */}
           <button
             onClick={handleToggleTheme}
-            className={`flex flex-col items-center gap-1 px-3 py-2 rounded-xl transition-all text-muted-foreground hover:text-foreground`}
+            className="flex flex-col items-center gap-1 px-3 py-2 rounded-xl transition-all text-muted-foreground hover:text-foreground"
           >
             {theme === 'dark' ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
             <span className="text-[10px] font-medium">{theme === 'dark' ? 'مضيء' : 'مظلم'}</span>
           </button>
         </div>
       </div>
+
+      {/* Extra Items Popup Menu */}
+      {showMore && !isAdmin && (
+        <div
+          ref={moreRef}
+          className="fixed bottom-20 left-3 right-3 z-50 glass-card border-gold/10 rounded-2xl p-2 animate-scale-in"
+          dir="rtl"
+        >
+          <div className="flex items-center gap-2 px-3 py-2 mb-1">
+            <ChevronUp className="w-4 h-4 text-gold" />
+            <span className="text-xs font-medium gold-text">القائمة الكاملة</span>
+          </div>
+          <div className="space-y-0.5">
+            {userExtraItems.map((item) => {
+              const isActive = currentScreen === item.key
+              return (
+                <button
+                  key={item.key}
+                  onClick={() => handleScreenClick(item.key)}
+                  className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm transition-all ${
+                    isActive
+                      ? 'bg-gold/10 text-gold font-medium'
+                      : 'text-muted-foreground hover:text-foreground hover:bg-white/5'
+                  }`}
+                >
+                  <item.icon className="w-4 h-4" />
+                  <span>{item.label}</span>
+                </button>
+              )
+            })}
+          </div>
+        </div>
+      )}
     </nav>
   )
 }

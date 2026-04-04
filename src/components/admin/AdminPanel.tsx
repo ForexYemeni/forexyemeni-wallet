@@ -2105,7 +2105,7 @@ function PaymentMethodsManager({ methods, onRefresh }: { methods: any[]; onRefre
 
 function AdminSettingsPanel({ settings, onRefresh }: { settings: { email: string; phone: string | null; hasPIN: boolean }; onRefresh: () => void }) {
   const { user } = useAuthStore()
-  const [activeSection, setActiveSection] = useState<'phone' | 'email' | 'password' | 'pin' | 'fees' | 'social' | 'cleanup'>('phone')
+  const [activeSection, setActiveSection] = useState<'phone' | 'email' | 'password' | 'pin' | 'fees' | 'social' | 'cleanup' | 'bot'>('phone')
   const [loading, setLoading] = useState(false)
 
   // Phone form
@@ -2136,11 +2136,14 @@ function AdminSettingsPanel({ settings, onRefresh }: { settings: { email: string
   const [socialInstagram, setSocialInstagram] = useState('')
   const [socialTwitter, setSocialTwitter] = useState('')
   const [socialTiktok, setSocialTiktok] = useState('')
+  // Bot toggle
+  const [botEnabledSetting, setBotEnabledSetting] = useState(true)
 
-  // Fetch fees & social links on mount
+  // Fetch fees & social links & bot setting on mount
   useEffect(() => {
     fetchFees()
     fetchSocialLinks()
+    fetchBotSetting()
   }, [])
 
   const fetchFees = async () => {
@@ -2168,6 +2171,22 @@ function AdminSettingsPanel({ settings, onRefresh }: { settings: { email: string
         setSocialTiktok(data.socialLinks.tiktok || '')
       }
     } catch { /* silent */ }
+  }
+
+  const fetchBotSetting = () => {
+    try {
+      const saved = localStorage.getItem('forexyemeni-bot-enabled')
+      setBotEnabledSetting(saved === null ? true : saved === 'true')
+    } catch {}
+ }
+
+  const toggleBotSetting = () => {
+    const newState = !botEnabledSetting
+    setBotEnabledSetting(newState)
+    try {
+      localStorage.setItem('forexyemeni-bot-enabled', String(newState))
+    } catch {}
+    toast.success(newState ? 'تم تفعيل الروبوت' : 'تم إيقاف الروبوت')
   }
 
   const handleSaveSocialLinks = async () => {
@@ -2260,6 +2279,7 @@ function AdminSettingsPanel({ settings, onRefresh }: { settings: { email: string
     { key: 'password' as const, label: 'كلمة المرور', icon: Lock, hasValue: true },
     { key: 'pin' as const, label: 'رمز PIN', icon: Shield, hasValue: settings.hasPIN, value: settings.hasPIN ? 'مُفعّل ✓' : 'غير معين' },
     { key: 'social' as const, label: 'تواصل', icon: MessageCircle },
+    { key: 'bot' as const, label: 'الروبوت', icon: MessageSquare },
     { key: 'cleanup' as const, label: 'تنظيف', icon: Trash2 },
   ]
 
@@ -2509,6 +2529,52 @@ function AdminSettingsPanel({ settings, onRefresh }: { settings: { email: string
           >
             {loading ? <Loader2 className="w-4 h-4 animate-spin mx-auto" /> : 'حفظ الروابط'}
           </button>
+        </div>
+      )}
+
+      {/* Bot Section */}
+      {activeSection === 'bot' && (
+        <div className="glass-card p-5 space-y-4">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-emerald-500/10 flex items-center justify-center">
+              <MessageSquare className="w-5 h-5 text-emerald-400" />
+            </div>
+            <div>
+              <h3 className="font-medium text-sm">الروبوت الذكي</h3>
+              <p className="text-[10px] text-muted-foreground">التحكم بمساعد الدعم الذكي</p>
+            </div>
+          </div>
+
+          <div className="flex items-center justify-between p-4 rounded-xl bg-white/5 border border-white/10">
+            <div>
+              <p className="text-sm font-medium">تشغيل الروبوت</p>
+              <p className="text-[10px] text-muted-foreground mt-0.5">
+                الروبوت يرد تلقائياً على أسئلة المستخدمين بالذكاء الاصطناعي
+              </p>
+            </div>
+            <button
+              onClick={toggleBotSetting}
+              className={`relative w-14 h-7 rounded-full transition-colors duration-300 ${
+                botEnabledSetting ? 'bg-emerald-500' : 'bg-muted'
+              }`}
+            >
+              <span
+                className={`absolute top-0.5 w-6 h-6 rounded-full bg-white shadow-md transition-transform duration-300 ${
+                  botEnabledSetting ? 'translate-x-7' : 'translate-x-0.5'
+                }`}
+              />
+            </button>
+          </div>
+
+          <div className="p-3 rounded-lg bg-gold/5 border border-gold/10">
+            <p className="text-[11px] text-muted-foreground">
+              {botEnabledSetting ? (
+                <>🟢 الروبوت <span className="text-emerald-400 font-medium">مفعّل</span> - يظهر للمستخدمين ويجيب على أسئلتهم تلقائياً</>
+              ) : (
+                <>🔴 الروبوت <span className="text-red-400 font-medium">متوقف</span> - لن يظهر للمستخدمين</>
+              )}
+            </p>
+          </div>
         </div>
       )}
 

@@ -9,6 +9,7 @@ import {
   Bot,
   Loader2,
   User,
+  Power,
 } from 'lucide-react'
 
 interface BotMessage {
@@ -24,8 +25,27 @@ export default function SupportBot() {
   const [messages, setMessages] = useState<BotMessage[]>([])
   const [input, setInput] = useState('')
   const [loading, setLoading] = useState(false)
+  const [botEnabled, setBotEnabled] = useState(true)
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
+
+  // Load bot enabled state from localStorage
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem('forexyemeni-bot-enabled')
+      if (saved !== null) {
+        setBotEnabled(saved === 'true')
+      }
+    } catch {}
+  }, [])
+
+  const toggleBot = () => {
+    const newState = !botEnabled
+    setBotEnabled(newState)
+    try {
+      localStorage.setItem('forexyemeni-bot-enabled', String(newState))
+    } catch {}
+  }
 
   // Add welcome message on first open
   useEffect(() => {
@@ -113,7 +133,7 @@ export default function SupportBot() {
     }
   }
 
-  if (!user) return null
+  if (!user || !botEnabled) return null
 
   return (
     <>

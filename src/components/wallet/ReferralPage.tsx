@@ -154,22 +154,7 @@ export default function ReferralPage() {
     )
   }
 
-  // If referral system is not enabled
-  if (settings && !settings.isEnabled) {
-    return (
-      <div className="space-y-4 animate-fade-in">
-        <div className="text-center space-y-3">
-          <h1 className="text-xl font-bold gold-text">برنامج الدعوات</h1>
-          <p className="text-sm text-muted-foreground">ادعُ أصدقائك واحصل على عمولات</p>
-        </div>
-        <div className="glass-card p-8 text-center rounded-xl">
-          <Gift className="w-16 h-16 text-muted-foreground/20 mx-auto mb-4" />
-          <h3 className="text-lg font-bold text-muted-foreground mb-2">البرنامج غير مفعل حالياً</h3>
-          <p className="text-sm text-muted-foreground/60">سيتم تفعيل برنامج الدعوات قريباً</p>
-        </div>
-      </div>
-    )
-  }
+  const isReferralEnabled = settings?.isEnabled ?? false
 
   return (
     <div className="space-y-4 animate-fade-in pb-6">
@@ -178,6 +163,14 @@ export default function ReferralPage() {
         <h1 className="text-xl font-bold gold-text">برنامج الدعوات</h1>
         <p className="text-sm text-muted-foreground">ادعُ أصدقائك واحصل على عمولات من إيداعاتهم</p>
       </div>
+
+      {/* Disabled Notice */}
+      {!isReferralEnabled && (
+        <div className="glass-card p-3 rounded-xl border border-yellow-500/20 flex items-center gap-3">
+          <Gift className="w-5 h-5 text-yellow-400 flex-shrink-0" />
+          <p className="text-xs text-muted-foreground">برنامج العمولات غير مفعل حالياً، لكن يمكنك مشاركة كود الدعوة الخاص بك</p>
+        </div>
+      )}
 
       {/* Referral Code Card */}
       <div className="gold-gradient rounded-2xl p-5 text-gray-900 relative overflow-hidden">
