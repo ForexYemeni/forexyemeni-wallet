@@ -502,3 +502,69 @@ Create 3 new admin API routes for the ForexYemeni wallet: audit logging, financi
 ### Git Commit:
 - Committed and pushed as `feat: add admin audit, reports, and export API routes`
 - 3 files changed, 580 insertions(+)
+
+---
+## Task ID: super-admin-enhance - Super Admin API Enhancement
+### Work Task
+Enhance the Super Admin API route at `src/app/api/admin/super-admin/route.ts` with 5 new POST actions (11-15) and enriched GET endpoint returning financial summary, admin team, recent audit logs, and system health data.
+
+### Work Summary
+
+#### POST Handler — New Actions Added:
+
+**Action 11: `get_financial_summary`**
+- Sums all user balances from `users` collection (up to 5000 docs)
+- Sums completed deposits, completed withdrawals, pending deposits, pending withdrawals using helper `sumFieldFromCollection()`
+- Counts total P2P trades from `p2pTrades` collection
+- Returns all financial aggregates plus totalUsers count
+- Logs to audit log on access
+
+**Action 12: `manage_admin`** — 4 sub-actions:
+- `list_admins`: Queries `users` where role='admin', returns id, email, name, role, parsed permissions, status, createdAt, lastLogin
+- `update_permissions`: Validates target user is admin, updates `permissions` field with `{ manageUsers, approveDeposits, approveWithdrawals, approveKYC, manageSettings }` stored as JSON string
+- `demote_admin`: Changes role to 'user', clears permissions; cannot demote self (validates targetUserId !== adminId)
+- `promote_to_admin`: Changes role to 'admin', sets default or specified permissions
+- All sub-actions logged to audit log with `permissions_change` / `user_demote` / `user_promote` types
+
+**Action 13: `cleanup_data`** — 4 cleanup targets:
+- `expired_otp`: Deletes `otpCodes` where createdAt > 24h old
+- `old_notifications`: Deletes `notifications` where read=true AND createdAt > 30 days old (query filters read=true, JS filters by date, batch deletes)
+- `old_login_attempts`: Deletes `loginAttempts` older than 7 days
+- `pending_pin_resets`: Tries `pendingPinResets` collection first; falls back to clearing `pendingPinReset` field on user documents
+- Uses batch writes with 499 ops per batch, returns deleted count per target
+
+**Action 14: `get_audit_logs`** — Advanced audit log viewer:
+- Accepts `filters`: `{ actionType?, adminId?, startDate?, endDate?, limit?, targetType? }`
+- Applies Firestore query filters for actionType, adminId, targetType
+- Applies date filters (startDate, endDate) in JavaScript to avoid composite index issues
+- Default limit 50, max 200, results sorted by createdAt descending
+- Returns logs array, total count, and applied filters
+
+**Action 15: `quick_user_operation`** — 4 sub-actions:
+- `search_user`: Partial match on email or fullName across all users, returns first 10 results with id, email, name, role, status, balance, createdAt
+- `get_user_details`: Full user details by userId including recent deposits, withdrawals, transactions (fetched in parallel), plus counts
+- `quick_credit`: Adds balance to user, creates transaction record (`admin_credit` type), logs to audit, sends notification to user
+- `quick_debit`: Validates sufficient balance before deducting, creates transaction record (`admin_debit` type), logs to audit, sends notification to user
+
+#### GET Handler — New Data Added:
+
+**`financialSummary`**: Same data as action 11 (totalUserBalances, completedDepositsTotal, completedWithdrawalsTotal, pendingDepositsTotal, pendingWithdrawalsTotal, totalP2PTrades)
+
+**`adminTeam`**: List of all admin users (id, email, name, role, parsed permissions, status, lastLogin)
+
+**`recentAuditLogs`**: Last 20 audit log entries sorted by createdAt descending
+
+**`systemHealth`**: `{ pendingDeposits, pendingWithdrawals, pendingKYC, unresolvedDisputes }` — counts from Firestore queries
+
+#### Helper Functions Added:
+- `parsePermissions()`: Safely parses permissions string/object/null to AdminPermissions
+- `stringifyPermissions()`: Serializes AdminPermissions to JSON string for Firestore storage
+- `sumFieldFromCollection()`: Paginated aggregation of a numeric field from Firestore collection filtered by status, handles >500 documents with startAfter pagination
+- `deleteOldDocuments()`: Generic old document cleanup with date field comparison, batch writes, and pagination support
+
+#### Type Definitions Added:
+- `AdminPermissions` interface with 5 permission fields
+- `AuditLogFilters` interface for audit log query parameters
+
+### Files Changed:
+- `src/app/api/admin/super-admin/route.ts` — Complete rewrite preserving all 10 existing actions, adding 5 new actions and enhanced GET
