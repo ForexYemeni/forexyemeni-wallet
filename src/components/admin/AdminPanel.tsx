@@ -184,12 +184,13 @@ export default function AdminPanel() {
   const { user, setScreen } = useAuthStore()
   const AdminFaqManager = lazy(() => import('@/components/admin/AdminFaqManager'))
   const AdminReferralSettings = lazy(() => import('@/components/admin/AdminReferralSettings'))
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'users' | 'deposits' | 'withdrawals' | 'kyc' | 'payment-methods' | 'admin-settings' | 'faq-bot' | 'chats' | 'referral-settings' | 'p2p' | 'audit-log' | 'reports' | 'system-monitor'>('dashboard')
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'users' | 'deposits' | 'withdrawals' | 'kyc' | 'payment-methods' | 'admin-settings' | 'faq-bot' | 'chats' | 'referral-settings' | 'p2p' | 'audit-log' | 'reports' | 'system-monitor' | 'super-admin'>('dashboard')
   const AdminChat = lazy(() => import('@/components/admin/AdminChat'))
   const AdminP2P = lazy(() => import('@/components/admin/AdminP2P'))
   const AdminAuditLog = lazy(() => import('@/components/admin/AdminAuditLog'))
   const AdminReports = lazy(() => import('@/components/admin/AdminReports'))
   const AdminSystemMonitor = lazy(() => import('@/components/admin/AdminSystemMonitor'))
+  const SuperAdminPanel = lazy(() => import('@/components/admin/SuperAdminPanel'))
   const [chatUnreadCount, setChatUnreadCount] = useState(0)
 
   // Listen for sidebar sub-navigation tab changes
@@ -901,6 +902,7 @@ export default function AdminPanel() {
       { key: 'audit-log' as const, label: 'سجل العمليات', icon: Clock, count: 0, perm: null as string | null },
       { key: 'reports' as const, label: 'التقارير المالية', icon: BarChart3, count: 0, perm: null as string | null },
       { key: 'system-monitor' as const, label: 'مراقبة النظام', icon: Activity, count: 0, perm: null as string | null },
+      { key: 'super-admin' as const, label: 'تحكم خارق', icon: Shield, count: 0, perm: null as string | null },
     ] : []),
   ]
 
@@ -1778,6 +1780,19 @@ export default function AdminPanel() {
               </div>
             }>
               <AdminSystemMonitor />
+            </Suspense>
+          )}
+
+          {/* ===================== SUPER ADMIN TAB ===================== */}
+          {effectiveActiveTab === 'super-admin' && (
+            <Suspense fallback={
+              <div className="space-y-3">
+                {[...Array(4)].map((_, i) => (
+                  <div key={i} className="glass-card p-4 shimmer h-24 rounded-xl" />
+                ))}
+              </div>
+            }>
+              <SuperAdminPanel />
             </Suspense>
           )}
 

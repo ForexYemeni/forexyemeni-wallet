@@ -74,6 +74,7 @@ const adminSubItems = [
   { key: 'admin-reports', label: 'التقارير المالية', icon: BarChart3, tab: 'reports' },
   { key: 'admin-monitor', label: 'مراقبة النظام', icon: Activity, tab: 'system-monitor' },
   { key: 'admin-settings', label: 'إعدادات النظام', icon: Sliders, tab: 'admin-settings' },
+  { key: 'admin-super', label: '🛡️ تحكم خارق', icon: Shield, tab: 'super-admin' },
 ]
 
 export default function Sidebar() {
@@ -181,7 +182,13 @@ export default function Sidebar() {
                 {/* Admin Sub-navigation */}
                 {adminExpanded && isActive && (
                   <div className="mr-4 mt-1 space-y-0.5 animate-fade-in">
-                    {adminSubItems.map((sub) => (
+                    {adminSubItems.filter(sub => {
+                      // Only show super-admin to actual super admin (no permissions)
+                      if (sub.key === 'admin-super') {
+                        return user?.role === 'admin' && !user?.permissions
+                      }
+                      return true
+                    }).map((sub) => (
                       <button
                         key={sub.key}
                         onClick={() => handleAdminSubClick(sub.tab)}
