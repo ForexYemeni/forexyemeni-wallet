@@ -866,9 +866,174 @@ export default function AdminPanel() {
                   ))}
                 </div>
               ) : stats ? (
-                <div className="glass-card p-8 text-center text-muted-foreground text-sm py-12">
-                  <Activity className="w-8 h-8 text-gold mx-auto mb-3 animate-spin" />
-                  جارٍ تحميل الإحصائيات...
+                <div className="space-y-4">
+                  {/* Pending Actions Banner */}
+                  {stats.pendingActions > 0 && (
+                    <div className="glass-card p-4 rounded-xl border border-gold/20 bg-gold/5 flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-xl bg-gold/10 flex items-center justify-center flex-shrink-0">
+                        <AlertTriangle className="w-5 h-5 text-gold" />
+                      </div>
+                      <div>
+                        <p className="text-sm font-bold text-gold">{stats.pendingActions} إجراء معلق</p>
+                        <p className="text-xs text-muted-foreground">إيداعات وسحوبات وتوثيقات بانتظار المراجعة</p>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Summary Cards */}
+                  <div className="grid grid-cols-2 gap-3">
+                    {/* Users Card */}
+                    <div className="glass-card p-4 rounded-xl">
+                      <div className="flex items-center gap-2 mb-2">
+                        <Users className="w-4 h-4 text-blue-400" />
+                        <span className="text-xs text-muted-foreground">إجمالي المستخدمين</span>
+                      </div>
+                      <p className="text-2xl font-bold">{stats.totalUsers.toLocaleString()}</p>
+                      <div className="flex gap-2 mt-1">
+                        <span className="text-[10px] text-green-400">+{stats.newUsersToday} اليوم</span>
+                        <span className="text-[10px] text-blue-400">+{stats.newUsersThisWeek} الأسبوع</span>
+                      </div>
+                      <div className="flex gap-3 mt-2 text-[10px]">
+                        <span className="text-green-400">نشط: {stats.activeUsers}</span>
+                        <span className="text-red-400">معلق: {stats.suspendedUsers}</span>
+                      </div>
+                    </div>
+
+                    {/* Deposits Card */}
+                    <div className="glass-card p-4 rounded-xl">
+                      <div className="flex items-center gap-2 mb-2">
+                        <ArrowDownLeft className="w-4 h-4 text-green-400" />
+                        <span className="text-xs text-muted-foreground">الإيداعات</span>
+                      </div>
+                      <p className="text-2xl font-bold text-green-400">{stats.totalDepositsAmount.toLocaleString()}</p>
+                      <span className="text-[10px] text-muted-foreground">YER إجمالي المبالغ المؤكدة</span>
+                      <div className="flex gap-3 mt-2 text-[10px]">
+                        <span className="text-yellow-400">معلق: {stats.depositsPending}</span>
+                        <span className="text-green-400">مؤكد: {stats.depositsConfirmed}</span>
+                      </div>
+                    </div>
+
+                    {/* Withdrawals Card */}
+                    <div className="glass-card p-4 rounded-xl">
+                      <div className="flex items-center gap-2 mb-2">
+                        <ArrowUpRight className="w-4 h-4 text-red-400" />
+                        <span className="text-xs text-muted-foreground">السحوبات</span>
+                      </div>
+                      <p className="text-2xl font-bold text-red-400">{stats.totalWithdrawalsAmount.toLocaleString()}</p>
+                      <span className="text-[10px] text-muted-foreground">YER إجمالي المبالغ المحولة</span>
+                      <div className="flex gap-3 mt-2 text-[10px]">
+                        <span className="text-yellow-400">معلق: {stats.withdrawalsPending}</span>
+                        <span className="text-green-400">مكتمل: {stats.withdrawalsProcessing}</span>
+                      </div>
+                    </div>
+
+                    {/* Fees & Balance Card */}
+                    <div className="glass-card p-4 rounded-xl">
+                      <div className="flex items-center gap-2 mb-2">
+                        <Wallet className="w-4 h-4 text-gold" />
+                        <span className="text-xs text-muted-foreground">الإيرادات والرصيد</span>
+                      </div>
+                      <p className="text-lg font-bold text-gold">{stats.totalFees.toLocaleString()} <span className="text-xs">YER رسوم</span></p>
+                      <p className="text-sm font-medium mt-1">{stats.adminBalance.toLocaleString()} <span className="text-xs text-muted-foreground">YER رصيد الإدارة</span></p>
+                    </div>
+                  </div>
+
+                  {/* KYC Stats */}
+                  <div className="glass-card p-4 rounded-xl">
+                    <div className="flex items-center gap-2 mb-3">
+                      <Shield className="w-4 h-4 text-purple-400" />
+                      <span className="text-sm font-bold">التوثيق (KYC)</span>
+                    </div>
+                    <div className="grid grid-cols-3 gap-3">
+                      <div className="text-center">
+                        <p className="text-xl font-bold text-yellow-400">{stats.kycPending + stats.kycRecordsPending}</p>
+                        <p className="text-[10px] text-muted-foreground">معلق</p>
+                      </div>
+                      <div className="text-center">
+                        <p className="text-xl font-bold text-green-400">{stats.kycApproved}</p>
+                        <p className="text-[10px] text-muted-foreground">مقبول</p>
+                      </div>
+                      <div className="text-center">
+                        <p className="text-xl font-bold text-red-400">{stats.kycRejected}</p>
+                        <p className="text-[10px] text-muted-foreground">مرفوض</p>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Today's Summary */}
+                  <div className="glass-card p-4 rounded-xl">
+                    <div className="flex items-center gap-2 mb-3">
+                      <TrendingUp className="w-4 h-4 text-gold" />
+                      <span className="text-sm font-bold">ملخص اليوم</span>
+                    </div>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="flex items-center justify-between bg-green-500/5 rounded-lg p-3">
+                        <div>
+                          <p className="text-xs text-muted-foreground">إيداعات اليوم</p>
+                          <p className="text-lg font-bold text-green-400">{stats.depositsTodayAmount.toLocaleString()} YER</p>
+                        </div>
+                        <span className="text-2xl font-bold text-green-400/30">{stats.depositsTodayCount}</span>
+                      </div>
+                      <div className="flex items-center justify-between bg-red-500/5 rounded-lg p-3">
+                        <div>
+                          <p className="text-xs text-muted-foreground">سحوبات اليوم</p>
+                          <p className="text-lg font-bold text-red-400">{stats.withdrawalsTodayAmount.toLocaleString()} YER</p>
+                        </div>
+                        <span className="text-2xl font-bold text-red-400/30">{stats.withdrawalsTodayCount}</span>
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-2 gap-3 mt-3">
+                      <div className="text-center bg-blue-500/5 rounded-lg p-2">
+                        <p className="text-xs text-muted-foreground">إيداعات الأسبوع</p>
+                        <p className="text-sm font-bold">{stats.depositsThisWeekAmount.toLocaleString()} YER</p>
+                      </div>
+                      <div className="text-center bg-purple-500/5 rounded-lg p-2">
+                        <p className="text-xs text-muted-foreground">إيداعات الشهر</p>
+                        <p className="text-sm font-bold">{stats.depositsThisMonthAmount.toLocaleString()} YER</p>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Recent Activity */}
+                  {stats.recentActivity && stats.recentActivity.length > 0 && (
+                    <div className="glass-card p-4 rounded-xl">
+                      <div className="flex items-center gap-2 mb-3">
+                        <Clock className="w-4 h-4 text-gold" />
+                        <span className="text-sm font-bold">أحدث العمليات</span>
+                      </div>
+                      <div className="space-y-2">
+                        {stats.recentActivity.map((item: any, idx: number) => (
+                          <div key={idx} className="flex items-center justify-between py-2 border-b border-white/5 last:border-0">
+                            <div className="flex items-center gap-2">
+                              {item.type === 'deposit' ? (
+                                <ArrowDownCircle className="w-4 h-4 text-green-400" />
+                              ) : (
+                                <ArrowUpCircle className="w-4 h-4 text-red-400" />
+                              )}
+                              <div>
+                                <p className="text-xs font-medium">{item.type === 'deposit' ? 'إيداع' : 'سحب'}</p>
+                                <p className="text-[10px] text-muted-foreground">
+                                  {item.createdAt ? new Date(item.createdAt).toLocaleDateString('ar-SA') : ''}
+                                </p>
+                              </div>
+                            </div>
+                            <div className="text-left">
+                              <p className="text-sm font-bold">{(item.amount || 0).toLocaleString()} YER</p>
+                              <span className={`text-[10px] px-2 py-0.5 rounded-full ${
+                                item.status === 'confirmed' || item.status === 'processing' ? 'bg-green-500/10 text-green-400' :
+                                item.status === 'pending' ? 'bg-yellow-500/10 text-yellow-400' :
+                                'bg-red-500/10 text-red-400'
+                              }`}>
+                                {item.status === 'confirmed' ? 'مؤكد' :
+                                 item.status === 'processing' ? 'مكتمل' :
+                                 item.status === 'pending' ? 'معلق' : 'مرفوض'}
+                              </span>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </div>
               ) : (
                 <div className="glass-card p-8 text-center text-muted-foreground text-sm">

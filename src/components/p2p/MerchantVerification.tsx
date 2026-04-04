@@ -22,18 +22,20 @@ export default function MerchantVerification({ onVerified }: { onVerified?: () =
   }, [user?.id])
 
   const fetchStatus = async () => {
+    if (!user?.id) return
     try {
-      const res = await fetch('/api/p2p/merchant')
+      const res = await fetch(`/api/p2p/merchant?userId=${user.id}`)
       const data = await res.json()
-      if (data.success) {
-        if (data.merchant) {
+      if (data.success && data.hasApplication && data.application) {
+        const app = data.application
+        if (app.status === 'approved') {
           setStatus('approved')
           onVerified?.()
-        } else if (data.pending) {
+        } else if (app.status === 'pending') {
           setStatus('pending')
-        } else if (data.rejected?.length > 0) {
+        } else if (app.status === 'rejected') {
           setStatus('rejected')
-          setRejectedList(data.rejected)
+          setRejectedList([app])
         } else {
           setStatus('none')
         }
@@ -68,12 +70,16 @@ export default function MerchantVerification({ onVerified }: { onVerified?: () =
       toast.error('جميع الحقول مطلوبة')
       return
     }
+    if (!user?.id) {
+      toast.error('يجب تسجيل الدخول أولاً')
+      return
+    }
     setLoading(true)
     try {
       const res = await fetch('/api/p2p/merchant', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ idPhoto, selfiePhoto, addressProof, fullName: fullName.trim(), phone: phone.trim() }),
+        body: JSON.stringify({ action: 'apply', userId: user.id, idPhoto, selfiePhoto, addressProof, fullName: fullName.trim(), phone: phone.trim() }),
       })
       const data = await res.json()
       if (data.success) {
