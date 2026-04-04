@@ -319,19 +319,19 @@ export async function sendAdminNewDepositEmail(
   network: string,
   depositId: string
 ): Promise<boolean> {
-  const feeInfo = fee > 0 ? `${fee.toFixed(2)} USDT` : 'لا يوجد'
+  const feeInfo = fee > 0 ? `${fee.toFixed(2)}&nbsp;USDT` : 'لا يوجد'
   const html = buildNotificationEmail(
     '&#128176;',
     'طلب إيداع جديد',
-    'تلقيت طلب إيداع جديد من المستخدم <strong>' + userName + '</strong> بقيمة <strong>' + amount.toFixed(2) + ' USDT</strong>.<br>يرجى مراجعة الطلب والموافقة عليه أو رفضه من لوحة الإدارة.',
+    'تلقيت طلب إيداع جديد من المستخدم <strong>' + userName + '</strong> بقيمة <strong>' + amount.toFixed(2) + '&nbsp;USDT</strong>.<br>يرجى مراجعة الطلب والموافقة عليه أو رفضه من لوحة الإدارة.',
     '#3b82f6',
     'طلب جديد بانتظار المراجعة',
     'info',
     [
       { label: 'المستخدم', value: userName + ' (' + userEmail + ')' },
-      { label: 'المبلغ المطلوب', value: amount.toFixed(2) + ' USDT' },
+      { label: 'المبلغ المطلوب', value: amount.toFixed(2) + '&nbsp;USDT' },
       { label: 'الرسوم', value: feeInfo },
-      { label: 'الصافي', value: netAmount.toFixed(2) + ' USDT' },
+      { label: 'الصافي', value: netAmount.toFixed(2) + '&nbsp;USDT' },
       { label: 'الشبكة', value: network },
       { label: 'رقم الطلب', value: depositId.substring(0, 16) + '...' },
     ]
@@ -353,15 +353,15 @@ export async function sendAdminNewWithdrawalEmail(
   const html = buildNotificationEmail(
     '&#128228;',
     'طلب سحب جديد',
-    'تلقيت طلب سحب جديد من المستخدم <strong>' + userName + '</strong> بقيمة <strong>' + amount.toFixed(2) + ' USDT</strong> (الصافي: ' + netAmount.toFixed(2) + ' USDT).<br>يرجى مراجعة الطلب وتنفيذه من لوحة الإدارة.',
+    'تلقيت طلب سحب جديد من المستخدم <strong>' + userName + '</strong> بقيمة <strong>' + amount.toFixed(2) + '&nbsp;USDT</strong> (الصافي: ' + netAmount.toFixed(2) + '&nbsp;USDT).<br>يرجى مراجعة الطلب وتنفيذه من لوحة الإدارة.',
     '#f59e0b',
     'طلب جديد بانتظار المراجعة',
     'warning',
     [
       { label: 'المستخدم', value: userName + ' (' + userEmail + ')' },
-      { label: 'المبلغ المطلوب', value: amount.toFixed(2) + ' USDT' },
-      { label: 'الرسوم', value: fee.toFixed(2) + ' USDT' },
-      { label: 'الصافي المرسل', value: netAmount.toFixed(2) + ' USDT' },
+      { label: 'المبلغ المطلوب', value: amount.toFixed(2) + '&nbsp;USDT' },
+      { label: 'الرسوم', value: fee.toFixed(2) + '&nbsp;USDT' },
+      { label: 'الصافي المرسل', value: netAmount.toFixed(2) + '&nbsp;USDT' },
       { label: 'الشبكة', value: network },
       { label: 'العنوان', value: toAddress.substring(0, 20) + '...' },
       { label: 'رقم الطلب', value: withdrawalId.substring(0, 16) + '...' },
@@ -404,18 +404,18 @@ export async function sendUserDepositConfirmedEmail(
   creditAmount: number,
   depositId: string
 ): Promise<boolean> {
-  const feeInfo = fee > 0 ? `تم خصم رسوم قدرها <strong>${fee.toFixed(2)} USDT</strong>` : 'بدون رسوم إضافية'
+  const feeInfo = fee > 0 ? `تم خصم رسوم قدرها <strong>${fee.toFixed(2)}&nbsp;USDT</strong>` : 'بدون رسوم إضافية'
   const html = buildNotificationEmail(
     '&#9989;',
     'تم تأكيد إيداعك بنجاح',
-    'تمت مراجعة وإيداعك بقيمة <strong>' + amount.toFixed(2) + ' USDT</strong> بنجاح.<br>' + feeInfo + '.<br>تم إضافة مبلغ <strong>' + creditAmount.toFixed(2) + ' USDT</strong> إلى رصيدك في المحفظة.',
+    'تمت مراجعة وإيداعك بقيمة <strong>' + amount.toFixed(2) + '&nbsp;USDT</strong> بنجاح.<br>' + feeInfo + '.<br>تم إضافة مبلغ <strong>' + creditAmount.toFixed(2) + '&nbsp;USDT</strong> إلى رصيدك في المحفظة.',
     '#22c55e',
     'تمت الموافقة',
     'success',
     [
-      { label: 'المبلغ المطلوب', value: amount.toFixed(2) + ' USDT' },
-      { label: 'الرسوم', value: fee > 0 ? fee.toFixed(2) + ' USDT' : 'لا يوجد' },
-      { label: 'المبلغ المضاف للرصيد', value: creditAmount.toFixed(2) + ' USDT' },
+      { label: 'المبلغ المطلوب', value: amount.toFixed(2) + '&nbsp;USDT' },
+      { label: 'الرسوم', value: fee > 0 ? fee.toFixed(2) + '&nbsp;USDT' : 'لا يوجد' },
+      { label: 'المبلغ المضاف للرصيد', value: creditAmount.toFixed(2) + '&nbsp;USDT' },
       { label: 'رقم العملية', value: depositId.substring(0, 16) + '...' },
     ]
   )
@@ -433,12 +433,12 @@ export async function sendUserDepositRejectedEmail(
   const html = buildNotificationEmail(
     '&#10060;',
     'تم رفض طلب الإيداع',
-    'نأسف، تم رفض طلب إيداعك بقيمة <strong>' + amount.toFixed(2) + ' USDT</strong>.' + reasonText + '<br>يمكنك تقديم طلب إيداع جديد أو التواصل مع فريق الدعم الفني للمساعدة.',
+    'نأسف، تم رفض طلب إيداعك بقيمة <strong>' + amount.toFixed(2) + '&nbsp;USDT</strong>.' + reasonText + '<br>يمكنك تقديم طلب إيداع جديد أو التواصل مع فريق الدعم الفني للمساعدة.',
     '#ef4444',
     'تم الرفض',
     'error',
     [
-      { label: 'المبلغ', value: amount.toFixed(2) + ' USDT' },
+      { label: 'المبلغ', value: amount.toFixed(2) + '&nbsp;USDT' },
       { label: 'سبب الرفض', value: reason || 'غير محدد' },
       { label: 'رقم العملية', value: depositId.substring(0, 16) + '...' },
     ]
@@ -455,12 +455,12 @@ export async function sendUserDepositReviewingEmail(
   const html = buildNotificationEmail(
     '&#128269;',
     'طلب إيداعك قيد المراجعة',
-    'تم بدء مراجعة طلب إيداعك بقيمة <strong>' + amount.toFixed(2) + ' USDT</strong> من قبل فريق الإدارة.<br>سيتم إشعارك بالنتيجة فور اكتمال المراجعة.',
+    'تم بدء مراجعة طلب إيداعك بقيمة <strong>' + amount.toFixed(2) + '&nbsp;USDT</strong> من قبل فريق الإدارة.<br>سيتم إشعارك بالنتيجة فور اكتمال المراجعة.',
     '#f59e0b',
     'قيد المراجعة',
     'warning',
     [
-      { label: 'المبلغ', value: amount.toFixed(2) + ' USDT' },
+      { label: 'المبلغ', value: amount.toFixed(2) + '&nbsp;USDT' },
       { label: 'رقم العملية', value: depositId.substring(0, 16) + '...' },
     ]
   )
@@ -477,13 +477,13 @@ export async function sendUserWithdrawalApprovedEmail(
   const html = buildNotificationEmail(
     '&#9989;',
     'تم قبول طلب السحب',
-    'تم قبول طلب سحبك بقيمة <strong>' + amount.toFixed(2) + ' USDT</strong> (الصافي: ' + netAmount.toFixed(2) + ' USDT).<br>جاري معالجة تحويل الأموال إلى عنوانك المسجل وسيتم إشعارك فور التنفيذ.',
+    'تم قبول طلب سحبك بقيمة <strong>' + amount.toFixed(2) + '&nbsp;USDT</strong> (الصافي: ' + netAmount.toFixed(2) + '&nbsp;USDT).<br>جاري معالجة تحويل الأموال إلى عنوانك المسجل وسيتم إشعارك فور التنفيذ.',
     '#22c55e',
     'تمت الموافقة',
     'success',
     [
-      { label: 'المبلغ المطلوب', value: amount.toFixed(2) + ' USDT' },
-      { label: 'الصافي المرسل', value: netAmount.toFixed(2) + ' USDT' },
+      { label: 'المبلغ المطلوب', value: amount.toFixed(2) + '&nbsp;USDT' },
+      { label: 'الصافي المرسل', value: netAmount.toFixed(2) + '&nbsp;USDT' },
       { label: 'رقم العملية', value: withdrawalId.substring(0, 16) + '...' },
     ]
   )
@@ -501,12 +501,12 @@ export async function sendUserWithdrawalProcessingEmail(
   const html = buildNotificationEmail(
     '&#128176;',
     'تم تنفيذ السحب بنجاح',
-    'تم تحويل مبلغ <strong>' + netAmount.toFixed(2) + ' USDT</strong> بنجاح إلى العنوان المحفوظ لدينا.<br>يرجى تأكيد الاستلام من خلال التطبيق.',
+    'تم تحويل مبلغ <strong>' + netAmount.toFixed(2) + '&nbsp;USDT</strong> بنجاح إلى العنوان المحفوظ لدينا.<br>يرجى تأكيد الاستلام من خلال التطبيق.',
     '#22c55e',
     'تم التنفيذ بنجاح',
     'success',
     [
-      { label: 'المبلغ المرسل', value: netAmount.toFixed(2) + ' USDT' },
+      { label: 'المبلغ المرسل', value: netAmount.toFixed(2) + '&nbsp;USDT' },
       { label: 'إلى العنوان', value: toAddress.substring(0, 24) + '...' },
       { label: 'رقم العملية', value: withdrawalId.substring(0, 16) + '...' },
     ]
@@ -525,12 +525,12 @@ export async function sendUserWithdrawalRejectedEmail(
   const html = buildNotificationEmail(
     '&#10060;',
     'تم رفض طلب السحب',
-    'نأسف، تم رفض طلب سحبك بقيمة <strong>' + amount.toFixed(2) + ' USDT</strong>.' + reasonText + '<br>تم إعادة المبلغ بالكامل إلى رصيدك المتاح في المحفظة.',
+    'نأسف، تم رفض طلب سحبك بقيمة <strong>' + amount.toFixed(2) + '&nbsp;USDT</strong>.' + reasonText + '<br>تم إعادة المبلغ بالكامل إلى رصيدك المتاح في المحفظة.',
     '#ef4444',
     'تم الرفض',
     'error',
     [
-      { label: 'المبلغ', value: amount.toFixed(2) + ' USDT' },
+      { label: 'المبلغ', value: amount.toFixed(2) + '&nbsp;USDT' },
       { label: 'سبب الرفض', value: reason || 'غير محدد' },
       { label: 'رقم العملية', value: withdrawalId.substring(0, 16) + '...' },
     ]
@@ -587,13 +587,13 @@ export async function sendMerchantNewOrderEmail(
   const html = buildNotificationEmail(
     '&#128230;',
     'طلب تداول P2P جديد',
-    'لديك طلب تداول جديد من المستخدم <strong>' + userName + '</strong> بقيمة <strong>' + amount.toFixed(2) + ' ' + currency + '</strong>.<br>يرجى مراجعة الطلب والموافقة عليه أو رفضه من لوحة تحكم التاجر.',
+    'لديك طلب تداول جديد من المستخدم <strong>' + userName + '</strong> بقيمة <strong>' + amount.toFixed(2) + '&nbsp;' + currency + '</strong>.<br>يرجى مراجعة الطلب والموافقة عليه أو رفضه من لوحة تحكم التاجر.',
     '#3b82f6',
     'طلب جديد',
     'info',
     [
       { label: 'المستخدم', value: userName },
-      { label: 'المبلغ', value: amount.toFixed(2) + ' ' + currency },
+      { label: 'المبلغ', value: amount.toFixed(2) + '&nbsp;' + currency },
       { label: 'رقم الطلب', value: orderId.substring(0, 16) + '...' },
     ]
   )
@@ -610,12 +610,12 @@ export async function sendMerchantOrderCompletedEmail(
   const html = buildNotificationEmail(
     '&#9989;',
     'تم اكتمال الصفقة بنجاح',
-    'تمت الموافقة على الصفقة <strong>#' + orderId.substring(0, 8) + '</strong> بنجاح بقيمة <strong>' + amount.toFixed(2) + ' ' + currency + '</strong>.<br>تم تحديث رصيدك وفقاً لتفاصيل الصفقة.',
+    'تمت الموافقة على الصفقة <strong>#' + orderId.substring(0, 8) + '</strong> بنجاح بقيمة <strong>' + amount.toFixed(2) + '&nbsp;' + currency + '</strong>.<br>تم تحديث رصيدك وفقاً لتفاصيل الصفقة.',
     '#22c55e',
     'صفقة مكتملة',
     'success',
     [
-      { label: 'المبلغ', value: amount.toFixed(2) + ' ' + currency },
+      { label: 'المبلغ', value: amount.toFixed(2) + '&nbsp;' + currency },
       { label: 'رقم الصفقة', value: orderId.substring(0, 16) + '...' },
     ]
   )
@@ -633,12 +633,12 @@ export async function sendMerchantOrderCancelledEmail(
   const html = buildNotificationEmail(
     '&#10060;',
     'تم إلغاء الصفقة',
-    'تم إلغاء الصفقة <strong>#' + orderId.substring(0, 8) + '</strong> بقيمة <strong>' + amount.toFixed(2) + ' ' + currency + '</strong>.<br>السبب: ' + (reason || 'غير محدد'),
+    'تم إلغاء الصفقة <strong>#' + orderId.substring(0, 8) + '</strong> بقيمة <strong>' + amount.toFixed(2) + '&nbsp;' + currency + '</strong>.<br>السبب: ' + (reason || 'غير محدد'),
     '#ef4444',
     'صفقة ملغية',
     'error',
     [
-      { label: 'المبلغ', value: amount.toFixed(2) + ' ' + currency },
+      { label: 'المبلغ', value: amount.toFixed(2) + '&nbsp;' + currency },
       { label: 'السبب', value: reason || 'غير محدد' },
       { label: 'رقم الصفقة', value: orderId.substring(0, 16) + '...' },
     ]
@@ -656,13 +656,13 @@ export async function sendMerchantDepositConfirmedEmail(
   const html = buildNotificationEmail(
     '&#9989;',
     'تم تأكيد إيداعك بنجاح',
-    'تم تأكيد إيداعك بقيمة <strong>' + amount.toFixed(2) + ' USDT</strong> بنجاح.<br>تم إضافة مبلغ <strong>' + creditAmount.toFixed(2) + ' USDT</strong> إلى رصيدك كتاجر.',
+    'تم تأكيد إيداعك بقيمة <strong>' + amount.toFixed(2) + '&nbsp;USDT</strong> بنجاح.<br>تم إضافة مبلغ <strong>' + creditAmount.toFixed(2) + '&nbsp;USDT</strong> إلى رصيدك كتاجر.',
     '#22c55e',
     'تمت الموافقة',
     'success',
     [
-      { label: 'المبلغ المطلوب', value: amount.toFixed(2) + ' USDT' },
-      { label: 'المبلغ المضاف', value: creditAmount.toFixed(2) + ' USDT' },
+      { label: 'المبلغ المطلوب', value: amount.toFixed(2) + '&nbsp;USDT' },
+      { label: 'المبلغ المضاف', value: creditAmount.toFixed(2) + '&nbsp;USDT' },
       { label: 'رقم العملية', value: depositId.substring(0, 16) + '...' },
     ]
   )
@@ -679,12 +679,12 @@ export async function sendMerchantDepositRejectedEmail(
   const html = buildNotificationEmail(
     '&#10060;',
     'تم رفض طلب الإيداع',
-    'نأسف، تم رفض طلب إيداعك بقيمة <strong>' + amount.toFixed(2) + ' USDT</strong>.<br>السبب: ' + (reason || 'غير محدد'),
+    'نأسف، تم رفض طلب إيداعك بقيمة <strong>' + amount.toFixed(2) + '&nbsp;USDT</strong>.<br>السبب: ' + (reason || 'غير محدد'),
     '#ef4444',
     'تم الرفض',
     'error',
     [
-      { label: 'المبلغ', value: amount.toFixed(2) + ' USDT' },
+      { label: 'المبلغ', value: amount.toFixed(2) + '&nbsp;USDT' },
       { label: 'السبب', value: reason || 'غير محدد' },
       { label: 'رقم العملية', value: depositId.substring(0, 16) + '...' },
     ]
@@ -702,13 +702,13 @@ export async function sendMerchantWithdrawalApprovedEmail(
   const html = buildNotificationEmail(
     '&#9989;',
     'تم قبول طلب السحب',
-    'تم قبول طلب سحبك بقيمة <strong>' + amount.toFixed(2) + ' USDT</strong> (الصافي: ' + netAmount.toFixed(2) + ' USDT).<br>جاري معالجة التحويل.',
+    'تم قبول طلب سحبك بقيمة <strong>' + amount.toFixed(2) + '&nbsp;USDT</strong> (الصافي: ' + netAmount.toFixed(2) + '&nbsp;USDT).<br>جاري معالجة التحويل.',
     '#22c55e',
     'تمت الموافقة',
     'success',
     [
-      { label: 'المبلغ', value: amount.toFixed(2) + ' USDT' },
-      { label: 'الصافي', value: netAmount.toFixed(2) + ' USDT' },
+      { label: 'المبلغ', value: amount.toFixed(2) + '&nbsp;USDT' },
+      { label: 'الصافي', value: netAmount.toFixed(2) + '&nbsp;USDT' },
       { label: 'رقم العملية', value: withdrawalId.substring(0, 16) + '...' },
     ]
   )
@@ -725,12 +725,12 @@ export async function sendMerchantWithdrawalProcessingEmail(
   const html = buildNotificationEmail(
     '&#128176;',
     'تم تنفيذ السحب بنجاح',
-    'تم تحويل مبلغ <strong>' + netAmount.toFixed(2) + ' USDT</strong> بنجاح إلى العنوان المحفوظ.',
+    'تم تحويل مبلغ <strong>' + netAmount.toFixed(2) + '&nbsp;USDT</strong> بنجاح إلى العنوان المحفوظ.',
     '#22c55e',
     'تم التنفيذ بنجاح',
     'success',
     [
-      { label: 'المبلغ المرسل', value: netAmount.toFixed(2) + ' USDT' },
+      { label: 'المبلغ المرسل', value: netAmount.toFixed(2) + '&nbsp;USDT' },
       { label: 'إلى العنوان', value: toAddress.substring(0, 24) + '...' },
       { label: 'رقم العملية', value: withdrawalId.substring(0, 16) + '...' },
     ]
@@ -748,12 +748,12 @@ export async function sendMerchantWithdrawalRejectedEmail(
   const html = buildNotificationEmail(
     '&#10060;',
     'تم رفض طلب السحب',
-    'نأسف، تم رفض طلب سحبك بقيمة <strong>' + amount.toFixed(2) + ' USDT</strong>.<br>تم إعادة المبلغ بالكامل إلى رصيدك. السبب: ' + (reason || 'غير محدد'),
+    'نأسف، تم رفض طلب سحبك بقيمة <strong>' + amount.toFixed(2) + '&nbsp;USDT</strong>.<br>تم إعادة المبلغ بالكامل إلى رصيدك. السبب: ' + (reason || 'غير محدد'),
     '#ef4444',
     'تم الرفض',
     'error',
     [
-      { label: 'المبلغ', value: amount.toFixed(2) + ' USDT' },
+      { label: 'المبلغ', value: amount.toFixed(2) + '&nbsp;USDT' },
       { label: 'السبب', value: reason || 'غير محدد' },
       { label: 'رقم العملية', value: withdrawalId.substring(0, 16) + '...' },
     ]
