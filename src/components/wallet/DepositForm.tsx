@@ -20,6 +20,13 @@ import {
   X,
 } from 'lucide-react'
 
+function getMethodLabel(m: any): string {
+  if (m.type === 'bank_deposit') return 'إيداع بنكي'
+  if (m.type === 'atm_transfer') return 'تحويل عبر صراف'
+  if (m.category === 'crypto') return 'عملات رقمية'
+  return 'إيداع'
+}
+
 import { compressImage } from '@/lib/image-compress'
 
 export default function DepositForm() {
@@ -178,7 +185,7 @@ export default function DepositForm() {
                     {m.category === 'crypto' ? <Wallet className="w-5 h-5" /> : <Building className="w-5 h-5" />}
                   </div>
                   <div>
-                    <p className="text-sm font-medium">{m.name || (m.type === 'bank_deposit' ? 'إيداع بنكي' : m.type === 'atm_transfer' ? 'تحويل عبر صراف' : m.category === 'crypto' ? 'عملات رقمية' : 'إيداع'))}</p>
+                    <p className="text-sm font-medium">{m.name || getMethodLabel(m)}</p>
                     <p className="text-[10px] text-muted-foreground">
                       {m.type === 'bank_deposit' ? (m.accountName || m.network || '') :
                        m.category === 'crypto' ? (m.network || '') :
@@ -212,7 +219,7 @@ export default function DepositForm() {
                 {selectedMethod.category === 'crypto' ? <Wallet className="w-5 h-5" /> : <Building className="w-5 h-5" />}
               </div>
               <div>
-                <h2 className="text-sm font-bold">{selectedMethod.name || (selectedMethod.type === 'bank_deposit' ? 'إيداع بنكي' : selectedMethod.type === 'atm_transfer' ? 'تحويل عبر صراف' : 'إيداع')}</h2>
+                <h2 className="text-sm font-bold">{selectedMethod.name || getMethodLabel(selectedMethod)}</h2>
                 <p className="text-xs text-muted-foreground">
                   {selectedMethod.type === 'bank_deposit' ? (selectedMethod.accountName || selectedMethod.network || '') :
                    selectedMethod.category === 'crypto' ? (selectedMethod.network || '') :
