@@ -389,7 +389,7 @@ export default function AdminPanel() {
           status === 'reviewing' ? 'تم تحويل للمراجعة' :
           'تم رفض الإيداع'
         )
-        fetchDeposits(); fetchUsers()
+        fetchDeposits(); fetchUsers(); fetchStats()
       } else {
         toast.error(data.message)
       }
@@ -411,7 +411,7 @@ export default function AdminPanel() {
       const data = await res.json()
       if (data.success) {
         toast.success('تم تحديث السحب')
-        fetchWithdrawals(); fetchUsers()
+        fetchWithdrawals(); fetchUsers(); fetchStats()
       } else {
         toast.error(data.message)
       }
@@ -766,9 +766,18 @@ export default function AdminPanel() {
       const data = await res.json()
       if (data.success) {
         toast.success(balanceAction === 'add' ? `تم إضافة ${amount} USDT` : `تم سحب ${amount} USDT`)
+        // If admin adjusted their own balance, update local store
+        if (balanceDialogUser?.id === user?.id) {
+          useAuthStore.getState().updateBalance(
+            balanceAction === 'add'
+              ? (user?.balance ?? 0) + amount
+              : (user?.balance ?? 0) - amount
+          )
+        }
         setBalanceDialogUser(null)
         setBalanceAmount('')
         fetchUsers()
+        fetchStats()
       } else {
         toast.error(data.message)
       }
@@ -1054,7 +1063,7 @@ export default function AdminPanel() {
                         <span className="text-xs text-muted-foreground">الإيداعات</span>
                       </div>
                       <p className="text-2xl font-bold text-green-400">{stats.totalDepositsAmount.toLocaleString()}</p>
-                      <span className="text-[10px] text-muted-foreground">YER إجمالي المبالغ المؤكدة</span>
+                      <span className="text-[10px] text-muted-foreground">USDT إجمالي المبالغ المؤكدة</span>
                       <div className="flex gap-3 mt-2 text-[10px]">
                         <span className="text-yellow-400">معلق: {stats.depositsPending}</span>
                         <span className="text-green-400">مؤكد: {stats.depositsConfirmed}</span>
@@ -1068,7 +1077,7 @@ export default function AdminPanel() {
                         <span className="text-xs text-muted-foreground">السحوبات</span>
                       </div>
                       <p className="text-2xl font-bold text-red-400">{stats.totalWithdrawalsAmount.toLocaleString()}</p>
-                      <span className="text-[10px] text-muted-foreground">YER إجمالي المبالغ المحولة</span>
+                      <span className="text-[10px] text-muted-foreground">USDT إجمالي المبالغ المحولة</span>
                       <div className="flex gap-3 mt-2 text-[10px]">
                         <span className="text-yellow-400">معلق: {stats.withdrawalsPending}</span>
                         <span className="text-green-400">مكتمل: {stats.withdrawalsProcessing}</span>
@@ -1081,8 +1090,8 @@ export default function AdminPanel() {
                         <Wallet className="w-4 h-4 text-gold" />
                         <span className="text-xs text-muted-foreground">الإيرادات والرصيد</span>
                       </div>
-                      <p className="text-lg font-bold text-gold">{stats.totalFees.toLocaleString()} <span className="text-xs">YER رسوم</span></p>
-                      <p className="text-sm font-medium mt-1">{stats.adminBalance.toLocaleString()} <span className="text-xs text-muted-foreground">YER رصيد الإدارة</span></p>
+                      <p className="text-lg font-bold text-gold">{stats.totalFees.toLocaleString()} <span className="text-xs">USDT رسوم</span></p>
+                      <p className="text-sm font-medium mt-1">{stats.adminBalance.toLocaleString()} <span className="text-xs text-muted-foreground">USDT رصيد الإدارة</span></p>
                     </div>
                   </div>
 
@@ -1118,14 +1127,14 @@ export default function AdminPanel() {
                       <div className="flex items-center justify-between bg-green-500/5 rounded-lg p-3">
                         <div>
                           <p className="text-xs text-muted-foreground">إيداعات اليوم</p>
-                          <p className="text-lg font-bold text-green-400">{stats.depositsTodayAmount.toLocaleString()} YER</p>
+                          <p className="text-lg font-bold text-green-400">{stats.depositsTodayAmount.toLocaleString()} USDT</p>
                         </div>
                         <span className="text-2xl font-bold text-green-400/30">{stats.depositsTodayCount}</span>
                       </div>
                       <div className="flex items-center justify-between bg-red-500/5 rounded-lg p-3">
                         <div>
                           <p className="text-xs text-muted-foreground">سحوبات اليوم</p>
-                          <p className="text-lg font-bold text-red-400">{stats.withdrawalsTodayAmount.toLocaleString()} YER</p>
+                          <p className="text-lg font-bold text-red-400">{stats.withdrawalsTodayAmount.toLocaleString()} USDT</p>
                         </div>
                         <span className="text-2xl font-bold text-red-400/30">{stats.withdrawalsTodayCount}</span>
                       </div>
@@ -1133,11 +1142,11 @@ export default function AdminPanel() {
                     <div className="grid grid-cols-2 gap-3 mt-3">
                       <div className="text-center bg-blue-500/5 rounded-lg p-2">
                         <p className="text-xs text-muted-foreground">إيداعات الأسبوع</p>
-                        <p className="text-sm font-bold">{stats.depositsThisWeekAmount.toLocaleString()} YER</p>
+                        <p className="text-sm font-bold">{stats.depositsThisWeekAmount.toLocaleString()} USDT</p>
                       </div>
                       <div className="text-center bg-purple-500/5 rounded-lg p-2">
                         <p className="text-xs text-muted-foreground">إيداعات الشهر</p>
-                        <p className="text-sm font-bold">{stats.depositsThisMonthAmount.toLocaleString()} YER</p>
+                        <p className="text-sm font-bold">{stats.depositsThisMonthAmount.toLocaleString()} USDT</p>
                       </div>
                     </div>
                   </div>
@@ -1166,7 +1175,7 @@ export default function AdminPanel() {
                               </div>
                             </div>
                             <div className="text-left">
-                              <p className="text-sm font-bold">{(item.amount || 0).toLocaleString()} YER</p>
+                              <p className="text-sm font-bold">{(item.amount || 0).toLocaleString()} USDT</p>
                               <span className={`text-[10px] px-2 py-0.5 rounded-full ${
                                 item.status === 'confirmed' || item.status === 'processing' ? 'bg-green-500/10 text-green-400' :
                                 item.status === 'pending' ? 'bg-yellow-500/10 text-yellow-400' :

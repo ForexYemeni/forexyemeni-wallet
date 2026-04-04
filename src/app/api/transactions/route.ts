@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { transactionOperations } from '@/lib/db-firebase'
+import { transactionOperations, userOperations } from '@/lib/db-firebase'
 
 export async function GET(request: NextRequest) {
   try {
@@ -15,9 +15,17 @@ export async function GET(request: NextRequest) {
 
     const transactions = await transactionOperations.findMany(userId)
 
+    // Also return latest user balance for real-time updates
+    let balance = null
+    try {
+      const userData = await userOperations.findUnique({ id: userId })
+      if (userData) balance = userData.balance ?? 0
+    } catch { /* ignore */ }
+
     return NextResponse.json({
       success: true,
       transactions,
+      balance,
     })
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : 'حدث خطأ'

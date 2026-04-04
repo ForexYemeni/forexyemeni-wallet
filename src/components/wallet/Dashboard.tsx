@@ -22,15 +22,25 @@ interface Transaction {
 }
 
 export default function Dashboard() {
-  const { user, setScreen } = useAuthStore()
+  const { user, setScreen, updateBalance } = useAuthStore()
   const [transactions, setTransactions] = useState<Transaction[]>([])
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
     if (user?.id) {
       fetchTransactions()
+      fetchLatestUserData()
     }
   }, [user?.id])
+
+  // Refresh data when screen becomes active (e.g. returning from another tab)
+  useEffect(() => {
+    if (user?.id) {
+      fetchTransactions()
+      fetchLatestUserData()
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.currentScreen])
 
   const fetchTransactions = async () => {
     if (!user?.id) return
@@ -39,11 +49,30 @@ export default function Dashboard() {
       const data = await res.json()
       if (data.success) {
         setTransactions(data.transactions.slice(0, 5))
+        // Update local balance from server
+        if (data.balance !== null && data.balance !== undefined && data.balance !== user?.balance) {
+          updateBalance(data.balance)
+        }
       }
     } catch {
       // silently fail
     } finally {
       setLoading(false)
+    }
+  }
+
+  const fetchLatestUserData = async () => {
+    if (!user?.id) return
+    try {
+      const res = await fetch(`/api/transactions?userId=${user.id}`)
+      const data = await res.json()
+      if (data.success && data.balance !== null && data.balance !== undefined) {
+        if (data.balance !== user?.balance) {
+          updateBalance(data.balance)
+        }
+      }
+    } catch {
+      // silently fail
     }
   }
 
