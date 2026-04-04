@@ -20,6 +20,11 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ success: false, message: 'المستخدم غير موجود' }, { status: 404 })
     }
 
+    // PIN can only be set ONCE - admin must reset if user needs a new one
+    if (user.pinHash) {
+      return NextResponse.json({ success: false, message: 'رمز PIN تم إعداده مسبقاً ولا يمكن تغييره. يرجى التواصل مع الإدارة.' }, { status: 400 })
+    }
+
     const pinHash = await bcrypt.hash(pin, 10)
     await userOperations.update({ id: userId }, { pinHash })
 

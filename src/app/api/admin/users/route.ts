@@ -20,10 +20,37 @@ export async function GET() {
 // POST update user (admin)
 export async function POST(request: NextRequest) {
   try {
-    const { userId, status, role, balance, balanceAdjustment, kycStatus, notes, permissions, merchantId, approvePinReset, rejectPinReset, removeMerchant } = await request.json()
+    const { userId, status, role, balance, balanceAdjustment, kycStatus, notes, permissions, merchantId, approvePinReset, rejectPinReset, removeMerchant, resetUserPin } = await request.json()
 
     if (!userId) {
       return NextResponse.json({ success: false, message: 'معرف المستخدم مطلوب' }, { status: 400 })
+    }
+
+    // Handle direct PIN reset by admin (no user request needed)
+    if (resetUserPin) {
+      // Clear user's pinHash so they'll be prompted to set a new one
+      await userOperations.update({ id: userId }, { pinHash: null as any })
+
+      // Also clear any pending request
+      try {
+        const db = getDb()
+        await db.collection('pendingPinReset').doc(userId).delete()
+      } catch {}
+
+      // Notify user
+      const targetUser = await userOperations.findUnique({ id: userId })
+      if (targetUser) {
+        await notificationOperations.create({
+          userId,
+          title: 'تم إعادة تعيين رمز PIN',
+          message: 'قامت الإدارة بإعادة تعيين رمز PIN الخاص بك. يرجى إعداد رمز PIN جديد عند تسجيل الدخول التالي.',
+          type: 'warning',
+          read: false,
+        })
+        await sendPushNotification(userId, 'تم إعادة تعيين رمز PIN', 'يرجى إعداد رمز PIN جديد عند تسجيل الدخول التالي.', 'warning')
+      }
+
+      return NextResponse.json({ success: true, message: 'تم إعادة تعيين رمز PIN للمستخدم' })
     }
 
     // Handle PIN reset approval

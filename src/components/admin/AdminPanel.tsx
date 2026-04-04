@@ -55,6 +55,7 @@ import {
   Repeat,
   Store,
   KeyRound,
+  RotateCcw,
 } from 'lucide-react'
 
 // ===================== TYPES =====================
@@ -855,6 +856,29 @@ export default function AdminPanel() {
     }
   }
 
+  // ===== RESET USER PIN (clear so they set new one) =====
+  const handleResetUserPin = async (userId: string, userEmail: string) => {
+    if (!confirm(`هل أنت متأكد من إعادة تعيين PIN للمستخدم ${userEmail}؟\nسيُطلب من المستخدم إعداد رمز PIN جديد عند تسجيل الدخول.`)) return
+    setActionLoading(userId)
+    try {
+      const res = await fetch('/api/admin/users', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId, resetUserPin: true }),
+      })
+      const data = await res.json()
+      if (data.success) {
+        toast.success(`تم إعادة تعيين PIN للمستخدم ${userEmail}`)
+      } else {
+        toast.error(data.message)
+      }
+    } catch {
+      toast.error('خطأ في إعادة تعيين PIN')
+    } finally {
+      setActionLoading(null)
+    }
+  }
+
   // Determine if user has specific permissions
   const hasPermissions = user?.permissions && Object.keys(user.permissions).length > 0
 
@@ -1410,6 +1434,17 @@ export default function AdminPanel() {
                               >
                                 {actionLoading === u.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <KeyRound className="w-3.5 h-3.5" />}
                                 إرسال PIN
+                              </button>
+                            )}
+                            {/* Reset PIN — admin only, non-admin users */}
+                            {u.role !== 'admin' && (
+                              <button
+                                onClick={() => handleResetUserPin(u.id, u.email)}
+                                disabled={actionLoading === u.id}
+                                className="flex items-center justify-center gap-1 text-xs py-2.5 rounded-lg bg-orange-500/10 text-orange-400 hover:bg-orange-500/20 transition-colors font-medium"
+                              >
+                                {actionLoading === u.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RotateCcw className="w-3.5 h-3.5" />}
+                                إعادة تعيين PIN
                               </button>
                             )}
                           </div>

@@ -235,6 +235,7 @@ export default function WithdrawForm() {
           network,
           paymentMethodId: selectedMethod?.id,
           paymentMethodName,
+          pin: pinCode,
         }),
       })
       const data = await res.json()
@@ -275,9 +276,7 @@ export default function WithdrawForm() {
       const pinData = await pinRes.json()
       if (!pinData.success) {
         if (!pinData.hasPin) {
-          toast.error('يرجى إعداد رمز PIN أولاً')
-          setScreen('set-pin')
-          setShowPinDialog(false)
+          toast.error('لم يتم إعداد رمز PIN لحسابك. يرجى التواصل مع الإدارة لتفعيله.')
         } else {
           toast.error(pinData.message || 'رمز PIN غير صحيح')
         }
