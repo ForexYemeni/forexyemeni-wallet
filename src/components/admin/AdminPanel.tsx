@@ -2056,7 +2056,7 @@ function PaymentMethodsManager({ methods, onRefresh }: { methods: any[]; onRefre
 
 function AdminSettingsPanel({ settings, onRefresh }: { settings: { email: string; phone: string | null; hasPIN: boolean }; onRefresh: () => void }) {
   const { user } = useAuthStore()
-  const [activeSection, setActiveSection] = useState<'phone' | 'email' | 'password' | 'pin' | 'fees'>('phone')
+  const [activeSection, setActiveSection] = useState<'phone' | 'email' | 'password' | 'pin' | 'fees' | 'cleanup'>('phone')
   const [loading, setLoading] = useState(false)
 
   // Phone form
@@ -2072,6 +2072,10 @@ function AdminSettingsPanel({ settings, onRefresh }: { settings: { email: string
   const [pinPassword, setPinPassword] = useState('')
   const [pinCode, setPinCode] = useState('')
   const [pinConfirm, setPinConfirm] = useState('')
+  // Cleanup form
+  const [cleanupPassword, setCleanupPassword] = useState('')
+  const [cleanupConfirmText, setCleanupConfirmText] = useState('')
+  const [cleanupResults, setCleanupResults] = useState<Record<string, number> | null>(null)
   // Fee form
   const [depositFee, setDepositFee] = useState('')
   const [withdrawalFee, setWithdrawalFee] = useState('')
@@ -2120,12 +2124,37 @@ function AdminSettingsPanel({ settings, onRefresh }: { settings: { email: string
     }
   }
 
+  const handleCleanup = async () => {
+    setLoading(true)
+    try {
+      const res = await fetch('/api/admin/cleanup', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId: user?.id, password: cleanupPassword, confirmText: cleanupConfirmText }),
+      })
+      const data = await res.json()
+      if (data.success) {
+        toast.success(data.message)
+        setCleanupResults(data.results)
+        setCleanupPassword('')
+        setCleanupConfirmText('')
+      } else {
+        toast.error(data.message)
+      }
+    } catch {
+      toast.error('خطأ في الاتصال')
+    } finally {
+      setLoading(false)
+    }
+  }
+
   const sections = [
     { key: 'fees' as const, label: 'الرسوم', icon: DollarSign },
     { key: 'phone' as const, label: 'الهاتف', icon: Phone, hasValue: !!settings.phone, value: settings.phone },
     { key: 'email' as const, label: 'البريد', icon: Mail, hasValue: !!settings.email, value: settings.email },
     { key: 'password' as const, label: 'كلمة المرور', icon: Lock, hasValue: true },
     { key: 'pin' as const, label: 'رمز PIN', icon: Shield, hasValue: settings.hasPIN, value: settings.hasPIN ? 'مُفعّل ✓' : 'غير معين' },
+    { key: 'cleanup' as const, label: 'تنظيف', icon: Trash2 },
   ]
 
   return (
@@ -2316,6 +2345,81 @@ function AdminSettingsPanel({ settings, onRefresh }: { settings: { email: string
             className="w-full h-11 gold-gradient text-gray-900 font-bold rounded-xl hover:opacity-90 transition-all"
           >
             {loading ? <Loader2 className="w-4 h-4 animate-spin mx-auto" /> : settings.hasPIN ? 'تغيير PIN' : 'تعيين PIN'}
+          </button>
+        </div>
+      )}
+
+      {/* Cleanup Section */}
+      {activeSection === 'cleanup' && (
+        <div className="glass-card p-5 space-y-4">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-red-500/10 flex items-center justify-center">
+              <Trash2 className="w-5 h-5 text-red-400" />
+            </div>
+            <div>
+              <h3 className="text-sm font-bold text-red-400">تنظيف قاعدة البيانات</h3>
+              <p className="text-[10px] text-muted-foreground">حذف جميع البيانات والبدء من الصفر</p>
+            </div>
+          </div>
+
+          <div className="p-3 rounded-lg bg-red-500/5 border border-red-500/10 text-xs text-red-400 space-y-2">
+            <p className="font-bold">⚠️ تحذير: هذا الإجراء لا يمكن التراجع عنه!</p>
+            <p>سيتم حذف:</p>
+            <ul className="list-disc list-inside space-y-0.5 text-muted-foreground">
+              <li>جميع المستخدمين (غير الإدارة)</li>
+              <li>جميع طلبات الإيداع</li>
+              <li>جميع طلبات السحب</li>
+              <li>جميع المعاملات</li>
+              <li>جميع الإشعارات</li>
+              <li>جميع سجلات KYC</li>
+              <li>جميع رموز OTP</li>
+              <li>جميع بيانات الأجهزة</li>
+            </ul>
+            <p className="font-medium text-red-400 mt-1">سيتم الاحتفاظ بـ: حساب الإدارة، طرق الدفع، إعدادات الرسوم</p>
+            <p className="font-medium text-gold">سيتم تصفير رصيد حساب الإدارة إلى 0</p>
+          </div>
+
+          {cleanupResults && (
+            <div className="p-3 rounded-lg bg-green-500/5 border border-green-500/10 text-xs space-y-1">
+              <p className="font-bold text-green-400">✅ تم التنظيف بنجاح:</p>
+              {Object.entries(cleanupResults).map(([key, value]) => (
+                <p key={key} className="text-muted-foreground">
+                  {key}: <span className="text-green-400 font-medium">{value}</span>
+                </p>
+              ))}
+            </div>
+          )}
+
+          <div className="space-y-3">
+            <div className="space-y-1">
+              <label className="text-xs text-muted-foreground">كلمة المرور للتأكيد</label>
+              <Input
+                type="password"
+                value={cleanupPassword}
+                onChange={(e) => setCleanupPassword(e.target.value)}
+                className="glass-input h-10 text-sm"
+                placeholder="أدخل كلمة المرور"
+                dir="ltr"
+              />
+            </div>
+            <div className="space-y-1">
+              <label className="text-xs text-red-400 font-medium">اكتب "حذف الكل" للتأكيد</label>
+              <Input
+                type="text"
+                value={cleanupConfirmText}
+                onChange={(e) => setCleanupConfirmText(e.target.value)}
+                className="glass-input h-10 text-sm border-red-500/20 focus:border-red-500/40"
+                placeholder="حذف الكل"
+              />
+            </div>
+          </div>
+
+          <button
+            onClick={handleCleanup}
+            disabled={loading || !cleanupPassword || cleanupConfirmText !== 'حذف الكل'}
+            className="w-full h-11 bg-red-500 text-white font-bold rounded-xl hover:bg-red-600 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {loading ? <Loader2 className="w-4 h-4 animate-spin mx-auto" /> : '🗑️ حذف جميع البيانات'}
           </button>
         </div>
       )}

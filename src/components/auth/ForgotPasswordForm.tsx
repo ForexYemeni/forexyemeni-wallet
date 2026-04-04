@@ -23,6 +23,7 @@ export default function ForgotPasswordForm() {
   const [adminNumber, setAdminNumber] = useState('')
   const [newEmail, setNewEmail] = useState('')
   const [adminUserId, setAdminUserId] = useState('')
+  const [adminHasPhone, setAdminHasPhone] = useState(false)
   const { setScreen } = useAuthStore()
 
   useState(() => {
@@ -70,7 +71,8 @@ export default function ForgotPasswordForm() {
             setStep('admin-otp')
             toast.success(data.message)
           } else {
-            // Admin has no PIN set - account is locked
+            // Admin has no PIN set
+            setAdminHasPhone(!!data.hasPhone)
             setStep('admin-no-pin')
           }
         } else {
@@ -213,7 +215,7 @@ export default function ForgotPasswordForm() {
     }
   }
 
-  // Admin: recovery with phone number - step 1: enter phone number
+  // Admin: recovery with phone number - step 1: verify phone number against admin account
   const handleAdminCheckPhone = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!adminNumber) {
@@ -223,13 +225,26 @@ export default function ForgotPasswordForm() {
 
     setLoading(true)
     try {
-      const res = await fetch('/api/admin/settings', {
-        method: 'GET',
+      const res = await fetch('/api/admin/verify-phone', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ adminNumber }),
       })
-      // We verify the phone against the stored admin number
-      // Send OTP to the new email instead
-      toast.success('تم التحقق من الرقم. أدخل البريد الإلكتروني الجديد.')
-      setStep('admin-new-email')
+      const data = await res.json()
+
+      if (data.success) {
+        setAdminUserId(data.adminId)
+        if (!data.hasPIN) {
+          toast.error('لم يتم تعيين رمز PIN في حساب الإدارة. لا يمكن الاستعادة بالرقم بدون PIN.')
+          return
+        }
+        toast.success('تم التحقق من الرقم. أدخل البريد الإلكتروني الجديد.')
+        setStep('admin-new-email')
+      } else {
+        toast.error(data.message)
+      }
+    } catch {
+      toast.error('حدث خطأ')
     } finally {
       setLoading(false)
     }
@@ -523,6 +538,16 @@ export default function ForgotPasswordForm() {
               </p>
             )}
           </div>
+          {adminHasPhone && (
+            <div className="p-3 rounded-lg bg-gold/5 border border-gold/10 text-xs space-y-2">
+              <p className="text-gold font-medium">
+                💡 لا يوجد رمز PIN، لذلك لا يمكن الاستعادة بالرقم حالياً.
+              </p>
+              <p className="text-muted-foreground">
+                يجب تعيين رمز PIN أولاً من الإعدادات لتتمكن من استعادة الحساب بالرقم عند فقدان البريد.
+              </p>
+            </div>
+          )}
           <Button
             onClick={() => setScreen('login')}
             className="w-full h-12 gold-gradient text-gray-900 font-bold text-base rounded-xl hover:opacity-90 transition-all"
