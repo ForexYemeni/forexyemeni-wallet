@@ -1,8 +1,7 @@
 'use client'
 
-import { useState, useEffect, useRef, useCallback, lazy, Suspense } from 'react'
+import { useState, useEffect, useRef, lazy, Suspense } from 'react'
 import { useAuthStore } from '@/lib/store'
-import { consumePendingAdminTab } from '@/lib/admin-nav'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -182,7 +181,7 @@ const ROLE_LABELS: Record<string, string> = {
 // ===================== MAIN COMPONENT =====================
 
 export default function AdminPanel() {
-  const { user, setScreen, pendingAdminTab, setPendingAdminTab } = useAuthStore()
+  const { user, setScreen } = useAuthStore()
   const AdminFaqManager = lazy(() => import('@/components/admin/AdminFaqManager'))
   const AdminReferralSettings = lazy(() => import('@/components/admin/AdminReferralSettings'))
   const [activeTab, setActiveTab] = useState<'dashboard' | 'users' | 'deposits' | 'withdrawals' | 'kyc' | 'payment-methods' | 'admin-settings' | 'faq-bot' | 'chats' | 'referral-settings' | 'p2p' | 'audit-log' | 'reports' | 'system-monitor' | 'admin-team' | 'admin-financial' | 'super-admin'>('dashboard')
@@ -196,33 +195,15 @@ export default function AdminPanel() {
   const AdminFinancial = lazy(() => import('@/components/admin/AdminFinancial'))
   const [chatUnreadCount, setChatUnreadCount] = useState(0)
 
-  // On mount + hash change, check for pending admin tab
-  const applyTabFromHash = useCallback(() => {
-    const pendingTab = consumePendingAdminTab()
-    if (pendingTab) {
-      console.log('[AdminPanel] Applying tab:', pendingTab)
-      setActiveTab(pendingTab as any)
-      setLoadedTabs(prev => {
-        const next = new Set(prev)
-        next.add(pendingTab)
-        return next
-      })
+  // Listen for sidebar sub-navigation tab changes
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const tab = (e as CustomEvent).detail
+      if (tab) setActiveTab(tab as any)
     }
+    window.addEventListener('admin-tab-change', handler)
+    return () => window.removeEventListener('admin-tab-change', handler)
   }, [])
-
-  useEffect(() => {
-    applyTabFromHash()
-    window.addEventListener('hashchange', applyTabFromHash)
-    return () => window.removeEventListener('hashchange', applyTabFromHash)
-  }, [applyTabFromHash])
-
-  // Re-fetch data when tab changes
-  useEffect(() => {
-    if (user?.role === 'admin' || (user?.permissions && Object.values(user.permissions).some(v => v))) {
-      fetchTabData(activeTab)
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeTab])
   const [users, setUsers] = useState<AdminUser[]>([])
   const [deposits, setDeposits] = useState<AdminDeposit[]>([])
   const [withdrawals, setWithdrawals] = useState<AdminWithdrawal[]>([])

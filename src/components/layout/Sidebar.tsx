@@ -1,7 +1,6 @@
 'use client'
 
 import { useAuthStore } from '@/lib/store'
-import { navigateToAdminTab } from '@/lib/admin-nav'
 import { getTheme, setTheme, type Theme } from '@/lib/theme'
 import {
   Home,
@@ -28,8 +27,6 @@ import {
   Gift,
   Repeat,
   Activity,
-  UserCog,
-  DollarSign,
 } from 'lucide-react'
 import { useState, useEffect } from 'react'
 
@@ -77,8 +74,6 @@ const adminSubItems = [
   { key: 'admin-reports', label: 'التقارير المالية', icon: BarChart3, tab: 'reports' },
   { key: 'admin-monitor', label: 'مراقبة النظام', icon: Activity, tab: 'system-monitor' },
   { key: 'admin-settings', label: 'إعدادات النظام', icon: Sliders, tab: 'admin-settings' },
-  { key: 'admin-team', label: '👥 فريق الإدارة', icon: UserCog, tab: 'admin-team' },
-  { key: 'admin-financial', label: '💰 الملخص المالي', icon: DollarSign, tab: 'admin-financial' },
   { key: 'admin-super', label: '🛡️ تحكم خارق', icon: Shield, tab: 'super-admin' },
 ]
 
@@ -86,13 +81,6 @@ export default function Sidebar() {
   const { currentScreen, setScreen, user, logout } = useAuthStore()
   const [theme, setThemeState] = useState<Theme>('dark')
   const [adminExpanded, setAdminExpanded] = useState(false)
-
-  // Auto-expand admin sub-items when admin screen is active
-  useEffect(() => {
-    if (currentScreen === 'admin' && !adminExpanded) {
-      setAdminExpanded(true)
-    }
-  }, [currentScreen])
 
   const isAdmin = user?.role === 'admin' || (user?.permissions && Object.values(user.permissions).some(v => v))
   const isMerchant = !!user?.merchantId && !isAdmin
@@ -111,7 +99,10 @@ export default function Sidebar() {
 
   const handleAdminSubClick = (tab: string) => {
     setScreen('admin')
-    navigateToAdminTab(tab)
+    // Dispatch custom event for AdminPanel to switch tab
+    setTimeout(() => {
+      window.dispatchEvent(new CustomEvent('admin-tab-change', { detail: tab }))
+    }, 50)
   }
 
   return (
@@ -168,16 +159,14 @@ export default function Sidebar() {
       <nav className="flex-1 overflow-y-auto p-3 space-y-1">
         {items.map((item) => {
           const isActive = currentScreen === item.key
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          const navItem = item as any
 
-          if (navItem.section) {
+          if (item.section) {
             return (
-              <div key={navItem.section}>
+              <div key={item.section}>
                 <button
                   onClick={() => {
                     setScreen(item.key!)
-                    setAdminExpanded(true)
+                    setAdminExpanded(!adminExpanded)
                   }}
                   className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm transition-all ${
                     isActive
@@ -187,15 +176,15 @@ export default function Sidebar() {
                 >
                   <item.icon className="w-4 h-4" />
                   {item.label}
-                  <ChevronLeft className={`w-3 h-3 mr-auto transition-transform ${adminExpanded && isActive ? 'rotate-90' : ''}`} />
+                  {isActive && <ChevronLeft className={`w-3 h-3 mr-auto transition-transform ${adminExpanded ? 'rotate-90' : ''}`} />}
                 </button>
 
                 {/* Admin Sub-navigation */}
                 {adminExpanded && isActive && (
                   <div className="mr-4 mt-1 space-y-0.5 animate-fade-in">
                     {adminSubItems.filter(sub => {
-                      // Only show super-admin, admin-team, admin-financial to actual super admin (no permissions)
-                      if (sub.key === 'admin-super' || sub.key === 'admin-team' || sub.key === 'admin-financial') {
+                      // Only show super-admin to actual super admin (no permissions)
+                      if (sub.key === 'admin-super') {
                         return user?.role === 'admin' && !user?.permissions
                       }
                       return true

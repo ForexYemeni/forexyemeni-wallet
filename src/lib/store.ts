@@ -29,7 +29,6 @@ interface AuthState {
   isAuthenticated: boolean
   pendingRegistration: { email: string; fullName: string; password: string } | null
   pendingWithdrawalConfirmation: string | null
-  pendingAdminTab: string | null
   setAuth: (user: User, token: string, mustChangePassword?: boolean) => void
   logout: () => void
   setScreen: (screen: string) => void
@@ -37,7 +36,6 @@ interface AuthState {
   updateUser: (updates: Partial<User>) => void
   setPendingRegistration: (data: { email: string; fullName: string; password: string } | null) => void
   setPendingWithdrawalConfirmation: (id: string | null) => void
-  setPendingAdminTab: (tab: string | null) => void
   clearForLock: () => void
 }
 
@@ -50,7 +48,6 @@ export const useAuthStore = create<AuthState>()(
       isAuthenticated: false,
       pendingRegistration: null,
       pendingWithdrawalConfirmation: null,
-      pendingAdminTab: null,
       setAuth: (user, token, mustChangePassword = false) => set({
         user,
         token,
@@ -74,7 +71,6 @@ export const useAuthStore = create<AuthState>()(
       updateUser: (updates) => set((state) => ({ user: state.user ? { ...state.user, ...updates } : null })),
       setPendingRegistration: (data) => set({ pendingRegistration: data }),
       setPendingWithdrawalConfirmation: (id) => set({ pendingWithdrawalConfirmation: id }),
-      setPendingAdminTab: (tab) => set({ pendingAdminTab: tab }),
     }),
     {
       name: 'forexyemeni-auth',
