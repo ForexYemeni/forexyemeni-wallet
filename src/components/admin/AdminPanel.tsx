@@ -868,28 +868,31 @@ export default function AdminPanel() {
                             </div>
                           </div>
 
-                          {/* Hide action buttons for sub-admins viewing, AND for promoted admin users being viewed */}
-                          {!hasPermissions && !(u.role === 'admin' && u.permissions) && (
+                          {/* Action buttons: main admin sees all, sub-admin sees limited */}
                           <div className="grid grid-cols-4 gap-2 pt-2">
-                            {u.status === 'active' ? (
-                              <button
-                                onClick={() => handleUpdateUser(u.id, { status: 'suspended' })}
-                                disabled={actionLoading === u.id}
-                                className="flex items-center justify-center gap-1 text-xs py-2.5 rounded-lg bg-red-500/10 text-red-400 hover:bg-red-500/20 transition-colors font-medium"
-                              >
-                                {actionLoading === u.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Ban className="w-3.5 h-3.5" />}
-                                تعليق
-                              </button>
-                            ) : (
-                              <button
-                                onClick={() => handleUpdateUser(u.id, { status: 'active' })}
-                                disabled={actionLoading === u.id}
-                                className="flex items-center justify-center gap-1 text-xs py-2.5 rounded-lg bg-green-500/10 text-green-400 hover:bg-green-500/20 transition-colors font-medium"
-                              >
-                                {actionLoading === u.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <UserCheck className="w-3.5 h-3.5" />}
-                                تفعيل
-                              </button>
+                            {/* Suspend / Activate — main admin always, sub-admin only for regular users */}
+                            {(!hasPermissions || (hasPermissions && u.role !== 'admin')) && (
+                              u.status === 'active' ? (
+                                <button
+                                  onClick={() => handleUpdateUser(u.id, { status: 'suspended' })}
+                                  disabled={actionLoading === u.id}
+                                  className="flex items-center justify-center gap-1 text-xs py-2.5 rounded-lg bg-red-500/10 text-red-400 hover:bg-red-500/20 transition-colors font-medium"
+                                >
+                                  {actionLoading === u.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Ban className="w-3.5 h-3.5" />}
+                                  تعليق
+                                </button>
+                              ) : (
+                                <button
+                                  onClick={() => handleUpdateUser(u.id, { status: 'active' })}
+                                  disabled={actionLoading === u.id}
+                                  className="flex items-center justify-center gap-1 text-xs py-2.5 rounded-lg bg-green-500/10 text-green-400 hover:bg-green-500/20 transition-colors font-medium"
+                                >
+                                  {actionLoading === u.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <UserCheck className="w-3.5 h-3.5" />}
+                                  {u.status === 'locked_device' ? 'فتح' : 'تفعيل'}
+                                </button>
+                              )
                             )}
+                            {/* Device management — always visible (needed for locked_device unlock) */}
                             <button
                               onClick={() => openDeviceDialog(u)}
                               className="flex items-center justify-center gap-1 text-xs py-2.5 rounded-lg bg-purple-500/10 text-purple-400 hover:bg-purple-500/20 transition-colors font-medium"
@@ -897,23 +900,28 @@ export default function AdminPanel() {
                               <Settings className="w-3.5 h-3.5" />
                               الأجهزة
                             </button>
-                            <button
-                              onClick={() => handleRoleChange(u, u.role === 'admin' ? 'user' : 'admin')}
-                              disabled={actionLoading === u.id}
-                              className="flex items-center justify-center gap-1 text-xs py-2.5 rounded-lg bg-gold/10 text-gold hover:bg-gold/20 transition-colors font-medium"
-                            >
-                              {actionLoading === u.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Crown className="w-3.5 h-3.5" />}
-                              {u.role === 'admin' ? 'إزالة' : 'ترقية'}
-                            </button>
-                            <button
-                              onClick={() => openDeleteDialog(u)}
-                              className="flex items-center justify-center gap-1 text-xs py-2.5 rounded-lg bg-red-600/10 text-red-500 hover:bg-red-600/20 transition-colors font-medium"
-                            >
-                              <Trash2 className="w-3.5 h-3.5" />
-                              حذف
-                            </button>
+                            {/* Promote / Remove admin — main admin only */}
+                            {!hasPermissions && (
+                              <button
+                                onClick={() => handleRoleChange(u, u.role === 'admin' ? 'user' : 'admin')}
+                                disabled={actionLoading === u.id}
+                                className="flex items-center justify-center gap-1 text-xs py-2.5 rounded-lg bg-gold/10 text-gold hover:bg-gold/20 transition-colors font-medium"
+                              >
+                                {actionLoading === u.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Crown className="w-3.5 h-3.5" />}
+                                {u.role === 'admin' ? 'إزالة' : 'ترقية'}
+                              </button>
+                            )}
+                            {/* Delete — main admin only */}
+                            {!hasPermissions && (
+                              <button
+                                onClick={() => openDeleteDialog(u)}
+                                className="flex items-center justify-center gap-1 text-xs py-2.5 rounded-lg bg-red-600/10 text-red-500 hover:bg-red-600/20 transition-colors font-medium"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                                حذف
+                              </button>
+                            )}
                           </div>
-                          )}
                         </div>
                       )}
                     </div>
