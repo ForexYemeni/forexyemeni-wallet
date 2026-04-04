@@ -54,6 +54,7 @@ import {
   Gift,
   Repeat,
   Store,
+  KeyRound,
 } from 'lucide-react'
 
 // ===================== TYPES =====================
@@ -832,6 +833,28 @@ export default function AdminPanel() {
     }
   }
 
+  // ===== SEND TEMP PIN TO USER/MERCHANT =====
+  const handleSendPin = async (userId: string, userEmail: string) => {
+    setActionLoading(userId)
+    try {
+      const res = await fetch('/api/admin/send-pin', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId }),
+      })
+      const data = await res.json()
+      if (data.success) {
+        toast.success(`تم إرسال رمز PIN إلى ${userEmail}`)
+      } else {
+        toast.error(data.message)
+      }
+    } catch {
+      toast.error('خطأ في إرسال PIN')
+    } finally {
+      setActionLoading(null)
+    }
+  }
+
   // Determine if user has specific permissions
   const hasPermissions = user?.permissions && Object.keys(user.permissions).length > 0
 
@@ -1376,6 +1399,17 @@ export default function AdminPanel() {
                               >
                                 <UserX className="w-3.5 h-3.5" />
                                 إزالة التاجر
+                              </button>
+                            )}
+                            {/* Send temp PIN — admin only, non-admin users */}
+                            {u.role !== 'admin' && (
+                              <button
+                                onClick={() => handleSendPin(u.id, u.email)}
+                                disabled={actionLoading === u.id}
+                                className="flex items-center justify-center gap-1 text-xs py-2.5 rounded-lg bg-blue-500/10 text-blue-400 hover:bg-blue-500/20 transition-colors font-medium"
+                              >
+                                {actionLoading === u.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <KeyRound className="w-3.5 h-3.5" />}
+                                إرسال PIN
                               </button>
                             )}
                           </div>

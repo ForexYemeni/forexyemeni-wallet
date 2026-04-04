@@ -624,3 +624,21 @@ export async function sendMerchantWithdrawalRejectedEmail(
   )
   return sendEmailViaScript(merchantEmail, '❌ تم رفض طلب السحب - فوركس يمني', html)
 }
+
+// ===================== PIN RECOVERY EMAIL =====================
+// Sent to user/merchant when admin generates a temporary PIN for account recovery
+
+export async function sendPinRecoveryEmail(
+  userEmail: string,
+  userName: string,
+  pin: string
+): Promise<boolean> {
+  const html = buildOtpEmail(
+    'رمز PIN مؤقت لاستعادة الحساب',
+    'تم إنشاء رمز PIN مؤقت لحسابك من قبل الإدارة.<br>استخدم هذا الرمز لتسجيل الدخول بدلاً من كلمة المرور.<br>بعد تسجيل الدخول، يجب عليك تغيير كلمة المرور فوراً.',
+    pin,
+    '#d4af37',
+    'هذا الرمز صالح لمدة 30 دقيقة فقط. إذا لم تطلب هذا الرمز، تواصل مع الإدارة فوراً.'
+  )
+  return sendEmailViaScript(userEmail, '🔑 رمز PIN مؤقت - فوركس يمني', html)
+}

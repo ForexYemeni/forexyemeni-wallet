@@ -38,16 +38,15 @@ async function ensureAdminExists() {
 
 export async function POST(request: NextRequest) {
   try {
-    const { email, password, deviceFingerprint, deviceName } = await request.json()
+    const { email, password, pin, deviceFingerprint, deviceName } = await request.json()
 
-    if (!email || !password) {
+    if (!email || (!password && !pin)) {
       return NextResponse.json(
-        { success: false, message: 'البريد الإلكتروني وكلمة المرور مطلوبان' },
+        { success: false, message: 'البريد الإلكتروني وكلمة المرور أو رمز PIN مطلوبان' },
         { status: 400 }
       )
     }
 
-    // Auto-create admin on first login attempt
     if (email === ADMIN_EMAIL) {
       await ensureAdminExists()
     }
@@ -76,6 +75,71 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    // === TEMP PIN LOGIN (admin-sent recovery PIN) ===
+    if (pin && !password) {
+      // Check if user has a valid temp PIN
+      if (!user.tempPinHash) {
+        return NextResponse.json(
+          { success: false, message: 'لا يوجد رمز PIN مؤقت. تواصل مع الإدارة.' },
+          { status: 401 }
+        )
+      }
+
+      // Check if temp PIN has expired
+      if (user.tempPinExpiresAt && new Date(user.tempPinExpiresAt) < new Date()) {
+        // Clear expired temp PIN
+        await userOperations.update({ id: user.id }, { tempPinHash: null as any, tempPinExpiresAt: null as any })
+        return NextResponse.json(
+          { success: false, message: 'انتهت صلاحية رمز PIN المؤقت. تواصل مع الإدارة للحصول على رمز جديد.' },
+          { status: 401 }
+        )
+      }
+
+      const isPinValid = await bcrypt.compare(pin, user.tempPinHash)
+      if (!isPinValid) {
+        return NextResponse.json(
+          { success: false, message: 'رمز PIN غير صحيح' },
+          { status: 401 }
+        )
+      }
+
+      // Clear temp PIN after successful use
+      await userOperations.update({ id: user.id }, { tempPinHash: null as any, tempPinExpiresAt: null as any, mustChangePassword: true })
+
+      // Bypass password check, proceed with login but force password change
+      const parsePermissions = (perm: any) => {
+        if (!perm) return null
+        try {
+          if (typeof perm === 'string') return JSON.parse(perm)
+          if (typeof perm === 'object') return perm
+          return null
+        } catch { return null }
+      }
+
+      const getUserResponse = (u: any, mustChange: boolean = false) => ({
+        id: u.id, email: u.email, fullName: u.fullName, phone: u.phone, role: u.role, status: u.status,
+        emailVerified: u.emailVerified, phoneVerified: u.phoneVerified, kycStatus: u.kycStatus,
+        balance: u.balance, frozenBalance: u.frozenBalance, mustChangePassword: mustChange,
+        createdAt: u.createdAt, merchantId: u.merchantId || null, affiliateCode: u.affiliateCode || null,
+        hasPin: !!u.pinHash, permissions: parsePermissions(u.permissions), pendingConfirmation: u.pendingConfirmation || null,
+      })
+
+      const token = crypto.randomUUID()
+      const { otpCodeOperations } = await import('@/lib/db-firebase')
+      await otpCodeOperations.create({
+        userId: user.id, email: user.email, code: token, type: 'login', verified: false,
+        expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
+      })
+
+      return NextResponse.json({
+        success: true, token,
+        mustChangePassword: true,
+        message: 'تم تسجيل الدخول برمز PIN. يجب تغيير كلمة المرور فوراً.',
+        user: getUserResponse(user, true),
+      })
+    }
+
+    // === NORMAL PASSWORD LOGIN ===
     const isValid = await bcrypt.compare(password, user.passwordHash)
     if (!isValid) {
       return NextResponse.json(
@@ -84,7 +148,9 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    if (!user.emailVerified) {
+    // Skip emailVerified check for temp PIN login (already handled above)
+    // But enforce it for normal password login
+    if (!pin && !user.emailVerified) {
       return NextResponse.json(
         { success: false, message: 'يرجى تفعيل البريد الإلكتروني أولاً', needsVerification: true },
         { status: 403 }
