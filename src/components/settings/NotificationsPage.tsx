@@ -43,8 +43,19 @@ export default function NotificationsPage() {
     }
   }
 
-  const markAllRead = () => {
-    setNotifications(prev => prev.map(n => ({ ...n, read: true })))
+  const markAllRead = async () => {
+    if (!user?.id) return
+    try {
+      await fetch('/api/notifications', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId: user.id }),
+      })
+      setNotifications(prev => prev.map(n => ({ ...n, read: true })))
+    } catch {
+      // Fallback to local-only
+      setNotifications(prev => prev.map(n => ({ ...n, read: true })))
+    }
   }
 
   const formatDate = (dateStr: string) => {

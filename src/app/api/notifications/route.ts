@@ -5,6 +5,8 @@ export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url)
     const userId = searchParams.get('userId')
+    const after = searchParams.get('after')
+    const countOnly = searchParams.get('countOnly')
 
     if (!userId) {
       return NextResponse.json(
@@ -13,7 +15,14 @@ export async function GET(request: NextRequest) {
       )
     }
 
-    const notifications = await notificationOperations.findMany(userId)
+    // Return unread count only (lightweight, for badge polling)
+    if (countOnly === 'true') {
+      const unreadCount = await notificationOperations.countUnread(userId)
+      return NextResponse.json({ success: true, unreadCount })
+    }
+
+    // Return notifications, optionally filtered by timestamp
+    const notifications = await notificationOperations.findMany(userId, after || undefined)
 
     return NextResponse.json({
       success: true,
@@ -50,6 +59,29 @@ export async function POST(request: NextRequest) {
       success: true,
       notification,
     })
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : 'حدث خطأ'
+    return NextResponse.json(
+      { success: false, message },
+      { status: 500 }
+    )
+  }
+}
+
+export async function PUT(request: NextRequest) {
+  try {
+    const { userId } = await request.json()
+
+    if (!userId) {
+      return NextResponse.json(
+        { success: false, message: 'معرف المستخدم مطلوب' },
+        { status: 400 }
+      )
+    }
+
+    await notificationOperations.markAllRead(userId)
+
+    return NextResponse.json({ success: true })
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : 'حدث خطأ'
     return NextResponse.json(

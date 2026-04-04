@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { useAuthStore } from '@/lib/store'
+import { useRealtimeNotifications, useUnreadCount } from '@/hooks/useRealtimeNotifications'
 import BottomNav from './BottomNav'
 import Sidebar from './Sidebar'
 import { Bell, LogOut } from 'lucide-react'
@@ -22,6 +23,11 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   const [logoutDialogOpen, setLogoutDialogOpen] = useState(false)
 
   const isAdmin = user?.role === 'admin' || (user?.permissions && Object.values(user.permissions).some(v => v))
+
+  // Real-time notification listener (sound + browser notifications)
+  useRealtimeNotifications()
+  // Dynamic unread count for badge
+  const unreadCount = useUnreadCount()
 
   const handleLogout = () => {
     setLogoutDialogOpen(false)
@@ -48,9 +54,11 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                 className="relative w-9 h-9 rounded-xl bg-white/5 flex items-center justify-center hover:bg-white/10 transition-colors"
               >
                 <Bell className="w-4 h-4 text-muted-foreground" />
-                <span className="absolute -top-1 -left-1 w-4 h-4 bg-gold text-gray-900 text-[8px] font-bold rounded-full flex items-center justify-center">
-                  !
-                </span>
+                {unreadCount > 0 && (
+                  <span className="absolute -top-1 -left-1 min-w-4 h-4 bg-red-500 text-white text-[9px] font-bold rounded-full flex items-center justify-center px-1">
+                    {unreadCount > 99 ? '99+' : unreadCount}
+                  </span>
+                )}
               </button>
 
               {/* Quick Logout Button in Header */}

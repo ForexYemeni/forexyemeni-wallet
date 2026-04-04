@@ -7,6 +7,10 @@ const nextConfig: NextConfig = {
     ignoreBuildErrors: true,
   },
   reactStrictMode: false,
+  // Required for PWA: allow images from external domains
+  images: {
+    unoptimized: true,
+  },
 };
 
 export default nextConfig;

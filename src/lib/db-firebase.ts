@@ -498,16 +498,42 @@ export const notificationOperations = {
     return notification
   },
 
-  async findMany(userId: string): Promise<Notification[]> {
+  async findMany(userId: string, after?: string): Promise<Notification[]> {
     const db = getDb()
-    const snapshot = await db.collection('notifications')
+    let query: Query<DocumentData, Filter> = db.collection('notifications')
       .where('userId', '==', userId)
-      .limit(50)
-      .get()
+    if (after) {
+      query = query.where('createdAt', '>', after)
+    }
+    const snapshot = await query.limit(50).get()
     const results = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() } as Notification))
     // Sort by createdAt desc in JS to avoid composite index
     results.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
     return results
+  },
+
+  async countUnread(userId: string): Promise<number> {
+    const db = getDb()
+    const snapshot = await db.collection('notifications')
+      .where('userId', '==', userId)
+      .where('read', '==', false)
+      .limit(100)
+      .get()
+    return snapshot.docs.length
+  },
+
+  async markAllRead(userId: string): Promise<void> {
+    const db = getDb()
+    const snapshot = await db.collection('notifications')
+      .where('userId', '==', userId)
+      .where('read', '==', false)
+      .limit(100)
+      .get()
+    const batch = db.batch()
+    for (const doc of snapshot.docs) {
+      batch.update(doc.ref, { read: true })
+    }
+    await batch.commit()
   },
 }
 
