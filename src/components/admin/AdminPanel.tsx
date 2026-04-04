@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, lazy, Suspense } from 'react'
 import { useAuthStore } from '@/lib/store'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
@@ -49,6 +49,9 @@ import {
   ArrowDownCircle,
   ArrowUpCircle,
   FileCheck,
+  MessageCircle,
+  MessageSquare,
+  Gift,
 } from 'lucide-react'
 
 // ===================== TYPES =====================
@@ -174,7 +177,11 @@ const ROLE_LABELS: Record<string, string> = {
 
 export default function AdminPanel() {
   const { user, setScreen } = useAuthStore()
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'users' | 'deposits' | 'withdrawals' | 'kyc' | 'payment-methods' | 'admin-settings'>('dashboard')
+  const AdminFaqManager = lazy(() => import('@/components/admin/AdminFaqManager'))
+  const AdminReferralSettings = lazy(() => import('@/components/admin/AdminReferralSettings'))
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'users' | 'deposits' | 'withdrawals' | 'kyc' | 'payment-methods' | 'admin-settings' | 'faq-bot' | 'chats' | 'referral-settings'>('dashboard')
+  const AdminChat = lazy(() => import('@/components/admin/AdminChat'))
+  const [chatUnreadCount, setChatUnreadCount] = useState(0)
 
   // Listen for sidebar sub-navigation tab changes
   useEffect(() => {
@@ -729,7 +736,10 @@ export default function AdminPanel() {
     { key: 'withdrawals' as const, label: 'السحوبات', icon: ArrowUpRight, count: withdrawals.filter(w => w.status === 'pending' || w.status === 'approved').length, perm: 'approveWithdrawals' as const },
     { key: 'kyc' as const, label: 'التحقق', icon: Shield, count: kycRecords.filter(k => k.status === 'pending').length, perm: 'approveKYC' as const },
     { key: 'payment-methods' as const, label: 'طرق الدفع', icon: CreditCard, count: paymentMethods.filter(p => p.isActive).length, perm: 'manageUsers' as const },
+    { key: 'referral-settings' as const, label: 'برنامج الدعوات', icon: Gift, count: 0, perm: 'manageSettings' as const },
     ...(user?.role === 'admin' && !hasPermissions ? [{ key: 'admin-settings' as const, label: 'إعدادات الإدارة', icon: Settings, count: 0, perm: 'manageSettings' as const }] : []),
+    { key: 'chats' as const, label: 'المحادثات', icon: MessageCircle, count: chatUnreadCount, perm: null as string | null },
+    { key: 'faq-bot' as const, label: 'البوت والأسئلة', icon: MessageSquare, count: 0, perm: 'manageSettings' as const },
   ]
 
   const tabs = hasPermissions
@@ -1439,6 +1449,45 @@ export default function AdminPanel() {
             <AdminSettingsPanel settings={adminSettings} onRefresh={fetchAdminSettings} />
           )}
 
+          {/* ===================== CHATS TAB ===================== */}
+          {effectiveActiveTab === 'chats' && (
+            <Suspense fallback={
+              <div className="space-y-3">
+                {[...Array(3)].map((_, i) => (
+                  <div key={i} className="glass-card p-4 shimmer h-24 rounded-xl" />
+                ))}
+              </div>
+            }>
+              <AdminChat />
+            </Suspense>
+          )}
+
+          {/* ===================== REFERRAL SETTINGS TAB ===================== */}
+          {effectiveActiveTab === 'referral-settings' && (
+            <Suspense fallback={
+              <div className="space-y-3">
+                {[...Array(3)].map((_, i) => (
+                  <div key={i} className="glass-card p-4 shimmer h-24 rounded-xl" />
+                ))}
+              </div>
+            }>
+              <AdminReferralSettings />
+            </Suspense>
+          )}
+
+          {/* ===================== FAQ BOT TAB ===================== */}
+          {effectiveActiveTab === 'faq-bot' && (
+            <Suspense fallback={
+              <div className="space-y-3">
+                {[...Array(3)].map((_, i) => (
+                  <div key={i} className="glass-card p-4 shimmer h-24 rounded-xl" />
+                ))}
+              </div>
+            }>
+              <AdminFaqManager />
+            </Suspense>
+          )}
+
           {/* ===================== KYC TAB ===================== */}
           {effectiveActiveTab === 'kyc' && (
             <div className="space-y-2 max-h-[500px] overflow-y-auto">
@@ -2056,7 +2105,7 @@ function PaymentMethodsManager({ methods, onRefresh }: { methods: any[]; onRefre
 
 function AdminSettingsPanel({ settings, onRefresh }: { settings: { email: string; phone: string | null; hasPIN: boolean }; onRefresh: () => void }) {
   const { user } = useAuthStore()
-  const [activeSection, setActiveSection] = useState<'phone' | 'email' | 'password' | 'pin' | 'fees' | 'cleanup'>('phone')
+  const [activeSection, setActiveSection] = useState<'phone' | 'email' | 'password' | 'pin' | 'fees' | 'social' | 'cleanup'>('phone')
   const [loading, setLoading] = useState(false)
 
   // Phone form
@@ -2079,10 +2128,19 @@ function AdminSettingsPanel({ settings, onRefresh }: { settings: { email: string
   // Fee form
   const [depositFee, setDepositFee] = useState('')
   const [withdrawalFee, setWithdrawalFee] = useState('')
+  // Social links form
+  const [socialWhatsapp, setSocialWhatsapp] = useState('')
+  const [socialPhone, setSocialPhone] = useState('')
+  const [socialTelegram, setSocialTelegram] = useState('')
+  const [socialFacebook, setSocialFacebook] = useState('')
+  const [socialInstagram, setSocialInstagram] = useState('')
+  const [socialTwitter, setSocialTwitter] = useState('')
+  const [socialTiktok, setSocialTiktok] = useState('')
 
-  // Fetch fees on mount
+  // Fetch fees & social links on mount
   useEffect(() => {
     fetchFees()
+    fetchSocialLinks()
   }, [])
 
   const fetchFees = async () => {
@@ -2094,6 +2152,53 @@ function AdminSettingsPanel({ settings, onRefresh }: { settings: { email: string
         setWithdrawalFee(String(data.settings.withdrawalFee || 0.1))
       }
     } catch { /* silent */ }
+  }
+
+  const fetchSocialLinks = async () => {
+    try {
+      const res = await fetch('/api/admin/social-links')
+      const data = await res.json()
+      if (data.success && data.socialLinks) {
+        setSocialWhatsapp(data.socialLinks.whatsapp || '')
+        setSocialPhone(data.socialLinks.phone || '')
+        setSocialTelegram(data.socialLinks.telegram || '')
+        setSocialFacebook(data.socialLinks.facebook || '')
+        setSocialInstagram(data.socialLinks.instagram || '')
+        setSocialTwitter(data.socialLinks.twitter || '')
+        setSocialTiktok(data.socialLinks.tiktok || '')
+      }
+    } catch { /* silent */ }
+  }
+
+  const handleSaveSocialLinks = async () => {
+    setLoading(true)
+    try {
+      const res = await fetch('/api/admin/social-links', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          userId: user?.id,
+          role: 'admin',
+          whatsapp: socialWhatsapp,
+          phone: socialPhone,
+          telegram: socialTelegram,
+          facebook: socialFacebook,
+          instagram: socialInstagram,
+          twitter: socialTwitter,
+          tiktok: socialTiktok,
+        }),
+      })
+      const data = await res.json()
+      if (data.success) {
+        toast.success('تم تحديث روابط التواصل الاجتماعي')
+      } else {
+        toast.error(data.message)
+      }
+    } catch {
+      toast.error('خطأ في الاتصال')
+    } finally {
+      setLoading(false)
+    }
   }
 
   const handleSave = async (actionKey: string, payload?: any) => {
@@ -2154,6 +2259,7 @@ function AdminSettingsPanel({ settings, onRefresh }: { settings: { email: string
     { key: 'email' as const, label: 'البريد', icon: Mail, hasValue: !!settings.email, value: settings.email },
     { key: 'password' as const, label: 'كلمة المرور', icon: Lock, hasValue: true },
     { key: 'pin' as const, label: 'رمز PIN', icon: Shield, hasValue: settings.hasPIN, value: settings.hasPIN ? 'مُفعّل ✓' : 'غير معين' },
+    { key: 'social' as const, label: 'تواصل', icon: MessageCircle },
     { key: 'cleanup' as const, label: 'تنظيف', icon: Trash2 },
   ]
 
@@ -2345,6 +2451,63 @@ function AdminSettingsPanel({ settings, onRefresh }: { settings: { email: string
             className="w-full h-11 gold-gradient text-gray-900 font-bold rounded-xl hover:opacity-90 transition-all"
           >
             {loading ? <Loader2 className="w-4 h-4 animate-spin mx-auto" /> : settings.hasPIN ? 'تغيير PIN' : 'تعيين PIN'}
+          </button>
+        </div>
+      )}
+
+      {/* Social Links Section */}
+      {activeSection === 'social' && (
+        <div className="glass-card p-5 space-y-4">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-green-500/10 flex items-center justify-center">
+              <MessageCircle className="w-5 h-5 text-green-400" />
+            </div>
+            <div>
+              <h3 className="text-sm font-bold">روابط التواصل الاجتماعي</h3>
+              <p className="text-[10px] text-muted-foreground">الروابط تظهر للمستخدمين عبر زر التواصل العائم</p>
+            </div>
+          </div>
+
+          <div className="space-y-3">
+            <div className="space-y-1">
+              <Label className="text-xs text-muted-foreground">واتساب (WhatsApp)</Label>
+              <Input value={socialWhatsapp} onChange={(e) => setSocialWhatsapp(e.target.value)} className="glass-input h-10 text-sm" placeholder="967771234567" dir="ltr" />
+              <p className="text-[10px] text-muted-foreground">رقم الهاتف مع رمز الدولة بدون +</p>
+            </div>
+            <div className="space-y-1">
+              <Label className="text-xs text-muted-foreground">هاتف (Phone)</Label>
+              <Input value={socialPhone} onChange={(e) => setSocialPhone(e.target.value)} className="glass-input h-10 text-sm" placeholder="967771234567" dir="ltr" />
+              <p className="text-[10px] text-muted-foreground">رقم الهاتف المباشر مع رمز الدولة</p>
+            </div>
+            <div className="space-y-1">
+              <Label className="text-xs text-muted-foreground">تيلجرام (Telegram)</Label>
+              <Input value={socialTelegram} onChange={(e) => setSocialTelegram(e.target.value)} className="glass-input h-10 text-sm" placeholder="username" dir="ltr" />
+              <p className="text-[10px] text-muted-foreground">اسم المستخدم بدون @</p>
+            </div>
+            <div className="space-y-1">
+              <Label className="text-xs text-muted-foreground">فيسبوك (Facebook)</Label>
+              <Input value={socialFacebook} onChange={(e) => setSocialFacebook(e.target.value)} className="glass-input h-10 text-sm" placeholder="https://facebook.com/..." dir="ltr" />
+            </div>
+            <div className="space-y-1">
+              <Label className="text-xs text-muted-foreground">إنستقرام (Instagram)</Label>
+              <Input value={socialInstagram} onChange={(e) => setSocialInstagram(e.target.value)} className="glass-input h-10 text-sm" placeholder="https://instagram.com/..." dir="ltr" />
+            </div>
+            <div className="space-y-1">
+              <Label className="text-xs text-muted-foreground">تويتر (Twitter/X)</Label>
+              <Input value={socialTwitter} onChange={(e) => setSocialTwitter(e.target.value)} className="glass-input h-10 text-sm" placeholder="https://twitter.com/..." dir="ltr" />
+            </div>
+            <div className="space-y-1">
+              <Label className="text-xs text-muted-foreground">تيك توك (TikTok)</Label>
+              <Input value={socialTiktok} onChange={(e) => setSocialTiktok(e.target.value)} className="glass-input h-10 text-sm" placeholder="https://tiktok.com/@..." dir="ltr" />
+            </div>
+          </div>
+
+          <button
+            onClick={handleSaveSocialLinks}
+            disabled={loading}
+            className="w-full h-11 gold-gradient text-gray-900 font-bold rounded-xl hover:opacity-90 transition-all"
+          >
+            {loading ? <Loader2 className="w-4 h-4 animate-spin mx-auto" /> : 'حفظ الروابط'}
           </button>
         </div>
       )}

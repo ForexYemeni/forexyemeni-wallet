@@ -107,6 +107,21 @@ export async function POST(request: NextRequest) {
             console.error('Error crediting admin fee:', adminErr)
           }
         }
+
+        // Process referral commissions for this deposit
+        try {
+          const referralRes = await fetch(`${process.env.NEXT_PUBLIC_BASE_URL || ''}/api/referral`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ action: 'process_commissions', depositId: deposit.id }),
+          })
+          const referralData = await referralRes.json()
+          if (referralData.success && referralData.commissionsProcessed > 0) {
+            console.log(`Referral commissions processed: ${referralData.commissionsProcessed}`)
+          }
+        } catch (refErr) {
+          console.error('Error processing referral commissions:', refErr)
+        }
       }
     }
 

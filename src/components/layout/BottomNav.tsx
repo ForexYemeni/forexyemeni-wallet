@@ -12,6 +12,7 @@ import {
   Sun,
   Moon,
   Bell,
+  Gift,
 } from 'lucide-react'
 import { useState, useEffect } from 'react'
 
@@ -19,7 +20,7 @@ const userNavItems = [
   { key: 'dashboard', label: 'الرئيسية', icon: Home },
   { key: 'deposit', label: 'إيداع', icon: ArrowDownLeft },
   { key: 'withdraw', label: 'سحب', icon: ArrowUpRight },
-  { key: 'kyc', label: 'التحقق', icon: Shield },
+  { key: 'referral', label: 'الدعوات', icon: Gift },
   { key: 'settings', label: 'الإعدادات', icon: Settings },
 ]
 

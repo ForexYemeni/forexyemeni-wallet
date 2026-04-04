@@ -20,7 +20,11 @@ const KYCVerification = dynamic(() => import('@/components/kyc/KYCVerification')
 const SettingsPage = dynamic(() => import('@/components/settings/Settings'), { ssr: false })
 const NotificationsPage = dynamic(() => import('@/components/settings/NotificationsPage'), { ssr: false })
 const AdminPanel = dynamic(() => import('@/components/admin/AdminPanel'), { ssr: false })
+const ReferralPage = dynamic(() => import('@/components/wallet/ReferralPage'), { ssr: false })
+const ChatPage = dynamic(() => import('@/components/chat/ChatPage'), { ssr: false })
 const AppLayout = dynamic(() => import('@/components/layout/AppLayout'), { ssr: false })
+const FaqPage = dynamic(() => import('@/components/chat/FaqPage'), { ssr: false })
+const SupportBot = dynamic(() => import('@/components/chat/SupportBot'), { ssr: false })
 
 interface PendingWithdrawal {
   amount: number
@@ -537,13 +541,19 @@ export default function Home() {
       {currentScreen === 'withdraw' && <WithdrawForm />}
       {currentScreen === 'transactions' && <TransactionHistory />}
       {currentScreen === 'kyc' && <KYCVerification />}
+      {currentScreen === 'referral' && <ReferralPage />}
       {currentScreen === 'settings' && <SettingsPage />}
       {currentScreen === 'notifications' && <NotificationsPage />}
+      {currentScreen === 'chat' && <ChatPage />}
+      {currentScreen === 'faq' && <FaqPage />}
       {currentScreen === 'admin' && (
         <AdminErrorBoundary>
           <AdminPanel />
         </AdminErrorBoundary>
       )}
+
+      {/* Floating Support Bot - always visible when authenticated */}
+      <SupportBot />
     </AppLayout>
   )
 }

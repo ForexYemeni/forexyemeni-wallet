@@ -17,11 +17,14 @@ import {
   ArrowDownCircle,
   ArrowUpCircle,
   FileCheck,
+  MessageCircle,
   CreditCard,
   Sliders,
   Sun,
   Moon,
   BarChart3,
+  MessageSquare,
+  Gift,
 } from 'lucide-react'
 import { useState, useEffect } from 'react'
 
@@ -30,7 +33,9 @@ const userNavItems = [
   { key: 'deposit', label: 'إيداع', icon: ArrowDownLeft },
   { key: 'withdraw', label: 'سحب', icon: ArrowUpRight },
   { key: 'transactions', label: 'المعاملات', icon: Clock },
+  { key: 'referral', label: 'الدعوات', icon: Gift },
   { key: 'kyc', label: 'التحقق (KYC)', icon: Shield },
+  { key: 'chat', label: 'الدعم الفني', icon: MessageCircle },
   { key: 'notifications', label: 'الإشعارات', icon: Bell },
   { key: 'settings', label: 'الإعدادات', icon: Settings },
 ]
@@ -49,7 +54,10 @@ const adminSubItems = [
   { key: 'admin-deposits', label: 'الإيداعات', icon: ArrowDownCircle, tab: 'deposits' },
   { key: 'admin-withdrawals', label: 'السحوبات', icon: ArrowUpCircle, tab: 'withdrawals' },
   { key: 'admin-kyc', label: 'التوثيق', icon: FileCheck, tab: 'kyc' },
+  { key: 'admin-chats', label: 'المحادثات', icon: MessageCircle, tab: 'chats' },
   { key: 'admin-methods', label: 'طرق الدفع', icon: CreditCard, tab: 'payment-methods' },
+  { key: 'admin-referral', label: 'برنامج الدعوات', icon: Gift, tab: 'referral-settings' },
+  { key: 'admin-faq', label: 'البوت والأسئلة', icon: MessageSquare, tab: 'faq-bot' },
   { key: 'admin-settings', label: 'إعدادات النظام', icon: Sliders, tab: 'admin-settings' },
 ]
 

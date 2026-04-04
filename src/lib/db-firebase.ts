@@ -587,6 +587,77 @@ export const paymentMethodOperations = {
   },
 }
 
+// ===================== FAQ BOT OPERATIONS =====================
+
+export interface FaqItem {
+  id: string
+  question: string
+  keywords: string[]
+  answer: string
+  category: string // 'general' | 'deposit' | 'withdrawal' | 'kyc' | 'account' | 'fees'
+  isActive: boolean
+  priority: number // higher = shown first
+  createdAt: string
+  updatedAt: string
+}
+
+export const faqBotOperations = {
+  async create(data: Omit<FaqItem, 'id' | 'createdAt' | 'updatedAt'>): Promise<FaqItem> {
+    const db = getDb()
+    const id = generateId()
+    const now = nowTimestamp()
+    const faq: FaqItem = { ...data, id, createdAt: now, updatedAt: now }
+    await db.collection('faqBot').doc(id).set(faq)
+    return faq
+  },
+
+  async findMany(options?: { activeOnly?: boolean }): Promise<FaqItem[]> {
+    const db = getDb()
+    let query: Query<DocumentData> = db.collection('faqBot')
+    if (options?.activeOnly) {
+      query = query.where('isActive', '==', true)
+    }
+    const snapshot = await query.limit(100).get()
+    const results = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() } as FaqItem))
+    // Sort by priority desc
+    results.sort((a, b) => (b.priority || 0) - (a.priority || 0))
+    return results
+  },
+
+  async update(id: string, data: Partial<FaqItem>): Promise<FaqItem> {
+    const db = getDb()
+    await db.collection('faqBot').doc(id).update({ ...data, updatedAt: nowTimestamp() })
+    const doc = await db.collection('faqBot').doc(id).get()
+    return { id: doc.id, ...doc.data() } as FaqItem
+  },
+
+  async delete(id: string): Promise<void> {
+    const db = getDb()
+    await db.collection('faqBot').doc(id).delete()
+  },
+
+  async getBotSettings(): Promise<{ isEnabled: boolean; greeting: string }> {
+    const db = getDb()
+    const doc = await db.collection('systemSettings').doc('botSettings').get()
+    if (!doc.exists) {
+      return { isEnabled: true, greeting: 'مرحباً! كيف يمكنني مساعدتك اليوم؟ اطرح سؤالك وسأحاول الإجابة.' }
+    }
+    const data = doc.data()
+    return {
+      isEnabled: data?.isEnabled ?? true,
+      greeting: data?.greeting || 'مرحباً! كيف يمكنني مساعدتك اليوم؟ اطرح سؤالك وسأحاول الإجابة.',
+    }
+  },
+
+  async updateBotSettings(data: { isEnabled: boolean; greeting: string }): Promise<void> {
+    const db = getDb()
+    await db.collection('systemSettings').doc('botSettings').set({
+      ...data,
+      updatedAt: nowTimestamp(),
+    }, { merge: true })
+  },
+}
+
 // ===================== USER PAYMENT METHOD OPERATIONS =====================
 
 export const userPaymentMethodOperations = {
@@ -618,6 +689,383 @@ export const userPaymentMethodOperations = {
   async delete(id: string): Promise<void> {
     const db = getDb()
     await db.collection('userPaymentMethods').doc(id).delete()
+  },
+}
+
+// ===================== REFERRAL TYPES =====================
+
+export interface Referral {
+  id: string
+  referrerId: string
+  referredId: string
+  referredEmail: string
+  referralCode: string
+  level: number
+  status: string // 'active' | 'inactive'
+  totalEarnings: number
+  createdAt: string
+}
+
+export interface ReferralCommission {
+  id: string
+  referrerId: string
+  referredId: string
+  referralId: string
+  depositId?: string | null
+  withdrawalId?: string | null
+  amount: number
+  level: number
+  description: string
+  createdAt: string
+}
+
+export interface ReferralSettings {
+  isEnabled: boolean
+  commissionType: string // 'percentage' | 'fixed'
+  commissionLevels: number[] // e.g., [3, 1, 0.5]
+  minDepositForCommission: number
+  maxLevels: number
+}
+
+// ===================== REFERRAL OPERATIONS =====================
+
+export const referralOperations = {
+  async create(data: Omit<Referral, 'id' | 'createdAt' | 'totalEarnings'>): Promise<Referral> {
+    const db = getDb()
+    const id = generateId()
+    const referral: Referral = { ...data, id, totalEarnings: 0, createdAt: nowTimestamp() }
+    await db.collection('referrals').doc(id).set(referral)
+    return referral
+  },
+
+  async findByReferrer(referrerId: string): Promise<Referral[]> {
+    const db = getDb()
+    const snapshot = await db.collection('referrals')
+      .where('referrerId', '==', referrerId)
+      .limit(200)
+      .get()
+    const results = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() } as Referral))
+    results.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+    return results
+  },
+
+  async findByReferred(referredId: string): Promise<Referral[]> {
+    const db = getDb()
+    const snapshot = await db.collection('referrals')
+      .where('referredId', '==', referredId)
+      .limit(10)
+      .get()
+    const results = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() } as Referral))
+    return results
+  },
+
+  async updateEarnings(id: string, additionalEarnings: number): Promise<void> {
+    const db = getDb()
+    const doc = await db.collection('referrals').doc(id).get()
+    if (!doc.exists) return
+    const current = (doc.data()?.totalEarnings || 0)
+    await db.collection('referrals').doc(id).update({ totalEarnings: current + additionalEarnings })
+  },
+
+  async createCommission(data: Omit<ReferralCommission, 'id' | 'createdAt'>): Promise<ReferralCommission> {
+    const db = getDb()
+    const id = generateId()
+    const commission: ReferralCommission = { ...data, id, createdAt: nowTimestamp() }
+    await db.collection('referralCommissions').doc(id).set(commission)
+    return commission
+  },
+
+  async findByReferrerCommissions(referrerId: string): Promise<ReferralCommission[]> {
+    const db = getDb()
+    const snapshot = await db.collection('referralCommissions')
+      .where('referrerId', '==', referrerId)
+      .limit(200)
+      .get()
+    const results = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() } as ReferralCommission))
+    results.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+    return results
+  },
+
+  async findAllCommissions(): Promise<ReferralCommission[]> {
+    const db = getDb()
+    const snapshot = await db.collection('referralCommissions').limit(500).get()
+    const results = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() } as ReferralCommission))
+    results.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+    return results
+  },
+
+  async countAllReferrals(): Promise<number> {
+    const db = getDb()
+    const snapshot = await db.collection('referrals').limit(500).get()
+    return snapshot.size
+  },
+}
+
+// ===================== SYSTEM SETTINGS OPERATIONS =====================
+
+export const systemSettingsOperations = {
+  async getReferralSettings(): Promise<ReferralSettings> {
+    const db = getDb()
+    const doc = await db.collection('systemSettings').doc('referralSettings').get()
+    if (!doc.exists) {
+      const defaults: ReferralSettings = {
+        isEnabled: false,
+        commissionType: 'percentage',
+        commissionLevels: [3, 1, 0.5],
+        minDepositForCommission: 10,
+        maxLevels: 3,
+      }
+      await db.collection('systemSettings').doc('referralSettings').set(defaults)
+      return defaults
+    }
+    return doc.data() as ReferralSettings
+  },
+
+  async updateReferralSettings(data: Partial<ReferralSettings>): Promise<ReferralSettings> {
+    const db = getDb()
+    const current = await systemSettingsOperations.getReferralSettings()
+    const updated = { ...current, ...data }
+    await db.collection('systemSettings').doc('referralSettings').set(updated)
+    return updated
+  },
+
+  async findByAffiliateCode(code: string): Promise<User | null> {
+    const db = getDb()
+    const snapshot = await db.collection('users')
+      .where('affiliateCode', '==', code)
+      .limit(1)
+      .get()
+    if (snapshot.empty) return null
+    const doc = snapshot.docs[0]
+    return { id: doc.id, ...doc.data() } as User
+  },
+}
+
+// ===================== CHAT OPERATIONS =====================
+
+export interface Chat {
+  id: string
+  userId: string
+  adminId: string
+  participants: string[]
+  lastMessage: string
+  lastMessageAt: string
+  lastMessageBy: string
+  userUnreadCount: number
+  adminUnreadCount: number
+  status: string
+  createdAt: string
+  updatedAt: string
+}
+
+export interface ChatMessage {
+  id: string
+  chatId: string
+  senderId: string
+  senderType: string
+  message: string
+  type: string
+  imageUrl?: string | null
+  read: boolean
+  createdAt: string
+}
+
+export const chatOperations = {
+  // Create a new chat
+  async createChat(userId: string, adminId: string, firstMessage: string): Promise<Chat> {
+    const db = getDb()
+    const id = generateId()
+    const now = nowTimestamp()
+    const chat: Chat = {
+      id,
+      userId,
+      adminId,
+      participants: [userId, adminId],
+      lastMessage: firstMessage,
+      lastMessageAt: now,
+      lastMessageBy: 'user',
+      userUnreadCount: 0,
+      adminUnreadCount: 1,
+      status: 'open',
+      createdAt: now,
+      updatedAt: now,
+    }
+    await db.collection('chats').doc(id).set(chat)
+    // Also create the first message
+    const messageId = generateId()
+    const message: ChatMessage = {
+      id: messageId,
+      chatId: id,
+      senderId: userId,
+      senderType: 'user',
+      message: firstMessage,
+      type: 'text',
+      read: false,
+      createdAt: now,
+    }
+    await db.collection('chatMessages').doc(messageId).set(message)
+    return chat
+  },
+
+  // List chats for a user or admin
+  async findChats(options: { userId: string; role: string }): Promise<Chat[]> {
+    const db = getDb()
+    let snapshot: FirebaseFirestore.QuerySnapshot
+    if (options.role === 'admin') {
+      snapshot = await db.collection('chats').where('adminId', '==', options.userId).limit(100).get()
+    } else {
+      snapshot = await db.collection('chats').where('userId', '==', options.userId).limit(50).get()
+    }
+    const results = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() } as Chat))
+    results.sort((a, b) => new Date(b.lastMessageAt).getTime() - new Date(a.lastMessageAt).getTime())
+    return results
+  },
+
+  // Get chat by id
+  async findChat(chatId: string): Promise<Chat | null> {
+    const db = getDb()
+    const doc = await db.collection('chats').doc(chatId).get()
+    if (!doc.exists) return null
+    return { id: doc.id, ...doc.data() } as Chat
+  },
+
+  // Send a message
+  async sendMessage(chatId: string, senderId: string, senderType: string, message: string, type: string = 'text', imageUrl?: string | null): Promise<ChatMessage> {
+    const db = getDb()
+    const now = nowTimestamp()
+    const id = generateId()
+    const msg: ChatMessage = {
+      id,
+      chatId,
+      senderId,
+      senderType,
+      message,
+      type,
+      imageUrl: imageUrl || null,
+      read: false,
+      createdAt: now,
+    }
+    await db.collection('chatMessages').doc(id).set(msg)
+    // Update chat header
+    const chatDoc = await db.collection('chats').doc(chatId).get()
+    if (chatDoc.exists) {
+      const chatData = chatDoc.data() as Chat
+      const updateFields: Partial<Chat> = {
+        lastMessage: message,
+        lastMessageAt: now,
+        lastMessageBy: senderType,
+        updatedAt: now,
+      }
+      // Increment unread for the other party
+      if (senderType === 'user') {
+        updateFields.adminUnreadCount = (chatData.adminUnreadCount || 0) + 1
+      } else {
+        updateFields.userUnreadCount = (chatData.userUnreadCount || 0) + 1
+      }
+      await db.collection('chats').doc(chatId).update(updateFields)
+    }
+    return msg
+  },
+
+  // Get messages for a chat (paginated)
+  async findMessages(chatId: string, limit: number = 50, before?: string): Promise<ChatMessage[]> {
+    const db = getDb()
+    let query: Query<DocumentData> = db.collection('chatMessages').where('chatId', '==', chatId)
+    if (before) {
+      const beforeDoc = await db.collection('chatMessages').doc(before).get()
+      if (beforeDoc.exists) {
+        query = query.endBefore(beforeDoc)
+      }
+    }
+    query = query.limit(limit)
+    const snapshot = await query.get()
+    const results = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() } as ChatMessage))
+    // Sort in chronological order (oldest first)
+    results.sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime())
+    return results
+  },
+
+  // Get latest messages for polling (messages after a given timestamp)
+  async findMessagesAfter(chatId: string, after: string): Promise<ChatMessage[]> {
+    const db = getDb()
+    const snapshot = await db.collection('chatMessages')
+      .where('chatId', '==', chatId)
+      .where('createdAt', '>', after)
+      .limit(50)
+      .get()
+    const results = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() } as ChatMessage))
+    results.sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime())
+    return results
+  },
+
+  // Mark messages as read
+  async markRead(chatId: string, readerType: string): Promise<void> {
+    const db = getDb()
+    // Mark unread messages as read
+    const snapshot = await db.collection('chatMessages')
+      .where('chatId', '==', chatId)
+      .where('read', '==', false)
+      .limit(100)
+      .get()
+    const batch = db.batch()
+    for (const doc of snapshot.docs) {
+      const data = doc.data()
+      // Only mark messages from the other party as read
+      if (data.senderType !== readerType) {
+        batch.update(doc.ref, { read: true })
+      }
+    }
+    if (snapshot.docs.length > 0) {
+      await batch.commit()
+    }
+    // Reset unread count for the reader
+    const chatDoc = await db.collection('chats').doc(chatId).get()
+    if (chatDoc.exists) {
+      if (readerType === 'user') {
+        await db.collection('chats').doc(chatId).update({ userUnreadCount: 0 })
+      } else {
+        await db.collection('chats').doc(chatId).update({ adminUnreadCount: 0 })
+      }
+    }
+  },
+
+  // Close a chat (admin only)
+  async closeChat(chatId: string): Promise<void> {
+    const db = getDb()
+    await db.collection('chats').doc(chatId).update({
+      status: 'closed',
+      updatedAt: nowTimestamp(),
+    })
+  },
+
+  // Count total unread for admin
+  async countAdminUnread(adminId: string): Promise<number> {
+    const db = getDb()
+    const snapshot = await db.collection('chats')
+      .where('adminId', '==', adminId)
+      .where('adminUnreadCount', '>', 0)
+      .limit(100)
+      .get()
+    let total = 0
+    for (const doc of snapshot.docs) {
+      total += (doc.data().adminUnreadCount || 0)
+    }
+    return total
+  },
+
+  // Count total unread for user
+  async countUserUnread(userId: string): Promise<number> {
+    const db = getDb()
+    const snapshot = await db.collection('chats')
+      .where('userId', '==', userId)
+      .where('userUnreadCount', '>', 0)
+      .limit(100)
+      .get()
+    let total = 0
+    for (const doc of snapshot.docs) {
+      total += (doc.data().userUnreadCount || 0)
+    }
+    return total
   },
 }
 

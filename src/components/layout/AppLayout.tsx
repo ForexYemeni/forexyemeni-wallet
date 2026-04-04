@@ -6,6 +6,7 @@ import { useRealtimeNotifications, useUnreadCount } from '@/hooks/useRealtimeNot
 import { setupFCMAutoRegister } from '@/lib/fcm-push'
 import BottomNav from './BottomNav'
 import Sidebar from './Sidebar'
+import SocialFloatingButton from './SocialFloatingButton'
 import { Bell, LogOut } from 'lucide-react'
 import {
   AlertDialog,
@@ -120,6 +121,9 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
       {/* Mobile Bottom Nav */}
       <BottomNav />
+
+      {/* Social Floating Button */}
+      <SocialFloatingButton />
     </div>
   )
 }

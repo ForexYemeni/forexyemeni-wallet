@@ -1,12 +1,12 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { useAuthStore } from '@/lib/store'
 import { toast } from 'sonner'
-import { Loader2, Eye, EyeOff, ArrowRight } from 'lucide-react'
+import { Loader2, Eye, EyeOff, ArrowRight, Gift } from 'lucide-react'
 
 export default function RegisterForm() {
   const [step, setStep] = useState<'email' | 'otp' | 'details'>('email')
@@ -239,8 +239,20 @@ function CompleteRegistration({ email }: { email: string }) {
   const [fullName, setFullName] = useState('')
   const [password, setPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
+  const [referralCode, setReferralCode] = useState('')
   const [loading, setLoading] = useState(false)
   const { setAuth, setPendingRegistration } = useAuthStore()
+
+  // Pre-fill referral code from URL ?ref=CODE
+  useEffect(() => {
+    try {
+      const params = new URLSearchParams(window.location.search)
+      const ref = params.get('ref')
+      if (ref) {
+        setReferralCode(ref.trim().toUpperCase())
+      }
+    } catch {}
+  }, [])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -266,6 +278,19 @@ function CompleteRegistration({ email }: { email: string }) {
         setAuth(data.user, data.token)
         setPendingRegistration(null)
         toast.success('مرحباً بك! تم إنشاء حسابك بنجاح')
+
+        // Apply referral code if provided
+        if (referralCode.trim()) {
+          try {
+            await fetch('/api/referral', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ action: 'apply_code', userId: data.user.id, referralCode: referralCode.trim() }),
+            })
+          } catch {
+            // Referral code application is non-blocking
+          }
+        }
       } else {
         toast.error(data.message || 'حدث خطأ في إنشاء الحساب')
       }
@@ -307,6 +332,22 @@ function CompleteRegistration({ email }: { email: string }) {
             {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
           </button>
         </div>
+      </div>
+
+      {/* Referral Code - Optional */}
+      <div className="space-y-2">
+        <Label className="text-sm text-muted-foreground flex items-center gap-1.5">
+          <Gift className="w-3.5 h-3.5 text-gold" />
+          كود الدعوة
+          <span className="text-muted-foreground/60 text-xs">(اختياري)</span>
+        </Label>
+        <Input
+          placeholder="أدخل كود الدعوة"
+          value={referralCode}
+          onChange={(e) => setReferralCode(e.target.value.toUpperCase())}
+          className="glass-input h-12 text-base"
+          dir="ltr"
+        />
       </div>
 
       <Button
