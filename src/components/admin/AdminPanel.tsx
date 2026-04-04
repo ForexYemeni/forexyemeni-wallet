@@ -6,6 +6,7 @@ import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { compressImage, fileToBase64 } from '@/lib/image-compress'
 import {
   Users,
   ArrowDownLeft,
@@ -171,10 +172,10 @@ export default function AdminPanel() {
   // Track which tabs have been loaded to avoid re-fetching
   const [loadedTabs, setLoadedTabs] = useState<Set<string>>(new Set())
 
-  // Fetch only data for the active tab
+  // Fetch data when switching tabs (lazy load)
   useEffect(() => {
     if (user?.role === 'admin' || (user?.permissions && Object.values(user.permissions).some(v => v))) {
-      if (!loadedTabs.has(activeTab)) {
+      if (!loadedTabs.has(activeTab) && activeTab !== 'users') {
         fetchTabData(activeTab)
         setLoadedTabs(prev => new Set(prev).add(activeTab))
       }
@@ -182,15 +183,19 @@ export default function AdminPanel() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeTab])
 
-  // Initial load: fetch users + payment-methods + settings (always needed)
+  // Initial load: fetch only users tab data (fast, no unnecessary calls)
   useEffect(() => {
     if (user?.role === 'admin' || (user?.permissions && Object.values(user.permissions).some(v => v))) {
-      fetchUsers()
-      fetchPaymentMethods()
-      fetchAdminSettings()
-      // Pre-load the active tab
-      fetchTabData(activeTab)
-      setLoadedTabs(prev => new Set(prev).add(activeTab))
+      const initLoad = async () => {
+        setLoading(true)
+        try {
+          // Only fetch users on initial load (the default tab)
+          await fetchUsers()
+        } finally {
+          setLoading(false)
+        }
+      }
+      initLoad()
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
@@ -245,40 +250,32 @@ export default function AdminPanel() {
     }
   }
 
+  const fetchFees = async () => {
+    try {
+      const res = await fetch('/api/settings')
+      const data = await res.json()
+      return data.settings || {}
+    } catch { return {} }
+  }
+
   const fetchTabData = (tab: string) => {
     switch (tab) {
       case 'deposits': fetchDeposits(); break
       case 'withdrawals': fetchWithdrawals(); break
       case 'kyc': fetchKYC(); break
       case 'payment-methods': fetchPaymentMethods(); break
+      case 'admin-settings': fetchAdminSettings(); break
     }
   }
 
   // Lightweight refresh: only re-fetch the affected tab
   const refreshCurrentTab = () => {
     fetchTabData(activeTab)
-    fetchPaymentMethods()
   }
 
-  // Full refresh for cross-tab data changes (used sparingly)
-  const fetchAll = async () => {
-    setLoading(true)
-    try {
-      await Promise.all([
-        fetchUsers(),
-        fetchDeposits(),
-        fetchWithdrawals(),
-        fetchKYC(),
-        fetchPaymentMethods(),
-        fetchAdminSettings(),
-      ])
-      // Mark all tabs as loaded
-      setLoadedTabs(new Set(['users', 'deposits', 'withdrawals', 'kyc', 'payment-methods', 'admin-settings']))
-    } catch {
-      toast.error('خطأ في تحميل البيانات')
-    } finally {
-      setLoading(false)
-    }
+  // Refresh a specific tab without loading spinner
+  const refreshTab = (tab: string) => {
+    fetchTabData(tab)
   }
 
   const handleUpdateDeposit = async (depositId: string, status: string) => {
@@ -525,7 +522,8 @@ export default function AdminPanel() {
       if (data.success) {
         toast.success('تم رفض السحب')
         setRejectDialog(null)
-        fetchAll()
+        refreshTab('withdrawals')
+        fetchUsers()
       } else {
         toast.error(data.message)
       }
@@ -624,13 +622,8 @@ export default function AdminPanel() {
     setProofLoading(true)
     try {
       const file = proofInputRef.current.files[0]
-      const compressed = await (await import('@/lib/image-compress')).compressImage(file, { maxSize: 1200, quality: 0.8 })
-      const reader = new FileReader()
-      const base64Promise = new Promise<string>((resolve) => {
-        reader.onload = () => resolve(reader.result as string)
-        reader.readAsDataURL(compressed)
-      })
-      const screenshotBase64 = await base64Promise
+      const compressed = await compressImage(file)
+      const screenshotBase64 = await fileToBase64(compressed)
 
       const res = await fetch('/api/admin/withdrawals', {
         method: 'POST',
@@ -645,7 +638,8 @@ export default function AdminPanel() {
       if (data.success) {
         toast.success('تم رفع إثبات الدفع بنجاح')
         setProofDialogWithdrawal(null)
-        fetchAll()
+        refreshTab('withdrawals')
+        fetchUsers()
       } else {
         toast.error(data.message)
       }
@@ -1132,7 +1126,7 @@ export default function AdminPanel() {
 
           {/* ===================== ADMIN SETTINGS TAB ===================== */}
           {effectiveActiveTab === 'admin-settings' && (
-            <AdminSettingsPanel settings={adminSettings} onRefresh={() => { fetchAdminSettings(); fetchFees() }} />
+            <AdminSettingsPanel settings={adminSettings} onRefresh={fetchAdminSettings} />
           )}
 
           {/* ===================== KYC TAB ===================== */}
