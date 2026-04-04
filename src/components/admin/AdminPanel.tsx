@@ -880,31 +880,25 @@ export default function AdminPanel() {
   // Determine if user has specific permissions
   const hasPermissions = user?.permissions && Object.keys(user.permissions).length > 0
 
-  const allTabs = [
-    { key: 'dashboard' as const, label: 'الإحصائيات', icon: BarChart3, count: stats?.pendingActions || 0, perm: null as string | null },
-    { key: 'users' as const, label: 'المستخدمون', icon: Users, count: users.length, perm: 'manageUsers' as const },
-    { key: 'deposits' as const, label: 'الإيداعات', icon: ArrowDownLeft, count: deposits.filter(d => d.status === 'pending' || d.status === 'reviewing').length, perm: 'approveDeposits' as const },
-    { key: 'withdrawals' as const, label: 'السحوبات', icon: ArrowUpRight, count: withdrawals.filter(w => w.status === 'pending' || w.status === 'approved').length, perm: 'approveWithdrawals' as const },
-    { key: 'kyc' as const, label: 'التحقق', icon: Shield, count: kycRecords.filter(k => k.status === 'pending').length, perm: 'approveKYC' as const },
-    { key: 'payment-methods' as const, label: 'طرق الدفع', icon: CreditCard, count: paymentMethods.filter(p => p.isActive).length, perm: 'manageUsers' as const },
-    { key: 'referral-settings' as const, label: 'برنامج الدعوات', icon: Gift, count: 0, perm: 'manageSettings' as const },
-    ...(user?.role === 'admin' && !hasPermissions ? [{ key: 'admin-settings' as const, label: 'إعدادات الإدارة', icon: Settings, count: 0, perm: 'manageSettings' as const }] : []),
-    { key: 'chats' as const, label: 'المحادثات', icon: MessageCircle, count: chatUnreadCount, perm: null as string | null },
-    { key: 'faq-bot' as const, label: 'البوت والأسئلة', icon: MessageSquare, count: 0, perm: 'manageSettings' as const },
-    { key: 'p2p' as const, label: 'P2P والنزاعات', icon: Repeat, count: 0, perm: 'manageUsers' as const },
-    ...(user?.role === 'admin' && !hasPermissions ? [
-      { key: 'audit-log' as const, label: 'سجل العمليات', icon: Clock, count: 0, perm: null as string | null },
-      { key: 'reports' as const, label: 'التقارير المالية', icon: BarChart3, count: 0, perm: null as string | null },
-      { key: 'system-monitor' as const, label: 'مراقبة النظام', icon: Activity, count: 0, perm: null as string | null },
-      { key: 'admin-team' as const, label: '👥 فريق الإدارة', icon: Users, count: 0, perm: null as string | null },
-      { key: 'admin-financial' as const, label: '💰 الملخص المالي', icon: CreditCard, count: 0, perm: null as string | null },
-      { key: 'super-admin' as const, label: '🛡️ تحكم خارق', icon: Shield, count: 0, perm: null as string | null },
-    ] : []),
+  const tabs = [
+    { key: 'dashboard' as const, label: 'الإحصائيات', icon: BarChart3, count: stats?.pendingActions || 0 },
+    { key: 'users' as const, label: 'المستخدمون', icon: Users, count: users.length },
+    { key: 'deposits' as const, label: 'الإيداعات', icon: ArrowDownLeft, count: deposits.filter(d => d.status === 'pending' || d.status === 'reviewing').length },
+    { key: 'withdrawals' as const, label: 'السحوبات', icon: ArrowUpRight, count: withdrawals.filter(w => w.status === 'pending' || w.status === 'approved').length },
+    { key: 'kyc' as const, label: 'التحقق', icon: Shield, count: kycRecords.filter(k => k.status === 'pending').length },
+    { key: 'payment-methods' as const, label: 'طرق الدفع', icon: CreditCard, count: paymentMethods.filter(p => p.isActive).length },
+    { key: 'referral-settings' as const, label: 'برنامج الدعوات', icon: Gift, count: 0 },
+    { key: 'admin-settings' as const, label: 'إعدادات الإدارة', icon: Settings, count: 0 },
+    { key: 'chats' as const, label: 'المحادثات', icon: MessageCircle, count: chatUnreadCount },
+    { key: 'faq-bot' as const, label: 'البوت والأسئلة', icon: MessageSquare, count: 0 },
+    { key: 'p2p' as const, label: 'P2P والنزاعات', icon: Repeat, count: 0 },
+    { key: 'audit-log' as const, label: 'سجل العمليات', icon: Clock, count: 0 },
+    { key: 'reports' as const, label: 'التقارير المالية', icon: BarChart3, count: 0 },
+    { key: 'system-monitor' as const, label: 'مراقبة النظام', icon: Activity, count: 0 },
+    { key: 'admin-team' as const, label: '👥 فريق الإدارة', icon: Users, count: 0 },
+    { key: 'admin-financial' as const, label: '💰 الملخص المالي', icon: CreditCard, count: 0 },
+    { key: 'super-admin' as const, label: '🛡️ تحكم خارق', icon: Shield, count: 0 },
   ]
-
-  const tabs = hasPermissions
-    ? allTabs.filter(tab => tab.perm === null || user.permissions?.[tab.perm])
-    : allTabs
 
   const allowedTabKeys = tabs.map(t => t.key)
   const effectiveActiveTab = allowedTabKeys.includes(activeTab) ? activeTab : allowedTabKeys[0] || 'dashboard'
