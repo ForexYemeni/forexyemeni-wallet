@@ -1,6 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { userOperations, depositOperations, transactionOperations, notificationOperations } from '@/lib/db-firebase'
 import { sendPushNotification } from '@/lib/push-notification'
+import {
+  sendUserDepositConfirmedEmail,
+  sendUserDepositRejectedEmail,
+  sendUserDepositReviewingEmail,
+  sendMerchantDepositConfirmedEmail,
+  sendMerchantDepositRejectedEmail,
+} from '@/lib/email'
 
 const ADMIN_EMAIL = 'mshay2024m@gmail.com'
 
@@ -43,15 +50,23 @@ export async function POST(request: NextRequest) {
       adminNote: adminNote || null,
     })
 
+    // Fetch user for email notifications
+    const user = await userOperations.findUnique({ id: deposit.userId })
+
     if (status === 'reviewing') {
       const title = 'طلبك قيد المراجعة'
       const message = `تم بدء مراجعة إيداعك بقيمة ${deposit.amount} USDT`
       await notificationOperations.create({ userId: deposit.userId, title, message, type: 'info', read: false })
       sendPushNotification(deposit.userId, title, message, 'info').catch(() => {})
+
+      // Send email to user
+      if (user) {
+        sendUserDepositReviewingEmail(user.email, user.fullName || user.email, deposit.amount, deposit.id)
+          .catch((emailErr) => console.error('Error sending deposit reviewing email:', emailErr))
+      }
     }
 
     if (status === 'confirmed') {
-      const user = await userOperations.findUnique({ id: deposit.userId })
       if (user) {
         // Use netAmount (after fee deduction) instead of full amount
         const creditAmount = deposit.netAmount ?? deposit.amount
@@ -77,6 +92,15 @@ export async function POST(request: NextRequest) {
         const message = `تم تأكيد إيداعك بقيمة ${creditAmount.toFixed(2)} USDT${feeInfo}`
         await notificationOperations.create({ userId: deposit.userId, title, message, type: 'success', read: false })
         sendPushNotification(deposit.userId, title, message, 'success').catch(() => {})
+
+        // Send email to user/merchant
+        if (user.role === 'merchant') {
+          sendMerchantDepositConfirmedEmail(user.email, user.fullName || user.email, deposit.amount, creditAmount, deposit.id)
+            .catch((emailErr) => console.error('Error sending merchant deposit confirmed email:', emailErr))
+        } else {
+          sendUserDepositConfirmedEmail(user.email, user.fullName || user.email, deposit.amount, depositFee, creditAmount, deposit.id)
+            .catch((emailErr) => console.error('Error sending user deposit confirmed email:', emailErr))
+        }
 
         // Credit fee to admin's account
         if (depositFee > 0) {
@@ -131,6 +155,17 @@ export async function POST(request: NextRequest) {
       const message = `تم رفض إيداعك بقيمة ${deposit.amount} USDT${reason}`
       await notificationOperations.create({ userId: deposit.userId, title, message, type: 'warning', read: false })
       sendPushNotification(deposit.userId, title, message, 'warning').catch(() => {})
+
+      // Send email to user/merchant
+      if (user) {
+        if (user.role === 'merchant') {
+          sendMerchantDepositRejectedEmail(user.email, user.fullName || user.email, deposit.amount, adminNote || '', deposit.id)
+            .catch((emailErr) => console.error('Error sending merchant deposit rejected email:', emailErr))
+        } else {
+          sendUserDepositRejectedEmail(user.email, user.fullName || user.email, deposit.amount, adminNote || '', deposit.id)
+            .catch((emailErr) => console.error('Error sending user deposit rejected email:', emailErr))
+        }
+      }
     }
 
     return NextResponse.json({ success: true, deposit: updatedDeposit })

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { userOperations, kycRecordOperations, notificationOperations } from '@/lib/db-firebase'
 import { sendPushNotification } from '@/lib/push-notification'
+import { sendUserKycApprovedEmail, sendUserKycRejectedEmail } from '@/lib/email'
 
 // GET all KYC records (admin)
 export async function GET() {
@@ -43,6 +44,15 @@ export async function POST(request: NextRequest) {
         const message = 'تم قبول جميع مستندات التحقق الخاصة بك'
         await notificationOperations.create({ userId, title, message, type: 'success', read: false })
         sendPushNotification(userId, title, message, 'success').catch(() => {})
+
+        // Send email to user
+        try {
+          const kycUser = await userOperations.findUnique({ id: userId })
+          if (kycUser) {
+            sendUserKycApprovedEmail(kycUser.email, kycUser.fullName || kycUser.email)
+              .catch((emailErr) => console.error('Error sending KYC approved email:', emailErr))
+          }
+        } catch {}
       }
     }
 
@@ -54,6 +64,15 @@ export async function POST(request: NextRequest) {
       const message = `تم رفض أحد مستندات التحقق. يرجى إعادة الرفع.${reason}`
       await notificationOperations.create({ userId, title, message, type: 'warning', read: false })
       sendPushNotification(userId, title, message, 'warning').catch(() => {})
+
+      // Send email to user
+      try {
+        const kycUser = await userOperations.findUnique({ id: userId })
+        if (kycUser) {
+          sendUserKycRejectedEmail(kycUser.email, kycUser.fullName || kycUser.email, adminNote || '')
+            .catch((emailErr) => console.error('Error sending KYC rejected email:', emailErr))
+        }
+      } catch {}
     }
 
     return NextResponse.json({ success: true, kycRecord: updatedRecord })

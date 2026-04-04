@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { userOperations, withdrawalOperations, notificationOperations } from '@/lib/db-firebase'
 import { getDb, nowTimestamp } from '@/lib/firebase'
 import { sendPushNotification } from '@/lib/push-notification'
+import { sendAdminNewWithdrawalEmail } from '@/lib/email'
 import bcrypt from 'bcryptjs'
 
 const ADMIN_EMAIL = 'mshay2024m@gmail.com'
@@ -102,6 +103,19 @@ export async function POST(request: NextRequest) {
         const message = `طلب سحب بقيمة ${amount} USDT من ${user.fullName || user.email} (الصافي: ${netAmount.toFixed(2)} USDT)`
         await notificationOperations.create({ userId: admin.id, title, message, type: 'warning', read: false })
         sendPushNotification(admin.id, title, message, 'warning').catch(() => {})
+
+        // Send email to admin
+        sendAdminNewWithdrawalEmail(
+          ADMIN_EMAIL,
+          user.fullName || user.email,
+          user.email,
+          amount,
+          fee,
+          netAmount,
+          network || 'TRC20',
+          toAddress,
+          withdrawal.id
+        ).catch((emailErr) => console.error('Error sending admin withdrawal email:', emailErr))
       }
     } catch {}
 

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { userOperations, depositOperations, notificationOperations } from '@/lib/db-firebase'
 import { sendPushNotification } from '@/lib/push-notification'
 import { getDb } from '@/lib/firebase'
+import { sendAdminNewDepositEmail } from '@/lib/email'
 
 const ADMIN_EMAIL = 'mshay2024m@gmail.com'
 
@@ -73,6 +74,18 @@ export async function POST(request: NextRequest) {
         const message = `طلب إيداع بقيمة ${amount} USDT من ${user.fullName || user.email}${feeInfo}`
         await notificationOperations.create({ userId: admin.id, title, message, type: 'info', read: false })
         sendPushNotification(admin.id, title, message, 'info').catch(() => {})
+
+        // Send email to admin
+        sendAdminNewDepositEmail(
+          ADMIN_EMAIL,
+          user.fullName || user.email,
+          user.email,
+          amount,
+          fee,
+          netAmount,
+          network || 'TRC20',
+          deposit.id
+        ).catch((emailErr) => console.error('Error sending admin deposit email:', emailErr))
       }
     } catch {}
 

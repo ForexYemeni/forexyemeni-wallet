@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { userOperations, kycRecordOperations, notificationOperations } from '@/lib/db-firebase'
 import { sendPushNotification } from '@/lib/push-notification'
+import { sendAdminNewKycEmail } from '@/lib/email'
 
 const ADMIN_EMAIL = 'mshay2024m@gmail.com'
 
@@ -79,6 +80,15 @@ export async function POST(request: NextRequest) {
         const message = `${typeLabel} جديدة من ${user.fullName || user.email}`
         await notificationOperations.create({ userId: admin.id, title, message, type: 'info' })
         sendPushNotification(admin.id, title, message, 'info').catch(() => {})
+
+        // Send email to admin
+        sendAdminNewKycEmail(
+          ADMIN_EMAIL,
+          user.fullName || user.email,
+          user.email,
+          type,
+          userId
+        ).catch((emailErr) => console.error('Error sending admin KYC email:', emailErr))
       }
     } catch {}
 

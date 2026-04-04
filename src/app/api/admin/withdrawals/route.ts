@@ -2,6 +2,14 @@ import { NextRequest, NextResponse } from 'next/server'
 import { userOperations, withdrawalOperations, transactionOperations, notificationOperations } from '@/lib/db-firebase'
 import { getDb, nowTimestamp } from '@/lib/firebase'
 import { sendPushNotification } from '@/lib/push-notification'
+import {
+  sendUserWithdrawalApprovedEmail,
+  sendUserWithdrawalProcessingEmail,
+  sendUserWithdrawalRejectedEmail,
+  sendMerchantWithdrawalApprovedEmail,
+  sendMerchantWithdrawalProcessingEmail,
+  sendMerchantWithdrawalRejectedEmail,
+} from '@/lib/email'
 
 const ADMIN_EMAIL = 'mshay2024m@gmail.com'
 
@@ -64,6 +72,16 @@ export async function POST(request: NextRequest) {
       const message = `تم قبول سحبك بقيمة ${netAmt.toFixed(2)} USDT. جاري معالجة الدفع.`
       await notificationOperations.create({ userId: withdrawal.userId, title, message, type: 'info', read: false })
       sendPushNotification(withdrawal.userId, title, message, 'info').catch(() => {})
+
+      // Send email to user/merchant
+      const wUser = await userOperations.findUnique({ id: withdrawal.userId })
+      if (wUser) {
+        const sendWApproved = wUser.role === 'merchant'
+          ? sendMerchantWithdrawalApprovedEmail
+          : sendUserWithdrawalApprovedEmail
+        sendWApproved(wUser.email, wUser.fullName || wUser.email, withdrawal.amount, netAmt, withdrawal.id)
+          .catch((emailErr) => console.error('Error sending withdrawal approved email:', emailErr))
+      }
     }
 
     if (status === 'processing') {
@@ -90,6 +108,15 @@ export async function POST(request: NextRequest) {
         await userOperations.update({ id: withdrawal.userId }, {
           pendingConfirmation: withdrawalId,
         })
+      }
+
+      // Send email to user/merchant
+      if (user) {
+        const sendWProcessing = user.role === 'merchant'
+          ? sendMerchantWithdrawalProcessingEmail
+          : sendUserWithdrawalProcessingEmail
+        sendWProcessing(user.email, user.fullName || user.email, netAmount, withdrawal.toAddress, withdrawal.id)
+          .catch((emailErr) => console.error('Error sending withdrawal processing email:', emailErr))
       }
 
       // Credit fee to admin's account
@@ -143,6 +170,15 @@ export async function POST(request: NextRequest) {
       const message = `تم رفض طلب سحبك. تم إعادة المبلغ إلى رصيدك.${reason}`
       await notificationOperations.create({ userId: withdrawal.userId, title, message, type: 'warning', read: false })
       sendPushNotification(withdrawal.userId, title, message, 'warning').catch(() => {})
+
+      // Send email to user/merchant
+      if (user) {
+        const sendWRejected = user.role === 'merchant'
+          ? sendMerchantWithdrawalRejectedEmail
+          : sendUserWithdrawalRejectedEmail
+        sendWRejected(user.email, user.fullName || user.email, withdrawal.amount, adminNote || '', withdrawal.id)
+          .catch((emailErr) => console.error('Error sending withdrawal rejected email:', emailErr))
+      }
     }
 
     return NextResponse.json({ success: true, withdrawal: updatedWithdrawal })
