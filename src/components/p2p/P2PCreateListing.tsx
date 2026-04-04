@@ -37,12 +37,22 @@ export default function P2PCreateListing({ onCreated, onBack }: P2PCreateListing
       toast.error('يرجى تسجيل الدخول أولاً')
       return
     }
-    if (!amount || !price || paymentMethods.length === 0) {
-      toast.error('الكمية، السعر وطريقة الدفع مطلوبة')
+    if (!amount || parseFloat(amount) <= 0) {
+      toast.error('يرجى إدخال كمية صحيحة')
       return
     }
+    if (!price || parseFloat(price) <= 0) {
+      toast.error('يرجى إدخال سعر صحيح')
+      return
+    }
+    if (paymentMethods.length === 0) {
+      toast.error('يرجى اختيار طريقة دفع واحدة على الأقل')
+      return
+    }
+
     setLoading(true)
     try {
+      console.log('[P2PCreateListing] Creating listing:', { type, amount, price, paymentMethods, network, userId: user.id })
       const res = await fetch('/api/p2p/listings', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'x-user-id': user.id },
@@ -58,15 +68,16 @@ export default function P2PCreateListing({ onCreated, onBack }: P2PCreateListing
         }),
       })
       const data = await res.json()
+      console.log('[P2PCreateListing] Response:', data)
       if (data.success) {
-        toast.success('تم إنشاء الإعلان')
+        toast.success('تم إنشاء الإعلان بنجاح')
         onCreated()
       } else {
         toast.error(data.message || 'خطأ في إنشاء الإعلان')
       }
     } catch (err) {
       console.error('[P2PCreateListing] Error:', err)
-      toast.error('خطأ في إنشاء الإعلان')
+      toast.error('خطأ في الاتصال، يرجى المحاولة مرة أخرى')
     } finally {
       setLoading(false)
     }
@@ -111,11 +122,11 @@ export default function P2PCreateListing({ onCreated, onBack }: P2PCreateListing
         {/* Amount & Price */}
         <div className="grid grid-cols-2 gap-3">
           <div className="space-y-1.5">
-            <label className="text-xs font-medium text-muted-foreground">الكمية (USDT)</label>
+            <label className="text-xs font-medium text-muted-foreground">الكمية (USDT) *</label>
             <input type="number" value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="100" className="w-full h-11 rounded-xl glass-input px-3 text-sm" dir="ltr" />
           </div>
           <div className="space-y-1.5">
-            <label className="text-xs font-medium text-muted-foreground">السعر (YER/USDT)</label>
+            <label className="text-xs font-medium text-muted-foreground">السعر (YER/USDT) *</label>
             <input type="number" value={price} onChange={(e) => setPrice(e.target.value)} placeholder="530" className="w-full h-11 rounded-xl glass-input px-3 text-sm" dir="ltr" />
           </div>
         </div>
@@ -134,7 +145,7 @@ export default function P2PCreateListing({ onCreated, onBack }: P2PCreateListing
 
         {/* Payment Methods */}
         <div className="space-y-1.5">
-          <label className="text-xs font-medium text-muted-foreground">طرق الدفع</label>
+          <label className="text-xs font-medium text-muted-foreground">طرق الدفع * <span className="text-yellow-400">(اختر واحدة على الأقل)</span></label>
           <div className="flex flex-wrap gap-2">
             {PAYMENT_METHODS.map(m => (
               <button key={m.value} onClick={() => togglePayment(m.value)} className={`px-3 py-2 rounded-xl text-xs font-medium transition-all ${paymentMethods.includes(m.value) ? 'gold-gradient text-gray-900' : 'bg-white/5 text-muted-foreground border border-transparent hover:bg-white/10'}`}>
@@ -142,9 +153,16 @@ export default function P2PCreateListing({ onCreated, onBack }: P2PCreateListing
               </button>
             ))}
           </div>
+          {paymentMethods.length === 0 && (
+            <p className="text-[10px] text-yellow-400">⚠️ يجب اختيار طريقة دفع واحدة على الأقل</p>
+          )}
         </div>
 
-        <button onClick={handleSubmit} disabled={loading || !amount || !price || paymentMethods.length === 0} className="w-full h-12 gold-gradient text-gray-900 font-bold rounded-xl hover:opacity-90 transition-all disabled:opacity-50">
+        <button
+          onClick={handleSubmit}
+          disabled={loading}
+          className="w-full h-12 gold-gradient text-gray-900 font-bold rounded-xl hover:opacity-90 transition-all disabled:opacity-50"
+        >
           {loading ? <Loader2 className="w-5 h-5 animate-spin mx-auto" /> : 'إنشاء الإعلان'}
         </button>
       </div>

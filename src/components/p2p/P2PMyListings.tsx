@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useAuthStore } from '@/lib/store'
 import { toast } from 'sonner'
-import { Plus, Pause, Play, Trash2, Loader2, RefreshCw, AlertTriangle } from 'lucide-react'
+import { Plus, Pause, Play, Trash2, Loader2, RefreshCw, AlertTriangle, RotateCw } from 'lucide-react'
 import P2PCreateListing from './P2PCreateListing'
 
 interface Listing {
@@ -28,40 +28,52 @@ export default function P2PMyListings() {
   const [loading, setLoading] = useState(true)
   const [checkingMerchant, setCheckingMerchant] = useState(true)
   const [isMerchant, setIsMerchant] = useState(false)
+  const [merchantCheckFailed, setMerchantCheckFailed] = useState(false)
   const [showCreate, setShowCreate] = useState(false)
   const [actionLoading, setActionLoading] = useState<string | null>(null)
 
-  // Check merchant status from API on mount
+  // Use merchantId from store directly
+  const effectiveMerchantId = user?.merchantId
+
+  // If user already has merchantId, skip the API check
   useEffect(() => {
     if (!user?.id) return
+
+    // Fast path: user already has merchantId in store from login
+    if (user.merchantId) {
+      console.log('[P2PMyListings] User has merchantId:', user.merchantId, '— skipping API check')
+      setIsMerchant(true)
+      setCheckingMerchant(false)
+      return
+    }
+
+    // Slow path: check API for merchant status
     const checkMerchant = async () => {
       setCheckingMerchant(true)
+      setMerchantCheckFailed(false)
       try {
         const res = await fetch(`/api/p2p/merchant?userId=${user.id}`)
         const data = await res.json()
+        console.log('[P2PMyListings] Merchant check response:', data)
         if (data.success && data.hasApplication && data.application?.status === 'approved') {
           setIsMerchant(true)
-          // Also update store with merchantId if missing
           if (!user?.merchantId) {
             updateUser({ merchantId: data.application.id })
           }
-        } else if (user?.merchantId) {
-          // User has merchantId from old system or direct DB field
-          setIsMerchant(true)
         } else {
           setIsMerchant(false)
+          console.log('[P2PMyListings] User is not an approved merchant. Application status:', data.application?.status || 'none')
         }
-      } catch {
-        setIsMerchant(false)
+      } catch (err) {
+        console.error('[P2PMyListings] Merchant check failed:', err)
+        setMerchantCheckFailed(true)
+        // Don't set isMerchant to false on API error - let the user retry
       } finally {
         setCheckingMerchant(false)
       }
     }
     checkMerchant()
-  }, [user?.id])
-
-  // Use merchantId from store or application id
-  const effectiveMerchantId = user?.merchantId
+  }, [user?.id, user?.merchantId])
 
   const fetchListings = useCallback(async () => {
     if (!effectiveMerchantId) { setLoading(false); return }
@@ -114,11 +126,35 @@ export default function P2PMyListings() {
     )
   }
 
+  // Merchant check failed - show retry instead of blocking
+  if (merchantCheckFailed && !effectiveMerchantId) {
+    return (
+      <div className="glass-card p-8 text-center space-y-4">
+        <AlertTriangle className="w-10 h-10 text-yellow-400 mx-auto" />
+        <p className="text-sm text-muted-foreground">تعذر التحقق من حالة التاجر</p>
+        <button
+          onClick={() => {
+            setCheckingMerchant(true)
+            setMerchantCheckFailed(false)
+            // Re-trigger the merchant check by updating user?.id dependency
+            window.location.reload()
+          }}
+          className="inline-flex items-center gap-2 px-4 h-10 gold-gradient text-gray-900 font-bold text-xs rounded-xl hover:opacity-90 transition-all"
+        >
+          <RotateCw className="w-4 h-4" />
+          إعادة المحاولة
+        </button>
+      </div>
+    )
+  }
+
+  // Not a merchant and no merchantId
   if (!isMerchant && !effectiveMerchantId) {
     return (
       <div className="glass-card p-8 text-center">
         <AlertTriangle className="w-10 h-10 text-yellow-400 mx-auto mb-3" />
         <p className="text-sm text-muted-foreground">يجب أن تكون تاجر موثق لإنشاء إعلانات</p>
+        <p className="text-xs text-muted-foreground mt-2">قم بتقديم طلب التوثيق من تبويب "التوثيق"</p>
       </div>
     )
   }
@@ -147,6 +183,13 @@ export default function P2PMyListings() {
       ) : listings.length === 0 ? (
         <div className="glass-card p-10 text-center">
           <p className="text-sm text-muted-foreground">لا توجد إعلانات. قم بإنشاء إعلانك الأول!</p>
+          <button
+            onClick={() => setShowCreate(true)}
+            className="mt-4 inline-flex items-center gap-1.5 px-4 h-9 gold-gradient text-gray-900 font-bold text-xs rounded-xl hover:opacity-90 transition-all"
+          >
+            <Plus className="w-4 h-4" />
+            إنشاء إعلان جديد
+          </button>
         </div>
       ) : (
         <div className="space-y-3">
