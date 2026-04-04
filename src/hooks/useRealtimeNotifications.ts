@@ -49,11 +49,11 @@ export function useRealtimeNotifications() {
       // Get the latest notification
       const latest = newOnes[0]
 
-      // Play sound based on type (now async - supports native sound)
+      // Play sound based on type (pass type for preference check)
       if (latest.type === 'success') {
-        await playSuccessSound()
+        await playSuccessSound(latest.type)
       } else {
-        await playNotificationSound()
+        await playNotificationSound(latest.type)
       }
 
       // Show browser notification (for non-APK)

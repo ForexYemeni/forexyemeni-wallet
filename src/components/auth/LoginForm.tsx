@@ -50,18 +50,18 @@ export default function LoginForm() {
         } else {
           toast.success('مرحباً بك، تم تسجيل الدخول بنجاح!')
           // Play welcome sound on successful login
-          playSuccessSound().catch(() => {})
+          playSuccessSound('general').catch(() => {})
           vibrate([200, 100, 200])
         }
       } else if (data.lockedDevice) {
         toast.error(data.message, { duration: 8000 })
-        playAlertSound().catch(() => {})
+        playAlertSound('general').catch(() => {})
         // Clear ALL auth state and show locked device screen
         clearForLock()
         setPendingRegistration({ email, fullName: '', password })
       } else if (data.mustChangePassword) {
         toast.error('⚠️ كلمة المرور المؤقتة لم تعد صالحة. يجب تغييرها أولاً.', { duration: 5000 })
-        playAlertSound().catch(() => {})
+        playAlertSound('general').catch(() => {})
       } else if (data.needsVerification) {
         setPendingRegistration({ email, fullName: '', password })
         setScreen('verify-email')

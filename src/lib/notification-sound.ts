@@ -1,11 +1,14 @@
 /**
- * Notification sound system - v2.6.0
+ * Notification sound system - v2.7.0
  * 
  * Priority chain for playing sounds:
- * 1. Capacitor native notifications (Android APK) — with sound file
- * 2. HTML5 Audio element — uses WAV files from /sounds/ (most reliable on web)
- * 3. Web Audio API oscillators — fallback if no audio files available
+ * 1. Check user sound preferences (notification-settings.ts)
+ * 2. Capacitor native notifications (Android APK) — with sound file
+ * 3. HTML5 Audio element — uses WAV files from /sounds/ (most reliable on web)
+ * 4. Web Audio API oscillators — fallback if no audio files available
  */
+
+import { shouldPlaySound } from '@/lib/notification-settings'
 
 // Check if running inside Capacitor native app
 function isCapacitor(): boolean {
@@ -200,8 +203,13 @@ async function playWebAudioBeep(frequencies: number[], type: OscillatorType = 's
 /**
  * Play notification chime sound.
  * Tries native Android → HTML5 Audio → Web Audio API.
+ * @param type - Notification type ('deposit', 'withdrawal', 'kyc', etc.)
+ *               Used to check user's sound preferences.
  */
-export async function playNotificationSound() {
+export async function playNotificationSound(type: string = 'general') {
+  // Check user preferences first
+  if (!shouldPlaySound(type)) return
+
   // 1. Try native sound first (Capacitor APK)
   const nativeOk = await playNativeSound('🔔', 'لديك إشعار جديد')
   if (nativeOk) return
@@ -220,8 +228,11 @@ export async function playNotificationSound() {
 
 /**
  * Play success sound.
+ * @param type - Notification type for preference check
  */
-export async function playSuccessSound() {
+export async function playSuccessSound(type: string = 'general') {
+  if (!shouldPlaySound(type)) return
+
   // 1. Try native
   const nativeOk = await playNativeSound('✅', 'تمت العملية بنجاح')
   if (nativeOk) return
@@ -240,8 +251,11 @@ export async function playSuccessSound() {
 
 /**
  * Play alert/warning sound.
+ * @param type - Notification type for preference check
  */
-export async function playAlertSound() {
+export async function playAlertSound(type: string = 'general') {
+  if (!shouldPlaySound(type)) return
+
   // 1. Try native
   const nativeOk = await playNativeSound('⚠️', 'تنبيه مهم')
   if (nativeOk) return

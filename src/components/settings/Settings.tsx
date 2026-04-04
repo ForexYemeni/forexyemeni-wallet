@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useCallback } from 'react'
 import { useAuthStore } from '@/lib/store'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
@@ -28,7 +28,17 @@ import {
   Loader2,
   Eye,
   EyeOff,
+  Volume2,
+  VolumeX,
 } from 'lucide-react'
+import {
+  getNotificationSoundSettings,
+  saveNotificationSoundSettings,
+  NOTIFICATION_CATEGORIES,
+  type NotificationSoundSettings,
+  type NotificationCategory,
+} from '@/lib/notification-settings'
+import { playNotificationSound } from '@/lib/notification-sound'
 
 export default function SettingsPage() {
   const { user, logout, updateUser, setScreen } = useAuthStore()
@@ -40,6 +50,28 @@ export default function SettingsPage() {
   const [showCurrentPassword, setShowCurrentPassword] = useState(false)
   const [showNewPassword, setShowNewPassword] = useState(false)
   const [logoutDialogOpen, setLogoutDialogOpen] = useState(false)
+
+  // Notification sound settings
+  const [soundSettings, setSoundSettings] = useState<NotificationSoundSettings>(() => getNotificationSoundSettings())
+
+  const handleToggleMaster = useCallback(() => {
+    const updated = { ...soundSettings, soundEnabled: !soundSettings.soundEnabled }
+    setSoundSettings(updated)
+    saveNotificationSoundSettings(updated)
+    toast.success(updated.soundEnabled ? 'تم تفعيل أصوات الإشعارات' : 'تم إيقاف أصوات الإشعارات')
+    if (updated.soundEnabled) playNotificationSound('general').catch(() => {})
+  }, [soundSettings])
+
+  const handleToggleCategory = useCallback((category: NotificationCategory) => {
+    const updated = {
+      ...soundSettings,
+      categories: { ...soundSettings.categories, [category]: !soundSettings.categories[category] },
+    }
+    setSoundSettings(updated)
+    saveNotificationSoundSettings(updated)
+    const cat = NOTIFICATION_CATEGORIES.find(c => c.key === category)
+    toast.success(updated.categories[category] ? `تم تفعيل صوت ${cat?.label}` : `تم إيقاف صوت ${cat?.label}`)
+  }, [soundSettings])
 
   const handleUpdateProfile = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -231,17 +263,87 @@ export default function SettingsPage() {
 
       {/* Notifications Tab */}
       {activeTab === 'notifications' && (
-        <div className="glass-card p-5 space-y-4">
-          <h3 className="text-sm font-bold">الإشعارات</h3>
-          <button
-            onClick={() => setScreen('notifications')}
-            className="w-full flex items-center justify-between p-3 rounded-xl bg-white/5 hover:bg-white/10 transition-colors"
-          >
-            <span className="text-sm">عرض الإشعارات</span>
-            <ChevronLeft className="w-4 h-4 text-muted-foreground" />
-          </button>
-          <div className="p-3 rounded-xl bg-gold/5 text-xs text-muted-foreground">
-            يتم إرسال إشعارات الإيداع والسحب والتحقق تلقائياً إلى حسابك.
+        <div className="space-y-4 animate-fade-in">
+          {/* View notifications */}
+          <div className="glass-card p-5 space-y-4">
+            <h3 className="text-sm font-bold">الإشعارات</h3>
+            <button
+              onClick={() => setScreen('notifications')}
+              className="w-full flex items-center justify-between p-3 rounded-xl bg-white/5 hover:bg-white/10 transition-colors"
+            >
+              <span className="text-sm">عرض جميع الإشعارات</span>
+              <ChevronLeft className="w-4 h-4 text-muted-foreground" />
+            </button>
+          </div>
+
+          {/* Sound settings */}
+          <div className="glass-card p-5 space-y-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${soundSettings.soundEnabled ? 'bg-gold/10' : 'bg-white/5'}`}>
+                  {soundSettings.soundEnabled ? (
+                    <Volume2 className="w-5 h-5 text-gold" />
+                  ) : (
+                    <VolumeX className="w-5 h-5 text-muted-foreground" />
+                  )}
+                </div>
+                <div>
+                  <h3 className="text-sm font-bold">أصوات الإشعارات</h3>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    {soundSettings.soundEnabled ? 'جميع الأصوات مفعّلة' : 'جميع الأصوات متوقفة'}
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={handleToggleMaster}
+                className={`relative w-12 h-7 rounded-full transition-all duration-300 ${
+                  soundSettings.soundEnabled
+                    ? 'bg-gold shadow-[0_0_12px_rgba(212,175,55,0.3)]'
+                    : 'bg-white/10'
+                }`}
+              >
+                <span
+                  className={`absolute top-0.5 w-6 h-6 rounded-full bg-white shadow-md transition-all duration-300 ${
+                    soundSettings.soundEnabled ? 'left-5.5' : 'left-0.5'
+                  }`}
+                  style={{ left: soundSettings.soundEnabled ? '22px' : '2px' }}
+                />
+              </button>
+            </div>
+
+            {/* Per-category toggles */}
+            {soundSettings.soundEnabled && (
+              <div className="space-y-2 pt-2 border-t border-white/5">
+                <p className="text-xs text-muted-foreground mb-3">تحكم بأصوات كل نوع من الإشعارات:</p>
+                {NOTIFICATION_CATEGORIES.map((cat) => {
+                  const isOn = soundSettings.categories[cat.key]
+                  return (
+                    <div
+                      key={cat.key}
+                      className="flex items-center justify-between p-3 rounded-xl bg-white/[0.02] hover:bg-white/5 transition-colors"
+                    >
+                      <div className="flex-1 ml-3">
+                        <p className="text-sm font-medium">{cat.label}</p>
+                        <p className="text-xs text-muted-foreground mt-0.5">{cat.description}</p>
+                      </div>
+                      <button
+                        onClick={() => handleToggleCategory(cat.key)}
+                        className={`relative w-11 h-6 rounded-full transition-all duration-300 flex-shrink-0 ${
+                          isOn
+                            ? 'bg-green-500/80'
+                            : 'bg-white/10'
+                        }`}
+                      >
+                        <span
+                          className="absolute top-0.5 w-5 h-5 rounded-full bg-white shadow-sm transition-all duration-300"
+                          style={{ left: isOn ? '20px' : '2px' }}
+                        />
+                      </button>
+                    </div>
+                  )
+                })}
+              </div>
+            )}
           </div>
         </div>
       )}

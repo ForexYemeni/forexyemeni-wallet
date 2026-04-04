@@ -69,11 +69,12 @@ export async function registerFCMPushNotifications(): Promise<boolean> {
       // Get actual notification title/body from FCM payload
       const title = notification.title || notification.data?.title || '🔔 إشعار جديد'
       const body = notification.body || notification.data?.body || 'لديك إشعار جديد في المحفظة'
+      const notifType = notification.data?.type || 'general'
 
       // Play sound & vibrate when notification received while app is in foreground
       try {
         const { playNotificationSound } = await import('@/lib/notification-sound')
-        await playNotificationSound()
+        await playNotificationSound(notifType)
       } catch (error) {
         console.warn('[FCM] Could not play foreground notification sound:', error)
       }
