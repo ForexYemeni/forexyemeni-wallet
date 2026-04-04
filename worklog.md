@@ -442,3 +442,63 @@ Add missing notifications across the ForexYemeni Wallet admin and user API route
 - `src/app/api/p2p/merchant/route.ts` — Added admin notifications for new merchant applications (+20 lines)
 - `src/app/api/admin/p2p/merchants/route.ts` — Added push notifications for merchant approve/reject (+2 lines)
 - `src/app/api/admin/users/route.ts` — Added 4 notification triggers for user management (+53 lines)
+
+---
+## Task ID: 2 - Admin Audit, Reports, and Export API Routes
+
+### Work Task
+Create 3 new admin API routes for the ForexYemeni wallet: audit logging, financial reports, and CSV data export.
+
+### Work Summary
+
+#### 1. New API: `/api/admin/audit/route.ts` (GET + POST)
+- **GET**: Returns audit log entries with optional filters
+  - Query params: `adminId` (required), `actionType`, `targetType`, `targetId`, `fromDate`, `toDate`, `limit` (default 50, max 200)
+  - Admin verification: checks user exists and is admin or main admin email
+  - Date filtering done in JS to avoid Firestore composite index issues
+  - Results sorted by `createdAt` descending
+  - Returns: `{ success: true, logs: [...], total: number }`
+- **POST**: Creates new audit log entry in `auditLog` Firestore collection
+  - Body: `{ adminId, actionType, targetType, targetId, targetName, details, ipAddress }`
+  - Validates `actionType` against 22 allowed types (user_suspend, deposit_approve, settings_change, etc.)
+  - Auto-fills `adminName` and `adminEmail` from the admin user document
+  - Uses `generateId()` for Firestore document IDs, `nowTimestamp()` for createdAt
+
+#### 2. New API: `/api/admin/reports/route.ts` (GET)
+- **GET**: Returns financial report data
+  - Query params: `adminId` (required), `period`, `fromDate`, `toDate`
+  - Default date range: last 7 days
+  - Admin verification same as audit route
+  - Fetches all deposits, withdrawals, and users (up to 1000 each) in parallel
+  - Returns structured report:
+    - `summary`: totalDeposits, totalWithdrawals, totalFees, netFlow, depositCount, withdrawalCount
+    - `deposits`: array grouped by date with { date, total, count, fees }
+    - `withdrawals`: array grouped by date with { date, total, count, fees }
+    - `topUsers`: top 10 users by combined deposit+withdrawal activity
+    - `dailyStats`: per-day breakdown with deposits, withdrawals, fees, netFlow, new users
+  - Uses confirmed deposits and processing withdrawals for totals (matching existing stats route pattern)
+  - All monetary values rounded to 2 decimal places
+
+#### 3. New API: `/api/admin/export/route.ts` (GET)
+- **GET**: Exports data as CSV with proper Arabic support
+  - Query params: `adminId` (required), `type` (users, deposits, withdrawals, audit)
+  - Admin verification same pattern
+  - Max 1000 records per export
+  - UTF-8 BOM (`\uFEFF`) prepended for Arabic character support in Excel
+  - Content-Type: `text/csv; charset=utf-8`
+  - Content-Disposition: `attachment; filename="export_[type]_[date].csv"`
+  - CSV field escaping handles commas, quotes, and newlines
+  - Arabic headers for all export types:
+    - Users: المعرف, الاسم الكامل, البريد الإلكتروني, الهاتف, الدور, الحالة, الرصيد, تاريخ التسجيل, حالة KYC
+    - Deposits: المعرف, معرف المستخدم, اسم المستخدم, المبلغ, الرسوم, المبلغ الصافي, الحالة, الشبكة, تاريخ الإنشاء
+    - Withdrawals: المعرف, معرف المستخدم, اسم المستخدم, المبلغ, الرسوم, المبلغ الصافي, الحالة, الشبكة, عنوان الاستقبال, تاريخ الإنشاء
+    - Audit: المعرف, اسم المسؤول, نوع الإجراء, نوع الهدف, اسم الهدف, التفاصيل, تاريخ الإنشاء
+
+### Files Created:
+- `src/app/api/admin/audit/route.ts` — Audit log API (GET + POST), ~155 lines
+- `src/app/api/admin/reports/route.ts` — Financial reports API (GET), ~210 lines
+- `src/app/api/admin/export/route.ts` — CSV export API (GET), ~175 lines
+
+### Git Commit:
+- Committed and pushed as `feat: add admin audit, reports, and export API routes`
+- 3 files changed, 580 insertions(+)

@@ -26,6 +26,7 @@ import {
   MessageSquare,
   Gift,
   Repeat,
+  Activity,
 } from 'lucide-react'
 import { useState, useEffect } from 'react'
 
@@ -69,6 +70,9 @@ const adminSubItems = [
   { key: 'admin-referral', label: 'برنامج الدعوات', icon: Gift, tab: 'referral-settings' },
   { key: 'admin-faq', label: 'البوت والأسئلة', icon: MessageSquare, tab: 'faq-bot' },
   { key: 'admin-p2p', label: 'P2P والنزاعات', icon: Repeat, tab: 'p2p' },
+  { key: 'admin-audit', label: 'سجل العمليات', icon: Clock, tab: 'audit-log' },
+  { key: 'admin-reports', label: 'التقارير المالية', icon: BarChart3, tab: 'reports' },
+  { key: 'admin-monitor', label: 'مراقبة النظام', icon: Activity, tab: 'system-monitor' },
   { key: 'admin-settings', label: 'إعدادات النظام', icon: Sliders, tab: 'admin-settings' },
 ]
 

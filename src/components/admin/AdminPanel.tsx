@@ -184,9 +184,12 @@ export default function AdminPanel() {
   const { user, setScreen } = useAuthStore()
   const AdminFaqManager = lazy(() => import('@/components/admin/AdminFaqManager'))
   const AdminReferralSettings = lazy(() => import('@/components/admin/AdminReferralSettings'))
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'users' | 'deposits' | 'withdrawals' | 'kyc' | 'payment-methods' | 'admin-settings' | 'faq-bot' | 'chats' | 'referral-settings' | 'p2p'>('dashboard')
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'users' | 'deposits' | 'withdrawals' | 'kyc' | 'payment-methods' | 'admin-settings' | 'faq-bot' | 'chats' | 'referral-settings' | 'p2p' | 'audit-log' | 'reports' | 'system-monitor'>('dashboard')
   const AdminChat = lazy(() => import('@/components/admin/AdminChat'))
   const AdminP2P = lazy(() => import('@/components/admin/AdminP2P'))
+  const AdminAuditLog = lazy(() => import('@/components/admin/AdminAuditLog'))
+  const AdminReports = lazy(() => import('@/components/admin/AdminReports'))
+  const AdminSystemMonitor = lazy(() => import('@/components/admin/AdminSystemMonitor'))
   const [chatUnreadCount, setChatUnreadCount] = useState(0)
 
   // Listen for sidebar sub-navigation tab changes
@@ -455,7 +458,7 @@ export default function AdminPanel() {
       const res = await fetch('/api/admin/users', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userId, ...updates }),
+        body: JSON.stringify({ userId, adminId: user?.id, ...updates }),
       })
       const data = await res.json()
       if (data.success) {
@@ -894,6 +897,11 @@ export default function AdminPanel() {
     { key: 'chats' as const, label: 'المحادثات', icon: MessageCircle, count: chatUnreadCount, perm: null as string | null },
     { key: 'faq-bot' as const, label: 'البوت والأسئلة', icon: MessageSquare, count: 0, perm: 'manageSettings' as const },
     { key: 'p2p' as const, label: 'P2P والنزاعات', icon: Repeat, count: 0, perm: 'manageUsers' as const },
+    ...(user?.role === 'admin' && !hasPermissions ? [
+      { key: 'audit-log' as const, label: 'سجل العمليات', icon: Clock, count: 0, perm: null as string | null },
+      { key: 'reports' as const, label: 'التقارير المالية', icon: BarChart3, count: 0, perm: null as string | null },
+      { key: 'system-monitor' as const, label: 'مراقبة النظام', icon: Activity, count: 0, perm: null as string | null },
+    ] : []),
   ]
 
   const tabs = hasPermissions
@@ -1731,6 +1739,45 @@ export default function AdminPanel() {
               </div>
             }>
               <AdminP2P />
+            </Suspense>
+          )}
+
+          {/* ===================== AUDIT LOG TAB ===================== */}
+          {effectiveActiveTab === 'audit-log' && (
+            <Suspense fallback={
+              <div className="space-y-3">
+                {[...Array(5)].map((_, i) => (
+                  <div key={i} className="glass-card p-4 shimmer h-16 rounded-xl" />
+                ))}
+              </div>
+            }>
+              <AdminAuditLog />
+            </Suspense>
+          )}
+
+          {/* ===================== REPORTS TAB ===================== */}
+          {effectiveActiveTab === 'reports' && (
+            <Suspense fallback={
+              <div className="space-y-3">
+                {[...Array(4)].map((_, i) => (
+                  <div key={i} className="glass-card p-4 shimmer h-24 rounded-xl" />
+                ))}
+              </div>
+            }>
+              <AdminReports />
+            </Suspense>
+          )}
+
+          {/* ===================== SYSTEM MONITOR TAB ===================== */}
+          {effectiveActiveTab === 'system-monitor' && (
+            <Suspense fallback={
+              <div className="space-y-3">
+                {[...Array(4)].map((_, i) => (
+                  <div key={i} className="glass-card p-4 shimmer h-24 rounded-xl" />
+                ))}
+              </div>
+            }>
+              <AdminSystemMonitor />
             </Suspense>
           )}
 

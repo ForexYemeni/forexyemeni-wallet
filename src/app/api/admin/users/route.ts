@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { userOperations, notificationOperations } from '@/lib/db-firebase'
 import { getDb } from '@/lib/firebase'
 import { sendPushNotification } from '@/lib/push-notification'
+import { logAudit } from '@/lib/audit-log'
 
 // GET all users (admin)
 export async function GET() {
@@ -20,7 +21,7 @@ export async function GET() {
 // POST update user (admin)
 export async function POST(request: NextRequest) {
   try {
-    const { userId, status, role, balance, balanceAdjustment, kycStatus, notes, permissions, merchantId, approvePinReset, rejectPinReset, removeMerchant, resetUserPin } = await request.json()
+    const { userId, status, role, balance, balanceAdjustment, kycStatus, notes, permissions, merchantId, approvePinReset, rejectPinReset, removeMerchant, resetUserPin, adminId } = await request.json()
 
     if (!userId) {
       return NextResponse.json({ success: false, message: 'معرف المستخدم مطلوب' }, { status: 400 })
@@ -50,6 +51,8 @@ export async function POST(request: NextRequest) {
         await sendPushNotification(userId, 'تم إعادة تعيين رمز PIN', 'يرجى إعداد رمز PIN جديد عند تسجيل الدخول التالي.', 'warning')
       }
 
+      // Audit log
+      if (adminId) logAudit(adminId, 'pin_reset', 'user', userId, targetUser?.fullName || targetUser?.email || '', 'إعادة تعيين PIN للمستخدم').catch(() => {})
       return NextResponse.json({ success: true, message: 'تم إعادة تعيين رمز PIN للمستخدم' })
     }
 
@@ -80,6 +83,8 @@ export async function POST(request: NextRequest) {
         await sendPushNotification(userId, 'تم الموافقة على إعادة تعيين PIN', 'يرجى إعداد رمز PIN جديد عند تسجيل الدخول.', 'success')
       }
 
+      // Audit log
+      if (adminId) logAudit(adminId, 'pin_reset', 'user', userId, targetUser?.fullName || '', 'الموافقة على طلب إعادة تعيين PIN').catch(() => {})
       return NextResponse.json({ success: true, message: 'تمت الموافقة على إعادة تعيين PIN' })
     }
 
@@ -165,6 +170,8 @@ export async function POST(request: NextRequest) {
       })
       await sendPushNotification(userId, 'تم إزالة حالة التاجر', 'تم تحويل حسابك إلى مستخدم عادي.', 'warning')
 
+      // Audit log
+      if (adminId) logAudit(adminId, 'merchant_remove', 'user', userId, targetUser?.fullName || targetUser?.email || '', 'إزالة حالة التاجر').catch(() => {})
       return NextResponse.json({ success: true, message: 'تم إزالة حالة التاجر بنجاح' })
     }
 
@@ -189,6 +196,14 @@ export async function POST(request: NextRequest) {
 
     // Send notifications based on what was changed
     try {
+      // Audit log: suspend
+      if (status === 'suspended' && adminId) logAudit(adminId, 'user_suspend', 'user', userId, user?.fullName || user?.email || '', 'إيقاف حساب المستخدم').catch(() => {})
+      if (status === 'active' && adminId) logAudit(adminId, 'user_activate', 'user', userId, user?.fullName || user?.email || '', 'تفعيل حساب المستخدم').catch(() => {})
+      if (role === 'admin' && adminId) logAudit(adminId, 'user_promote', 'user', userId, user?.fullName || user?.email || '', 'ترقية المستخدم لمدير').catch(() => {})
+      if (role === 'user' && adminId) logAudit(adminId, 'user_demote', 'user', userId, user?.fullName || user?.email || '', 'إزالة صلاحية الإدارة').catch(() => {})
+      if (typeof balanceAdjustment === 'number' && balanceAdjustment !== 0 && adminId) logAudit(adminId, balanceAdjustment > 0 ? 'balance_add' : 'balance_withdraw', 'user', userId, user?.fullName || '', `${balanceAdjustment > 0 ? 'إضافة' : 'سحب'} ${Math.abs(balanceAdjustment).toFixed(2)} USDT`).catch(() => {})
+      if (permissions && adminId) logAudit(adminId, 'permissions_change', 'user', userId, user?.fullName || '', 'تغيير صلاحيات المدير').catch(() => {})
+
       // Account suspension notification
       if (status === 'suspended') {
         await notificationOperations.create({
