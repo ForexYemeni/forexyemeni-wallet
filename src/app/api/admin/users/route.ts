@@ -20,7 +20,7 @@ export async function GET() {
 // POST update user (admin)
 export async function POST(request: NextRequest) {
   try {
-    const { userId, status, role, balance, balanceAdjustment, kycStatus, notes, permissions, merchantId, approvePinReset, rejectPinReset } = await request.json()
+    const { userId, status, role, balance, balanceAdjustment, kycStatus, notes, permissions, merchantId, approvePinReset, rejectPinReset, removeMerchant } = await request.json()
 
     if (!userId) {
       return NextResponse.json({ success: false, message: 'معرف المستخدم مطلوب' }, { status: 400 })
@@ -78,6 +78,67 @@ export async function POST(request: NextRequest) {
       await sendPushNotification(userId, 'تم رفض طلب إعادة تعيين PIN', 'يرجى التواصل مع الإدارة إذا كنت بحاجة إلى مساعدة.', 'error')
 
       return NextResponse.json({ success: true, message: 'تم رفض طلب إعادة تعيين PIN' })
+    }
+
+    // Handle full merchant removal (from all sources)
+    if (removeMerchant) {
+      const db = getDb()
+      const targetUser = await userOperations.findUnique({ id: userId })
+      if (!targetUser) {
+        return NextResponse.json({ success: false, message: 'المستخدم غير موجود' }, { status: 404 })
+      }
+
+      // 1. Clear merchantId on user document
+      await userOperations.update({ id: userId }, { merchantId: null })
+
+      // 2. Update merchantApplications collection - reject any approved application
+      try {
+        const applications = await db.collection('merchantApplications').where('userId', '==', userId).get()
+        for (const appDoc of applications.docs) {
+          if (appDoc.data()?.status === 'approved') {
+            await appDoc.ref.update({ status: 'rejected', rejectionReason: 'تمت إزالة حالة التاجر بواسطة الإدارة', reviewedAt: new Date().toISOString() })
+          }
+        }
+      } catch (err) {
+        console.error('[RemoveMerchant] Error updating merchantApplications:', err)
+      }
+
+      // 3. Check old merchants collection
+      try {
+        const oldMerchants = await db.collection('merchants').where('userId', '==', userId).get()
+        for (const merchantDoc of oldMerchants.docs) {
+          await merchantDoc.ref.update({ status: 'removed' })
+        }
+      } catch (err) {
+        console.error('[RemoveMerchant] Error updating old merchants:', err)
+      }
+
+      // 4. Pause all P2P listings for this merchant
+      try {
+        const merchantIdValue = targetUser.merchantId
+        if (merchantIdValue) {
+          const listings = await db.collection('p2pListings').where('merchantId', '==', merchantIdValue).get()
+          const batch = db.batch()
+          for (const listingDoc of listings.docs) {
+            batch.update(listingDoc.ref, { status: 'cancelled', updatedAt: new Date().toISOString() })
+          }
+          if (listings.docs.length > 0) await batch.commit()
+        }
+      } catch (err) {
+        console.error('[RemoveMerchant] Error updating P2P listings:', err)
+      }
+
+      // 5. Notify user
+      await notificationOperations.create({
+        userId,
+        title: 'تم إزالة حالة التاجر',
+        message: 'تم تحويل حسابك من تاجر إلى مستخدم عادي بواسطة الإدارة. تم إلغاء جميع إعلاناتك P2P.',
+        type: 'warning',
+        read: false,
+      })
+      await sendPushNotification(userId, 'تم إزالة حالة التاجر', 'تم تحويل حسابك إلى مستخدم عادي.', 'warning')
+
+      return NextResponse.json({ success: true, message: 'تم إزالة حالة التاجر بنجاح' })
     }
 
     const updateData: Record<string, unknown> = {}
@@ -140,7 +201,7 @@ export async function POST(request: NextRequest) {
         await sendPushNotification(userId, isAdd ? 'إيداع في حسابك' : 'خصم من حسابك', `${isAdd ? '+' : '-'}${Math.abs(balanceAdjustment).toFixed(2)} USDT`, isAdd ? 'success' : 'warning')
       }
 
-      // Merchant status removal notification
+      // Merchant status removal notification (legacy support)
       if (merchantId === null) {
         await notificationOperations.create({
           userId,

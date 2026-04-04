@@ -33,6 +33,10 @@ export default function P2PCreateListing({ onCreated, onBack }: P2PCreateListing
   }
 
   const handleSubmit = async () => {
+    if (!user?.id) {
+      toast.error('يرجى تسجيل الدخول أولاً')
+      return
+    }
     if (!amount || !price || paymentMethods.length === 0) {
       toast.error('الكمية، السعر وطريقة الدفع مطلوبة')
       return
@@ -41,7 +45,7 @@ export default function P2PCreateListing({ onCreated, onBack }: P2PCreateListing
     try {
       const res = await fetch('/api/p2p/listings', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'x-user-id': user?.id || '' },
+        headers: { 'Content-Type': 'application/json', 'x-user-id': user.id },
         body: JSON.stringify({
           type,
           amount: parseFloat(amount),
@@ -54,10 +58,18 @@ export default function P2PCreateListing({ onCreated, onBack }: P2PCreateListing
         }),
       })
       const data = await res.json()
-      if (data.success) { toast.success('تم إنشاء الإعلان'); onCreated() }
-      else toast.error(data.message)
-    } catch { toast.error('خطأ في إنشاء الإعلان') }
-    finally { setLoading(false) }
+      if (data.success) {
+        toast.success('تم إنشاء الإعلان')
+        onCreated()
+      } else {
+        toast.error(data.message || 'خطأ في إنشاء الإعلان')
+      }
+    } catch (err) {
+      console.error('[P2PCreateListing] Error:', err)
+      toast.error('خطأ في إنشاء الإعلان')
+    } finally {
+      setLoading(false)
+    }
   }
 
   return (

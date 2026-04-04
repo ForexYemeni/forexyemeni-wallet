@@ -806,7 +806,7 @@ export default function AdminPanel() {
 
   // ===== REMOVE MERCHANT STATUS HANDLER =====
   const handleRemoveMerchant = async () => {
-    if (!removeMerchantDialogUser || !confirm('هل أنت متأكد من إزالة حالة التاجر؟ سيتم تحويل الحساب إلى مستخدم عادي.')) return
+    if (!removeMerchantDialogUser) return
     setRemoveMerchantLoading(true)
     try {
       const res = await fetch('/api/admin/users', {
@@ -814,7 +814,7 @@ export default function AdminPanel() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           userId: removeMerchantDialogUser.id,
-          merchantId: null,
+          removeMerchant: true,
         }),
       })
       const data = await res.json()
@@ -1296,7 +1296,7 @@ export default function AdminPanel() {
                           </div>
 
                           {/* Action buttons: main admin sees all, sub-admin sees limited */}
-                          <div className="grid grid-cols-4 gap-2 pt-2">
+                          <div className="grid grid-cols-3 gap-2 pt-2">
                             {/* Suspend / Activate — main admin always, sub-admin only for regular users */}
                             {(!hasPermissions || (hasPermissions && u.role !== 'admin')) && (
                               u.status === 'active' ? (
