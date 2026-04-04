@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef, Component, ReactNode } from 'react'
 import dynamic from 'next/dynamic'
 import { useAuthStore } from '@/lib/store'
 import { toast } from 'sonner'
@@ -31,6 +31,53 @@ interface PendingWithdrawal {
   status: string
   walletAddress?: string
   walletName?: string
+}
+
+// React Error Boundary — catches rendering errors in child components
+class AdminErrorBoundary extends Component<
+  { children: ReactNode },
+  { hasError: boolean; error: Error | null }
+> {
+  constructor(props: { children: ReactNode }) {
+    super(props)
+    this.state = { hasError: false, error: null }
+  }
+
+  static getDerivedStateFromError(error: Error) {
+    return { hasError: true, error }
+  }
+
+  componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
+    console.warn('[AdminPanel Error]', error.message, errorInfo)
+  }
+
+  handleRetry = () => {
+    this.setState({ hasError: false, error: null })
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="flex flex-col items-center justify-center py-20 space-y-4">
+          <div className="w-16 h-16 rounded-2xl bg-red-500/10 flex items-center justify-center">
+            <AlertTriangle className="w-8 h-8 text-red-400" />
+          </div>
+          <div className="text-center space-y-2">
+            <p className="text-sm text-red-400 font-medium">حدث خطأ في لوحة الإدارة</p>
+            <p className="text-xs text-muted-foreground">{this.state.error?.message || ''}</p>
+          </div>
+          <button
+            onClick={this.handleRetry}
+            className="h-10 px-6 gold-gradient text-gray-900 font-bold rounded-xl hover:opacity-90 transition-all flex items-center gap-2"
+          >
+            <RefreshCw className="w-4 h-4" />
+            إعادة المحاولة
+          </button>
+        </div>
+      )
+    }
+    return this.props.children
+  }
 }
 
 // Error Boundary component to catch client-side rendering errors
@@ -126,6 +173,12 @@ export default function Home() {
       'hydration', 'Hydration',
       // Suppressed
       'suppressed', 'non-critical',
+      // Clipboard
+      'clipboard', 'Clipboard',
+      // Rendering / React
+      'render', 'Render', 'minified React error',
+      // Admin panel safe errors
+      'compress', 'image', 'Image',
     ]
 
     function isNonCriticalError(msg: string): boolean {
@@ -466,7 +519,11 @@ export default function Home() {
       {currentScreen === 'kyc' && <KYCVerification />}
       {currentScreen === 'settings' && <SettingsPage />}
       {currentScreen === 'notifications' && <NotificationsPage />}
-      {currentScreen === 'admin' && <AdminPanel />}
+      {currentScreen === 'admin' && (
+        <AdminErrorBoundary>
+          <AdminPanel />
+        </AdminErrorBoundary>
+      )}
     </AppLayout>
   )
 }

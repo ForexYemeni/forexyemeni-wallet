@@ -77,11 +77,13 @@ export default function RootLayout({
           position="top-center"
           toastOptions={{
             style: {
-              background: 'rgba(20, 20, 30, 0.95)',
-              border: '1px solid rgba(240, 185, 11, 0.3)',
-              color: '#fff',
               fontFamily: 'var(--font-tajawal)',
               direction: 'rtl',
+            },
+            classNames: {
+              toast: 'glass-card',
+              title: 'text-foreground',
+              description: 'text-muted-foreground',
             },
           }}
         />

@@ -24,6 +24,7 @@ const userNavItems = [
 
 const adminNavItems = [
   { key: 'admin', label: 'الإدارة', icon: LayoutDashboard },
+  { key: 'dashboard', label: 'الرئيسية', icon: Home },
   { key: 'settings', label: 'الإعدادات', icon: Settings },
 ]
 

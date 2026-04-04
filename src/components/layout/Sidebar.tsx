@@ -36,6 +36,7 @@ const userNavItems = [
 
 const adminNavItems = [
   { key: 'admin', label: 'لوحة التحكم', icon: LayoutDashboard, section: 'إدارة' },
+  { key: 'dashboard', label: 'الرئيسية', icon: Home, section: null },
   { key: 'notifications', label: 'الإشعارات', icon: Bell, section: null },
   { key: 'settings', label: 'الإعدادات', icon: Settings, section: null },
 ]

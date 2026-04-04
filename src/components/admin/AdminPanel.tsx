@@ -66,6 +66,8 @@ interface AdminUser {
 interface AdminDeposit {
   id: string
   amount: number
+  fee?: number
+  netAmount?: number
   txId: string | null
   status: string
   createdAt: string
@@ -77,6 +79,7 @@ interface AdminWithdrawal {
   id: string
   amount: number
   fee: number
+  netAmount?: number
   toAddress: string
   method: string
   network: string
@@ -955,12 +958,24 @@ export default function AdminPanel() {
                         <p className="text-xs text-muted-foreground" dir="ltr">{d.txId || d.id.substring(0, 12)}</p>
                       </div>
                       <div className="text-left">
-                        <p className="text-sm font-bold gold-text">{(d.amount ?? 0).toFixed(2)} USDT</p>
+                        <p className="text-sm font-bold gold-text">{(d.netAmount ?? d.amount ?? 0).toFixed(2)} USDT</p>
                         <span className={`text-xs px-2 py-0.5 rounded-md font-medium ${DEPOSIT_STATUS_MAP[d.status]?.color || ''}`}>
                           {DEPOSIT_STATUS_MAP[d.status]?.label || d.status}
                         </span>
                       </div>
                     </div>
+                    {/* Fee breakdown */}
+                    {(d.fee ?? 0) > 0 && (
+                      <div className="flex items-center justify-between p-2 rounded-lg bg-white/5 text-xs">
+                        <div className="flex items-center gap-3">
+                          <span className="text-muted-foreground">المبلغ المدفوع: <strong className="text-foreground">{(d.amount ?? 0).toFixed(2)} USDT</strong></span>
+                        </div>
+                        <div className="flex items-center gap-3">
+                          <span className="text-muted-foreground">الرسوم: <strong className="text-red-400">{(d.fee ?? 0).toFixed(2)} USDT</strong></span>
+                          <span className="text-muted-foreground">الصافي: <strong className="text-green-400">{(d.netAmount ?? 0).toFixed(2)} USDT</strong></span>
+                        </div>
+                      </div>
+                    )}
                     {/* Screenshot */}
                     {d.screenshot && (
                       <div className="pt-1">
@@ -1016,6 +1031,9 @@ export default function AdminPanel() {
                       </div>
                       <div className="text-left">
                         <p className="text-sm font-bold gold-text">{(w.amount ?? 0).toFixed(2)} USDT</p>
+                        {(w.fee ?? 0) > 0 && (
+                          <p className="text-[10px] text-muted-foreground">الصافي: {(w.netAmount ?? (w.amount - w.fee) ?? 0).toFixed(2)} USDT</p>
+                        )}
                         <span className={`text-xs px-2 py-0.5 rounded-md font-medium ${WITHDRAWAL_STATUS_MAP[w.status]?.color || ''}`}>
                           {WITHDRAWAL_STATUS_MAP[w.status]?.label || w.status}
                         </span>
@@ -1092,7 +1110,7 @@ export default function AdminPanel() {
                           </div>
                           <div className="flex items-center justify-between p-2 rounded-lg bg-white/5 text-xs">
                             <span className="text-muted-foreground">الرسوم: {(w.fee ?? 0).toFixed(2)} USDT</span>
-                            <span className="text-muted-foreground">الإجمالي: <strong className="text-foreground">{((w.amount ?? 0) + (w.fee ?? 0)).toFixed(2)} USDT</strong></span>
+                            <span className="text-muted-foreground">الصافي للمستلم: <strong className="text-green-400">{(w.netAmount ?? ((w.amount ?? 0) - (w.fee ?? 0))).toFixed(2)} USDT</strong></span>
                           </div>
                         </div>
                       </div>

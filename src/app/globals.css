@@ -82,7 +82,7 @@
 }
 
 /* ==================== LIGHT THEME ==================== */
-:root:not(:has(.dark)) {
+:root:not(.dark) {
   --background: #fafaf5;
   --foreground: #1a1a2e;
   --card: rgba(255, 255, 255, 0.9);
@@ -121,7 +121,7 @@
   .dark body {
     background-image: radial-gradient(ellipse at top, rgba(240, 185, 11, 0.03) 0%, transparent 60%);
   }
-  :root:not(:has(.dark)) body {
+  :root:not(.dark) body {
     background-image: radial-gradient(ellipse at top, rgba(201, 154, 10, 0.04) 0%, transparent 60%);
   }
 }
@@ -134,7 +134,7 @@
   border-radius: 16px;
 }
 
-:root:not(:has(.dark)) .glass-card {
+:root:not(.dark) .glass-card {
   background: rgba(255, 255, 255, 0.7);
   backdrop-filter: blur(20px);
   border: 1px solid rgba(201, 154, 10, 0.12);
@@ -147,7 +147,7 @@
   box-shadow: 0 0 30px rgba(240, 185, 11, 0.05);
 }
 
-:root:not(:has(.dark)) .glass-card-hover:hover {
+:root:not(.dark) .glass-card-hover:hover {
   background: rgba(255, 255, 255, 0.85);
   border-color: rgba(201, 154, 10, 0.25);
   box-shadow: 0 0 30px rgba(201, 154, 10, 0.06);
@@ -161,7 +161,7 @@
   transition: all 0.2s;
 }
 
-:root:not(:has(.dark)) .glass-input {
+:root:not(.dark) .glass-input {
   background: rgba(0, 0, 0, 0.02);
   backdrop-filter: blur(10px);
   border: 1px solid rgba(0, 0, 0, 0.1);
@@ -175,7 +175,7 @@
   box-shadow: 0 0 20px rgba(240, 185, 11, 0.1);
 }
 
-:root:not(:has(.dark)) .glass-input:focus {
+:root:not(.dark) .glass-input:focus {
   background: rgba(255, 255, 255, 0.9);
   border-color: rgba(201, 154, 10, 0.4);
   box-shadow: 0 0 20px rgba(201, 154, 10, 0.08);
@@ -192,7 +192,7 @@
   background-clip: text;
 }
 
-:root:not(:has(.dark)) .gold-text {
+:root:not(.dark) .gold-text {
   background: linear-gradient(135deg, #92700c 0%, #C99A0A 50%, #92700c 100%);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
@@ -222,7 +222,7 @@
   border-radius: 3px;
 }
 
-:root:not(:has(.dark)) ::-webkit-scrollbar-thumb {
+:root:not(.dark) ::-webkit-scrollbar-thumb {
   background: rgba(201, 154, 10, 0.25);
   border-radius: 3px;
 }
@@ -231,7 +231,7 @@
   background: rgba(240, 185, 11, 0.4);
 }
 
-:root:not(:has(.dark)) ::-webkit-scrollbar-thumb:hover {
+:root:not(.dark) ::-webkit-scrollbar-thumb:hover {
   background: rgba(201, 154, 10, 0.4);
 }
 
@@ -317,7 +317,7 @@
   caret-color: #F0B90B;
 }
 
-:root:not(:has(.dark)) .otp-input-custom {
+:root:not(.dark) .otp-input-custom {
   background: rgba(255, 255, 255, 0.8);
   border: 2px solid rgba(201, 154, 10, 0.2);
   color: #1a1a2e;
@@ -340,7 +340,7 @@
   outline: none;
 }
 
-:root:not(:has(.dark)) .otp-input-custom:focus {
+:root:not(.dark) .otp-input-custom:focus {
   border-color: #C99A0A;
   box-shadow: 0 0 20px rgba(201, 154, 10, 0.12);
   outline: none;

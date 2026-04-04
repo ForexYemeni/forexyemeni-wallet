@@ -95,8 +95,8 @@ export default function WithdrawForm() {
   }
 
   const fee = amount ? (parseFloat(amount) * (feePercentage / 100)).toFixed(2) : '0.00'
-  const total = amount ? (parseFloat(amount) + parseFloat(fee)).toFixed(2) : '0.00'
-  const hasEnoughBalance = user && parseFloat(total) <= user.balance
+  const netAmount = amount ? (parseFloat(amount) - parseFloat(fee)).toFixed(2) : '0.00'
+  const hasEnoughBalance = user && parseFloat(amount) <= user.balance
 
   const resetForm = () => {
     setStep('select')
@@ -233,8 +233,8 @@ export default function WithdrawForm() {
   }
 
   const setMaxAmount = () => {
-    if (user && user.balance > 0 && feePercentage > 0) {
-      setAmount((user.balance / (1 + feePercentage / 100)).toFixed(2))
+    if (user && user.balance > 0) {
+      setAmount(user.balance.toFixed(2))
     }
   }
 
@@ -380,11 +380,15 @@ export default function WithdrawForm() {
                 <div className="space-y-2 p-3 rounded-xl bg-white/5">
                   <div className="flex items-center justify-between text-sm">
                     <span className="text-muted-foreground">الرسوم ({feePercentage}%)</span>
-                    <span>{fee} USDT</span>
+                    <span className="text-red-400">-{fee} USDT</span>
                   </div>
                   <div className="flex items-center justify-between text-sm">
-                    <span className="text-muted-foreground">الإجمالي</span>
-                    <span className="font-bold text-gold">{total} USDT</span>
+                    <span className="text-muted-foreground">الصافي للمستلم</span>
+                    <span className="font-bold text-green-400">{netAmount} USDT</span>
+                  </div>
+                  <div className="flex items-center justify-between text-sm border-t border-white/5 pt-2">
+                    <span className="text-muted-foreground">يُخصم من رصيدك</span>
+                    <span className="font-bold text-gold">{amount} USDT</span>
                   </div>
                   {!hasEnoughBalance && (
                     <div className="flex items-center gap-2 text-red-400 text-xs pt-1">

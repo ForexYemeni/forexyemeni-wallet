@@ -38,18 +38,19 @@ export async function POST(request: NextRequest) {
     const feePercentage = settingsDoc.exists ? (settingsDoc.data().withdrawalFee || 0.1) : 0.1
 
     const fee = amount * (feePercentage / 100)
-    const totalAmount = amount + fee
+    const netAmount = amount - fee
 
-    if (user.balance < totalAmount) {
+    // Freeze only the amount (fee is deducted from it, not added)
+    if (user.balance < amount) {
       return NextResponse.json(
-        { success: false, message: `رصيدك غير كافي. المطلوب: ${totalAmount.toFixed(2)} USDT (يشمل الرسوم)` },
+        { success: false, message: `رصيدك غير كافي. المطلوب: ${amount.toFixed(2)} USDT` },
         { status: 400 }
       )
     }
 
     await userOperations.update({ id: userId }, {
-      balance: user.balance - totalAmount,
-      frozenBalance: user.frozenBalance + totalAmount,
+      balance: user.balance - amount,
+      frozenBalance: user.frozenBalance + amount,
     })
 
     const withdrawal = await withdrawalOperations.create({
@@ -62,6 +63,7 @@ export async function POST(request: NextRequest) {
       merchantId: null,
       txId: null,
       fee,
+      netAmount,
       adminNote: null,
       screenshot: null,
       paymentMethodName: paymentMethodName || null,
@@ -74,8 +76,8 @@ export async function POST(request: NextRequest) {
       const admin = await userOperations.findUnique({ email: ADMIN_EMAIL })
       if (admin) {
         const title = 'طلب سحب جديد'
-        const message = `طلب سحب بقيمة ${amount} USDT من ${user.fullName || user.email}`
-        await notificationOperations.create({ userId: admin.id, title, message, type: 'warning' })
+        const message = `طلب سحب بقيمة ${amount} USDT من ${user.fullName || user.email} (الصافي: ${netAmount.toFixed(2)} USDT)`
+        await notificationOperations.create({ userId: admin.id, title, message, type: 'warning', read: false })
         sendPushNotification(admin.id, title, message, 'warning').catch(() => {})
       }
     } catch {}

@@ -58,24 +58,28 @@ export async function POST(request: NextRequest) {
 
     if (status === 'approved') {
       const title = 'تم قبول السحب - قيد المراجعة'
-      const message = `تم قبول سحبك بقيمة ${withdrawal.amount} USDT. جاري معالجة الدفع.`
-      await notificationOperations.create({ userId: withdrawal.userId, title, message, type: 'info' })
+      const netAmt = withdrawal.netAmount ?? (withdrawal.amount - withdrawal.fee)
+      const message = `تم قبول سحبك بقيمة ${netAmt.toFixed(2)} USDT. جاري معالجة الدفع.`
+      await notificationOperations.create({ userId: withdrawal.userId, title, message, type: 'info', read: false })
       sendPushNotification(withdrawal.userId, title, message, 'info').catch(() => {})
     }
 
     if (status === 'processing') {
+      const netAmount = withdrawal.netAmount ?? (withdrawal.amount - withdrawal.fee)
+
       const user = await userOperations.findUnique({ id: withdrawal.userId })
       if (user) {
-        const newFrozen = user.frozenBalance - (withdrawal.amount + withdrawal.fee)
+        // Unfreeze only the amount (not amount + fee, since fee is deducted from amount)
+        const newFrozen = user.frozenBalance - withdrawal.amount
         await userOperations.updateFrozenBalance(withdrawal.userId, Math.max(0, newFrozen))
 
         await transactionOperations.create({
           userId: withdrawal.userId,
           type: 'withdrawal',
-          amount: -(withdrawal.amount + withdrawal.fee),
+          amount: -(withdrawal.amount),
           balanceBefore: user.balance,
           balanceAfter: user.balance,
-          description: `سحب USDT إلى ${withdrawal.toAddress.substring(0, 10)}...`,
+          description: `سحب USDT إلى ${withdrawal.toAddress.substring(0, 10)}... (الصافي: ${netAmount.toFixed(2)})`,
           referenceId: withdrawal.id,
         })
 
@@ -86,25 +90,25 @@ export async function POST(request: NextRequest) {
       }
 
       const title = 'تم السحب'
-      const message = `تم سحب ${withdrawal.amount} USDT بنجاح. يرجى تأكيد الاستلام.`
-      await notificationOperations.create({ userId: withdrawal.userId, title, message, type: 'success' })
+      const message = `تم سحب ${netAmount.toFixed(2)} USDT بنجاح. يرجى تأكيد الاستلام.`
+      await notificationOperations.create({ userId: withdrawal.userId, title, message, type: 'success', read: false })
       sendPushNotification(withdrawal.userId, title, message, 'success').catch(() => {})
     }
 
     if (status === 'rejected') {
       const user = await userOperations.findUnique({ id: withdrawal.userId })
       if (user) {
-        const totalRefund = withdrawal.amount + withdrawal.fee
+        // Refund only the amount (since that's what was frozen)
         await userOperations.update({ id: withdrawal.userId }, {
-          balance: user.balance + totalRefund,
-          frozenBalance: user.frozenBalance - totalRefund,
+          balance: user.balance + withdrawal.amount,
+          frozenBalance: user.frozenBalance - withdrawal.amount,
         })
       }
 
       const reason = adminNote ? ` (${adminNote})` : ''
       const title = 'تم رفض السحب'
-      const message = `تم رفض طلب سحبك بقيمة ${withdrawal.amount} USDT. تم إعادة المبلغ إلى رصيدك.${reason}`
-      await notificationOperations.create({ userId: withdrawal.userId, title, message, type: 'warning' })
+      const message = `تم رفض طلب سحبك. تم إعادة المبلغ إلى رصيدك.${reason}`
+      await notificationOperations.create({ userId: withdrawal.userId, title, message, type: 'warning', read: false })
       sendPushNotification(withdrawal.userId, title, message, 'warning').catch(() => {})
     }
 

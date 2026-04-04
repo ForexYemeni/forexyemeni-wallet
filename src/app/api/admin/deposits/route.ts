@@ -44,31 +44,36 @@ export async function POST(request: NextRequest) {
     if (status === 'reviewing') {
       const title = 'طلبك قيد المراجعة'
       const message = `تم بدء مراجعة إيداعك بقيمة ${deposit.amount} USDT`
-      await notificationOperations.create({ userId: deposit.userId, title, message, type: 'info' })
+      await notificationOperations.create({ userId: deposit.userId, title, message, type: 'info', read: false })
       sendPushNotification(deposit.userId, title, message, 'info').catch(() => {})
     }
 
     if (status === 'confirmed') {
       const user = await userOperations.findUnique({ id: deposit.userId })
       if (user) {
+        // Use netAmount (after fee deduction) instead of full amount
+        const creditAmount = deposit.netAmount ?? deposit.amount
+        const depositFee = deposit.fee ?? 0
+
         const balanceBefore = user.balance
-        const balanceAfter = balanceBefore + deposit.amount
+        const balanceAfter = balanceBefore + creditAmount
 
         await userOperations.updateBalance(deposit.userId, balanceAfter)
 
         await transactionOperations.create({
           userId: deposit.userId,
           type: 'deposit',
-          amount: deposit.amount,
+          amount: creditAmount,
           balanceBefore,
           balanceAfter,
-          description: `إيداع USDT - ${deposit.txId || deposit.id.substring(0, 8)}`,
+          description: `إيداع USDT${depositFee > 0 ? ` (الرسوم: ${depositFee.toFixed(2)} USDT)` : ''} - ${deposit.txId || deposit.id.substring(0, 8)}`,
           referenceId: deposit.id,
         })
 
         const title = 'تم تأكيد الإيداع'
-        const message = `تم تأكيد إيداعك بقيمة ${deposit.amount} USDT`
-        await notificationOperations.create({ userId: deposit.userId, title, message, type: 'success' })
+        const feeInfo = depositFee > 0 ? ` (${depositFee.toFixed(2)} USDT رسوم)` : ''
+        const message = `تم تأكيد إيداعك بقيمة ${creditAmount.toFixed(2)} USDT${feeInfo}`
+        await notificationOperations.create({ userId: deposit.userId, title, message, type: 'success', read: false })
         sendPushNotification(deposit.userId, title, message, 'success').catch(() => {})
       }
     }
@@ -77,7 +82,7 @@ export async function POST(request: NextRequest) {
       const reason = adminNote ? ` (${adminNote})` : ''
       const title = 'تم رفض الإيداع'
       const message = `تم رفض إيداعك بقيمة ${deposit.amount} USDT${reason}`
-      await notificationOperations.create({ userId: deposit.userId, title, message, type: 'warning' })
+      await notificationOperations.create({ userId: deposit.userId, title, message, type: 'warning', read: false })
       sendPushNotification(deposit.userId, title, message, 'warning').catch(() => {})
     }
 

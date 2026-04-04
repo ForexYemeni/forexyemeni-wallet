@@ -38,9 +38,20 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    // Fetch deposit fee from settings
+    const db = getDb()
+    const settingsDoc = await db.collection('systemSettings').doc('fees').get()
+    const depositFeePercentage = settingsDoc.exists ? (settingsDoc.data().depositFee || 0) : 0
+
+    // Calculate fee and net amount
+    const fee = amount * (depositFeePercentage / 100)
+    const netAmount = amount - fee
+
     const deposit = await depositOperations.create({
       userId,
       amount,
+      fee,
+      netAmount,
       currency: 'USDT',
       network: network || 'TRC20',
       txId: txId || null,
@@ -58,8 +69,9 @@ export async function POST(request: NextRequest) {
       const admin = await userOperations.findUnique({ email: ADMIN_EMAIL })
       if (admin) {
         const title = 'طلب إيداع جديد'
-        const message = `طلب إيداع بقيمة ${amount} USDT من ${user.fullName || user.email}`
-        await notificationOperations.create({ userId: admin.id, title, message, type: 'info' })
+        const feeInfo = depositFeePercentage > 0 ? ` (الرسوم: ${fee.toFixed(2)} USDT - الصافي: ${netAmount.toFixed(2)} USDT)` : ''
+        const message = `طلب إيداع بقيمة ${amount} USDT من ${user.fullName || user.email}${feeInfo}`
+        await notificationOperations.create({ userId: admin.id, title, message, type: 'info', read: false })
         sendPushNotification(admin.id, title, message, 'info').catch(() => {})
       }
     } catch {}

@@ -60,6 +60,8 @@ export interface Deposit {
   id: string
   userId: string
   amount: number
+  fee?: number
+  netAmount?: number
   currency: string
   network: string
   txId?: string | null
@@ -69,6 +71,7 @@ export interface Deposit {
   method: string
   merchantId?: string | null
   merchantNote?: string | null
+  adminNote?: string | null
   screenshot?: string | null
   createdAt: string
   updatedAt: string
@@ -86,6 +89,7 @@ export interface Withdrawal {
   merchantId?: string | null
   txId?: string | null
   fee: number
+  netAmount?: number
   adminNote?: string | null
   screenshot?: string | null
   paymentMethodName?: string | null
