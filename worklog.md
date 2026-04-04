@@ -225,3 +225,45 @@ Comprehensive v1.6 update addressing multiple user-reported issues: deposit name
 ### Git Commit
 - Committed and pushed as v1.6 tag
 - 137 files changed, 1143 insertions(+), 347 deletions(-)
+
+---
+## Task ID: 3 - Admin Balance Adjustment & Merchant Management
+
+### Work Task
+Add balance adjustment (add/withdraw) and merchant status management to the admin panel, including UI controls, dialogs, and API support.
+
+### Work Summary
+
+#### 1. AdminPanel.tsx - AdminUser Interface
+- Added `merchantId?: string | null` field to the `AdminUser` interface to track merchant status per user
+
+#### 2. AdminPanel.tsx - Lucide Icons
+- Added `Store` to the lucide-react imports for the merchant badge icon
+
+#### 3. AdminPanel.tsx - State Variables
+- Added 6 new state variables for balance adjustment and merchant removal dialogs:
+  - `balanceDialogUser` / `balanceAmount` / `balanceAction` / `balanceLoading`
+  - `removeMerchantDialogUser` / `removeMerchantLoading`
+
+#### 4. AdminPanel.tsx - Handler Functions
+- **`handleAdjustBalance`**: Sends `balanceAdjustment` (positive or negative) to `/api/admin/users` POST endpoint, validates amount, shows toast feedback, refreshes user list
+- **`handleRemoveMerchant`**: Sends `merchantId: null` to `/api/admin/users` POST endpoint, with confirmation dialog, refreshes user list
+
+#### 5. AdminPanel.tsx - User List Enhancements
+- Added merchant badge (`Store` icon + "تاجر" label) next to user email when `u.merchantId` is set
+- Added "إضافة رصيد" (Add Balance) button - green, main admin only
+- Added "سحب رصيد" (Withdraw Balance) button - orange, main admin only
+- Added "إزالة التاجر" (Remove Merchant) button - orange, main admin only, only for users with merchantId
+
+#### 6. AdminPanel.tsx - Dialogs
+- **Balance Adjustment Dialog**: Shows add/withdraw mode, current balance, amount input with USDT step, calculated post-operation balance, confirm/cancel buttons
+- **Remove Merchant Confirmation Dialog**: Warning with AlertTriangle icon, explains P2P listing deletion, confirm/cancel buttons
+
+#### 7. API Route - `/api/admin/users/route.ts`
+- Updated POST handler to accept `balanceAdjustment` and `merchantId` parameters
+- `balanceAdjustment`: When non-zero number provided, fetches current user balance, calculates new balance (max 0), updates in DB
+- `merchantId`: When provided (including null), updates the merchantId field on user record
+
+### Files Changed:
+- `src/components/admin/AdminPanel.tsx` - ~190 lines added (state, handlers, badge, buttons, 2 dialogs)
+- `src/app/api/admin/users/route.ts` - Updated POST handler with balanceAdjustment and merchantId support

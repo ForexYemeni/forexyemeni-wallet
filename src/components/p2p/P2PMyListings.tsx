@@ -124,7 +124,7 @@ export default function P2PMyListings() {
   }
 
   if (showCreate) {
-    return <P2PCreateListing onCreated={() => { setShowCreate(false); fetchListings() }} />
+    return <P2PCreateListing onCreated={() => { setShowCreate(false); fetchListings() }} onBack={() => setShowCreate(false)} />
   }
 
   return (

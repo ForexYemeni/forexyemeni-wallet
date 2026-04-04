@@ -53,6 +53,7 @@ import {
   MessageSquare,
   Gift,
   Repeat,
+  Store,
 } from 'lucide-react'
 
 // ===================== TYPES =====================
@@ -71,6 +72,7 @@ interface AdminUser {
   frozenBalance: number
   country: string | null
   createdAt: string
+  merchantId?: string | null
 }
 
 interface AdminDeposit {
@@ -236,6 +238,14 @@ export default function AdminPanel() {
   // Stats state
   const [stats, setStats] = useState<AdminStats | null>(null)
   const [statsLoading, setStatsLoading] = useState(false)
+  // Balance adjustment dialog state
+  const [balanceDialogUser, setBalanceDialogUser] = useState<AdminUser | null>(null)
+  const [balanceAmount, setBalanceAmount] = useState('')
+  const [balanceAction, setBalanceAction] = useState<'add' | 'withdraw'>('add')
+  const [balanceLoading, setBalanceLoading] = useState(false)
+  // Remove merchant dialog state
+  const [removeMerchantDialogUser, setRemoveMerchantDialogUser] = useState<AdminUser | null>(null)
+  const [removeMerchantLoading, setRemoveMerchantLoading] = useState(false)
 
   // Track which tabs have been loaded to avoid re-fetching
   const [loadedTabs, setLoadedTabs] = useState<Set<string>>(new Set())
@@ -728,6 +738,67 @@ export default function AdminPanel() {
     }
   }
 
+  // ===== BALANCE ADJUSTMENT HANDLER =====
+  const handleAdjustBalance = async () => {
+    if (!balanceDialogUser || !balanceAmount || parseFloat(balanceAmount) <= 0) {
+      toast.error('يرجى إدخال مبلغ صحيح')
+      return
+    }
+    setBalanceLoading(true)
+    try {
+      const amount = parseFloat(balanceAmount)
+      const res = await fetch('/api/admin/users', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          userId: balanceDialogUser.id,
+          balanceAdjustment: balanceAction === 'add' ? amount : -amount,
+        }),
+      })
+      const data = await res.json()
+      if (data.success) {
+        toast.success(balanceAction === 'add' ? `تم إضافة ${amount} USDT` : `تم سحب ${amount} USDT`)
+        setBalanceDialogUser(null)
+        setBalanceAmount('')
+        fetchUsers()
+      } else {
+        toast.error(data.message)
+      }
+    } catch {
+      toast.error('خطأ في تعديل الرصيد')
+    } finally {
+      setBalanceLoading(false)
+    }
+  }
+
+  // ===== REMOVE MERCHANT STATUS HANDLER =====
+  const handleRemoveMerchant = async () => {
+    if (!removeMerchantDialogUser || !confirm('هل أنت متأكد من إزالة حالة التاجر؟ سيتم تحويل الحساب إلى مستخدم عادي.')) return
+    setRemoveMerchantLoading(true)
+    try {
+      const res = await fetch('/api/admin/users', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          userId: removeMerchantDialogUser.id,
+          merchantId: null,
+        }),
+      })
+      const data = await res.json()
+      if (data.success) {
+        toast.success('تم إزالة حالة التاجر بنجاح')
+        setRemoveMerchantDialogUser(null)
+        fetchUsers()
+      } else {
+        toast.error(data.message)
+      }
+    } catch {
+      toast.error('خطأ في إزالة حالة التاجر')
+    } finally {
+      setRemoveMerchantLoading(false)
+    }
+  }
+
   // Determine if user has specific permissions
   const hasPermissions = user?.permissions && Object.keys(user.permissions).length > 0
 
@@ -1079,6 +1150,12 @@ export default function AdminPanel() {
                             <p className="text-xs text-muted-foreground flex items-center gap-1" dir="ltr">
                               <Mail className="w-3 h-3" /> {u.email}
                             </p>
+                            {u.merchantId && (
+                              <span className="text-[9px] px-1.5 py-0.5 rounded-md bg-emerald-500/10 text-emerald-400 font-medium flex items-center gap-0.5">
+                                <Store className="w-2.5 h-2.5" />
+                                تاجر
+                              </span>
+                            )}
                           </div>
                         </div>
                         <div className="flex items-center gap-2">
@@ -1198,6 +1275,36 @@ export default function AdminPanel() {
                               >
                                 <Trash2 className="w-3.5 h-3.5" />
                                 حذف
+                              </button>
+                            )}
+                            {/* Add balance — main admin only */}
+                            {!hasPermissions && (
+                              <button
+                                onClick={() => { setBalanceDialogUser(u); setBalanceAction('add'); setBalanceAmount('') }}
+                                className="flex items-center justify-center gap-1 text-xs py-2.5 rounded-lg bg-green-500/10 text-green-400 hover:bg-green-500/20 transition-colors font-medium"
+                              >
+                                <Plus className="w-3.5 h-3.5" />
+                                إضافة رصيد
+                              </button>
+                            )}
+                            {/* Withdraw balance — main admin only */}
+                            {!hasPermissions && (
+                              <button
+                                onClick={() => { setBalanceDialogUser(u); setBalanceAction('withdraw'); setBalanceAmount('') }}
+                                className="flex items-center justify-center gap-1 text-xs py-2.5 rounded-lg bg-orange-500/10 text-orange-400 hover:bg-orange-500/20 transition-colors font-medium"
+                              >
+                                <ArrowUpRight className="w-3.5 h-3.5" />
+                                سحب رصيد
+                              </button>
+                            )}
+                            {/* Remove merchant — main admin only, merchants only */}
+                            {!hasPermissions && u.merchantId && (
+                              <button
+                                onClick={() => setRemoveMerchantDialogUser(u)}
+                                className="flex items-center justify-center gap-1 text-xs py-2.5 rounded-lg bg-orange-500/10 text-orange-400 hover:bg-orange-500/20 transition-colors font-medium"
+                              >
+                                <UserX className="w-3.5 h-3.5" />
+                                إزالة التاجر
                               </button>
                             )}
                           </div>
@@ -2649,6 +2756,91 @@ function AdminSettingsPanel({ settings, onRefresh }: { settings: { email: string
           >
             {loading ? <Loader2 className="w-4 h-4 animate-spin mx-auto" /> : '🗑️ حذف جميع البيانات'}
           </button>
+        </div>
+      )}
+
+      {/* ===== BALANCE ADJUSTMENT DIALOG ===== */}
+      {balanceDialogUser && (
+        <div className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4" onClick={() => setBalanceDialogUser(null)}>
+          <div className="glass-card p-6 space-y-4 w-full max-w-sm animate-scale-in" onClick={e => e.stopPropagation()} dir="rtl">
+            <div className="text-center space-y-2">
+              <div className={`w-14 h-14 mx-auto rounded-2xl flex items-center justify-center ${balanceAction === 'add' ? 'bg-green-500/10' : 'bg-orange-500/10'}`}>
+                {balanceAction === 'add' ? <ArrowDownLeft className="w-7 h-7 text-green-400" /> : <ArrowUpRight className="w-7 h-7 text-orange-400" />}
+              </div>
+              <h3 className="text-lg font-bold">{balanceAction === 'add' ? 'إضافة رصيد' : 'سحب رصيد'}</h3>
+              <p className="text-sm text-muted-foreground">{balanceDialogUser.fullName || balanceDialogUser.email}</p>
+              <p className="text-xs text-muted-foreground">الرصيد الحالي: <span className="gold-text font-bold">{(balanceDialogUser.balance ?? 0).toFixed(2)} USDT</span></p>
+            </div>
+            <div className="space-y-3">
+              <input
+                type="number"
+                value={balanceAmount}
+                onChange={(e) => setBalanceAmount(e.target.value)}
+                placeholder="المبلغ (USDT)"
+                className="w-full h-12 rounded-xl glass-input px-4 text-sm"
+                dir="ltr"
+                min="0"
+                step="0.01"
+              />
+              {balanceAmount && parseFloat(balanceAmount) > 0 && (
+                <p className="text-xs text-center">
+                  الرصيد بعد العملية: <span className={`font-bold ${balanceAction === 'add' ? 'text-green-400' : 'text-orange-400'}`}>
+                    {((balanceDialogUser.balance ?? 0) + (balanceAction === 'add' ? parseFloat(balanceAmount) : -parseFloat(balanceAmount))).toFixed(2)} USDT
+                  </span>
+                </p>
+              )}
+              <button
+                onClick={handleAdjustBalance}
+                disabled={balanceLoading || !balanceAmount || parseFloat(balanceAmount) <= 0}
+                className={`w-full h-12 font-bold rounded-xl hover:opacity-90 transition-all disabled:opacity-50 ${
+                  balanceAction === 'add' ? 'bg-green-500 text-white' : 'bg-orange-500 text-white'
+                }`}
+              >
+                {balanceLoading ? <Loader2 className="w-5 h-5 animate-spin mx-auto" /> : balanceAction === 'add' ? 'تأكيد الإضافة' : 'تأكيد السحب'}
+              </button>
+              <button
+                onClick={() => setBalanceDialogUser(null)}
+                className="w-full h-10 bg-white/10 text-foreground rounded-xl text-sm"
+              >
+                إلغاء
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ===== REMOVE MERCHANT CONFIRMATION DIALOG ===== */}
+      {removeMerchantDialogUser && (
+        <div className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4" onClick={() => setRemoveMerchantDialogUser(null)}>
+          <div className="glass-card p-6 space-y-4 w-full max-w-sm animate-scale-in" onClick={e => e.stopPropagation()} dir="rtl">
+            <div className="text-center space-y-3">
+              <div className="w-14 h-14 mx-auto rounded-2xl bg-orange-500/10 flex items-center justify-center">
+                <AlertTriangle className="w-7 h-7 text-orange-400" />
+              </div>
+              <h3 className="text-lg font-bold text-orange-400">إزالة حالة التاجر</h3>
+              <p className="text-sm text-muted-foreground">
+                سيتم تحويل حساب <strong>{removeMerchantDialogUser.fullName || removeMerchantDialogUser.email}</strong> من تاجر إلى مستخدم عادي.
+              </p>
+              <div className="p-3 rounded-xl bg-red-500/5 border border-red-500/10">
+                <p className="text-xs text-red-400">⚠️ سيتم حذف جميع إعلانات P2P المرتبطة بهذا التاجر ولن يتمكن من إنشاء إعلانات جديدة.</p>
+              </div>
+            </div>
+            <div className="space-y-2">
+              <button
+                onClick={handleRemoveMerchant}
+                disabled={removeMerchantLoading}
+                className="w-full h-12 bg-orange-500 text-white font-bold rounded-xl hover:opacity-90 transition-all disabled:opacity-50"
+              >
+                {removeMerchantLoading ? <Loader2 className="w-5 h-5 animate-spin mx-auto" /> : 'تأكيد إزالة التاجر'}
+              </button>
+              <button
+                onClick={() => setRemoveMerchantDialogUser(null)}
+                className="w-full h-10 bg-white/10 text-foreground rounded-xl text-sm"
+              >
+                إلغاء
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>

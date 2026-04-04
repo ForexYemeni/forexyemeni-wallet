@@ -7,6 +7,7 @@ import { Loader2, ArrowLeft } from 'lucide-react'
 
 interface P2PCreateListingProps {
   onCreated: () => void
+  onBack: () => void
 }
 
 const PAYMENT_METHODS = [
@@ -15,7 +16,7 @@ const PAYMENT_METHODS = [
   { value: 'atm_transfer', label: 'صراف آلي' },
 ]
 
-export default function P2PCreateListing({ onCreated }: P2PCreateListingProps) {
+export default function P2PCreateListing({ onCreated, onBack }: P2PCreateListingProps) {
   const { user } = useAuthStore()
 
   const [type, setType] = useState<'sell' | 'buy'>('sell')
@@ -61,7 +62,7 @@ export default function P2PCreateListing({ onCreated }: P2PCreateListingProps) {
 
   return (
     <div className="space-y-4">
-      <button onClick={() => {}} className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors">
+      <button onClick={onBack} className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors">
         <ArrowLeft className="w-4 h-4" />
         العودة لإعلاناتي
       </button>

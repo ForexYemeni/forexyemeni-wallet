@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { userOperations, otpCodeOperations } from '@/lib/db-firebase'
+import { userOperations, otpCodeOperations, merchantApplicationOperations, merchantOperations } from '@/lib/db-firebase'
 import bcrypt from 'bcryptjs'
 import crypto from 'crypto'
 import { getDb } from '@/lib/firebase'
@@ -58,6 +58,22 @@ export async function POST(request: NextRequest) {
         { success: false, message: 'البريد الإلكتروني أو كلمة المرور غير صحيحة' },
         { status: 401 }
       )
+    }
+
+    // Enrich merchantId from merchant application / old merchant system if missing
+    if (!user.merchantId && user.role !== 'admin') {
+      const applications = await merchantApplicationOperations.findByUser(user.id)
+      const approvedApp = applications.find(a => a.status === 'approved')
+      if (approvedApp) {
+        await userOperations.update({ id: user.id }, { merchantId: approvedApp.id })
+        user.merchantId = approvedApp.id
+      } else {
+        const oldMerchant = await merchantOperations.findApprovedByUser(user.id)
+        if (oldMerchant) {
+          await userOperations.update({ id: user.id }, { merchantId: oldMerchant.id })
+          user.merchantId = oldMerchant.id
+        }
+      }
     }
 
     const isValid = await bcrypt.compare(password, user.passwordHash)

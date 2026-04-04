@@ -18,7 +18,7 @@ export async function GET() {
 // POST update user (admin)
 export async function POST(request: NextRequest) {
   try {
-    const { userId, status, role, balance, kycStatus, notes, permissions } = await request.json()
+    const { userId, status, role, balance, balanceAdjustment, kycStatus, notes, permissions, merchantId } = await request.json()
 
     if (!userId) {
       return NextResponse.json({ success: false, message: 'معرف المستخدم مطلوب' }, { status: 400 })
@@ -28,10 +28,18 @@ export async function POST(request: NextRequest) {
     if (status) updateData.status = status
     if (role) updateData.role = role
     if (typeof balance === 'number') updateData.balance = balance
+    if (typeof balanceAdjustment === 'number' && balanceAdjustment !== 0) {
+      const targetUser = await userOperations.findUnique({ id: userId })
+      if (!targetUser) {
+        return NextResponse.json({ success: false, message: 'المستخدم غير موجود' }, { status: 404 })
+      }
+      const newBalance = Math.max(0, (targetUser.balance || 0) + balanceAdjustment)
+      updateData.balance = newBalance
+    }
     if (kycStatus) updateData.kycStatus = kycStatus
     if (notes !== undefined) updateData.kycNotes = notes
-    // Store permissions as JSON string in a custom field
     if (permissions) updateData.permissions = JSON.stringify(permissions)
+    if (merchantId !== undefined) updateData.merchantId = merchantId
 
     const user = await userOperations.update({ id: userId }, updateData)
 
