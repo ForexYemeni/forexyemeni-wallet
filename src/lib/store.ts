@@ -16,6 +16,8 @@ export interface User {
   mustChangePassword: boolean
   pendingConfirmation?: string | null
   createdAt: string
+  merchantId?: string | null
+  affiliateCode?: string | null
   permissions?: { manageUsers?: boolean; approveDeposits?: boolean; approveWithdrawals?: boolean; approveKYC?: boolean; manageSettings?: boolean } | null
 }
 

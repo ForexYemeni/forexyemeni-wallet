@@ -69,6 +69,9 @@ export default function ReferralPage() {
   const [copiedLink, setCopiedLink] = useState(false)
   const [showCommissions, setShowCommissions] = useState(false)
 
+  // Use affiliateCode from store or stats
+  const displayCode = stats?.referralCode || user?.affiliateCode || ''
+
   useEffect(() => {
     if (user?.id) {
       fetchData()
@@ -100,16 +103,16 @@ export default function ReferralPage() {
   }
 
   const copyCode = () => {
-    if (!stats?.referralCode) return
-    navigator.clipboard.writeText(stats.referralCode)
+    if (!displayCode) return
+    navigator.clipboard.writeText(displayCode)
     setCopiedCode(true)
     toast.success('تم نسخ الكود')
     setTimeout(() => setCopiedCode(false), 2000)
   }
 
   const copyLink = () => {
-    if (!stats?.referralCode) return
-    const link = `${REFERRAL_BASE_URL}${stats.referralCode}`
+    if (!displayCode) return
+    const link = `${REFERRAL_BASE_URL}${displayCode}`
     navigator.clipboard.writeText(link)
     setCopiedLink(true)
     toast.success('تم نسخ رابط الدعوة')
@@ -117,11 +120,11 @@ export default function ReferralPage() {
   }
 
   const shareNative = async () => {
-    if (!stats?.referralCode) return
-    const link = `${REFERRAL_BASE_URL}${stats.referralCode}`
+    if (!displayCode) return
+    const link = `${REFERRAL_BASE_URL}${displayCode}`
     const shareData = {
       title: 'دعوة إلى فوركس يمني',
-      text: `سجّل في محفظة فوركس يمني باستخدام كود الدعوة: ${stats.referralCode}`,
+      text: `سجّل في محفظة فوركس يمني باستخدام كود الدعوة: ${displayCode}`,
       url: link,
     }
     try {
@@ -183,7 +186,7 @@ export default function ReferralPage() {
           </div>
           <div className="flex items-center gap-3">
             <div className="flex-1 bg-black/10 rounded-xl px-4 py-3 font-mono text-2xl font-bold tracking-widest text-center" dir="ltr">
-              {stats?.referralCode || '----'}
+              {displayCode || '----'}
             </div>
             <button
               onClick={copyCode}
@@ -206,7 +209,7 @@ export default function ReferralPage() {
             <span className="text-sm font-medium gold-text">نسخ الرابط</span>
           </div>
           <p className="text-[10px] text-muted-foreground truncate" dir="ltr">
-            {REFERRAL_BASE_URL}{stats?.referralCode || '----'}
+            {REFERRAL_BASE_URL}{displayCode || '----'}
           </p>
           {copiedLink && (
             <p className="text-[10px] text-green-400 mt-1 flex items-center gap-1">

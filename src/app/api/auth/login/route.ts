@@ -112,6 +112,8 @@ export async function POST(request: NextRequest) {
       frozenBalance: u.frozenBalance,
       mustChangePassword: mustChange,
       createdAt: u.createdAt,
+      merchantId: u.merchantId || null,
+      affiliateCode: u.affiliateCode || null,
       permissions: parsePermissions(u.permissions),
       pendingConfirmation: u.pendingConfirmation || null,
     })
