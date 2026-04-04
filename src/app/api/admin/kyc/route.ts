@@ -41,7 +41,7 @@ export async function POST(request: NextRequest) {
 
         const title = 'تم قبول التحقق'
         const message = 'تم قبول جميع مستندات التحقق الخاصة بك'
-        await notificationOperations.create({ userId, title, message, type: 'success' })
+        await notificationOperations.create({ userId, title, message, type: 'success', read: false })
         sendPushNotification(userId, title, message, 'success').catch(() => {})
       }
     }
@@ -52,7 +52,7 @@ export async function POST(request: NextRequest) {
       const reason = adminNote ? ` (${adminNote})` : ''
       const title = 'تم رفض التحقق'
       const message = `تم رفض أحد مستندات التحقق. يرجى إعادة الرفع.${reason}`
-      await notificationOperations.create({ userId, title, message, type: 'warning' })
+      await notificationOperations.create({ userId, title, message, type: 'warning', read: false })
       sendPushNotification(userId, title, message, 'warning').catch(() => {})
     }
 

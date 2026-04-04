@@ -11,7 +11,7 @@ import { Loader2, Eye, EyeOff, ShieldAlert, CheckCircle2 } from 'lucide-react'
 const TEMP_PASSWORD = 'admin123admin123admin123'
 
 export default function ForceChangePassword() {
-  const { user, setAuth, logout } = useAuthStore()
+  const { user, token, setAuth, logout } = useAuthStore()
   const [newPassword, setNewPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
   const [showNew, setShowNew] = useState(false)
@@ -79,7 +79,7 @@ export default function ForceChangePassword() {
         toast.success('تم تغيير كلمة المرور بنجاح! يمكنك الآن استخدام التطبيق.')
         // Update user state and go to dashboard
         if (user) {
-          setAuth({ ...user, mustChangePassword: false }, user.token || '', false)
+          setAuth({ ...user, mustChangePassword: false }, token || '', false)
         }
       } else {
         toast.error(data.message || 'حدث خطأ في تغيير كلمة المرور')

@@ -219,6 +219,7 @@ export async function POST(request: NextRequest) {
       email: user.email,
       code: token,
       type: 'login',
+      verified: false,
       expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
     })
 

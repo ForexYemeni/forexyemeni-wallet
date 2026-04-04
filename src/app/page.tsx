@@ -64,7 +64,7 @@ class AdminErrorBoundary extends Component<
           </div>
           <div className="text-center space-y-2">
             <p className="text-sm text-red-400 font-medium">حدث خطأ في لوحة الإدارة</p>
-            <p className="text-xs text-muted-foreground">{this.state.error?.message || ''}</p>
+            <p className="text-xs text-muted-foreground max-w-xs">{this.state.error?.message || ''}</p>
           </div>
           <button
             onClick={this.handleRetry}
@@ -72,6 +72,15 @@ class AdminErrorBoundary extends Component<
           >
             <RefreshCw className="w-4 h-4" />
             إعادة المحاولة
+          </button>
+          <button
+            onClick={() => {
+              try { localStorage.removeItem('forexyemeni-auth') } catch {}
+              window.location.href = '/'
+            }}
+            className="h-10 px-6 bg-white/10 text-foreground font-medium rounded-xl hover:bg-white/20 transition-all text-xs"
+          >
+            مسح البيانات وإعادة التحميل
           </button>
         </div>
       )
@@ -179,6 +188,11 @@ export default function Home() {
       'render', 'Render', 'minified React error',
       // Admin panel safe errors
       'compress', 'image', 'Image',
+      // Script loading
+      'script', 'Script', 'Loading script',
+      // Property access errors (common in dynamic/optional data)
+      "Cannot read propert", "Cannot read undefined",
+      "is not a function", "is not defined",
     ]
 
     function isNonCriticalError(msg: string): boolean {
@@ -224,6 +238,12 @@ export default function Home() {
 
       // Don't set error state for non-critical errors
       if (isNonCriticalError(msg)) {
+        return
+      }
+
+      // Also don't show error screen for authenticated users with admin panel
+      // Admin panel has its own AdminErrorBoundary for rendering errors
+      if (isAuthenticated) {
         return
       }
 

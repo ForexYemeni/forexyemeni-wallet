@@ -1179,10 +1179,10 @@ export default function AdminPanel() {
                   <div key={k.id} className="glass-card p-4 rounded-xl space-y-2">
                     <div className="flex items-center justify-between">
                       <div>
-                        <p className="text-sm font-medium">{k.user.fullName || k.user.email}</p>
+                        <p className="text-sm font-medium">{k.user?.fullName || k.user?.email || 'مستخدم غير معروف'}</p>
                         <p className="text-xs text-muted-foreground">
                           {k.type === 'id_photo' ? 'صورة الهوية' : 'صورة شخصية'}
-                          {k.user.phone ? ` | ${k.user.phone}` : ''}
+                          {k.user?.phone ? ` | ${k.user.phone}` : ''}
                         </p>
                       </div>
                       <span className={`text-xs px-2 py-0.5 rounded-md status-${k.status}`}>
@@ -1192,12 +1192,12 @@ export default function AdminPanel() {
                     {/* FIX 3: Image with error handler */}
                     <div className="rounded-xl overflow-hidden border border-white/10 bg-white/5 relative">
                       <img
-                        src={k.fileUrl}
+                        src={k.fileUrl || ''}
                         alt={k.type}
                         className="w-full h-40 object-cover"
                         onError={(e) => {
                           (e.target as HTMLImageElement).style.display = 'none'
-                          (e.target as HTMLImageElement).nextElementSibling?.classList.remove('hidden')
+                          ;(e.target as HTMLImageElement).nextElementSibling?.classList.remove('hidden')
                         }}
                       />
                       <div className="absolute inset-0 flex items-center justify-center bg-white/5 hidden">
@@ -1213,7 +1213,7 @@ export default function AdminPanel() {
                         سبب الرفض: {k.notes}
                       </div>
                     )}
-                    {k.status === 'pending' && (
+                    {k.status === 'pending' && k.userId && (
                       <div className="flex gap-2">
                         <button onClick={() => handleUpdateKYC(k.id, 'approved', k.userId)} className="flex-1 flex items-center justify-center gap-1 text-xs py-2 rounded-lg bg-green-500/10 text-green-400 hover:bg-green-500/20 transition-colors">
                           <Check className="w-3 h-3" /> قبول
