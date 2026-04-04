@@ -45,6 +45,9 @@ export default function P2PMyListings() {
           if (!user?.merchantId) {
             updateUser({ merchantId: data.application.id })
           }
+        } else if (user?.merchantId) {
+          // User has merchantId from old system or direct DB field
+          setIsMerchant(true)
         } else {
           setIsMerchant(false)
         }

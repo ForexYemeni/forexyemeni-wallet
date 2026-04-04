@@ -33,6 +33,11 @@ export default function MerchantVerification({ onVerified }: { onVerified?: () =
         if (app.status === 'approved') {
           setStatus('approved')
           onVerified?.()
+          // Update store with merchantId if missing
+          if (!user?.merchantId) {
+            const { updateUser } = useAuthStore.getState()
+            updateUser({ merchantId: app.id })
+          }
         } else if (app.status === 'pending') {
           setStatus('pending')
         } else if (app.status === 'rejected') {
@@ -41,6 +46,10 @@ export default function MerchantVerification({ onVerified }: { onVerified?: () =
         } else {
           setStatus('none')
         }
+      } else if (user?.merchantId) {
+        // User has merchantId from old system
+        setStatus('approved')
+        onVerified?.()
       } else {
         setStatus('none')
       }

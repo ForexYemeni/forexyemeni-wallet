@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { userOperations, merchantApplicationOperations, notificationOperations } from '@/lib/db-firebase'
+import { userOperations, merchantApplicationOperations, merchantOperations, notificationOperations } from '@/lib/db-firebase'
 
 // GET: get merchant application status for user
 export async function GET(req: NextRequest) {
@@ -9,29 +9,86 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ success: false, message: 'معرف المستخدم مطلوب' }, { status: 400 })
     }
 
+    // Check new merchant application system
     const applications = await merchantApplicationOperations.findByUser(userId)
+    const approvedApp = applications.find(a => a.status === 'approved')
 
-    if (applications.length === 0) {
+    if (approvedApp) {
+      // Also ensure user document has merchantId set
+      const user = await userOperations.findUnique({ id: userId })
+      if (user && !user.merchantId) {
+        await userOperations.update({ id: userId }, { merchantId: approvedApp.id })
+      }
       return NextResponse.json({
         success: true,
-        hasApplication: false,
-        application: null,
+        hasApplication: true,
+        application: {
+          id: approvedApp.id,
+          status: approvedApp.status,
+          rejectionReason: approvedApp.rejectionReason || null,
+          appliedAt: approvedApp.appliedAt,
+          reviewedAt: approvedApp.reviewedAt || null,
+        },
       })
     }
 
-    // Return the latest application (sorted by appliedAt desc)
-    const latest = applications[0]
+    // Return latest non-approved application if exists (pending/rejected)
+    if (applications.length > 0) {
+      const latest = applications[0]
+      return NextResponse.json({
+        success: true,
+        hasApplication: true,
+        application: {
+          id: latest.id,
+          status: latest.status,
+          rejectionReason: latest.rejectionReason || null,
+          appliedAt: latest.appliedAt,
+          reviewedAt: latest.reviewedAt || null,
+        },
+      })
+    }
+
+    // Check old merchant system
+    const oldMerchant = await merchantOperations.findApprovedByUser(userId)
+    if (oldMerchant) {
+      // Ensure user document has merchantId set
+      const user = await userOperations.findUnique({ id: userId })
+      if (user && !user.merchantId) {
+        await userOperations.update({ id: userId }, { merchantId: oldMerchant.id })
+      }
+      return NextResponse.json({
+        success: true,
+        hasApplication: true,
+        application: {
+          id: oldMerchant.id,
+          status: 'approved',
+          rejectionReason: null,
+          appliedAt: oldMerchant.submittedAt || null,
+          reviewedAt: oldMerchant.reviewedAt || null,
+        },
+      })
+    }
+
+    // Check if user has merchantId set directly on their document
+    const user = await userOperations.findUnique({ id: userId })
+    if (user?.merchantId) {
+      return NextResponse.json({
+        success: true,
+        hasApplication: true,
+        application: {
+          id: user.merchantId,
+          status: 'approved',
+          rejectionReason: null,
+          appliedAt: null,
+          reviewedAt: null,
+        },
+      })
+    }
 
     return NextResponse.json({
       success: true,
-      hasApplication: true,
-      application: {
-        id: latest.id,
-        status: latest.status,
-        rejectionReason: latest.rejectionReason || null,
-        appliedAt: latest.appliedAt,
-        reviewedAt: latest.reviewedAt || null,
-      },
+      hasApplication: false,
+      application: null,
     })
   } catch (error: any) {
     console.error('[Merchant GET]', error)
