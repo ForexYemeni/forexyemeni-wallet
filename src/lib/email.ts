@@ -45,124 +45,242 @@ async function sendEmailViaScript(to: string, subject: string, htmlContent: stri
   }
 }
 
-// ===================== HTML EMAIL TEMPLATES =====================
+// ===================== HELPER: EMAIL WRAPPER =====================
 
-function buildOtpEmail(title: string, description: string, otp: string, color: string, footer: string): string {
-  return '<!DOCTYPE html><html dir="rtl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>'
-    + '<body style="margin:0;padding:0;background:#f5f5f5;font-family:Arial,Helvetica,sans-serif;">'
-    + '<table width="100%" cellpadding="0" cellspacing="0" style="background:#f5f5f5;padding:30px 10px;">'
+function emailWrapper(bodyContent: string): string {
+  const now = new Date()
+  const dateStr = now.toLocaleDateString('ar-YE', { year: 'numeric', month: 'long', day: 'numeric' })
+  const timeStr = now.toLocaleTimeString('ar-YE', { hour: '2-digit', minute: '2-digit' })
+
+  return '<!DOCTYPE html>'
+    + '<html dir="rtl" lang="ar">'
+    + '<head>'
+    + '<meta charset="utf-8">'
+    + '<meta name="viewport" content="width=device-width,initial-scale=1">'
+    + '<meta http-equiv="X-UA-Compatible" content="IE=edge">'
+    + '<title>فوركس يمني</title>'
+    + '<style>'
+    + 'body{margin:0;padding:0;background:#f0f2f5;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,"Noto Sans Arabic",sans-serif;}'
+    + '.email-body{background:#f0f2f5;padding:32px 16px;}'
+    + '.email-container{max-width:560px;margin:0 auto;background:#ffffff;border-radius:20px;overflow:hidden;box-shadow:0 4px 24px rgba(0,0,0,0.06);}'
+    + '</style>'
+    + '</head>'
+    + '<body>'
+    + '<div class="email-body">'
+    + '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:transparent;">'
     + '<tr><td align="center">'
-    + '<table width="460" cellpadding="0" cellspacing="0" style="background:#ffffff;border-radius:16px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.08);">'
 
-    // Header
-    + '<tr><td style="background:linear-gradient(135deg,#1a1a2e,#16213e);padding:30px 20px;text-align:center;">'
-    + '<h1 style="margin:0;color:#d4af37;font-size:22px;">فوركس يمني</h1>'
-    + '<p style="margin:6px 0 0;color:#8888aa;font-size:13px;">محفظة USDT الرقمية</p>'
+    // Main container
+    + '<table role="presentation" width="560" cellpadding="0" cellspacing="0" class="email-container" style="max-width:560px;width:100%;">'
+
+    // === HEADER ===
+    + '<tr><td style="background:linear-gradient(135deg,#0f172a 0%,#1e293b 50%,#0f172a 100%);padding:0;">'
+    + '<table role="presentation" width="100%" cellpadding="0" cellspacing="0">'
+    + '<tr>'
+    // Logo area
+    + '<td style="padding:28px 32px 20px;">'
+    + '<table role="presentation" cellpadding="0" cellspacing="0">'
+    + '<tr>'
+    + '<td style="vertical-align:middle;">'
+    + '<div style="width:44px;height:44px;background:linear-gradient(135deg,#d4af37,#f4d03f);border-radius:12px;text-align:center;line-height:44px;font-size:20px;color:#0f172a;font-weight:bold;">F</div>'
+    + '</td>'
+    + '<td style="padding-right:14px;vertical-align:middle;">'
+    + '<h1 style="margin:0;color:#ffffff;font-size:20px;font-weight:700;letter-spacing:0.5px;">فوركس يمني</h1>'
+    + '<p style="margin:2px 0 0;color:rgba(255,255,255,0.5);font-size:11px;letter-spacing:1px;">FOREX YEMENI WALLET</p>'
+    + '</td>'
+    + '</tr></table>'
+    + '</td>'
+    + '</tr>'
+    // Gold accent line
+    + '<tr><td style="padding:0 32px;">'
+    + '<div style="height:1px;background:linear-gradient(90deg,transparent,rgba(212,175,55,0.4),transparent);"></div>'
+    + '</td></tr>'
+    + '</table>'
     + '</td></tr>'
 
-    // Body
-    + '<tr><td style="padding:30px 20px;">'
-    + '<h2 style="margin:0 0 10px;color:#333;font-size:18px;text-align:center;">' + title + '</h2>'
-    + '<p style="margin:0 0 20px;color:#666;font-size:14px;text-align:center;">' + description + '</p>'
-
-    // OTP Code Box
-    + '<table width="100%" cellpadding="0" cellspacing="0"><tr><td align="center">'
-    + '<div style="background:#f8f9fa;border:2px dashed ' + color + ';border-radius:12px;padding:20px 30px;display:inline-block;">'
-    + '<span style="font-size:32px;font-weight:bold;color:#333;letter-spacing:10px;font-family:Courier New,monospace;">' + otp + '</span>'
-    + '</div>'
-    + '</td></tr></table>'
-
-    + '<p style="margin:16px 0 0;color:#999;font-size:12px;text-align:center;">هذا الرمز صالح لمدة 10 دقائق فقط</p>'
+    // === BODY ===
+    + '<tr><td style="padding:32px;">'
+    + bodyContent
     + '</td></tr>'
 
-    // Footer
-    + '<tr><td style="background:#fafafa;padding:20px;border-top:1px solid #eee;">'
-    + '<p style="margin:0 0 6px;color:#aaa;font-size:11px;text-align:center;">' + footer + '</p>'
-    + '<p style="margin:0;color:#ccc;font-size:10px;text-align:center;">\u00A9 ' + new Date().getFullYear() + ' فوركس يمني - جميع الحقوق محفوظة</p>'
+    // === FOOTER ===
+    + '<tr><td style="background:#f8fafc;padding:24px 32px;border-top:1px solid #e2e8f0;">'
+    + '<table role="presentation" width="100%" cellpadding="0" cellspacing="0">'
+    // Date/time
+    + '<tr><td style="text-align:center;padding-bottom:12px;">'
+    + '<p style="margin:0;color:#94a3b8;font-size:11px;">' + dateStr + ' &bull; ' + timeStr + '</p>'
+    + '</td></tr>'
+    // Brand
+    + '<tr><td style="text-align:center;padding-bottom:8px;">'
+    + '<p style="margin:0;color:#64748b;font-size:12px;font-weight:600;">فوركس يمني &mdash; محفظة USDT الرقمية</p>'
+    + '</td></tr>'
+    // Disclaimer
+    + '<tr><td style="text-align:center;">'
+    + '<p style="margin:0;color:#94a3b8;font-size:10px;line-height:1.6;">هذا إشعار تلقائي من نظام فوركس يمني. يرجى عدم الرد على هذه الرسالة.<br>&copy; ' + now.getFullYear() + ' فوركس يمني. جميع الحقوق محفوظة.</p>'
+    + '</td></tr>'
+    + '</table>'
     + '</td></tr>'
 
     + '</table>'
     + '</td></tr></table>'
+    + '</div>'
     + '</body></html>'
+}
+
+// ===================== OTP EMAIL TEMPLATE =====================
+
+function buildOtpEmail(title: string, description: string, otp: string, accentColor: string, footerNote: string): string {
+  // Split OTP into individual digits for styling
+  var digits = otp.split('')
+  var otpDigitsHtml = ''
+  digits.forEach(function(d) {
+    otpDigitsHtml += '<span style="display:inline-block;width:40px;height:48px;line-height:48px;text-align:center;background:#f8fafc;border:2px solid #e2e8f0;border-radius:10px;font-size:24px;font-weight:700;color:#1e293b;font-family:\'Courier New\',monospace;margin:0 3px;">' + d + '</span>'
+  })
+
+  var body = ''
+  // Icon circle
+  + '<table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr><td style="text-align:center;padding-bottom:24px;">'
+  + '<div style="display:inline-block;width:64px;height:64px;border-radius:50%;background:linear-gradient(135deg,' + accentColor + '15,' + accentColor + '08);border:2px solid ' + accentColor + '20;text-align:center;line-height:64px;font-size:28px;">&#128274;</div>'
+  + '</td></tr></table>'
+
+  // Title
+  + '<h2 style="margin:0 0 8px;color:#1e293b;font-size:20px;font-weight:700;text-align:center;">' + title + '</h2>'
+
+  // Description
+  + '<p style="margin:0 0 28px;color:#64748b;font-size:14px;line-height:1.8;text-align:center;">' + description + '</p>'
+
+  // OTP Digits
+  + '<table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr><td style="text-align:center;padding:24px 0 8px;">'
+  + '<div style="background:#f8fafc;border-radius:16px;padding:20px 16px;display:inline-block;border:1px solid #e2e8f0;">'
+  + otpDigitsHtml
+  + '</div>'
+  + '</td></tr></table>'
+
+  // Expiry note
+  + '<p style="margin:16px 0 0;color:#94a3b8;font-size:12px;text-align:center;">&#9202; هذا الرمز صالح لمدة محدودة فقط</p>'
+
+  // Divider
+  + '<table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr><td style="padding:24px 0 0;">'
+  + '<div style="height:1px;background:linear-gradient(90deg,transparent,#e2e8f0,transparent);"></div>'
+  + '</td></tr></table>'
+
+  // Security note
+  + '<table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr><td style="text-align:center;">'
+  + '<div style="display:inline-block;background:#fff7ed;border:1px solid #fed7aa;border-radius:10px;padding:10px 18px;">'
+  + '<p style="margin:0;color:#9a3412;font-size:11px;line-height:1.6;">&#9888; ' + footerNote + '</p>'
+  + '</div>'
+  + '</td></tr></table>'
+
+  return emailWrapper(body)
 }
 
 // ===================== NOTIFICATION EMAIL TEMPLATE =====================
 
 function buildNotificationEmail(
-  icon: string,        // emoji icon
-  title: string,       // notification title
-  message: string,     // main message body (can include HTML)
-  statusColor: string, // #22c55e green, #ef4444 red, #3b82f6 blue, #f59e0b yellow
-  statusLabel: string, // status badge text (e.g. "طلب جديد", "تم القبول")
-  details?: Array<{ label: string; value: string }> // optional details rows
+  icon: string,
+  title: string,
+  message: string,
+  statusColor: string,
+  statusLabel: string,
+  statusType: string, // 'success', 'error', 'warning', 'info'
+  details?: Array<{ label: string; value: string }>
 ): string {
-  let detailsHtml = ''
+  // Status bar color mapping
+  var statusBgMap: Record<string, string> = {
+    success: '#dcfce7',
+    error: '#fee2e2',
+    warning: '#fef3c7',
+    info: '#dbeafe',
+  }
+  var statusBorderMap: Record<string, string> = {
+    success: '#86efac',
+    error: '#fca5a5',
+    warning: '#fcd34d',
+    info: '#93c5fd',
+  }
+  var statusIconMap: Record<string, string> = {
+    success: '&#10004;',
+    error: '&#10008;',
+    warning: '&#9888;',
+    info: '&#8505;',
+  }
+  var bg = statusBgMap[statusType] || statusBgMap.info
+  var border = statusBorderMap[statusType] || statusBorderMap.info
+  var sIcon = statusIconMap[statusType] || statusIconMap.info
+
+  // Build details table
+  var detailsHtml = ''
   if (details && details.length > 0) {
-    detailsHtml = '<table width="100%" cellpadding="0" cellspacing="0" style="margin:20px 0 0;border-collapse:collapse;">'
-    details.forEach(function(d) {
-      detailsHtml += '<tr style="border-bottom:1px solid #f0f0f0;">'
-        + '<td style="padding:10px 0;color:#888;font-size:13px;width:40%;">' + d.label + '</td>'
-        + '<td style="padding:10px 0;color:#333;font-size:13px;font-weight:bold;width:60%;direction:ltr;text-align:right;">' + d.value + '</td>'
+    detailsHtml = '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:24px 0 0;border:1px solid #e2e8f0;border-radius:12px;overflow:hidden;">'
+    // Table header
+    detailsHtml += '<tr><td style="background:#f8fafc;padding:10px 16px;border-bottom:1px solid #e2e8f0;">'
+    + '<p style="margin:0;color:#94a3b8;font-size:11px;font-weight:600;letter-spacing:0.5px;">تفاصيل العملية</p>'
+    + '</td></tr>'
+
+    details.forEach(function(d, i) {
+      var rowBg = i % 2 === 0 ? '#ffffff' : '#fafbfc'
+      detailsHtml += '<tr>'
+        + '<td style="background:' + rowBg + ';padding:12px 16px;border-bottom:1px solid #f1f5f9;width:38%;">'
+        + '<p style="margin:0;color:#94a3b8;font-size:12px;">' + d.label + '</p>'
+        + '</td>'
+        + '<td style="background:' + rowBg + ';padding:12px 16px;border-bottom:1px solid #f1f5f9;width:62%;direction:ltr;text-align:right;">'
+        + '<p style="margin:0;color:#1e293b;font-size:13px;font-weight:600;">' + d.value + '</p>'
+        + '</td>'
         + '</tr>'
     })
+
     detailsHtml += '</table>'
   }
 
-  return '<!DOCTYPE html><html dir="rtl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>'
-    + '<body style="margin:0;padding:0;background:#f5f5f5;font-family:Arial,Helvetica,sans-serif;">'
-    + '<table width="100%" cellpadding="0" cellspacing="0" style="background:#f5f5f5;padding:30px 10px;">'
-    + '<tr><td align="center">'
-    + '<table width="480" cellpadding="0" cellspacing="0" style="background:#ffffff;border-radius:16px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.08);">'
+  var body = ''
 
-    // Header
-    + '<tr><td style="background:linear-gradient(135deg,#1a1a2e,#16213e);padding:30px 20px;text-align:center;">'
-    + '<h1 style="margin:0;color:#d4af37;font-size:22px;">فوركس يمني</h1>'
-    + '<p style="margin:6px 0 0;color:#8888aa;font-size:13px;">محفظة USDT الرقمية</p>'
-    + '</td></tr>'
+  // Status banner
+  + '<table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr><td style="padding-bottom:24px;">'
+  + '<div style="background:' + bg + ';border:1px solid ' + border + ';border-radius:14px;padding:14px 20px;text-align:center;">'
+  + '<table role="presentation" cellpadding="0" cellspacing="0"><tr>'
+  + '<td style="vertical-align:middle;">'
+  + '<div style="width:32px;height:32px;border-radius:50%;background:' + border + ';color:#ffffff;text-align:center;line-height:32px;font-size:14px;font-weight:bold;">' + sIcon + '</div>'
+  + '</td>'
+  + '<td style="vertical-align:middle;padding-right:10px;">'
+  + '<span style="color:' + statusColor + ';font-size:14px;font-weight:700;">' + statusLabel + '</span>'
+  + '</td>'
+  + '</tr></table>'
+  + '</div>'
+  + '</td></tr></table>'
 
-    // Body
-    + '<tr><td style="padding:30px 20px;">'
+  // Large icon
+  + '<table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr><td style="text-align:center;padding-bottom:16px;">'
+  + '<div style="display:inline-block;width:72px;height:72px;border-radius:50%;background:linear-gradient(135deg,' + statusColor + '12,' + statusColor + '06);text-align:center;line-height:72px;font-size:36px;">' + icon + '</div>'
+  + '</td></tr></table>'
 
-    // Status Badge
-    + '<table width="100%" cellpadding="0" cellspacing="0"><tr><td align="center">'
-    + '<div style="display:inline-block;background:' + statusColor + '15;border:1px solid ' + statusColor + '30;border-radius:20px;padding:6px 16px;">'
-    + '<span style="font-size:12px;color:' + statusColor + ';font-weight:bold;">' + statusLabel + '</span>'
-    + '</div>'
-    + '</td></tr></table>'
+  // Title
+  + '<h2 style="margin:0 0 12px;color:#1e293b;font-size:20px;font-weight:700;text-align:center;">' + title + '</h2>'
 
-    // Icon + Title
-    + '<table width="100%" cellpadding="0" cellspacing="0" style="margin-top:20px;"><tr><td align="center">'
-    + '<span style="font-size:40px;">' + icon + '</span>'
-    + '</td></tr></table>'
+  // Message
+  + '<p style="margin:0 auto 0;color:#64748b;font-size:14px;line-height:2;text-align:center;max-width:420px;">' + message + '</p>'
 
-    + '<h2 style="margin:10px 0;color:#333;font-size:18px;text-align:center;">' + title + '</h2>'
-    + '<p style="margin:0 0 8px;color:#555;font-size:14px;text-align:center;line-height:1.8;">' + message + '</p>'
+  // Details
+  + detailsHtml
 
-    // Details Table
-    + detailsHtml
+  // Bottom action hint
+  + '<table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr><td style="padding:24px 0 0;text-align:center;">'
+  + '<div style="display:inline-block;background:#f8fafc;border-radius:10px;padding:10px 20px;border:1px solid #e2e8f0;">'
+  + '<p style="margin:0;color:#94a3b8;font-size:11px;">&#128203; يمكنك متابعة تفاصيل هذه العملية من خلال التطبيق</p>'
+  + '</div>'
+  + '</td></tr></table>'
 
-    + '</td></tr>'
-
-    // Footer
-    + '<tr><td style="background:#fafafa;padding:20px;border-top:1px solid #eee;">'
-    + '<p style="margin:0 0 6px;color:#aaa;font-size:11px;text-align:center;">هذا إشعار تلقائي من محفظة فوركس يمني</p>'
-    + '<p style="margin:0;color:#ccc;font-size:10px;text-align:center;">\u00A9 ' + new Date().getFullYear() + ' فوركس يمني - جميع الحقوق محفوظة</p>'
-    + '</td></tr>'
-
-    + '</table>'
-    + '</td></tr></table>'
-    + '</body></html>'
+  return emailWrapper(body)
 }
 
 // ===================== OTP EMAIL FUNCTIONS =====================
 
 export async function sendVerificationEmail(to: string, otp: string): Promise<boolean> {
   const html = buildOtpEmail(
-    'رمز التحقق',
-    'أدخل هذا الرمز لتفعيل بريدك الإلكتروني',
+    'رمز التحقق من البريد الإلكتروني',
+    'أدخل الرمز أدناه لتفعيل بريدك الإلكتروني واستكمال تسجيل حسابك في محفظة فوركس يمني.',
     otp,
     '#d4af37',
-    'إذا لم تطلب هذا الرمز، تجاهل هذه الرسالة'
+    'إذا لم تطلب هذا الرمز بنفسك، يرجى تجاهل هذه الرسالة تماماً. لا تشارك هذا الرمز مع أي شخص.'
   )
   return sendEmailViaScript(to, 'رمز التحقق - فوركس يمني', html)
 }
@@ -170,10 +288,10 @@ export async function sendVerificationEmail(to: string, otp: string): Promise<bo
 export async function sendPasswordResetEmail(to: string, otp: string): Promise<boolean> {
   const html = buildOtpEmail(
     'إعادة تعيين كلمة المرور',
-    'أدخل هذا الرمز لإعادة تعيين كلمة المرور',
+    'أدخل الرمز أدناه لإعادة تعيين كلمة المرور الخاصة بحسابك في محفظة فوركس يمني.',
     otp,
     '#ef4444',
-    'إذا لم تطلب إعادة تعيين كلمة المرور، تجاهل هذه الرسالة'
+    'إذا لم تطلب إعادة تعيين كلمة المرور، يرجى تجاهل هذه الرسالة وتأمين حسابك فوراً.'
   )
   return sendEmailViaScript(to, 'إعادة تعيين كلمة المرور - فوركس يمني', html)
 }
@@ -181,16 +299,15 @@ export async function sendPasswordResetEmail(to: string, otp: string): Promise<b
 export async function sendPhoneVerificationEmail(to: string, phone: string, otp: string): Promise<boolean> {
   const html = buildOtpEmail(
     'التحقق من رقم الهاتف',
-    'أدخل هذا الرمز للتحقق من الرقم: <strong style="color:#3b82f6;direction:ltr;">' + phone + '</strong>',
+    'أدخل الرمز أدناه للتحقق من رقم الهاتف المرتبط بحسابك في محفظة فوركس يمني.<br><strong style="color:#3b82f6;direction:ltr;display:inline-block;margin-top:8px;">' + phone + '</strong>',
     otp,
     '#3b82f6',
-    'إذا لم تطلب هذا التحقق، تجاهل هذه الرسالة'
+    'إذا لم تطلب هذا التحقق، يرجى تجاهل هذه الرسالة. لا تشارك هذا الرمز مع أي شخص.'
   )
   return sendEmailViaScript(to, 'رمز التحقق من رقم الهاتف - فوركس يمني', html)
 }
 
 // ===================== ADMIN EMAIL NOTIFICATIONS =====================
-// These emails are sent to the ADMIN when users/merchants submit requests
 
 export async function sendAdminNewDepositEmail(
   adminEmail: string,
@@ -202,21 +319,24 @@ export async function sendAdminNewDepositEmail(
   network: string,
   depositId: string
 ): Promise<boolean> {
-  const feeInfo = fee > 0 ? ` (الرسوم: ${fee.toFixed(2)} USDT - الصافي: ${netAmount.toFixed(2)} USDT)` : ''
+  const feeInfo = fee > 0 ? `${fee.toFixed(2)} USDT` : 'لا يوجد'
   const html = buildNotificationEmail(
-    '💰',
+    '&#128176;',
     'طلب إيداع جديد',
-    'طلب إيداع جديد من المستخدم <strong>' + userName + '</strong> بقيمة <strong>' + amount.toFixed(2) + ' USDT</strong>' + feeInfo + '.<br>يرجى مراجعة الطلب والموافقة عليه من لوحة الإدارة.',
+    'تلقيت طلب إيداع جديد من المستخدم <strong>' + userName + '</strong> بقيمة <strong>' + amount.toFixed(2) + ' USDT</strong>.<br>يرجى مراجعة الطلب والموافقة عليه أو رفضه من لوحة الإدارة.',
     '#3b82f6',
-    'طلب جديد',
+    'طلب جديد بانتظار المراجعة',
+    'info',
     [
       { label: 'المستخدم', value: userName + ' (' + userEmail + ')' },
-      { label: 'المبلغ', value: amount.toFixed(2) + ' USDT' },
+      { label: 'المبلغ المطلوب', value: amount.toFixed(2) + ' USDT' },
+      { label: 'الرسوم', value: feeInfo },
+      { label: 'الصافي', value: netAmount.toFixed(2) + ' USDT' },
       { label: 'الشبكة', value: network },
-      { label: 'معرف الطلب', value: depositId.substring(0, 12) + '...' },
+      { label: 'رقم الطلب', value: depositId.substring(0, 16) + '...' },
     ]
   )
-  return sendEmailViaScript(adminEmail, 'طلب إيداع جديد - ' + userName, html)
+  return sendEmailViaScript(adminEmail, '[طلب جديد] إيداع - ' + userName, html)
 }
 
 export async function sendAdminNewWithdrawalEmail(
@@ -231,22 +351,23 @@ export async function sendAdminNewWithdrawalEmail(
   withdrawalId: string
 ): Promise<boolean> {
   const html = buildNotificationEmail(
-    '📤',
+    '&#128228;',
     'طلب سحب جديد',
-    'طلب سحب جديد من المستخدم <strong>' + userName + '</strong> بقيمة <strong>' + amount.toFixed(2) + ' USDT</strong> (الصافي: ' + netAmount.toFixed(2) + ' USDT).<br>يرجى مراجعة الطلب والموافقة عليه من لوحة الإدارة.',
+    'تلقيت طلب سحب جديد من المستخدم <strong>' + userName + '</strong> بقيمة <strong>' + amount.toFixed(2) + ' USDT</strong> (الصافي: ' + netAmount.toFixed(2) + ' USDT).<br>يرجى مراجعة الطلب وتنفيذه من لوحة الإدارة.',
     '#f59e0b',
-    'طلب جديد',
+    'طلب جديد بانتظار المراجعة',
+    'warning',
     [
       { label: 'المستخدم', value: userName + ' (' + userEmail + ')' },
-      { label: 'المبلغ', value: amount.toFixed(2) + ' USDT' },
+      { label: 'المبلغ المطلوب', value: amount.toFixed(2) + ' USDT' },
       { label: 'الرسوم', value: fee.toFixed(2) + ' USDT' },
-      { label: 'الصافي', value: netAmount.toFixed(2) + ' USDT' },
+      { label: 'الصافي المرسل', value: netAmount.toFixed(2) + ' USDT' },
       { label: 'الشبكة', value: network },
-      { label: 'العنوان', value: toAddress.substring(0, 16) + '...' },
-      { label: 'معرف الطلب', value: withdrawalId.substring(0, 12) + '...' },
+      { label: 'العنوان', value: toAddress.substring(0, 20) + '...' },
+      { label: 'رقم الطلب', value: withdrawalId.substring(0, 16) + '...' },
     ]
   )
-  return sendEmailViaScript(adminEmail, 'طلب سحب جديد - ' + userName, html)
+  return sendEmailViaScript(adminEmail, '[طلب جديد] سحب - ' + userName, html)
 }
 
 export async function sendAdminNewKycEmail(
@@ -258,22 +379,22 @@ export async function sendAdminNewKycEmail(
 ): Promise<boolean> {
   const typeLabel = docType === 'id_photo' ? 'صورة الهوية' : 'الصورة الشخصية'
   const html = buildNotificationEmail(
-    '🪪',
-    'طلب توثيق جديد',
-    'تم رفع مستند توثيق جديد (<strong>' + typeLabel + '</strong>) من المستخدم <strong>' + userName + '</strong>.<br>يرجى مراجعة المستندات والموافقة أو الرفض من لوحة الإدارة.',
+    '&#128100;',
+    'طلب توثيق حساب جديد',
+    'قام المستخدم <strong>' + userName + '</strong> برفع مستند توثيق جديد (<strong>' + typeLabel + '</strong>).<br>يرجى مراجعة المستند والموافقة أو الرفض من لوحة الإدارة.',
     '#8b5cf6',
-    'طلب توثيق',
+    'طلب توثيق بانتظار المراجعة',
+    'info',
     [
       { label: 'المستخدم', value: userName + ' (' + userEmail + ')' },
       { label: 'نوع المستند', value: typeLabel },
-      { label: 'معرف المستخدم', value: userId.substring(0, 12) + '...' },
+      { label: 'رقم المستخدم', value: userId.substring(0, 16) + '...' },
     ]
   )
-  return sendEmailViaScript(adminEmail, 'طلب توثيق جديد - ' + userName, html)
+  return sendEmailViaScript(adminEmail, '[طلب جديد] توثيق - ' + userName, html)
 }
 
 // ===================== USER EMAIL NOTIFICATIONS =====================
-// These emails are sent to USERS when admin processes their requests
 
 export async function sendUserDepositConfirmedEmail(
   userEmail: string,
@@ -283,21 +404,22 @@ export async function sendUserDepositConfirmedEmail(
   creditAmount: number,
   depositId: string
 ): Promise<boolean> {
-  const feeInfo = fee > 0 ? `<br>تم خصم رسوم قدرها <strong>${fee.toFixed(2)} USDT</strong>` : ''
+  const feeInfo = fee > 0 ? `تم خصم رسوم قدرها <strong>${fee.toFixed(2)} USDT</strong>` : 'بدون رسوم إضافية'
   const html = buildNotificationEmail(
-    '✅',
-    'تم تأكيد إيداعك',
-    'تم تأكيد إيداعك بقيمة <strong>' + amount.toFixed(2) + ' USDT</strong> بنجاح.' + feeInfo + '<br>تم إضافة مبلغ <strong>' + creditAmount.toFixed(2) + ' USDT</strong> إلى رصيدك.',
+    '&#9989;',
+    'تم تأكيد إيداعك بنجاح',
+    'تمت مراجعة وإيداعك بقيمة <strong>' + amount.toFixed(2) + ' USDT</strong> بنجاح.<br>' + feeInfo + '.<br>تم إضافة مبلغ <strong>' + creditAmount.toFixed(2) + ' USDT</strong> إلى رصيدك في المحفظة.',
     '#22c55e',
-    'مقبول',
+    'تمت الموافقة',
+    'success',
     [
       { label: 'المبلغ المطلوب', value: amount.toFixed(2) + ' USDT' },
       { label: 'الرسوم', value: fee > 0 ? fee.toFixed(2) + ' USDT' : 'لا يوجد' },
-      { label: 'المبلغ المضاف', value: creditAmount.toFixed(2) + ' USDT' },
-      { label: 'معرف الطلب', value: depositId.substring(0, 12) + '...' },
+      { label: 'المبلغ المضاف للرصيد', value: creditAmount.toFixed(2) + ' USDT' },
+      { label: 'رقم العملية', value: depositId.substring(0, 16) + '...' },
     ]
   )
-  return sendEmailViaScript(userEmail, '✅ تم تأكيد إيداعك بنجاح - فوركس يمني', html)
+  return sendEmailViaScript(userEmail, 'تم تأكيد إيداعك بنجاح - فوركس يمني', html)
 }
 
 export async function sendUserDepositRejectedEmail(
@@ -307,20 +429,21 @@ export async function sendUserDepositRejectedEmail(
   reason: string,
   depositId: string
 ): Promise<boolean> {
-  const reasonText = reason ? '<br>السبب: <strong>' + reason + '</strong>' : ''
+  const reasonText = reason ? '<br>السبب المحدد: <strong>' + reason + '</strong>' : ''
   const html = buildNotificationEmail(
-    '❌',
-    'تم رفض إيداعك',
-    'تم رفض طلب إيداعك بقيمة <strong>' + amount.toFixed(2) + ' USDT</strong>.' + reasonText + '<br>يمكنك تقديم طلب جديد أو التواصل مع الدعم الفني.',
+    '&#10060;',
+    'تم رفض طلب الإيداع',
+    'نأسف، تم رفض طلب إيداعك بقيمة <strong>' + amount.toFixed(2) + ' USDT</strong>.' + reasonText + '<br>يمكنك تقديم طلب إيداع جديد أو التواصل مع فريق الدعم الفني للمساعدة.',
     '#ef4444',
-    'مرفوض',
+    'تم الرفض',
+    'error',
     [
       { label: 'المبلغ', value: amount.toFixed(2) + ' USDT' },
-      { label: 'السبب', value: reason || 'غير محدد' },
-      { label: 'معرف الطلب', value: depositId.substring(0, 12) + '...' },
+      { label: 'سبب الرفض', value: reason || 'غير محدد' },
+      { label: 'رقم العملية', value: depositId.substring(0, 16) + '...' },
     ]
   )
-  return sendEmailViaScript(userEmail, '❌ تم رفض طلب الإيداع - فوركس يمني', html)
+  return sendEmailViaScript(userEmail, 'تم رفض طلب الإيداع - فوركس يمني', html)
 }
 
 export async function sendUserDepositReviewingEmail(
@@ -330,17 +453,18 @@ export async function sendUserDepositReviewingEmail(
   depositId: string
 ): Promise<boolean> {
   const html = buildNotificationEmail(
-    '🔍',
+    '&#128269;',
     'طلب إيداعك قيد المراجعة',
-    'تم بدء مراجعة طلب إيداعك بقيمة <strong>' + amount.toFixed(2) + ' USDT</strong>.<br>سيتم إشعارك بالنتيجة قريباً.',
+    'تم بدء مراجعة طلب إيداعك بقيمة <strong>' + amount.toFixed(2) + ' USDT</strong> من قبل فريق الإدارة.<br>سيتم إشعارك بالنتيجة فور اكتمال المراجعة.',
     '#f59e0b',
     'قيد المراجعة',
+    'warning',
     [
       { label: 'المبلغ', value: amount.toFixed(2) + ' USDT' },
-      { label: 'معرف الطلب', value: depositId.substring(0, 12) + '...' },
+      { label: 'رقم العملية', value: depositId.substring(0, 16) + '...' },
     ]
   )
-  return sendEmailViaScript(userEmail, '🔍 طلب إيداعك قيد المراجعة - فوركس يمني', html)
+  return sendEmailViaScript(userEmail, 'طلب إيداعك قيد المراجعة - فوركس يمني', html)
 }
 
 export async function sendUserWithdrawalApprovedEmail(
@@ -351,18 +475,19 @@ export async function sendUserWithdrawalApprovedEmail(
   withdrawalId: string
 ): Promise<boolean> {
   const html = buildNotificationEmail(
-    '✅',
+    '&#9989;',
     'تم قبول طلب السحب',
-    'تم قبول طلب سحبك بقيمة <strong>' + amount.toFixed(2) + ' USDT</strong> (الصافي: ' + netAmount.toFixed(2) + ' USDT).<br>جاري معالجة الدفع وسيتم إرسال الأموال إلى عنوانك قريباً.',
+    'تم قبول طلب سحبك بقيمة <strong>' + amount.toFixed(2) + ' USDT</strong> (الصافي: ' + netAmount.toFixed(2) + ' USDT).<br>جاري معالجة تحويل الأموال إلى عنوانك المسجل وسيتم إشعارك فور التنفيذ.',
     '#22c55e',
-    'مقبول',
+    'تمت الموافقة',
+    'success',
     [
-      { label: 'المبلغ', value: amount.toFixed(2) + ' USDT' },
-      { label: 'الصافي', value: netAmount.toFixed(2) + ' USDT' },
-      { label: 'معرف الطلب', value: withdrawalId.substring(0, 12) + '...' },
+      { label: 'المبلغ المطلوب', value: amount.toFixed(2) + ' USDT' },
+      { label: 'الصافي المرسل', value: netAmount.toFixed(2) + ' USDT' },
+      { label: 'رقم العملية', value: withdrawalId.substring(0, 16) + '...' },
     ]
   )
-  return sendEmailViaScript(userEmail, '✅ تم قبول طلب السحب - فوركس يمني', html)
+  return sendEmailViaScript(userEmail, 'تم قبول طلب السحب - فوركس يمني', html)
 }
 
 export async function sendUserWithdrawalProcessingEmail(
@@ -374,18 +499,19 @@ export async function sendUserWithdrawalProcessingEmail(
   withdrawalId: string
 ): Promise<boolean> {
   const html = buildNotificationEmail(
-    '💸',
+    '&#128176;',
     'تم تنفيذ السحب بنجاح',
-    'تم تنفيذ سحبك بقيمة <strong>' + netAmount.toFixed(2) + ' USDT</strong> بنجاح.<br>تم إرسال الأموال إلى العنوان المحدد. يرجى تأكيد الاستلام من التطبيق.',
+    'تم تحويل مبلغ <strong>' + netAmount.toFixed(2) + ' USDT</strong> بنجاح إلى العنوان المحفوظ لدينا.<br>يرجى تأكيد الاستلام من خلال التطبيق.',
     '#22c55e',
-    'تم التنفيذ',
+    'تم التنفيذ بنجاح',
+    'success',
     [
       { label: 'المبلغ المرسل', value: netAmount.toFixed(2) + ' USDT' },
-      { label: 'إلى العنوان', value: toAddress.substring(0, 20) + '...' },
-      { label: 'معرف الطلب', value: withdrawalId.substring(0, 12) + '...' },
+      { label: 'إلى العنوان', value: toAddress.substring(0, 24) + '...' },
+      { label: 'رقم العملية', value: withdrawalId.substring(0, 16) + '...' },
     ]
   )
-  return sendEmailViaScript(userEmail, '💸 تم تنفيذ السحب بنجاح - فوركس يمني', html)
+  return sendEmailViaScript(userEmail, 'تم تنفيذ السحب بنجاح - فوركس يمني', html)
 }
 
 export async function sendUserWithdrawalRejectedEmail(
@@ -395,20 +521,21 @@ export async function sendUserWithdrawalRejectedEmail(
   reason: string,
   withdrawalId: string
 ): Promise<boolean> {
-  const reasonText = reason ? '<br>السبب: <strong>' + reason + '</strong>' : ''
+  const reasonText = reason ? '<br>السبب المحدد: <strong>' + reason + '</strong>' : ''
   const html = buildNotificationEmail(
-    '❌',
+    '&#10060;',
     'تم رفض طلب السحب',
-    'تم رفض طلب سحبك بقيمة <strong>' + amount.toFixed(2) + ' USDT</strong>.' + reasonText + '<br>تم إعادة المبلغ بالكامل إلى رصيدك.',
+    'نأسف، تم رفض طلب سحبك بقيمة <strong>' + amount.toFixed(2) + ' USDT</strong>.' + reasonText + '<br>تم إعادة المبلغ بالكامل إلى رصيدك المتاح في المحفظة.',
     '#ef4444',
-    'مرفوض',
+    'تم الرفض',
+    'error',
     [
       { label: 'المبلغ', value: amount.toFixed(2) + ' USDT' },
-      { label: 'السبب', value: reason || 'غير محدد' },
-      { label: 'معرف الطلب', value: withdrawalId.substring(0, 12) + '...' },
+      { label: 'سبب الرفض', value: reason || 'غير محدد' },
+      { label: 'رقم العملية', value: withdrawalId.substring(0, 16) + '...' },
     ]
   )
-  return sendEmailViaScript(userEmail, '❌ تم رفض طلب السحب - فوركس يمني', html)
+  return sendEmailViaScript(userEmail, 'تم رفض طلب السحب - فوركس يمني', html)
 }
 
 export async function sendUserKycApprovedEmail(
@@ -416,14 +543,15 @@ export async function sendUserKycApprovedEmail(
   userName: string
 ): Promise<boolean> {
   const html = buildNotificationEmail(
-    '✅',
-    'تم قبول توثيق حسابك',
-    'تهانينا! تم قبول جميع مستندات التحقق الخاصة بك بنجاح.<br>حسابك الآن موثق بالكامل ويمكنك الاستفادة من جميع ميزات المحفظة.',
+    '&#127942;',
+    'تم توثيق حسابك بنجاح',
+    'تهانينا! تم قبول جميع مستندات التحقق الخاصة بك بنجاح.<br>حسابك الآن موثق بالكامل ويمكنك الاستفادة من جميع الميزات والخدمات المتقدمة في المحفظة.',
     '#22c55e',
-    'موثق',
+    'حساب موثق',
+    'success',
     []
   )
-  return sendEmailViaScript(userEmail, '✅ تم قبول توثيق حسابك - فوركس يمني', html)
+  return sendEmailViaScript(userEmail, 'تم توثيق حسابك بنجاح - فوركس يمني', html)
 }
 
 export async function sendUserKycRejectedEmail(
@@ -431,22 +559,22 @@ export async function sendUserKycRejectedEmail(
   userName: string,
   reason: string
 ): Promise<boolean> {
-  const reasonText = reason ? '<br>السبب: <strong>' + reason + '</strong>' : ''
+  const reasonText = reason ? '<br>السبب المحدد: <strong>' + reason + '</strong>' : ''
   const html = buildNotificationEmail(
-    '❌',
+    '&#10060;',
     'تم رفض طلب التوثيق',
-    'تم رفض أحد مستندات التحقق الخاصة بك.' + reasonText + '<br>يرجى إعادة رفع المستندات المطلوبة من خلال التطبيق.',
+    'نأسف، تم رفض أحد مستندات التحقق الخاصة بك.' + reasonText + '<br>يرجى إعادة رفع المستندات المطلوبة بجودة أعلى من خلال التطبيق.',
     '#ef4444',
-    'مرفوض',
+    'تم الرفض',
+    'error',
     [
-      { label: 'السبب', value: reason || 'غير محدد' },
+      { label: 'سبب الرفض', value: reason || 'غير محدد' },
     ]
   )
-  return sendEmailViaScript(userEmail, '❌ تم رفض طلب التوثيق - فوركس يمني', html)
+  return sendEmailViaScript(userEmail, 'تم رفض طلب التوثيق - فوركس يمني', html)
 }
 
 // ===================== MERCHANT EMAIL NOTIFICATIONS =====================
-// These emails are sent to MERCHANTS when their P2P orders are processed
 
 export async function sendMerchantNewOrderEmail(
   merchantEmail: string,
@@ -457,18 +585,19 @@ export async function sendMerchantNewOrderEmail(
   orderId: string
 ): Promise<boolean> {
   const html = buildNotificationEmail(
-    '📦',
-    'طلب P2P جديد',
-    'لديك طلب جديد من المستخدم <strong>' + userName + '</strong> بقيمة <strong>' + amount.toFixed(2) + ' ' + currency + '</strong>.<br>يرجى مراجعة الطلب والموافقة عليه أو رفضه من لوحة تحكم التاجر.',
+    '&#128230;',
+    'طلب تداول P2P جديد',
+    'لديك طلب تداول جديد من المستخدم <strong>' + userName + '</strong> بقيمة <strong>' + amount.toFixed(2) + ' ' + currency + '</strong>.<br>يرجى مراجعة الطلب والموافقة عليه أو رفضه من لوحة تحكم التاجر.',
     '#3b82f6',
     'طلب جديد',
+    'info',
     [
       { label: 'المستخدم', value: userName },
       { label: 'المبلغ', value: amount.toFixed(2) + ' ' + currency },
-      { label: 'معرف الطلب', value: orderId.substring(0, 12) + '...' },
+      { label: 'رقم الطلب', value: orderId.substring(0, 16) + '...' },
     ]
   )
-  return sendEmailViaScript(merchantEmail, '📦 طلب P2P جديد - فوركس يمني', html)
+  return sendEmailViaScript(merchantEmail, 'طلب تداول P2P جديد - فوركس يمني', html)
 }
 
 export async function sendMerchantOrderCompletedEmail(
@@ -479,17 +608,18 @@ export async function sendMerchantOrderCompletedEmail(
   orderId: string
 ): Promise<boolean> {
   const html = buildNotificationEmail(
-    '✅',
-    'تم اكتمال الصفقة',
-    'تم اكتمال الصفقة رقم <strong>' + orderId.substring(0, 8) + '</strong> بنجاح بقيمة <strong>' + amount.toFixed(2) + ' ' + currency + '</strong>.<br>تم تحديث رصيدك وفقاً لذلك.',
+    '&#9989;',
+    'تم اكتمال الصفقة بنجاح',
+    'تمت الموافقة على الصفقة <strong>#' + orderId.substring(0, 8) + '</strong> بنجاح بقيمة <strong>' + amount.toFixed(2) + ' ' + currency + '</strong>.<br>تم تحديث رصيدك وفقاً لتفاصيل الصفقة.',
     '#22c55e',
-    'مكتمل',
+    'صفقة مكتملة',
+    'success',
     [
       { label: 'المبلغ', value: amount.toFixed(2) + ' ' + currency },
-      { label: 'معرف الطلب', value: orderId.substring(0, 12) + '...' },
+      { label: 'رقم الصفقة', value: orderId.substring(0, 16) + '...' },
     ]
   )
-  return sendEmailViaScript(merchantEmail, '✅ تم اكتمال الصفقة - فوركس يمني', html)
+  return sendEmailViaScript(merchantEmail, 'اكتمال الصفقة - فوركس يمني', html)
 }
 
 export async function sendMerchantOrderCancelledEmail(
@@ -501,18 +631,19 @@ export async function sendMerchantOrderCancelledEmail(
   orderId: string
 ): Promise<boolean> {
   const html = buildNotificationEmail(
-    '❌',
+    '&#10060;',
     'تم إلغاء الصفقة',
-    'تم إلغاء الصفقة رقم <strong>' + orderId.substring(0, 8) + '</strong> بقيمة <strong>' + amount.toFixed(2) + ' ' + currency + '</strong>.<br>السبب: ' + (reason || 'غير محدد'),
+    'تم إلغاء الصفقة <strong>#' + orderId.substring(0, 8) + '</strong> بقيمة <strong>' + amount.toFixed(2) + ' ' + currency + '</strong>.<br>السبب: ' + (reason || 'غير محدد'),
     '#ef4444',
-    'ملغي',
+    'صفقة ملغية',
+    'error',
     [
       { label: 'المبلغ', value: amount.toFixed(2) + ' ' + currency },
       { label: 'السبب', value: reason || 'غير محدد' },
-      { label: 'معرف الطلب', value: orderId.substring(0, 12) + '...' },
+      { label: 'رقم الصفقة', value: orderId.substring(0, 16) + '...' },
     ]
   )
-  return sendEmailViaScript(merchantEmail, '❌ تم إلغاء الصفقة - فوركس يمني', html)
+  return sendEmailViaScript(merchantEmail, 'إلغاء الصفقة - فوركس يمني', html)
 }
 
 export async function sendMerchantDepositConfirmedEmail(
@@ -523,18 +654,19 @@ export async function sendMerchantDepositConfirmedEmail(
   depositId: string
 ): Promise<boolean> {
   const html = buildNotificationEmail(
-    '✅',
-    'تم تأكيد إيداعك',
-    'تم تأكيد إيداعك بقيمة <strong>' + amount.toFixed(2) + ' USDT</strong> بنجاح.<br>تم إضافة مبلغ <strong>' + creditAmount.toFixed(2) + ' USDT</strong> إلى رصيدك.',
+    '&#9989;',
+    'تم تأكيد إيداعك بنجاح',
+    'تم تأكيد إيداعك بقيمة <strong>' + amount.toFixed(2) + ' USDT</strong> بنجاح.<br>تم إضافة مبلغ <strong>' + creditAmount.toFixed(2) + ' USDT</strong> إلى رصيدك كتاجر.',
     '#22c55e',
-    'مقبول',
+    'تمت الموافقة',
+    'success',
     [
       { label: 'المبلغ المطلوب', value: amount.toFixed(2) + ' USDT' },
       { label: 'المبلغ المضاف', value: creditAmount.toFixed(2) + ' USDT' },
-      { label: 'معرف الطلب', value: depositId.substring(0, 12) + '...' },
+      { label: 'رقم العملية', value: depositId.substring(0, 16) + '...' },
     ]
   )
-  return sendEmailViaScript(merchantEmail, '✅ تم تأكيد إيداعك - فوركس يمني', html)
+  return sendEmailViaScript(merchantEmail, 'تم تأكيد إيداعك - فوركس يمني', html)
 }
 
 export async function sendMerchantDepositRejectedEmail(
@@ -545,18 +677,19 @@ export async function sendMerchantDepositRejectedEmail(
   depositId: string
 ): Promise<boolean> {
   const html = buildNotificationEmail(
-    '❌',
-    'تم رفض إيداعك',
-    'تم رفض طلب إيداعك بقيمة <strong>' + amount.toFixed(2) + ' USDT</strong>.<br>السبب: ' + (reason || 'غير محدد'),
+    '&#10060;',
+    'تم رفض طلب الإيداع',
+    'نأسف، تم رفض طلب إيداعك بقيمة <strong>' + amount.toFixed(2) + ' USDT</strong>.<br>السبب: ' + (reason || 'غير محدد'),
     '#ef4444',
-    'مرفوض',
+    'تم الرفض',
+    'error',
     [
       { label: 'المبلغ', value: amount.toFixed(2) + ' USDT' },
       { label: 'السبب', value: reason || 'غير محدد' },
-      { label: 'معرف الطلب', value: depositId.substring(0, 12) + '...' },
+      { label: 'رقم العملية', value: depositId.substring(0, 16) + '...' },
     ]
   )
-  return sendEmailViaScript(merchantEmail, '❌ تم رفض طلب الإيداع - فوركس يمني', html)
+  return sendEmailViaScript(merchantEmail, 'تم رفض طلب الإيداع - فوركس يمني', html)
 }
 
 export async function sendMerchantWithdrawalApprovedEmail(
@@ -567,18 +700,19 @@ export async function sendMerchantWithdrawalApprovedEmail(
   withdrawalId: string
 ): Promise<boolean> {
   const html = buildNotificationEmail(
-    '✅',
+    '&#9989;',
     'تم قبول طلب السحب',
-    'تم قبول طلب سحبك بقيمة <strong>' + amount.toFixed(2) + ' USDT</strong> (الصافي: ' + netAmount.toFixed(2) + ' USDT).<br>جاري معالجة الدفع.',
+    'تم قبول طلب سحبك بقيمة <strong>' + amount.toFixed(2) + ' USDT</strong> (الصافي: ' + netAmount.toFixed(2) + ' USDT).<br>جاري معالجة التحويل.',
     '#22c55e',
-    'مقبول',
+    'تمت الموافقة',
+    'success',
     [
       { label: 'المبلغ', value: amount.toFixed(2) + ' USDT' },
       { label: 'الصافي', value: netAmount.toFixed(2) + ' USDT' },
-      { label: 'معرف الطلب', value: withdrawalId.substring(0, 12) + '...' },
+      { label: 'رقم العملية', value: withdrawalId.substring(0, 16) + '...' },
     ]
   )
-  return sendEmailViaScript(merchantEmail, '✅ تم قبول طلب السحب - فوركس يمني', html)
+  return sendEmailViaScript(merchantEmail, 'تم قبول طلب السحب - فوركس يمني', html)
 }
 
 export async function sendMerchantWithdrawalProcessingEmail(
@@ -589,18 +723,19 @@ export async function sendMerchantWithdrawalProcessingEmail(
   withdrawalId: string
 ): Promise<boolean> {
   const html = buildNotificationEmail(
-    '💸',
+    '&#128176;',
     'تم تنفيذ السحب بنجاح',
-    'تم تنفيذ سحبك بقيمة <strong>' + netAmount.toFixed(2) + ' USDT</strong> بنجاح.<br>تم إرسال الأموال إلى العنوان المحدد.',
+    'تم تحويل مبلغ <strong>' + netAmount.toFixed(2) + ' USDT</strong> بنجاح إلى العنوان المحفوظ.',
     '#22c55e',
-    'تم التنفيذ',
+    'تم التنفيذ بنجاح',
+    'success',
     [
       { label: 'المبلغ المرسل', value: netAmount.toFixed(2) + ' USDT' },
-      { label: 'إلى العنوان', value: toAddress.substring(0, 20) + '...' },
-      { label: 'معرف الطلب', value: withdrawalId.substring(0, 12) + '...' },
+      { label: 'إلى العنوان', value: toAddress.substring(0, 24) + '...' },
+      { label: 'رقم العملية', value: withdrawalId.substring(0, 16) + '...' },
     ]
   )
-  return sendEmailViaScript(merchantEmail, '💸 تم تنفيذ السحب - فوركس يمني', html)
+  return sendEmailViaScript(merchantEmail, 'تم تنفيذ السحب - فوركس يمني', html)
 }
 
 export async function sendMerchantWithdrawalRejectedEmail(
@@ -611,22 +746,22 @@ export async function sendMerchantWithdrawalRejectedEmail(
   withdrawalId: string
 ): Promise<boolean> {
   const html = buildNotificationEmail(
-    '❌',
+    '&#10060;',
     'تم رفض طلب السحب',
-    'تم رفض طلب سحبك بقيمة <strong>' + amount.toFixed(2) + ' USDT</strong>.<br>تم إعادة المبلغ بالكامل إلى رصيدك. السبب: ' + (reason || 'غير محدد'),
+    'نأسف، تم رفض طلب سحبك بقيمة <strong>' + amount.toFixed(2) + ' USDT</strong>.<br>تم إعادة المبلغ بالكامل إلى رصيدك. السبب: ' + (reason || 'غير محدد'),
     '#ef4444',
-    'مرفوض',
+    'تم الرفض',
+    'error',
     [
       { label: 'المبلغ', value: amount.toFixed(2) + ' USDT' },
       { label: 'السبب', value: reason || 'غير محدد' },
-      { label: 'معرف الطلب', value: withdrawalId.substring(0, 12) + '...' },
+      { label: 'رقم العملية', value: withdrawalId.substring(0, 16) + '...' },
     ]
   )
-  return sendEmailViaScript(merchantEmail, '❌ تم رفض طلب السحب - فوركس يمني', html)
+  return sendEmailViaScript(merchantEmail, 'تم رفض طلب السحب - فوركس يمني', html)
 }
 
 // ===================== PIN RECOVERY EMAIL =====================
-// Sent to user/merchant when admin generates a temporary PIN for account recovery
 
 export async function sendPinRecoveryEmail(
   userEmail: string,
@@ -635,10 +770,10 @@ export async function sendPinRecoveryEmail(
 ): Promise<boolean> {
   const html = buildOtpEmail(
     'رمز PIN مؤقت لاستعادة الحساب',
-    'تم إنشاء رمز PIN مؤقت لحسابك من قبل الإدارة.<br>استخدم هذا الرمز لتسجيل الدخول بدلاً من كلمة المرور.<br>بعد تسجيل الدخول، يجب عليك تغيير كلمة المرور فوراً.',
+    'تم إنشاء رمز PIN مؤقت لحسابك من قبل فريق الإدارة.<br>استخدم هذا الرمز لتسجيل الدخول بدلاً من كلمة المرور.<br>بعد تسجيل الدخول بنجاح، سيُطلب منك تغيير كلمة المرور فوراً.',
     pin,
     '#d4af37',
-    'هذا الرمز صالح لمدة 30 دقيقة فقط. إذا لم تطلب هذا الرمز، تواصل مع الإدارة فوراً.'
+    'هذا الرمز صالح لمدة 30 دقيقة فقط ويُستخدم لمرة واحدة. إذا لم تطلب هذا الرمز، تواصل مع الإدارة فوراً.'
   )
-  return sendEmailViaScript(userEmail, '🔑 رمز PIN مؤقت - فوركس يمني', html)
+  return sendEmailViaScript(userEmail, 'رمز PIN مؤقت - فوركس يمني', html)
 }
