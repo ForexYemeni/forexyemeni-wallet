@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">فوركس يمني</string>
+    <string name="title_activity_main">فوركس يمني</string>
+    <string name="package_name">com.forexyemeni.wallet</string>
+    <string name="custom_url_scheme">com.forexyemeni.wallet</string>
+</resources>

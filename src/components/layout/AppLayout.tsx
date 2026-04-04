@@ -1,8 +1,9 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useAuthStore } from '@/lib/store'
 import { useRealtimeNotifications, useUnreadCount } from '@/hooks/useRealtimeNotifications'
+import { setupFCMAutoRegister } from '@/lib/fcm-push'
 import BottomNav from './BottomNav'
 import Sidebar from './Sidebar'
 import { Bell, LogOut } from 'lucide-react'
@@ -28,6 +29,11 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   useRealtimeNotifications()
   // Dynamic unread count for badge
   const unreadCount = useUnreadCount()
+
+  // FCM Push Notifications (Android APK only)
+  useEffect(() => {
+    setupFCMAutoRegister()
+  }, [])
 
   const handleLogout = () => {
     setLogoutDialogOpen(false)
