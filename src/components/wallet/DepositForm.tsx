@@ -178,11 +178,11 @@ export default function DepositForm() {
                     {m.category === 'crypto' ? <Wallet className="w-5 h-5" /> : <Building className="w-5 h-5" />}
                   </div>
                   <div>
-                    <p className="text-sm font-medium">{m.name}</p>
+                    <p className="text-sm font-medium">{m.name || (m.type === 'bank_deposit' ? 'إيداع بنكي' : m.type === 'atm_transfer' ? 'تحويل عبر صراف' : m.category === 'crypto' ? 'عملات رقمية' : 'إيداع'))}</p>
                     <p className="text-[10px] text-muted-foreground">
                       {m.type === 'bank_deposit' ? (m.accountName || m.network || '') :
                        m.category === 'crypto' ? (m.network || '') :
-                       m.type === 'atm_transfer' ? (m.recipientName || m.network || '') :
+                       m.type === 'atm_transfer' ? (m.network || 'تحويل نقدي') :
                        m.network || ''}
                     </p>
                   </div>
@@ -212,11 +212,11 @@ export default function DepositForm() {
                 {selectedMethod.category === 'crypto' ? <Wallet className="w-5 h-5" /> : <Building className="w-5 h-5" />}
               </div>
               <div>
-                <h2 className="text-sm font-bold">{selectedMethod.name}</h2>
+                <h2 className="text-sm font-bold">{selectedMethod.name || (selectedMethod.type === 'bank_deposit' ? 'إيداع بنكي' : selectedMethod.type === 'atm_transfer' ? 'تحويل عبر صراف' : 'إيداع')}</h2>
                 <p className="text-xs text-muted-foreground">
                   {selectedMethod.type === 'bank_deposit' ? (selectedMethod.accountName || selectedMethod.network || '') :
                    selectedMethod.category === 'crypto' ? (selectedMethod.network || '') :
-                   selectedMethod.type === 'atm_transfer' ? (selectedMethod.recipientName || selectedMethod.network || '') :
+                   selectedMethod.type === 'atm_transfer' ? (selectedMethod.network || 'تحويل نقدي') :
                    selectedMethod.network || ''}
                 </p>
               </div>

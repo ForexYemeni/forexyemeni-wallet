@@ -49,7 +49,7 @@ export default function P2PMyListings() {
       if (!confirm('هل أنت متأكد من حذف هذا الإعلان؟')) return
       setActionLoading(id)
       try {
-        const res = await fetch(`/api/p2p/listings/${id}`, { method: 'DELETE' })
+        const res = await fetch(`/api/p2p/listings/${id}`, { method: 'DELETE', headers: { 'x-user-id': user?.id || '' } })
         const data = await res.json()
         if (data.success) { toast.success('تم حذف الإعلان'); fetchListings() }
         else toast.error(data.message)
@@ -62,7 +62,7 @@ export default function P2PMyListings() {
     try {
       const res = await fetch(`/api/p2p/listings/${id}`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', 'x-user-id': user?.id || '' },
         body: JSON.stringify({ action }),
       })
       const data = await res.json()

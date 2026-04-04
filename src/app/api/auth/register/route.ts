@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { userOperations, otpCodeOperations } from '@/lib/db-firebase'
 import { sendVerificationEmail } from '@/lib/email'
-import { getDb } from '@/lib/firebase'
+import { getDb, generateAffiliateCode } from '@/lib/firebase'
 import bcrypt from 'bcryptjs'
 
 export async function POST(request: NextRequest) {
@@ -59,6 +59,7 @@ export async function POST(request: NextRequest) {
       mustChangePassword: false,
       referredBy: null,
       merchantId: null,
+      affiliateCode: generateAffiliateCode(),
     })
 
     // Delete any old OTPs for this email to avoid confusion

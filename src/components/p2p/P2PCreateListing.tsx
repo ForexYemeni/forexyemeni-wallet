@@ -16,6 +16,8 @@ const PAYMENT_METHODS = [
 ]
 
 export default function P2PCreateListing({ onCreated }: P2PCreateListingProps) {
+  const { user } = useAuthStore()
+
   const [type, setType] = useState<'sell' | 'buy'>('sell')
   const [amount, setAmount] = useState('')
   const [price, setPrice] = useState('')
@@ -38,7 +40,7 @@ export default function P2PCreateListing({ onCreated }: P2PCreateListingProps) {
     try {
       const res = await fetch('/api/p2p/listings', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', 'x-user-id': user?.id || '' },
         body: JSON.stringify({
           type,
           amount: parseFloat(amount),
