@@ -541,14 +541,15 @@ export default function Home() {
 
   // Main App Screens
   const isMerchant = !!user?.merchantId && user.role !== 'admin'
+  const isAdmin = user?.role === 'admin'
   return (
     <AppLayout>
-      {!isMerchant && currentScreen === 'dashboard' && <Dashboard />}
-      {!isMerchant && currentScreen === 'deposit' && <DepositForm />}
-      {!isMerchant && currentScreen === 'withdraw' && <WithdrawForm />}
+      {currentScreen === 'dashboard' && <Dashboard />}
+      {currentScreen === 'deposit' && <DepositForm />}
+      {currentScreen === 'withdraw' && <WithdrawForm />}
       {currentScreen === 'transactions' && <TransactionHistory />}
-      {!isMerchant && currentScreen === 'kyc' && <KYCVerification />}
-      {!isMerchant && currentScreen === 'referral' && <ReferralPage />}
+      {currentScreen === 'kyc' && <KYCVerification />}
+      {currentScreen === 'referral' && <ReferralPage />}
       {currentScreen === 'settings' && <SettingsPage />}
       {currentScreen === 'notifications' && <NotificationsPage />}
       {currentScreen === 'chat' && <ChatPage />}
@@ -559,9 +560,6 @@ export default function Home() {
           <AdminPanel />
         </AdminErrorBoundary>
       )}
-
-      {/* Merchant redirect: if merchant tries to access user-only pages, redirect to P2P */}
-      {isMerchant && ['dashboard', 'deposit', 'withdraw', 'kyc', 'referral'].includes(currentScreen) && <P2PPage />}
 
       {/* Floating Support Bot - always visible when authenticated */}
       <SupportBot />

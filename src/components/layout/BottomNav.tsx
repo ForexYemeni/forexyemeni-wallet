@@ -29,8 +29,9 @@ const userNavItems = [
 ]
 
 const merchantNavItems = [
+  { key: 'dashboard', label: 'الرئيسية', icon: Home },
+  { key: 'deposit', label: 'إيداع', icon: ArrowDownLeft },
   { key: 'p2p', label: 'P2P', icon: Repeat },
-  { key: 'p2p-trades', label: 'صفقاتي', icon: Clock },
   { key: 'settings', label: 'المزيد', icon: Settings },
 ]
 
@@ -46,8 +47,10 @@ const userExtraItems = [
 ]
 
 const merchantExtraItems = [
+  { key: 'withdraw', label: 'سحب', icon: ArrowUpRight },
   { key: 'p2p', label: 'سوق P2P', icon: Repeat },
-  { key: 'p2p-trades', label: 'إعلاناتي وصفقاتي', icon: Clock },
+  { key: 'transactions', label: 'المعاملات', icon: Clock },
+  { key: 'kyc', label: 'التحقق (KYC)', icon: Shield },
   { key: 'chat', label: 'الدعم الفني', icon: MessageCircle },
   { key: 'notifications', label: 'الإشعارات', icon: Bell },
   { key: 'settings', label: 'الإعدادات', icon: Settings },
