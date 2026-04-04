@@ -141,6 +141,7 @@ export default function Home() {
   const logout = useAuthStore(s => s.logout)
   const setPendingWithdrawalConfirmation = useAuthStore(s => s.setPendingWithdrawalConfirmation)
   const updateUser = useAuthStore(s => s.updateUser)
+  const pendingAdminTab = useAuthStore(s => s.pendingAdminTab)
   const [confirmPassword, setConfirmPassword] = useState('')
   const [confirmLoading, setConfirmLoading] = useState(false)
   const [pendingWithdrawal, setPendingWithdrawal] = useState<PendingWithdrawal | null>(null)
@@ -557,7 +558,7 @@ export default function Home() {
       {currentScreen === 'p2p' && <P2PPage />}
       {currentScreen === 'admin' && (
         <AdminErrorBoundary>
-          <AdminPanel />
+          <AdminPanel key={pendingAdminTab || '_'} />
         </AdminErrorBoundary>
       )}
 
