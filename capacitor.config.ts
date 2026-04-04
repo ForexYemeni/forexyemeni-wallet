@@ -10,6 +10,14 @@ const config: CapacitorConfig = {
     cleartext: true,
   },
   plugins: {
+    PushNotifications: {
+      presentationOptions: ['alert', 'sound', 'badge'],
+    },
+    LocalNotifications: {
+      smallIcon: 'ic_stat_icon',
+      iconColor: '#d4af37',
+      sound: 'notification.wav',
+    },
     SplashScreen: {
       launchShowDuration: 2000,
       launchAutoHide: true,
