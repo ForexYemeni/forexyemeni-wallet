@@ -23,24 +23,55 @@ interface Listing {
 }
 
 export default function P2PMyListings() {
-  const { user } = useAuthStore()
+  const { user, updateUser } = useAuthStore()
   const [listings, setListings] = useState<Listing[]>([])
   const [loading, setLoading] = useState(true)
+  const [checkingMerchant, setCheckingMerchant] = useState(true)
+  const [isMerchant, setIsMerchant] = useState(false)
   const [showCreate, setShowCreate] = useState(false)
   const [actionLoading, setActionLoading] = useState<string | null>(null)
 
+  // Check merchant status from API on mount
+  useEffect(() => {
+    if (!user?.id) return
+    const checkMerchant = async () => {
+      setCheckingMerchant(true)
+      try {
+        const res = await fetch(`/api/p2p/merchant?userId=${user.id}`)
+        const data = await res.json()
+        if (data.success && data.hasApplication && data.application?.status === 'approved') {
+          setIsMerchant(true)
+          // Also update store with merchantId if missing
+          if (!user?.merchantId) {
+            updateUser({ merchantId: data.application.id })
+          }
+        } else {
+          setIsMerchant(false)
+        }
+      } catch {
+        setIsMerchant(false)
+      } finally {
+        setCheckingMerchant(false)
+      }
+    }
+    checkMerchant()
+  }, [user?.id])
+
+  // Use merchantId from store or application id
+  const effectiveMerchantId = user?.merchantId
+
   const fetchListings = useCallback(async () => {
-    if (!user?.merchantId) { setLoading(false); return }
+    if (!effectiveMerchantId) { setLoading(false); return }
     setLoading(true)
     try {
       const res = await fetch(`/api/p2p/listings`)
       const data = await res.json()
       if (data.success) {
-        setListings((data.listings || []).filter((l: Listing) => l.merchantId === user.merchantId))
+        setListings((data.listings || []).filter((l: Listing) => l.merchantId === effectiveMerchantId))
       }
     } catch { /* silent */ }
     finally { setLoading(false) }
-  }, [user?.merchantId])
+  }, [effectiveMerchantId])
 
   useEffect(() => { fetchListings() }, [fetchListings])
 
@@ -72,7 +103,15 @@ export default function P2PMyListings() {
     finally { setActionLoading(null) }
   }
 
-  if (!user?.merchantId) {
+  if (checkingMerchant) {
+    return (
+      <div className="flex justify-center py-10">
+        <Loader2 className="w-6 h-6 animate-spin text-gold" />
+      </div>
+    )
+  }
+
+  if (!isMerchant && !effectiveMerchantId) {
     return (
       <div className="glass-card p-8 text-center">
         <AlertTriangle className="w-10 h-10 text-yellow-400 mx-auto mb-3" />
