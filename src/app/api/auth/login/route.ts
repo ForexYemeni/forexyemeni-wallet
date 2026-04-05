@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { userOperations, otpCodeOperations, merchantApplicationOperations, merchantOperations } from '@/lib/db-firebase'
 import bcrypt from 'bcryptjs'
 import crypto from 'crypto'
-import { getDb } from '@/lib/firebase'
+import { getDb, generateAccountNumber } from '@/lib/firebase'
 
 export async function POST(request: NextRequest) {
   try {
@@ -152,6 +152,17 @@ export async function POST(request: NextRequest) {
         { success: false, message: 'حسابك معطل. يرجى التواصل مع الدعم' },
         { status: 403 }
       )
+    }
+
+    // Auto-assign account number to existing users who don't have one
+    if (!user.accountNumber) {
+      try {
+        const newAccountNumber = await generateAccountNumber()
+        await userOperations.update({ id: user.id }, { accountNumber: newAccountNumber })
+        user.accountNumber = newAccountNumber
+      } catch {
+        // Non-critical: continue login even if assignment fails
+      }
     }
 
     const getUserResponse = (u: any, mustChange: boolean = false) => ({
