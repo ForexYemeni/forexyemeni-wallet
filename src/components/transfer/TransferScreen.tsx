@@ -255,7 +255,7 @@ export default function TransferScreen() {
             </label>
             <input
               type="text"
-              placeholder="example@email.com  أو  100001  أو  +967..."
+              placeholder="example@email.com  أو  100001  أو  777123456"
               value={receiver}
               onChange={(e) => setReceiver(e.target.value)}
               className="w-full h-12 rounded-xl glass-input px-4 text-sm"
@@ -354,7 +354,7 @@ export default function TransferScreen() {
               {receiverInfo.phone && (
                 <div className="p-2.5 rounded-lg bg-white/5">
                   <p className="text-[10px] text-muted-foreground">رقم الهاتف</p>
-                  <p className="text-sm font-medium" dir="ltr">+967 {receiverInfo.phone}</p>
+                  <p className="text-sm font-medium" dir="ltr">{receiverInfo.phone.startsWith('967') ? '0' + receiverInfo.phone.slice(3) : receiverInfo.phone}</p>
                 </div>
               )}
             </div>

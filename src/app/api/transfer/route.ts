@@ -75,14 +75,33 @@ export async function POST(request: NextRequest) {
       if (!snap.empty) receiverDoc_snap = snap.docs[0]
     }
 
-    // Try 3: Phone number (strip +, spaces, dashes)
+    // Try 3: Phone number (strip +, spaces, dashes) — supports with/without country code
     if (!receiverDoc_snap) {
       const cleanPhone = receiverInput.replace(/[\s\-\+]/g, '')
-      const snap = await db.collection('users')
-        .where('phone', '==', cleanPhone)
-        .limit(1)
-        .get()
-      if (!snap.empty) receiverDoc_snap = snap.docs[0]
+      // Build variants: exact, with 967 prefix, with 0 prefix
+      const phoneVariants = new Set<string>([cleanPhone])
+      // If starts with 0, try without 0 → prepend 967
+      if (cleanPhone.startsWith('0')) {
+        phoneVariants.add('967' + cleanPhone.slice(1))
+      }
+      // If 9 digits (Yemeni local), prepend 967
+      if (/^\d{9}$/.test(cleanPhone)) {
+        phoneVariants.add('967' + cleanPhone)
+      }
+      // If starts with 967, also try with 0 prefix
+      if (cleanPhone.startsWith('967')) {
+        phoneVariants.add('0' + cleanPhone.slice(3))
+      }
+      for (const variant of phoneVariants) {
+        const snap = await db.collection('users')
+          .where('phone', '==', variant)
+          .limit(1)
+          .get()
+        if (!snap.empty) {
+          receiverDoc_snap = snap.docs[0]
+          break
+        }
+      }
     }
 
     if (!receiverDoc_snap) {

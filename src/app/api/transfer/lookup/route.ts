@@ -37,16 +37,29 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Try 3: Phone
+    // Try 3: Phone — supports with/without country code
     if (!found) {
       const cleanPhone = receiverInput.replace(/[\s\-\+]/g, '')
-      const snap = await db.collection('users')
-        .where('phone', '==', cleanPhone)
-        .limit(1)
-        .get()
-      if (!snap.empty) {
-        const d = snap.docs[0].data()
-        found = { id: snap.docs[0].id, fullName: d.fullName, email: d.email, phone: d.phone, accountNumber: d.accountNumber }
+      const phoneVariants = new Set<string>([cleanPhone])
+      if (cleanPhone.startsWith('0')) {
+        phoneVariants.add('967' + cleanPhone.slice(1))
+      }
+      if (/^\d{9}$/.test(cleanPhone)) {
+        phoneVariants.add('967' + cleanPhone)
+      }
+      if (cleanPhone.startsWith('967')) {
+        phoneVariants.add('0' + cleanPhone.slice(3))
+      }
+      for (const variant of phoneVariants) {
+        const snap = await db.collection('users')
+          .where('phone', '==', variant)
+          .limit(1)
+          .get()
+        if (!snap.empty) {
+          const d = snap.docs[0].data()
+          found = { id: snap.docs[0].id, fullName: d.fullName, email: d.email, phone: d.phone, accountNumber: d.accountNumber }
+          break
+        }
       }
     }
 
