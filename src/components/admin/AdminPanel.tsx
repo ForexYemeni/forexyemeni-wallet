@@ -1038,40 +1038,42 @@ export default function AdminPanel() {
         </div>
       </div>
 
-      {/* Main tabs (6) + More dropdown */}
-      <div className="flex gap-2 pb-2 scrollbar-none">
-        {mainTabs.map((tab) => (
-          <button
-            key={tab.key}
-            onClick={() => setActiveTab(tab.key)}
-            className={`flex items-center gap-2 px-4 py-3 rounded-xl text-xs transition-all relative whitespace-nowrap flex-shrink-0 ${
-              effectiveActiveTab === tab.key
-                ? 'bg-gold/10 text-gold border border-gold/20'
-                : 'text-muted-foreground hover:text-foreground hover:bg-white/5 border border-transparent'
-            }`}
-          >
-            <tab.icon className="w-4 h-4" />
-            {tab.label}
-            {tab.count > 0 && (
-              <span className="w-5 h-5 bg-gold text-gray-900 text-[10px] font-bold rounded-full flex items-center justify-center">
-                {tab.count}
-              </span>
-            )}
-          </button>
-        ))}
+      {/* Main tabs (scrollable) + More dropdown (always visible) */}
+      <div className="flex gap-2 pb-2 items-center">
+        <div className="flex gap-2 overflow-x-auto scrollbar-none flex-1 min-w-0">
+          {mainTabs.map((tab) => (
+            <button
+              key={tab.key}
+              onClick={() => setActiveTab(tab.key)}
+              className={`flex items-center gap-1.5 px-3 py-2.5 rounded-xl text-xs transition-all relative whitespace-nowrap flex-shrink-0 ${
+                effectiveActiveTab === tab.key
+                  ? 'bg-gold/10 text-gold border border-gold/20'
+                  : 'text-muted-foreground hover:text-foreground hover:bg-white/5 border border-transparent'
+              }`}
+            >
+              <tab.icon className="w-3.5 h-3.5" />
+              {tab.label}
+              {tab.count > 0 && (
+                <span className="w-5 h-5 bg-gold text-gray-900 text-[10px] font-bold rounded-full flex items-center justify-center">
+                  {tab.count}
+                </span>
+              )}
+            </button>
+          ))}
+        </div>
 
-        {/* المزيد button */}
+        {/* المزيد button — always visible */}
         <div className="relative flex-shrink-0" ref={moreMenuRef}>
           <button
             onClick={() => setShowMoreMenu(!showMoreMenu)}
-            className={`flex items-center gap-2 px-4 py-3 rounded-xl text-xs transition-all whitespace-nowrap ${
+            className={`flex items-center gap-1.5 px-3 py-2.5 rounded-xl text-xs transition-all whitespace-nowrap ${
               showMoreMenu
                 ? 'bg-gold/10 text-gold border border-gold/20'
                 : 'text-muted-foreground hover:text-foreground hover:bg-white/5 border border-transparent'
             }`}
           >
             المزيد
-            <ChevronDown className={`w-4 h-4 transition-transform ${showMoreMenu ? 'rotate-180' : ''}`} />
+            <ChevronDown className={`w-3.5 h-3.5 transition-transform ${showMoreMenu ? 'rotate-180' : ''}`} />
           </button>
 
           {showMoreMenu && (
