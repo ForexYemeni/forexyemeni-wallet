@@ -3,14 +3,25 @@
  * This is called by admin operations (deposit confirmation, withdrawal, etc.)
  * to send real push notifications to the user's Android device.
  *
- * IMPORTANT: We send DATA-ONLY messages (no "notification" field).
- * This ensures onMessageReceived() is ALWAYS called in our custom
- * MyFirebaseMessagingService, which plays sound + shows notification.
- * If we include "notification" field, Android handles it directly
- * in background WITHOUT calling onMessageReceived() → NO SOUND.
+ * IMPORTANT v3.5.0 FIX:
+ * We send BOTH "notification" AND "data" fields.
+ * 
+ * WHY:
+ * - The "notification" field (with channelId set to fx_v8) ensures that when 
+ *   Android handles the message in background, it uses OUR channel which has
+ *   IMPORTANCE_MAX and sound configured → SOUND PLAYS RELIABLY.
+ * - The "data" field ensures our custom MyFirebaseMessagingService can also
+ *   read the data in onMessageReceived() (for foreground handling).
+ * - Previous data-only approach: Android might not show notification at all
+ *   in deep background/Doze mode.
+ * - Previous notification-only approach: Android bypassed onMessageReceived()
+ *   and used wrong channel (default, no sound).
  */
 import { getDb, initializeFirebase } from '@/lib/firebase'
 import { getMessaging, Message } from 'firebase-admin/messaging'
+
+// Channel ID must match MyFirebaseMessagingService.java and MainActivity.java
+const CHANNEL_ID = 'fx_v8'
 
 export async function sendPushNotification(
   userId: string,
@@ -46,32 +57,49 @@ export async function sendPushNotification(
       return { sent: false, count: 0 }
     }
 
-    // Build DATA-ONLY message — NO "notification" field!
-    // This guarantees onMessageReceived() is always called.
-    // All title/body info goes in the "data" payload.
+    // Build message with BOTH notification AND data fields.
+    // 
+    // "notification" field:
+    //   - Android uses this to create the system notification in background
+    //   - We set channelId to our fx_v8 channel which has IMPORTANCE_MAX + sound
+    //   - This guarantees sound plays even when app is killed/in Doze mode
+    //
+    // "data" field:
+    //   - Our custom MyFirebaseMessagingService reads this in onMessageReceived()
+    //   - Used for foreground handling and custom data
     const message: Message = {
-      // ❌ NO "notification" field — Android would handle it without sound
       android: {
-        // High priority ensures immediate delivery even in Doze
         priority: 'high' as const,
-        // TTL: 24 hours
         ttl: 86400,
-        // No android.notification either — our Java code handles everything
+        // CRITICAL: Set notification with our channel ID + sound
+        // This tells Android which channel to use for the system notification
+        notification: {
+          channelId: CHANNEL_ID,
+          sound: 'default',
+          title: title,
+          body: body,
+          clickAction: 'OPEN_NOTIFICATIONS',
+        },
         data: {
           type: type || 'info',
           userId,
-          click_action: 'OPEN_NOTIFICATIONS',
           title,
           body,
           ...(data || {}),
         },
       },
-      // Top-level data payload — this is what our Java service reads
+      // Top-level notification for cross-platform support
+      notification: {
+        title: title,
+        body: body,
+      },
+      // Top-level data — read by MyFirebaseMessagingService.onMessageReceived()
       data: {
         type: type || 'info',
         userId,
         title,
         body,
+        click_action: 'OPEN_NOTIFICATIONS',
         ...(data || {}),
       },
       tokens,

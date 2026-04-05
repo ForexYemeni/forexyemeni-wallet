@@ -1,15 +1,15 @@
 /**
- * Notification sound system - v3.4.0
+ * Notification sound system - v3.5.0
  * 
  * Priority chain for playing sounds:
  * 1. Check user sound preferences (notification-settings.ts)
- * 2. HTML5 Audio element — uses WAV files from /sounds/ (works in WebView)
- * 3. Web Audio API oscillators — fallback if no audio files available
+ * 2. Force AudioContext resume (CRITICAL: fixes suspended context issue)
+ * 3. HTML5 Audio element — uses WAV files from /sounds/
+ * 4. Web Audio API oscillators — fallback
  *
- * IMPORTANT: In Capacitor APK, we use HTML5 Audio (not LocalNotifications)
- * to avoid creating duplicate notifications. The native FCM service
- * already handles notification display with sound in background.
- * In foreground, this JS code handles sound.
+ * v3.5.0 FIX: AudioContext.resume() is called BEFORE every play attempt.
+ * Previous versions failed because AudioContext was suspended (no recent user
+ * gesture) and the play() call silently failed.
  */
 
 import { shouldPlaySound } from '@/lib/notification-settings'
@@ -19,9 +19,33 @@ function isCapacitor(): boolean {
   return typeof window !== 'undefined' && !!(window as any).Capacitor
 }
 
-// ============ HTML5 Audio Element (Primary Method - works in both Web and Capacitor) ============
+// ============ Audio Context Management ============
 
-// Preload audio elements for instant playback
+let audioContext: AudioContext | null = null
+
+/**
+ * Get or create AudioContext. ALWAYS tries to resume it.
+ * This is the KEY FIX for v3.5.0 — previous versions assumed AudioContext
+ * was active, but in Capacitor WebView it can be suspended at any time.
+ */
+async function getAudioContext(): Promise<AudioContext | null> {
+  if (typeof window === 'undefined') return null
+  try {
+    if (!audioContext) {
+      audioContext = new (window.AudioContext || (window as any).webkitAudioContext)()
+    }
+    // ALWAYS try to resume — this is critical!
+    if (audioContext.state === 'suspended') {
+      await audioContext.resume()
+    }
+    return audioContext
+  } catch (error) {
+    return null
+  }
+}
+
+// ============ HTML5 Audio Element (Primary Method) ============
+
 const audioElements: Record<string, HTMLAudioElement | null> = {
   notification: null,
   success: null,
@@ -32,7 +56,6 @@ let audioPreloaded = false
 
 /**
  * Preload audio files so they play instantly when needed.
- * Should be called after first user interaction.
  */
 function preloadAudioFiles() {
   if (audioPreloaded || typeof window === 'undefined') return
@@ -48,8 +71,7 @@ function preloadAudioFiles() {
     try {
       const audio = new Audio(src)
       audio.preload = 'auto'
-      audio.volume = 1.0  // MAX volume for notification reliability
-      // Store reference
+      audio.volume = 1.0
       audioElements[key as keyof typeof audioElements] = audio
     } catch (error) {
     }
@@ -58,33 +80,35 @@ function preloadAudioFiles() {
 
 /**
  * Play sound using HTML5 Audio element.
- * Works in both web browser and Capacitor WebView.
  */
 function playAudioElement(type: 'notification' | 'success' | 'alert'): Promise<boolean> {
-  return new Promise((resolve) => {
+  return new Promise(async (resolve) => {
     try {
-      const audio = audioElements[type]
+      // STEP 1: Force AudioContext resume BEFORE playing
+      await getAudioContext()
+      
+      // STEP 2: Get or create audio element
+      let audio = audioElements[type]
       if (!audio) {
-        // Try creating on the fly
         const src = `/sounds/${type}.wav`
-        const fallback = new Audio(src)
-        fallback.volume = 1.0
-        fallback.onended = () => resolve(true)
-        fallback.onerror = () => resolve(false)
-        fallback.play().catch(() => resolve(false))
-        // Timeout fallback
-        setTimeout(() => resolve(true), 3000)
-        return
+        audio = new Audio(src)
+        audio.volume = 1.0
+        audioElements[type] = audio
       }
 
-      // Reset to beginning in case it was played before
+      // STEP 3: Reset and play
       audio.currentTime = 0
       audio.volume = 1.0
       audio.onended = () => resolve(true)
       audio.onerror = () => resolve(false)
-      audio.play().catch(() => resolve(false))
-      // Timeout fallback
-      setTimeout(() => resolve(true), 3000)
+      
+      try {
+        await audio.play()
+        resolve(true)
+      } catch (playError) {
+        // If HTML5 Audio fails, try Web Audio API
+        resolve(false)
+      }
     } catch {
       resolve(false)
     }
@@ -93,49 +117,31 @@ function playAudioElement(type: 'notification' | 'success' | 'alert'): Promise<b
 
 // ============ Web Audio API Fallback ============
 
-let audioContext: AudioContext | null = null
 let audioInitialized = false
 
 /**
- * Get or create AudioContext. Handles suspended state properly.
- */
-async function getAudioContext(): Promise<AudioContext | null> {
-  if (typeof window === 'undefined') return null
-  try {
-    if (!audioContext) {
-      audioContext = new (window.AudioContext || (window as any).webkitAudioContext)()
-    }
-    if (audioContext.state === 'suspended') {
-      await audioContext.resume()
-    }
-    return audioContext
-  } catch (error) {
-    return null
-  }
-}
-
-/**
- * Initialize AudioContext and preload audio files after user interaction.
- * Must be called once from a click/tap handler.
+ * Initialize AudioContext and preload audio files.
+ * Should be called after first user interaction.
  */
 export function initAudioOnInteraction() {
   if (audioInitialized) return
   audioInitialized = true
-  // Pre-create AudioContext
   getAudioContext().catch(() => {})
-  // Preload audio files
   preloadAudioFiles()
 }
 
-// Register interaction listener once (auto-initialize on first user interaction)
+// Register interaction listener — use persistent (not once-only) listeners
+// This ensures AudioContext gets resumed on EVERY interaction, not just the first
 if (typeof document !== 'undefined') {
-  const handler = () => {
+  const resumeAudio = () => {
+    if (audioContext && audioContext.state === 'suspended') {
+      audioContext.resume().catch(() => {})
+    }
     initAudioOnInteraction()
-    document.removeEventListener('click', handler)
-    document.removeEventListener('touchstart', handler)
   }
-  document.addEventListener('click', handler, { once: true })
-  document.addEventListener('touchstart', handler, { once: true })
+  document.addEventListener('click', resumeAudio, { passive: true })
+  document.addEventListener('touchstart', resumeAudio, { passive: true })
+  document.addEventListener('touchend', resumeAudio, { passive: true })
 }
 
 /**
@@ -143,23 +149,25 @@ if (typeof document !== 'undefined') {
  */
 async function playWebAudioBeep(frequencies: number[], type: OscillatorType = 'sine', volume = 0.5) {
   const ctx = await getAudioContext()
-  if (!ctx) return
+  if (!ctx) return false
 
   try {
     const now = ctx.currentTime
     frequencies.forEach((freq, i) => {
-      const osc = ctx.createOscillator()
-      const gain = ctx.createGain()
+      const osc = ctx!.createOscillator()
+      const gain = ctx!.createGain()
       osc.type = type
       osc.frequency.setValueAtTime(freq, now + i * 0.15)
       gain.gain.setValueAtTime(volume, now + i * 0.15)
       gain.gain.exponentialRampToValueAtTime(0.01, now + i * 0.15 + 0.3)
       osc.connect(gain)
-      gain.connect(ctx.destination)
+      gain.connect(ctx!.destination)
       osc.start(now + i * 0.15)
       osc.stop(now + i * 0.15 + 0.3)
     })
+    return true
   } catch (error) {
+    return false
   }
 }
 
@@ -167,23 +175,26 @@ async function playWebAudioBeep(frequencies: number[], type: OscillatorType = 's
 
 /**
  * Play notification chime sound.
- * Tries HTML5 Audio → Web Audio API.
- * Works in BOTH web browser and Capacitor WebView (foreground).
+ * Tries: AudioContext resume → HTML5 Audio → Web Audio API.
  */
 export async function playNotificationSound(type: string = 'general') {
-  // Check user preferences first
   if (!shouldPlaySound(type)) return
 
-  // 1. Try HTML5 Audio element (works in both web and Capacitor)
+  // 1. Force AudioContext resume (KEY FIX)
+  await getAudioContext()
+
+  // 2. Try HTML5 Audio element
   const audioOk = await playAudioElement('notification')
   if (audioOk) {
     vibrate([200, 100, 200])
     return
   }
 
-  // 2. Fallback: Web Audio API oscillators
-  await playWebAudioBeep([880, 1046.5, 1318.5], 'sine', 0.5)
-  vibrate([200, 100, 200])
+  // 3. Fallback: Web Audio API oscillators
+  const beepOk = await playWebAudioBeep([880, 1046.5, 1318.5], 'sine', 0.8)
+  if (beepOk) {
+    vibrate([200, 100, 200])
+  }
 }
 
 /**
@@ -192,16 +203,18 @@ export async function playNotificationSound(type: string = 'general') {
 export async function playSuccessSound(type: string = 'general') {
   if (!shouldPlaySound(type)) return
 
-  // 1. Try HTML5 Audio
+  await getAudioContext()
+
   const audioOk = await playAudioElement('success')
   if (audioOk) {
     vibrate([200, 100, 200])
     return
   }
 
-  // 2. Fallback: Web Audio
-  await playWebAudioBeep([523.25, 659.25, 783.99], 'sine', 0.5)
-  vibrate([200, 100, 200])
+  const beepOk = await playWebAudioBeep([523.25, 659.25, 783.99], 'sine', 0.8)
+  if (beepOk) {
+    vibrate([200, 100, 200])
+  }
 }
 
 /**
@@ -210,16 +223,18 @@ export async function playSuccessSound(type: string = 'general') {
 export async function playAlertSound(type: string = 'general') {
   if (!shouldPlaySound(type)) return
 
-  // 1. Try HTML5 Audio
+  await getAudioContext()
+
   const audioOk = await playAudioElement('alert')
   if (audioOk) {
     vibrate([300, 100, 300, 100, 300])
     return
   }
 
-  // 2. Fallback: Web Audio
-  await playWebAudioBeep([600, 600], 'square', 0.3)
-  vibrate([300, 100, 300, 100, 300])
+  const beepOk = await playWebAudioBeep([600, 600], 'square', 0.5)
+  if (beepOk) {
+    vibrate([300, 100, 300, 100, 300])
+  }
 }
 
 /**
@@ -239,7 +254,6 @@ export async function requestNotificationPermission(): Promise<boolean> {
  * In Capacitor, this is skipped (native FCM handles display).
  */
 export async function showBrowserNotification(title: string, body: string, icon?: string) {
-  // In Capacitor, native notification already handles display
   if (isCapacitor()) return
 
   try {
@@ -261,7 +275,6 @@ export async function showBrowserNotification(title: string, body: string, icon?
       notification.close()
     }
   } catch {
-    // Silently fail — notification permission might be denied
   }
 }
 
@@ -274,6 +287,5 @@ export function vibrate(pattern: number | number[] = [200, 100, 200]) {
       navigator.vibrate(pattern)
     }
   } catch {
-    // Silently fail
   }
 }

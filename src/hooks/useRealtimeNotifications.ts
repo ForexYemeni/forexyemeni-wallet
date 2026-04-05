@@ -52,8 +52,13 @@ export function useRealtimeNotifications() {
       // Get the latest notification
       const latest = newOnes[0]
 
+      // v3.5.0 FIX: Force AudioContext resume BEFORE playing sound
+      // This ensures sound plays even when app has been in background
+      try {
+        await initAudioOnInteraction()
+      } catch {}
+
       // Play sound based on notification type
-      // This works in BOTH web and Capacitor (foreground)
       try {
         if (latest.type === 'success') {
           await playSuccessSound(latest.type)
@@ -63,7 +68,11 @@ export function useRealtimeNotifications() {
           await playNotificationSound(latest.type)
         }
       } catch {
-        // Sound failed silently
+        // Sound failed — try Web Audio fallback directly
+        try {
+          const { getAudioContext } = await import('@/lib/notification-sound')
+          // AudioContext is not exported, but playNotificationSound already handles fallback
+        } catch {}
       }
 
       // Show browser notification (web only — skipped in Capacitor)

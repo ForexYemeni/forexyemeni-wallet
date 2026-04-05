@@ -15,9 +15,9 @@ import com.getcapacitor.BridgeActivity;
 
 public class MainActivity extends BridgeActivity {
 
-    // Channel IDs must match MyFirebaseMessagingService.java (fx_v7)
-    private static final String CHANNEL_ID = "fx_v7";
-    private static final String CHANNEL_ID_URGENT = "fx_urgent_v7";
+    // Channel IDs must match MyFirebaseMessagingService.java (fx_v8)
+    private static final String CHANNEL_ID = "fx_v8";
+    private static final String CHANNEL_ID_URGENT = "fx_urgent_v8";
 
     @Override
     public void onCreate(Bundle savedInstanceState) {
@@ -47,18 +47,18 @@ public class MainActivity extends BridgeActivity {
                 Uri defaultSound = android.media.RingtoneManager.getDefaultUri(
                     android.media.RingtoneManager.TYPE_NOTIFICATION);
 
-                // Main channel - only create if not exists
+                // Main channel - only create if not exists (IMPORTANCE_MAX for reliable sound)
                 if (manager.getNotificationChannel(CHANNEL_ID) == null) {
                     NotificationChannel channel = new NotificationChannel(
                         CHANNEL_ID,
                         "إشعارات فوركس يمني",
-                        NotificationManager.IMPORTANCE_HIGH
+                        NotificationManager.IMPORTANCE_MAX
                     );
                     channel.setDescription("إشعارات المعاملات والأحداث المهمة");
                     channel.enableLights(true);
                     channel.setLightColor(0xFFD4AF37);
                     channel.enableVibration(true);
-                    channel.setVibrationPattern(new long[]{0, 300, 150, 300});
+                    channel.setVibrationPattern(new long[]{0, 300, 200, 300});
                     channel.setSound(defaultSound, audioAttributes);
                     channel.setBypassDnd(true);
                     channel.setLockscreenVisibility(androidx.core.app.NotificationCompat.VISIBILITY_PUBLIC);
@@ -66,7 +66,7 @@ public class MainActivity extends BridgeActivity {
                     manager.createNotificationChannel(channel);
                 }
 
-                // Urgent channel - only create if not exists
+                // Urgent channel - only create if not exists (IMPORTANCE_MAX)
                 if (manager.getNotificationChannel(CHANNEL_ID_URGENT) == null) {
                     NotificationChannel urgentChannel = new NotificationChannel(
                         CHANNEL_ID_URGENT,

@@ -2,6 +2,10 @@
  * FCM Push Notification Handler for Capacitor (Android APK)
  * Registers device for FCM and handles incoming push notifications.
  * Only activates when running inside Capacitor native app.
+ *
+ * v3.5.0 FIX: When push notification received in foreground,
+ * we now ALSO play sound via JS (not just vibrate).
+ * This provides a backup in case native sound fails.
  */
 import { useAuthStore } from '@/lib/store'
 
@@ -48,14 +52,16 @@ export async function registerFCMPushNotifications(): Promise<boolean> {
       }
     })
 
-    // When push notification received in foreground:
-    // Do NOT play sound here — the native MyFirebaseMessagingService
-    // already creates a system notification WITH sound.
-    // Playing sound via JS in WebView is unreliable and causes issues.
+    // v3.5.0 FIX: When push notification received in foreground,
+    // play sound via JS as BACKUP (native should also play)
     PushNotifications.addListener('pushNotificationReceived', async (notification) => {
-      // Vibrate only (sound is handled natively)
+      console.log('[FCM] pushNotificationReceived in foreground')
+      
+      // Play sound AND vibrate via JS
       try {
-        navigator.vibrate([300, 100, 300])
+        const { playNotificationSound, vibrate } = await import('@/lib/notification-sound')
+        vibrate([300, 100, 300])
+        playNotificationSound('general').catch(() => {})
       } catch {}
     })
 
