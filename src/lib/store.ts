@@ -20,6 +20,7 @@ export interface User {
   createdAt: string
   merchantId?: string | null
   affiliateCode?: string | null
+  accountNumber?: string | null
   permissions?: { manageUsers?: boolean; approveDeposits?: boolean; approveWithdrawals?: boolean; approveKYC?: boolean; manageSettings?: boolean } | null
 }
 

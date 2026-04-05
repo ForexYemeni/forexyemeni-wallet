@@ -13,6 +13,10 @@ import {
   ArrowLeft,
   Mail,
   DollarSign,
+  Phone,
+  Hash,
+  Copy,
+  Check as CheckIcon,
 } from 'lucide-react'
 
 type Step = 'input' | 'confirm' | 'pin' | 'success' | 'error'
@@ -20,19 +24,56 @@ type Step = 'input' | 'confirm' | 'pin' | 'success' | 'error'
 export default function TransferScreen() {
   const { user, setScreen, updateBalance } = useAuthStore()
   const [step, setStep] = useState<Step>('input')
-  const [receiverEmail, setReceiverEmail] = useState('')
+  const [receiver, setReceiver] = useState('')
   const [amount, setAmount] = useState('')
   const [pin, setPin] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [result, setResult] = useState<{ senderBalance: number; receiverBalance: number } | null>(null)
+  const [copiedAccount, setCopiedAccount] = useState(false)
 
   const transferAmount = parseFloat(amount) || 0
 
+  // Detect input type
+  const detectInputType = (value: string): 'email' | 'phone' | 'account' | '' => {
+    const trimmed = value.trim()
+    if (/^fx-\d+$/i.test(trimmed)) return 'account'
+    if (trimmed.includes('@')) return 'email'
+    if (/^[\d\+\-\s]{7,15}$/.test(trimmed.replace(/\s/g, ''))) return 'phone'
+    return ''
+  }
+
+  const inputType = detectInputType(receiver)
+
+  const getInputLabel = () => {
+    if (!receiver) return 'بريد المستلم / رقم الهاتف / رقم الحساب'
+    switch (inputType) {
+      case 'email': return 'بريد إلكتروني'
+      case 'phone': return 'رقم هاتف'
+      case 'account': return 'رقم حساب'
+      default: return 'بريد المستلم / رقم الهاتف / رقم الحساب'
+    }
+  }
+
+  const getInputIcon = () => {
+    switch (inputType) {
+      case 'email': return Mail
+      case 'phone': return Phone
+      case 'account': return Hash
+      default: return ArrowRightLeft
+    }
+  }
+
+  const InputIcon = getInputIcon()
+
   const handleNext = () => {
     setError('')
-    if (!receiverEmail.trim()) {
-      setError('يرجى إدخال بريد المستلم')
+    if (!receiver.trim()) {
+      setError('يرجى إدخال بريد أو رقم هاتف أو رقم حساب المستلم')
+      return
+    }
+    if (!inputType) {
+      setError('صيغة غير صحيحة. أدخل بريد إلكتروني أو رقم هاتف أو رقم حساب (FX-XXXX)')
       return
     }
     if (!amount || transferAmount <= 0) {
@@ -41,10 +82,6 @@ export default function TransferScreen() {
     }
     if (transferAmount > (user?.balance || 0)) {
       setError('رصيدك غير كافي')
-      return
-    }
-    if (receiverEmail.trim().toLowerCase() === user?.email?.toLowerCase()) {
-      setError('لا يمكنك التحويل لنفسك')
       return
     }
     setStep('confirm')
@@ -69,7 +106,7 @@ export default function TransferScreen() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           senderId: user?.id,
-          receiverEmail: receiverEmail.trim(),
+          receiver: receiver.trim(),
           amount: transferAmount,
           token: useAuthStore.getState().token,
           pin,
@@ -102,11 +139,20 @@ export default function TransferScreen() {
 
   const handleReset = () => {
     setStep('input')
-    setReceiverEmail('')
+    setReceiver('')
     setAmount('')
     setPin('')
     setError('')
     setResult(null)
+  }
+
+  const copyAccountNumber = () => {
+    if (user?.accountNumber) {
+      navigator.clipboard.writeText(user.accountNumber)
+      setCopiedAccount(true)
+      toast.success('تم نسخ رقم الحساب')
+      setTimeout(() => setCopiedAccount(false), 2000)
+    }
   }
 
   return (
@@ -132,7 +178,7 @@ export default function TransferScreen() {
 
       {/* Balance Card */}
       {step !== 'success' && step !== 'error' && (
-        <div className="glass-card p-4 rounded-xl">
+        <div className="glass-card p-4 rounded-xl space-y-3">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
               <DollarSign className="w-4 h-4 text-gold" />
@@ -142,6 +188,24 @@ export default function TransferScreen() {
               {(user?.balance ?? 0).toFixed(2)} USDT
             </span>
           </div>
+          {user?.accountNumber && (
+            <div className="flex items-center justify-between pt-2 border-t border-white/10">
+              <span className="text-xs text-muted-foreground">رقم حسابك</span>
+              <div className="flex items-center gap-2">
+                <span className="text-sm font-bold text-gold font-mono">{user.accountNumber}</span>
+                <button
+                  onClick={copyAccountNumber}
+                  className="w-6 h-6 rounded-md bg-white/5 flex items-center justify-center hover:bg-white/10 transition-colors"
+                >
+                  {copiedAccount ? (
+                    <CheckIcon className="w-3 h-3 text-green-400" />
+                  ) : (
+                    <Copy className="w-3 h-3 text-muted-foreground" />
+                  )}
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       )}
 
@@ -150,17 +214,25 @@ export default function TransferScreen() {
         <div className="glass-card p-6 rounded-xl space-y-5">
           <div className="space-y-3">
             <label className="text-sm font-medium flex items-center gap-2">
-              <Mail className="w-4 h-4 text-gold" />
-              بريد المستلم
+              <InputIcon className="w-4 h-4 text-gold" />
+              {getInputLabel()}
             </label>
             <input
-              type="email"
-              placeholder="example@email.com"
-              value={receiverEmail}
-              onChange={(e) => setReceiverEmail(e.target.value)}
+              type="text"
+              placeholder="example@email.com  أو  FX-1001  أو  +967..."
+              value={receiver}
+              onChange={(e) => setReceiver(e.target.value)}
               className="w-full h-12 rounded-xl glass-input px-4 text-sm"
               dir="ltr"
             />
+            {inputType && (
+              <div className="flex items-center gap-1.5">
+                <div className="w-2 h-2 rounded-full bg-green-400" />
+                <span className="text-xs text-green-400">
+                  {inputType === 'email' ? 'بريد إلكتروني' : inputType === 'phone' ? 'رقم هاتف' : 'رقم حساب'}
+                </span>
+              </div>
+            )}
           </div>
 
           <div className="space-y-3">
@@ -194,6 +266,13 @@ export default function TransferScreen() {
             <ArrowRightLeft className="w-5 h-5" />
             متابعة
           </button>
+
+          {/* Help text */}
+          <div className="p-3 rounded-xl bg-white/[0.03] border border-white/5">
+            <p className="text-xs text-muted-foreground leading-relaxed">
+              يمكنك التحويل عبر: <span className="text-foreground font-medium">البريد الإلكتروني</span> أو <span className="text-foreground font-medium">رقم الهاتف</span> أو <span className="text-foreground font-medium">رقم الحساب (FX-XXXX)</span>
+            </p>
+          </div>
         </div>
       )}
 
@@ -210,7 +289,13 @@ export default function TransferScreen() {
           <div className="p-4 rounded-xl bg-white/5 border border-white/10 space-y-3">
             <div className="flex items-center justify-between">
               <span className="text-sm text-muted-foreground">إلى</span>
-              <span className="text-sm font-medium" dir="ltr">{receiverEmail}</span>
+              <span className="text-sm font-medium" dir="ltr">{receiver}</span>
+            </div>
+            <div className="flex items-center justify-between">
+              <span className="text-sm text-muted-foreground">طريقة التعريف</span>
+              <span className="text-xs text-gold">
+                {inputType === 'email' ? 'بريد إلكتروني' : inputType === 'phone' ? 'رقم هاتف' : 'رقم حساب'}
+              </span>
             </div>
             <div className="border-t border-white/10 pt-3 flex items-center justify-between">
               <span className="text-sm text-muted-foreground">المبلغ</span>
@@ -307,7 +392,7 @@ export default function TransferScreen() {
           <div className="space-y-2">
             <h2 className="text-xl font-bold text-green-400">تم التحويل بنجاح!</h2>
             <p className="text-2xl font-bold gold-text">{transferAmount.toFixed(2)} USDT</p>
-            <p className="text-sm text-muted-foreground" dir="ltr">إلى {receiverEmail}</p>
+            <p className="text-sm text-muted-foreground" dir="ltr">إلى {receiver}</p>
           </div>
 
           {result && (

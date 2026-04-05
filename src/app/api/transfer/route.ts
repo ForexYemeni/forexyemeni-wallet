@@ -5,9 +5,9 @@ import bcrypt from 'bcryptjs'
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
-    const { senderId, receiverEmail, amount, token, pin } = body
+    const { senderId, receiver, amount, token, pin } = body
 
-    if (!senderId || !receiverEmail || !amount || !pin) {
+    if (!senderId || !receiver || !amount || !pin) {
       return NextResponse.json({ success: false, message: 'جميع الحقول مطلوبة' }, { status: 400 })
     }
 
@@ -53,24 +53,52 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ success: false, message: 'رصيدك غير كافي' }, { status: 400 })
     }
 
+    // --- Find receiver by: email OR phone OR accountNumber ---
+    const receiverInput = receiver.trim().toLowerCase()
+    let receiverDoc_snap: FirebaseFirestore.QueryDocumentSnapshot | null = null
+
+    // Try 1: Account Number (FX-XXXX) — exact match
+    if (/^fx-\d+$/i.test(receiverInput)) {
+      const snap = await db.collection('users')
+        .where('accountNumber', '==', receiverInput.toUpperCase())
+        .limit(1)
+        .get()
+      if (!snap.empty) receiverDoc_snap = snap.docs[0]
+    }
+
+    // Try 2: Email
+    if (!receiverDoc_snap && receiverInput.includes('@')) {
+      const snap = await db.collection('users')
+        .where('email', '==', receiverInput)
+        .limit(1)
+        .get()
+      if (!snap.empty) receiverDoc_snap = snap.docs[0]
+    }
+
+    // Try 3: Phone number (strip +, spaces, dashes)
+    if (!receiverDoc_snap) {
+      const cleanPhone = receiverInput.replace(/[\s\-\+]/g, '')
+      const snap = await db.collection('users')
+        .where('phone', '==', cleanPhone)
+        .limit(1)
+        .get()
+      if (!snap.empty) receiverDoc_snap = snap.docs[0]
+    }
+
+    if (!receiverDoc_snap) {
+      return NextResponse.json({
+        success: false,
+        message: 'المستلم غير موجود. تأكد من البريد الإلكتروني أو رقم الهاتف أو رقم الحساب (FX-XXXX)',
+      }, { status: 404 })
+    }
+
+    const receiverId = receiverDoc_snap.id
+    const receiverData = receiverDoc_snap.data()
+
     // Check sender is not transferring to themselves
-    if (senderData.email.toLowerCase() === receiverEmail.toLowerCase()) {
+    if (receiverId === senderId) {
       return NextResponse.json({ success: false, message: 'لا يمكنك التحويل لنفسك' }, { status: 400 })
     }
-
-    // Find receiver by email
-    const receiverSnapshot = await db.collection('users')
-      .where('email', '==', receiverEmail.toLowerCase().trim())
-      .limit(1)
-      .get()
-
-    if (receiverSnapshot.empty) {
-      return NextResponse.json({ success: false, message: 'المستلم غير موجود. تأكد من عنوان البريد الإلكتروني' }, { status: 404 })
-    }
-
-    const receiverDoc = receiverSnapshot.docs[0]
-    const receiverId = receiverDoc.id
-    const receiverData = receiverDoc.data()
 
     // Check receiver is active and not admin
     if (receiverData.status !== 'active') {
@@ -101,6 +129,8 @@ export async function POST(request: NextRequest) {
       updatedAt: now,
     })
 
+    const receiverLabel = receiverData.fullName || receiverData.email
+
     // Create sender transaction record
     const senderTxId = generateId()
     batch.set(db.collection('transactions').doc(senderTxId), {
@@ -110,7 +140,7 @@ export async function POST(request: NextRequest) {
       amount: -transferAmount,
       balanceBefore: senderBalance,
       balanceAfter: newSenderBalance,
-      description: `تحويل إلى ${receiverData.fullName || receiverData.email}`,
+      description: `تحويل إلى ${receiverLabel}${receiverData.accountNumber ? ` (${receiverData.accountNumber})` : ''}`,
       referenceId: senderTxId,
       createdAt: now,
     })
@@ -124,7 +154,7 @@ export async function POST(request: NextRequest) {
       amount: transferAmount,
       balanceBefore: receiverBalance,
       balanceAfter: newReceiverBalance,
-      description: `تحويل وارد من ${senderData.fullName || senderData.email}`,
+      description: `تحويل وارد من ${senderData.fullName || senderData.email}${senderData.accountNumber ? ` (${senderData.accountNumber})` : ''}`,
       referenceId: senderTxId,
       createdAt: now,
     })

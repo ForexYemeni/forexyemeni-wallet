@@ -32,6 +32,9 @@ import {
   Volume2,
   VolumeX,
   Mail,
+  Hash,
+  Copy,
+  Check as CheckIcon,
 } from 'lucide-react'
 import {
   getNotificationSoundSettings,
@@ -56,6 +59,7 @@ export default function SettingsPage() {
   const [logoutDialogOpen, setLogoutDialogOpen] = useState(false)
   const [show2FASettings, setShow2FASettings] = useState(false)
   const [showChangeEmail, setShowChangeEmail] = useState(false)
+  const [copiedAccount, setCopiedAccount] = useState(false)
 
   // Notification sound settings
   const [soundSettings, setSoundSettings] = useState<NotificationSoundSettings>(() => getNotificationSoundSettings())
@@ -212,6 +216,35 @@ export default function SettingsPage() {
                 dir="ltr"
               />
             </div>
+            {user?.accountNumber && (
+              <div className="space-y-2">
+                <Label className="text-sm text-muted-foreground">رقم الحساب</Label>
+                <div className="flex items-center gap-2">
+                  <Input
+                    value={user.accountNumber}
+                    disabled
+                    className="glass-input h-12 text-base opacity-60 font-mono font-bold"
+                    dir="ltr"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => {
+                      navigator.clipboard.writeText(user.accountNumber!)
+                      setCopiedAccount(true)
+                      toast.success('تم نسخ رقم الحساب')
+                      setTimeout(() => setCopiedAccount(false), 2000)
+                    }}
+                    className="w-12 h-12 rounded-xl bg-gold/10 flex items-center justify-center hover:bg-gold/20 transition-colors flex-shrink-0"
+                  >
+                    {copiedAccount ? (
+                      <CheckIcon className="w-4 h-4 text-green-400" />
+                    ) : (
+                      <Copy className="w-4 h-4 text-gold" />
+                    )}
+                  </button>
+                </div>
+              </div>
+            )}
             <Button
               type="submit"
               disabled={loading}

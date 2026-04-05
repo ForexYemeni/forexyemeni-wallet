@@ -85,6 +85,7 @@ export async function POST(request: NextRequest) {
         emailVerified: u.emailVerified, phoneVerified: u.phoneVerified, kycStatus: u.kycStatus,
         balance: u.balance, frozenBalance: u.frozenBalance, mustChangePassword: mustChange,
         createdAt: u.createdAt, merchantId: u.merchantId || null, affiliateCode: u.affiliateCode || null,
+        accountNumber: u.accountNumber || null,
         hasPin: !!u.pinHash, permissions: parsePermissions(u.permissions), pendingConfirmation: u.pendingConfirmation || null,
         twoFactorEnabled: u.twoFactorEnabled || false,
       })
@@ -169,6 +170,7 @@ export async function POST(request: NextRequest) {
       createdAt: u.createdAt,
       merchantId: u.merchantId || null,
       affiliateCode: u.affiliateCode || null,
+      accountNumber: u.accountNumber || null,
       hasPin: !!u.pinHash,
       permissions: parsePermissions(u.permissions),
       pendingConfirmation: u.pendingConfirmation || null,

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { userOperations, otpCodeOperations } from '@/lib/db-firebase'
 import { sendVerificationEmail } from '@/lib/email'
-import { getDb, generateAffiliateCode } from '@/lib/firebase'
+import { getDb, generateAffiliateCode, generateAccountNumber } from '@/lib/firebase'
 import bcrypt from 'bcryptjs'
 
 export async function POST(request: NextRequest) {
@@ -39,6 +39,7 @@ export async function POST(request: NextRequest) {
     }
 
     const passwordHash = await bcrypt.hash(password, 12)
+    const accountNumber = await generateAccountNumber()
 
     const user = await userOperations.create({
       email,
@@ -60,6 +61,7 @@ export async function POST(request: NextRequest) {
       referredBy: null,
       merchantId: null,
       affiliateCode: generateAffiliateCode(),
+      accountNumber,
     })
 
     // Delete any old OTPs for this email to avoid confusion

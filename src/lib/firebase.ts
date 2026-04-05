@@ -64,6 +64,19 @@ export function generateAffiliateCode(): string {
     .toUpperCase()
 }
 
+// Helper to generate sequential account number (FX-XXXX)
+export async function generateAccountNumber(): Promise<string> {
+  const db = getDb()
+  const counterRef = db.collection('counters').doc('accountNumber')
+  const counterDoc = await counterRef.get()
+  let nextNum = 1001
+  if (counterDoc.exists) {
+    nextNum = (counterDoc.data()?.value || 1000) + 1
+  }
+  await counterRef.set({ value: nextNum }, { merge: true })
+  return `FX-${nextNum}`
+}
+
 // Timestamp helpers
 export function nowTimestamp() {
   return new Date().toISOString()

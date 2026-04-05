@@ -60,6 +60,7 @@ import {
   KeyRound,
   RotateCcw,
   ShieldOff,
+  Hash,
 } from 'lucide-react'
 
 // ===================== TYPES =====================
@@ -79,6 +80,7 @@ interface AdminUser {
   country: string | null
   createdAt: string
   merchantId?: string | null
+  accountNumber?: string | null
   twoFactorEnabled?: boolean | null
 }
 
@@ -1437,6 +1439,13 @@ export default function AdminPanel() {
                               <div>
                                 <p className="text-[10px] text-muted-foreground">الرصيد</p>
                                 <p className="text-xs font-bold gold-text">{(u.balance ?? 0).toFixed(2)} USDT</p>
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-2 p-2.5 rounded-lg bg-white/5">
+                              <Hash className="w-4 h-4 text-blue-400" />
+                              <div>
+                                <p className="text-[10px] text-muted-foreground">رقم الحساب</p>
+                                <p className="text-xs font-medium font-mono">{u.merchantId ? `FX-0000` : (u.accountNumber || 'غير محدد')}</p>
                               </div>
                             </div>
                             <div className="flex items-center gap-2 p-2.5 rounded-lg bg-white/5">
