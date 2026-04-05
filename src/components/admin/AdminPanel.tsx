@@ -246,6 +246,7 @@ export default function AdminPanel() {
   const [showMoreMenu, setShowMoreMenu] = useState(false)
   const [menuPosition, setMenuPosition] = useState({ top: 0, left: 0 })
   const moreMenuRef = useRef<HTMLButtonElement>(null)
+  const dropdownRef = useRef<HTMLDivElement>(null)
   // Stats state
   const [stats, setStats] = useState<AdminStats | null>(null)
   const [statsLoading, setStatsLoading] = useState(false)
@@ -260,10 +261,13 @@ export default function AdminPanel() {
   // PIN reset requests state
   const [pinResetRequests, setPinResetRequests] = useState<any[]>([])
 
-  // Close dropdown when clicking outside
+  // Close dropdown when clicking outside (button or dropdown)
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
-      if (moreMenuRef.current && !moreMenuRef.current.contains(e.target as Node)) {
+      const target = e.target as Node
+      const clickedOnButton = moreMenuRef.current?.contains(target)
+      const clickedOnDropdown = dropdownRef.current?.contains(target)
+      if (!clickedOnButton && !clickedOnDropdown) {
         setShowMoreMenu(false)
       }
     }
@@ -1091,6 +1095,7 @@ export default function AdminPanel() {
         {showMoreMenu && (
           <Portal>
             <div
+              ref={dropdownRef}
               dir="rtl"
               className="fixed glass-card rounded-xl border border-white/10 py-2 z-[9999] max-h-[70vh] overflow-y-auto shadow-2xl"
               style={{ top: menuPosition.top, left: `${menuPosition.left}px`, right: '8px' }}
