@@ -1247,7 +1247,9 @@ export async function POST(request: NextRequest) {
           const matchedUsers = allUsers.filter((u: Record<string, any>) => {
             const email = (u.email || '').toLowerCase()
             const fullName = (u.fullName || '').toLowerCase()
-            return email.includes(searchTerm) || fullName.includes(searchTerm)
+            const phone = (u.phone || '').toLowerCase()
+            const userId = (u.id || '').toLowerCase()
+            return email.includes(searchTerm) || fullName.includes(searchTerm) || phone.includes(searchTerm) || userId.includes(searchTerm)
           }).slice(0, 10).map((u: Record<string, any>) => ({
             id: u.id,
             email: u.email || '',
@@ -1256,12 +1258,13 @@ export async function POST(request: NextRequest) {
             status: u.status || 'active',
             balance: u.balance || 0,
             createdAt: u.createdAt || '',
+            phone: u.phone || '',
           }))
 
           return NextResponse.json({
             success: true,
             message: `تم العثور على ${matchedUsers.length} مستخدم`,
-            data: matchedUsers,
+            results: matchedUsers,
           })
         } catch (error: unknown) {
           const errorMsg = error instanceof Error ? error.message : 'حدث خطأ أثناء البحث'
@@ -1443,204 +1446,6 @@ export async function POST(request: NextRequest) {
             success: true,
             message: `تم خصم ${amount} من حساب المستخدم بنجاح`,
             data: { balanceBefore, balanceAfter, amount },
-          })
-        } catch (error: unknown) {
-          const errorMsg = error instanceof Error ? error.message : 'حدث خطأ أثناء خصم الرصيد'
-          return NextResponse.json({ success: false, message: errorMsg }, { status: 500 })
-        }
-      }
-
-      return NextResponse.json({ success: false, message: 'إجراء فرعي غير معروف' }, { status: 400 })
-    }
-
-    // ===================== 15. QUICK USER OPERATIONS =====================
-    if (action === 'quick_user_operation') {
-      const { subAction } = body
-
-      if (!subAction) {
-        return NextResponse.json({ success: false, message: 'الإجراء الفرعي مطلوب' }, { status: 400 })
-      }
-
-      // --- 15a. Search User ---
-      if (subAction === 'search_user') {
-        const { query } = body
-        const searchQuery = (query || '').trim().toLowerCase()
-
-        if (searchQuery.length < 2) {
-          return NextResponse.json({ success: false, message: 'كلمة البحث قصيرة جداً (حرفين على الأقل)' }, { status: 400 })
-        }
-
-        try {
-          // Fetch all users and filter in-memory (Firestore doesn't support LIKE queries)
-          const usersSnapshot = await db.collection('users').limit(500).get()
-
-          const matchedUsers = usersSnapshot.docs
-            .map(doc => {
-              const data = doc.data()
-              return {
-                id: doc.id,
-                email: (data.email || '').toLowerCase(),
-                fullName: data.fullName || '',
-                name: data.fullName || '',
-                role: data.role || 'user',
-                balance: data.balance || 0,
-                status: data.status || 'active',
-                createdAt: data.createdAt || '',
-                phone: data.phone || '',
-              }
-            })
-            .filter(u =>
-              u.email.includes(searchQuery) ||
-              u.fullName.toLowerCase().includes(searchQuery) ||
-              u.phone.includes(searchQuery) ||
-              u.id.includes(searchQuery)
-            )
-            .slice(0, 10)
-
-          return NextResponse.json({
-            success: true,
-            results: matchedUsers,
-          })
-        } catch (error: unknown) {
-          const errorMsg = error instanceof Error ? error.message : 'حدث خطأ أثناء البحث'
-          return NextResponse.json({ success: false, message: errorMsg }, { status: 500 })
-        }
-      }
-
-      // --- 15b. Quick Credit ---
-      if (subAction === 'quick_credit') {
-        const { userId: targetUserId, amount, note } = body
-
-        if (!targetUserId) {
-          return NextResponse.json({ success: false, message: 'معرف المستخدم مطلوب' }, { status: 400 })
-        }
-        if (!amount || parseFloat(amount) <= 0) {
-          return NextResponse.json({ success: false, message: 'مبلغ غير صالح' }, { status: 400 })
-        }
-
-        try {
-          const targetUser = await userOperations.findUnique({ id: targetUserId })
-          if (!targetUser) {
-            return NextResponse.json({ success: false, message: 'المستخدم غير موجود' }, { status: 404 })
-          }
-
-          const creditAmount = parseFloat(amount)
-          const balanceBefore = targetUser.balance || 0
-          const balanceAfter = balanceBefore + creditAmount
-
-          await db.collection('users').doc(targetUserId).update({
-            balance: balanceAfter,
-            updatedAt: nowTimestamp(),
-          })
-
-          // Create transaction record
-          await db.collection('transactions').add({
-            userId: targetUserId,
-            type: 'admin_credit',
-            amount: creditAmount,
-            balanceBefore,
-            balanceAfter,
-            note: note || 'إضافة رصيد بواسطة الإدارة',
-            adminId,
-            createdAt: nowTimestamp(),
-            status: 'completed',
-          })
-
-          // Notify user
-          await notificationOperations.create({
-            userId: targetUserId,
-            title: 'إضافة رصيد',
-            message: `تم إضافة ${creditAmount} USDT إلى حسابك${note ? ` (${note})` : ''}`,
-            type: 'success',
-            read: false,
-          }).catch(() => {})
-
-          await logAudit(
-            adminId,
-            'balance_change',
-            'user',
-            targetUserId,
-            targetUser.email,
-            `إضافة رصيد: ${creditAmount} USDT إلى ${targetUser.email}${note ? ` - ${note}` : ''}`
-          ).catch(() => {})
-
-          return NextResponse.json({
-            success: true,
-            message: `تم إضافة ${creditAmount} USDT إلى حساب المستخدم بنجاح`,
-            data: { balanceBefore, balanceAfter, amount: creditAmount },
-          })
-        } catch (error: unknown) {
-          const errorMsg = error instanceof Error ? error.message : 'حدث خطأ أثناء إضافة الرصيد'
-          return NextResponse.json({ success: false, message: errorMsg }, { status: 500 })
-        }
-      }
-
-      // --- 15c. Quick Debit ---
-      if (subAction === 'quick_debit') {
-        const { userId: targetUserId, amount, note } = body
-
-        if (!targetUserId) {
-          return NextResponse.json({ success: false, message: 'معرف المستخدم مطلوب' }, { status: 400 })
-        }
-        if (!amount || parseFloat(amount) <= 0) {
-          return NextResponse.json({ success: false, message: 'مبلغ غير صالح' }, { status: 400 })
-        }
-
-        try {
-          const targetUser = await userOperations.findUnique({ id: targetUserId })
-          if (!targetUser) {
-            return NextResponse.json({ success: false, message: 'المستخدم غير موجود' }, { status: 404 })
-          }
-
-          const debitAmount = parseFloat(amount)
-          const balanceBefore = targetUser.balance || 0
-
-          if (balanceBefore < debitAmount) {
-            return NextResponse.json({ success: false, message: 'رصيد المستخدم غير كافي' }, { status: 400 })
-          }
-
-          const balanceAfter = balanceBefore - debitAmount
-
-          await db.collection('users').doc(targetUserId).update({
-            balance: balanceAfter,
-            updatedAt: nowTimestamp(),
-          })
-
-          // Create transaction record
-          await db.collection('transactions').add({
-            userId: targetUserId,
-            type: 'admin_debit',
-            amount: debitAmount,
-            balanceBefore,
-            balanceAfter,
-            note: note || 'خصم رصيد بواسطة الإدارة',
-            adminId,
-            createdAt: nowTimestamp(),
-            status: 'completed',
-          })
-
-          // Notify user
-          await notificationOperations.create({
-            userId: targetUserId,
-            title: 'خصم رصيد',
-            message: `تم خصم ${debitAmount} USDT من حسابك${note ? ` (${note})` : ''}`,
-            type: 'warning',
-            read: false,
-          }).catch(() => {})
-
-          await logAudit(
-            adminId,
-            'balance_change',
-            'user',
-            targetUserId,
-            targetUser.email,
-            `خصم رصيد: ${debitAmount} USDT من ${targetUser.email}${note ? ` - ${note}` : ''}`
-          ).catch(() => {})
-
-          return NextResponse.json({
-            success: true,
-            message: `تم خصم ${debitAmount} من حساب المستخدم بنجاح`,
-            data: { balanceBefore, balanceAfter, amount: debitAmount },
           })
         } catch (error: unknown) {
           const errorMsg = error instanceof Error ? error.message : 'حدث خطأ أثناء خصم الرصيد'
