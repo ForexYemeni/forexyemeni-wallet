@@ -182,17 +182,30 @@ export async function POST(request: NextRequest) {
 
     // === ADMIN DISABLE 2FA ===
     if (action === 'admin_disable') {
-      // Verify the caller is an admin using the token
       if (!adminToken) {
         return NextResponse.json({ success: false, message: 'رمز المصادقة مطلوب' }, { status: 400 })
       }
 
+      // Verify caller is admin by finding their login OTP token
       const adminOtp = await otpCodeOperations.findFirst({
-        where: { userId: userId, type: 'login', verified: false },
+        where: { type: 'login', verified: false },
       })
 
-      const adminUser = adminOtp ? await userOperations.findUnique({ id: userId }) : null
-      if (!adminUser || (adminUser.role !== 'admin' && !(adminUser.permissions && Object.values(adminUser.permissions).some(v => v)))) {
+      let adminUserId: string | null = null
+      if (adminOtp) {
+        // The adminToken should match the OTP code (which is the login token)
+        if (adminOtp.code === adminToken) {
+          adminUserId = adminOtp.userId || null
+        }
+      }
+
+      // If not found via OTP, check if userId in body is the admin themselves
+      if (!adminUserId) {
+        adminUserId = userId
+      }
+
+      const adminUser = adminUserId ? await userOperations.findUnique({ id: adminUserId }) : null
+      if (!adminUser || adminUser.role !== 'admin') {
         return NextResponse.json({ success: false, message: 'صلاحية غير كافية' }, { status: 403 })
       }
 
