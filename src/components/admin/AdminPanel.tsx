@@ -244,7 +244,7 @@ export default function AdminPanel() {
   const [previewImage, setPreviewImage] = useState<string | null>(null)
   // More tabs dropdown
   const [showMoreMenu, setShowMoreMenu] = useState(false)
-  const [menuPosition, setMenuPosition] = useState({ top: 0, right: 0, maxWidth: 200 })
+  const [menuPosition, setMenuPosition] = useState({ top: 0, right: 0 })
   const moreMenuRef = useRef<HTMLButtonElement>(null)
   // Stats state
   const [stats, setStats] = useState<AdminStats | null>(null)
@@ -275,10 +275,7 @@ export default function AdminPanel() {
     if (moreMenuRef.current) {
       const rect = moreMenuRef.current.getBoundingClientRect()
       const rightPos = window.innerWidth - rect.right
-      // Ensure dropdown doesn't overflow left edge of screen (leave 8px padding)
-      const availableWidth = rect.right - 8
-      const maxWidth = Math.min(200, availableWidth)
-      setMenuPosition({ top: rect.bottom + 8, right: rightPos, maxWidth })
+      setMenuPosition({ top: rect.bottom + 8, right: rightPos })
     }
     setShowMoreMenu(true)
   }
@@ -1096,7 +1093,7 @@ export default function AdminPanel() {
             <div
               dir="rtl"
               className="fixed glass-card rounded-xl border border-white/10 py-2 z-[9999] max-h-[70vh] overflow-y-auto shadow-2xl"
-              style={{ top: menuPosition.top, right: menuPosition.right, width: menuPosition.maxWidth }}
+              style={{ top: menuPosition.top, right: `${menuPosition.right}px`, left: '8px' }}
             >
               {moreTabs.map((tab) => (
                 <button
@@ -1109,7 +1106,7 @@ export default function AdminPanel() {
                   }`}
                 >
                   <tab.icon className="w-4 h-4 flex-shrink-0" />
-                  <span className="flex-1 whitespace-nowrap overflow-hidden">{tab.label}</span>
+                  <span className="flex-1 truncate">{tab.label}</span>
                   {tab.count > 0 && (
                     <span className="w-5 h-5 bg-gold text-gray-900 text-[10px] font-bold rounded-full flex items-center justify-center flex-shrink-0">
                       {tab.count}
