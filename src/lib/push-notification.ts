@@ -44,8 +44,8 @@ export async function sendPushNotification(
     const isUrgent = ['transfer', 'deposit', 'withdraw', 'payment'].some(t => 
       (type || '').includes(t)
     ) || ['تحويل', 'إيداع', 'سحب', 'دف'].some(w => title.includes(w))
-    // Use v4 channel IDs
-    const channelId = isUrgent ? 'fx_urgent_v4' : 'fx_v4'
+    // Use v6 channel IDs (matching MyFirebaseMessagingService.java)
+    const channelId = isUrgent ? 'fx_urgent_v6' : 'fx_v6'
 
     // Build the message
     const message: Message = {

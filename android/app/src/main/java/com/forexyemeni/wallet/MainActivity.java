@@ -15,8 +15,9 @@ import com.getcapacitor.BridgeActivity;
 
 public class MainActivity extends BridgeActivity {
 
-    private static final String CHANNEL_ID = "forexyemeni_notifications";
-    private static final String CHANNEL_ID_URGENT = "forexyemeni_urgent";
+    // Channel IDs must match MyFirebaseMessagingService.java (fx_v6)
+    private static final String CHANNEL_ID = "fx_v6";
+    private static final String CHANNEL_ID_URGENT = "fx_urgent_v6";
 
     @Override
     public void onCreate(Bundle savedInstanceState) {
@@ -42,41 +43,47 @@ public class MainActivity extends BridgeActivity {
                     .setUsage(AudioAttributes.USAGE_NOTIFICATION)
                     .build();
 
-                Uri soundUri = Uri.parse("android.resource://" + getPackageName() + "/raw/notification");
+                // Use SYSTEM DEFAULT notification sound (most reliable across all devices)
+                Uri defaultSound = android.media.RingtoneManager.getDefaultUri(
+                    android.media.RingtoneManager.TYPE_NOTIFICATION);
 
-                // Main channel
-                NotificationChannel channel = new NotificationChannel(
-                    CHANNEL_ID,
-                    "إشعارات فوركس يمني",
-                    NotificationManager.IMPORTANCE_HIGH
-                );
-                channel.setDescription("إشعارات المعاملات والأحداث المهمة");
-                channel.enableLights(true);
-                channel.setLightColor(0xFFD4AF37);
-                channel.enableVibration(true);
-                channel.setVibrationPattern(new long[]{0, 500, 200, 500, 200, 500});
-                channel.setSound(soundUri, audioAttributes);
-                channel.setBypassDnd(true);
-                channel.setLockscreenVisibility(androidx.core.app.NotificationCompat.VISIBILITY_PUBLIC);
-                channel.setShowBadge(true);
-                manager.createNotificationChannel(channel);
+                // Main channel - only create if not exists
+                if (manager.getNotificationChannel(CHANNEL_ID) == null) {
+                    NotificationChannel channel = new NotificationChannel(
+                        CHANNEL_ID,
+                        "إشعارات فوركس يمني",
+                        NotificationManager.IMPORTANCE_HIGH
+                    );
+                    channel.setDescription("إشعارات المعاملات والأحداث المهمة");
+                    channel.enableLights(true);
+                    channel.setLightColor(0xFFD4AF37);
+                    channel.enableVibration(true);
+                    channel.setVibrationPattern(new long[]{0, 300, 150, 300});
+                    channel.setSound(defaultSound, audioAttributes);
+                    channel.setBypassDnd(true);
+                    channel.setLockscreenVisibility(androidx.core.app.NotificationCompat.VISIBILITY_PUBLIC);
+                    channel.setShowBadge(true);
+                    manager.createNotificationChannel(channel);
+                }
 
-                // Urgent channel
-                NotificationChannel urgentChannel = new NotificationChannel(
-                    CHANNEL_ID_URGENT,
-                    "إشعارات المعاملات",
-                    NotificationManager.IMPORTANCE_MAX
-                );
-                urgentChannel.setDescription("إشعارات التحويلات والإيداعات والسحوبات");
-                urgentChannel.enableLights(true);
-                urgentChannel.setLightColor(0xFFD4AF37);
-                urgentChannel.enableVibration(true);
-                urgentChannel.setVibrationPattern(new long[]{0, 800, 200, 800});
-                urgentChannel.setSound(soundUri, audioAttributes);
-                urgentChannel.setBypassDnd(true);
-                urgentChannel.setLockscreenVisibility(androidx.core.app.NotificationCompat.VISIBILITY_PUBLIC);
-                urgentChannel.setShowBadge(true);
-                manager.createNotificationChannel(urgentChannel);
+                // Urgent channel - only create if not exists
+                if (manager.getNotificationChannel(CHANNEL_ID_URGENT) == null) {
+                    NotificationChannel urgentChannel = new NotificationChannel(
+                        CHANNEL_ID_URGENT,
+                        "إشعارات المعاملات",
+                        NotificationManager.IMPORTANCE_MAX
+                    );
+                    urgentChannel.setDescription("إشعارات التحويلات والإيداعات والسحوبات");
+                    urgentChannel.enableLights(true);
+                    urgentChannel.setLightColor(0xFFD4AF37);
+                    urgentChannel.enableVibration(true);
+                    urgentChannel.setVibrationPattern(new long[]{0, 500, 150, 500});
+                    urgentChannel.setSound(defaultSound, audioAttributes);
+                    urgentChannel.setBypassDnd(true);
+                    urgentChannel.setLockscreenVisibility(androidx.core.app.NotificationCompat.VISIBILITY_PUBLIC);
+                    urgentChannel.setShowBadge(true);
+                    manager.createNotificationChannel(urgentChannel);
+                }
             }
         }
     }

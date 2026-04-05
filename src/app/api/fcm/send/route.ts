@@ -49,10 +49,10 @@ export async function POST(request: NextRequest) {
         priority: 'high' as const,
         ttl: 86400,
         notification: {
-          channelId: 'forexyemeni_notifications',
+          channelId: 'fx_v6',
           sound: 'notification',
           priority: 'high' as const,
-          defaultSound: false,
+          defaultSound: true,
           defaultVibrateTimings: true,
           notificationCount: 1,
         },

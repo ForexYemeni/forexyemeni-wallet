@@ -6,7 +6,6 @@ import android.app.PendingIntent;
 import android.content.Context;
 import android.content.Intent;
 import android.media.AudioAttributes;
-import android.media.Ringtone;
 import android.media.RingtoneManager;
 import android.net.Uri;
 import android.os.Build;
@@ -23,32 +22,41 @@ import com.google.firebase.messaging.RemoteMessage;
 import java.util.Random;
 
 /**
- * FCM Service v5 — GUARANTEES sound using RingtoneManager (system default).
- * No custom sound files, no channel dependencies, no MediaPlayer issues.
+ * FCM Service v6 — Definitive notification sound fix.
+ *
+ * ROOT CAUSE of previous failures (v2.8.0 → v3.2.0):
+ * 1. setDefaults(DEFAULT_ALL) conflicted with channel sound settings on Android 8+
+ * 2. deleteChannel+createChannel inherited muted settings on Android 13+
+ * 3. Direct RingtoneManager.play() failed silently in Doze/background
+ *
+ * FIX STRATEGY:
+ * - Use a BRAND NEW channel ID (fx_v6) to avoid inheriting broken settings
+ * - ONLY create channel if it doesn't exist (never delete+recreate)
+ * - DO NOT use setDefaults() — let the channel handle sound/vibration
+ * - ONLY use RingtoneManager as FALLBACK for pre-Oreo (no channels)
+ * - On Android 8+, the notification channel itself produces the sound
  */
 public class MyFirebaseMessagingService extends FirebaseMessagingService {
 
     private static final String TAG = "FX_NOTIFY";
-    private static final String CHANNEL_ID = "fx_v5";
+    private static final String CHANNEL_ID = "fx_v6";
 
     @Override
     public void onCreate() {
         super.onCreate();
-        setupChannel();
+        createChannelIfNeeded();
     }
 
     @Override
     public void onNewToken(@NonNull String token) {
-        Log.d(TAG, "Token: " + token.substring(0, 10) + "...");
+        Log.d(TAG, "New FCM token: " + token.substring(0, Math.min(10, token.length())) + "...");
     }
 
     @Override
     public void onMessageReceived(@NonNull RemoteMessage remoteMessage) {
-        Log.d(TAG, "=== NOTIFICATION RECEIVED ===");
+        Log.d(TAG, "=== NOTIFICATION RECEIVED (v6) ===");
 
-        setupChannel();
-
-        // Extract data
+        // Extract notification data
         String title = null, body = null;
         if (remoteMessage.getNotification() != null) {
             title = remoteMessage.getNotification().getTitle();
@@ -65,80 +73,45 @@ public class MyFirebaseMessagingService extends FirebaseMessagingService {
 
         Log.d(TAG, "Title: " + title + " | Body: " + body);
 
-        // Step 1: Play system notification sound IMMEDIATELY
-        playSystemSound();
+        // Ensure channel exists
+        createChannelIfNeeded();
 
-        // Step 2: Vibrate
+        // Vibrate
         vibrateDevice();
 
-        // Step 3: Wake screen
+        // Wake screen
         wakeScreen();
 
-        // Step 4: Show notification
+        // Show notification (channel handles sound on Android 8+)
         showNotification(title, body, data);
-    }
 
-    /**
-     * Play the default system notification sound.
-     * This is the MOST RELIABLE way to play a sound on Android.
-     * Works on ALL devices, ALL Android versions, NO custom files needed.
-     */
-    private void playSystemSound() {
-        try {
-            Uri soundUri = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION);
-            Ringtone ringtone = RingtoneManager.getRingtone(getApplicationContext(), soundUri);
-            if (ringtone != null) {
-                ringtone.setStreamType(android.media.AudioManager.STREAM_NOTIFICATION);
-                ringtone.play();
-                Log.d(TAG, "✅ System sound played via RingtoneManager");
-            } else {
-                Log.e(TAG, "❌ Ringtone is null");
-                // Fallback: try alarm sound
-                try {
-                    Uri alarmUri = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_ALARM);
-                    Ringtone alarm = RingtoneManager.getRingtone(getApplicationContext(), alarmUri);
-                    if (alarm != null) {
-                        alarm.setStreamType(android.media.AudioManager.STREAM_ALARM);
-                        alarm.play();
-                        Log.d(TAG, "✅ Alarm sound played as fallback");
-                    }
-                } catch (Exception e2) {
-                    Log.e(TAG, "❌ All sound methods failed");
-                }
-            }
-        } catch (Exception e) {
-            Log.e(TAG, "❌ playSystemSound error: " + e.getMessage());
+        // Fallback: only for pre-Oreo devices where channels don't exist
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) {
+            playSystemSoundFallback();
         }
     }
 
-    private void vibrateDevice() {
-        try {
-            android.os.Vibrator v = (android.os.Vibrator) getSystemService(Context.VIBRATOR_SERVICE);
-            if (v != null && v.hasVibrator()) {
-                v.vibrate(new long[]{0, 500, 200, 500}, -1);
-            }
-        } catch (Exception ignored) {}
-    }
-
-    private void wakeScreen() {
-        try {
-            PowerManager pm = (PowerManager) getSystemService(POWER_SERVICE);
-            if (pm != null && !pm.isInteractive()) {
-                PowerManager.WakeLock wl = pm.newWakeLock(
-                    PowerManager.SCREEN_DIM_WAKE_LOCK | PowerManager.ACQUIRE_CAUSES_WAKEUP, "fx:w"
-                );
-                wl.acquire(3000);
-            }
-        } catch (Exception ignored) {}
-    }
-
-    private void setupChannel() {
+    /**
+     * Create notification channel ONLY if it doesn't already exist.
+     * NEVER delete and recreate — this inherits muted/broken settings on Android 13+.
+     * Uses a fresh channel ID (fx_v6) to avoid broken legacy channels.
+     */
+    private void createChannelIfNeeded() {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return;
         try {
             NotificationManager nm = (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
             if (nm == null) return;
 
-            // Use SYSTEM DEFAULT sound for the channel
+            // Check if channel already exists — DO NOT recreate
+            NotificationChannel existing = nm.getNotificationChannel(CHANNEL_ID);
+            if (existing != null) {
+                Log.d(TAG, "Channel already exists: " + CHANNEL_ID
+                    + " sound=" + existing.getSound()
+                    + " importance=" + existing.getImportance());
+                return;
+            }
+
+            // Create fresh channel with system default notification sound
             Uri defaultSound = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION);
             AudioAttributes attrs = new AudioAttributes.Builder()
                     .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
@@ -151,22 +124,64 @@ public class MyFirebaseMessagingService extends FirebaseMessagingService {
             ch.enableLights(true);
             ch.setLightColor(0xFFD4AF37);
             ch.enableVibration(true);
-            ch.setVibrationPattern(new long[]{0, 500, 200, 500});
-            ch.setSound(defaultSound, attrs);  // System default sound
+            ch.setVibrationPattern(new long[]{0, 300, 150, 300});
+            ch.setSound(defaultSound, attrs);
             ch.setBypassDnd(true);
             ch.setLockscreenVisibility(NotificationCompat.VISIBILITY_PUBLIC);
             ch.setShowBadge(true);
 
-            // Delete old channel first to clear any cached settings
-            try { nm.deleteNotificationChannel(CHANNEL_ID); } catch (Exception ignored) {}
             nm.createNotificationChannel(ch);
-
-            Log.d(TAG, "✅ Channel created: " + CHANNEL_ID);
+            Log.d(TAG, "✅ NEW channel created: " + CHANNEL_ID + " with sound: " + defaultSound);
         } catch (Exception e) {
             Log.e(TAG, "Channel error: " + e.getMessage());
         }
     }
 
+    /**
+     * Fallback sound for pre-Oreo devices only.
+     * On Android 8+, the notification channel handles sound automatically.
+     */
+    private void playSystemSoundFallback() {
+        try {
+            Uri soundUri = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION);
+            android.media.Ringtone ringtone = RingtoneManager.getRingtone(getApplicationContext(), soundUri);
+            if (ringtone != null) {
+                ringtone.setStreamType(android.media.AudioManager.STREAM_NOTIFICATION);
+                ringtone.play();
+                Log.d(TAG, "✅ Pre-Oreo fallback sound played");
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "Fallback sound error: " + e.getMessage());
+        }
+    }
+
+    private void vibrateDevice() {
+        try {
+            android.os.Vibrator v = (android.os.Vibrator) getSystemService(Context.VIBRATOR_SERVICE);
+            if (v != null && v.hasVibrator()) {
+                v.vibrate(new long[]{0, 300, 150, 300}, -1);
+            }
+        } catch (Exception ignored) {}
+    }
+
+    private void wakeScreen() {
+        try {
+            PowerManager pm = (PowerManager) getSystemService(POWER_SERVICE);
+            if (pm != null && !pm.isInteractive()) {
+                PowerManager.WakeLock wl = pm.newWakeLock(
+                    PowerManager.SCREEN_DIM_WAKE_LOCK | PowerManager.ACQUIRE_CAUSES_WAKEUP, "fx:wake"
+                );
+                wl.acquire(3000);
+            }
+        } catch (Exception ignored) {}
+    }
+
+    /**
+     * Show notification WITHOUT setDefaults().
+     * On Android 8+, the channel's sound/vibration settings are used automatically.
+     * DO NOT use setDefaults(DEFAULT_ALL) — it conflicts with channel settings.
+     * DO NOT use setSound() on the builder — channel handles it.
+     */
     private void showNotification(String title, String body, Bundle data) {
         try {
             Context ctx = getApplicationContext();
@@ -192,12 +207,16 @@ public class MyFirebaseMessagingService extends FirebaseMessagingService {
                     .setAutoCancel(true)
                     .setContentIntent(pi)
                     .setWhen(System.currentTimeMillis())
-                    .setPriority(NotificationCompat.PRIORITY_MAX)
                     .setCategory(NotificationCompat.CATEGORY_MESSAGE)
                     .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
-                    // These defaults ensure sound+ vibration even if channel settings are wrong
-                    .setDefaults(NotificationCompat.DEFAULT_ALL)
-                    .setVibrate(new long[]{0, 500, 200, 500});
+                    .setOnlyAlertOnce(false);
+
+            // For pre-Oreo: set defaults since channels don't exist
+            if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) {
+                builder.setPriority(NotificationCompat.PRIORITY_MAX);
+                builder.setDefaults(NotificationCompat.DEFAULT_SOUND | NotificationCompat.DEFAULT_VIBRATE);
+                builder.setVibrate(new long[]{0, 300, 150, 300});
+            }
 
             try {
                 builder.setLargeIcon(android.graphics.BitmapFactory.decodeResource(
@@ -205,7 +224,7 @@ public class MyFirebaseMessagingService extends FirebaseMessagingService {
             } catch (Exception ignored) {}
 
             nm.notify(nid, builder.build());
-            Log.d(TAG, "✅ Notification shown: " + nid);
+            Log.d(TAG, "✅ Notification shown: id=" + nid + " channel=" + CHANNEL_ID);
         } catch (Exception e) {
             Log.e(TAG, "❌ Show notification error: " + e.getMessage());
         }

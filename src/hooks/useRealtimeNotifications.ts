@@ -4,6 +4,11 @@ import { useState, useEffect, useRef, useCallback } from 'react'
 import { useAuthStore } from '@/lib/store'
 import { playNotificationSound, playSuccessSound, showBrowserNotification, vibrate, initAudioOnInteraction } from '@/lib/notification-sound'
 
+// Check if running inside Capacitor native app
+function isCapacitor(): boolean {
+  return typeof window !== 'undefined' && !!(window as any).Capacitor
+}
+
 interface NotificationItem {
   id: string
   userId: string
@@ -49,14 +54,22 @@ export function useRealtimeNotifications() {
       // Get the latest notification
       const latest = newOnes[0]
 
-      // Play sound based on type (pass type for preference check)
+      // In Capacitor APK: native FCM (MyFirebaseMessagingService) already
+      // handles sound + vibration + notification display. Do NOT duplicate here.
+      if (isCapacitor()) {
+        // Only update internal state, no sound/notification from JS side
+        lastCheckedRef.current = newOnes[0].createdAt
+        return
+      }
+
+      // Web-only: play sound and show browser notification
       if (latest.type === 'success') {
         await playSuccessSound(latest.type)
       } else {
         await playNotificationSound(latest.type)
       }
 
-      // Show browser notification (for non-APK)
+      // Show browser notification (web only)
       await showBrowserNotification(latest.title, latest.message)
 
       // Update last checked timestamp

@@ -22,36 +22,13 @@ function isCapacitor(): boolean {
  * Works reliably in Android APK even in background.
  */
 async function playNativeSound(title: string, body: string): Promise<boolean> {
-  if (!isCapacitor()) return false
+  // In Capacitor APK: native FCM (MyFirebaseMessagingService) already handles
+  // notification display with sound. Do NOT create duplicate local notifications.
+  // This function is intentionally disabled in Capacitor to prevent double notifications.
+  if (isCapacitor()) return false
 
-  try {
-    // Dynamic import with string template to prevent webpack from resolving at build time
-    const capacitorModule = await import(/* webpackIgnore: true */ '@capacitor/local-notifications')
-    const LocalNotifications = capacitorModule.LocalNotifications || capacitorModule.default?.LocalNotifications
-
-    // Check permission
-    const perm = await LocalNotifications.requestPermissions()
-    if (perm.display !== 'granted') return false
-
-    // Schedule a local notification with sound (fires immediately)
-    await LocalNotifications.schedule({
-      notifications: [{
-        title,
-        body,
-        id: Date.now() % 100000,
-        sound: 'notification.wav',
-        smallIcon: 'ic_stat_icon',
-        largeIcon: 'ic_launcher',
-        priority: 'high' as any,
-        visibility: 'public' as any,
-        autoCancel: true,
-      }],
-    })
-
-    return true
-  } catch (error) {
-    return false
-  }
+  // Only for web — not applicable (web doesn't have Capacitor local notifications)
+  return false
 }
 
 // ============ HTML5 Audio Element (Primary Web Method) ============
