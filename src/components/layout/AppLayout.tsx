@@ -114,7 +114,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         </header>
 
         {/* Page Content */}
-        <div className="px-4 md:px-6 py-4 max-w-2xl mx-auto">
+        <div className="px-4 md:px-6 py-4 max-w-2xl mx-auto overflow-x-hidden">
           {children}
         </div>
       </main>

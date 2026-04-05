@@ -1355,7 +1355,7 @@ export default function SuperAdminPanel() {
 
           {/* ===================== ADMIN TEAM ===================== */}
           {activeSection === 'admin-team' && (
-            <div className="space-y-4">
+            <div className="space-y-4 overflow-x-hidden">
               {/* Admin Team Header */}
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
@@ -1381,9 +1381,9 @@ export default function SuperAdminPanel() {
                     const activePerms = permKeys.filter(k => admin.permissions?.[k])
 
                     return (
-                      <div key={admin.id} className={`glass-card p-4 rounded-xl ${isSelf ? 'border border-gold/20' : ''}`}>
-                        <div className="flex items-start justify-between gap-3">
-                          <div className="flex items-start gap-3 flex-1">
+                      <div key={admin.id} className={`glass-card p-3 rounded-xl min-w-0 ${isSelf ? 'border border-gold/20' : ''}`}>
+                        <div className="flex items-start justify-between gap-2 min-w-0">
+                          <div className="flex items-start gap-2 flex-1 min-w-0">
                             {/* Avatar placeholder */}
                             <div className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 ${isSelf ? 'bg-gold/10' : 'bg-white/10'}`}>
                               <UserCog className={`w-5 h-5 ${isSelf ? 'text-gold' : 'text-muted-foreground'}`} />
