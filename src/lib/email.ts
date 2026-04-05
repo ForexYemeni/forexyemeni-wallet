@@ -791,6 +791,62 @@ export async function send2FASetupEmail(to: string, code: string): Promise<boole
   return sendEmailViaScript(to, 'تفعيل المصادقة الثنائية - فوركس يمني', html)
 }
 
+// ===================== TRANSFER EMAIL NOTIFICATIONS =====================
+
+export async function sendTransferSenderEmail(
+  senderEmail: string,
+  senderName: string,
+  amount: number,
+  receiverName: string,
+  receiverAccountNumber: number | null,
+  newBalance: number,
+  transferId: string
+): Promise<boolean> {
+  const receiverInfo = receiverName + (receiverAccountNumber ? ' (' + receiverAccountNumber + ')' : '')
+  const html = buildNotificationEmail(
+    '&#128228;',
+    'تم خصم مبلغ من حسابك',
+    'تم تحويل مبلغ <strong>' + amount.toFixed(2) + '&nbsp;USDT</strong> من حسابك بنجاح إلى المستخدم <strong>' + receiverInfo + '</strong>.',
+    '#f59e0b',
+    'تم خصم المبلغ',
+    'warning',
+    [
+      { label: 'المبلغ المُحوّل', value: amount.toFixed(2) + '&nbsp;USDT' },
+      { label: 'المستلم', value: receiverInfo },
+      { label: 'رصيدك بعد التحويل', value: newBalance.toFixed(2) + '&nbsp;USDT' },
+      { label: 'رقم العملية', value: transferId.substring(0, 16) + '...' },
+    ]
+  )
+  return sendEmailViaScript(senderEmail, 'تم تحويل مبلغ من حسابك - فوركس يمني', html)
+}
+
+export async function sendTransferReceiverEmail(
+  receiverEmail: string,
+  receiverName: string,
+  amount: number,
+  senderName: string,
+  senderAccountNumber: number | null,
+  newBalance: number,
+  transferId: string
+): Promise<boolean> {
+  const senderInfo = senderName + (senderAccountNumber ? ' (' + senderAccountNumber + ')' : '')
+  const html = buildNotificationEmail(
+    '&#128176;',
+    'تحويل وارد إلى حسابك',
+    'تم استلام تحويل بقيمة <strong>' + amount.toFixed(2) + '&nbsp;USDT</strong> في حسابك من المستخدم <strong>' + senderInfo + '</strong>.',
+    '#22c55e',
+    'تم الاستلام بنجاح',
+    'success',
+    [
+      { label: 'المبلغ المستلم', value: amount.toFixed(2) + '&nbsp;USDT' },
+      { label: 'المرسل', value: senderInfo },
+      { label: 'رصيدك الجديد', value: newBalance.toFixed(2) + '&nbsp;USDT' },
+      { label: 'رقم العملية', value: transferId.substring(0, 16) + '...' },
+    ]
+  )
+  return sendEmailViaScript(receiverEmail, 'تم استلام تحويل - فوركس يمني', html)
+}
+
 // ===================== PIN RECOVERY EMAIL =====================
 
 export async function sendPinRecoveryEmail(

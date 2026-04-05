@@ -193,6 +193,33 @@ export async function POST(request: NextRequest) {
       createdAt: now,
     })
 
+    // Send email notifications (non-blocking — don't fail the transfer if email fails)
+    try {
+      const { sendTransferSenderEmail, sendTransferReceiverEmail } = await import('@/lib/email')
+
+      // Sender email: "تم خصم مبلغ من حسابك"
+      sendTransferSenderEmail(
+        senderData.email,
+        senderData.fullName || 'مستخدم',
+        transferAmount,
+        receiverData.fullName || receiverData.email,
+        receiverData.accountNumber || null,
+        newSenderBalance,
+        senderTxId,
+      ).catch(() => {})
+
+      // Receiver email: "تحويل وارد إلى حسابك"
+      sendTransferReceiverEmail(
+        receiverData.email,
+        receiverData.fullName || 'مستخدم',
+        transferAmount,
+        senderData.fullName || senderData.email,
+        senderData.accountNumber || null,
+        newReceiverBalance,
+        senderTxId,
+      ).catch(() => {})
+    } catch {}
+
     return NextResponse.json({
       success: true,
       message: 'تم التحويل بنجاح',
