@@ -40,6 +40,12 @@ export async function sendPushNotification(
       return { sent: false, count: 0 }
     }
 
+    // Determine channel based on notification type
+    const isUrgent = ['transfer', 'deposit', 'withdraw', 'payment'].some(t => 
+      (type || '').includes(t)
+    ) || ['تحويل', 'إيداع', 'سحب', 'دف'].some(w => title.includes(w))
+    const channelId = isUrgent ? 'forexyemeni_urgent' : 'forexyemeni_notifications'
+
     // Build the message
     const message: Message = {
       notification: {
@@ -52,13 +58,17 @@ export async function sendPushNotification(
         // TTL: 24 hours — retry delivery if device is offline
         ttl: 86400,
         notification: {
-          channelId: 'forexyemeni_notifications',
+          channelId,
           sound: 'notification',
-          priority: 'high' as const,
-          // Use notification sound explicitly (no defaultSound override)
-          defaultSound: false,
+          priority: 'max' as const,
+          // Enable default sound and vibration
+          defaultSound: true,
           defaultVibrateTimings: true,
           notificationCount: 1,
+          // Show on lock screen
+          visibility: 'public' as const,
+          // Vibration pattern
+          vibrateTimingsMillis: [0, 500, 200, 500, 200, 500],
         },
         data: {
           type: type || 'info',
@@ -68,6 +78,14 @@ export async function sendPushNotification(
           body,
           ...(data || {}),
         },
+      },
+      // Also include data payload at top level for our custom FCM service
+      data: {
+        type: type || 'info',
+        userId,
+        title,
+        body,
+        ...(data || {}),
       },
       tokens,
     }
