@@ -19,7 +19,17 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ success: false, message: 'المستخدم غير موجود' }, { status: 404 })
     }
 
-    if (user.role !== 'admin' || user.permissions) {
+    // Check if main admin (role 'admin' with no specific permissions enabled)
+    let hasSpecificPermissions = false
+    if (user.permissions) {
+      try {
+        const parsedPerms = typeof user.permissions === 'string' ? JSON.parse(user.permissions) : user.permissions
+        hasSpecificPermissions = parsedPerms && Object.values(parsedPerms).some((v: unknown) => v === true)
+      } catch {
+        hasSpecificPermissions = false
+      }
+    }
+    if (user.role !== 'admin' || hasSpecificPermissions) {
       return NextResponse.json({ success: false, message: 'ليس لديك صلاحية. فقط المدير الرئيسي يمكنه تنفيذ هذا الإجراء.' }, { status: 403 })
     }
 

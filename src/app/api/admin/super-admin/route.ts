@@ -66,8 +66,11 @@ async function verifySuperAdmin(adminId: string): Promise<{ authorized: boolean;
   if (!user) {
     return { authorized: false, user: null, message: 'المستخدم غير موجود' }
   }
-  // Super admin = role 'admin' with no permissions (main admin)
-  const isMainAdmin = user.role === 'admin' && !user.permissions
+  // Super admin = role 'admin' with no specific permissions enabled (main admin)
+  // Parse permissions to check if any are actively set to true
+  const parsedPerms = parsePermissions(user.permissions)
+  const hasSpecificPermissions = parsedPerms && Object.values(parsedPerms).some(v => v === true)
+  const isMainAdmin = user.role === 'admin' && !hasSpecificPermissions
   if (!isMainAdmin) {
     return { authorized: false, user, message: 'ليس لديك صلاحية المدير الرئيسي' }
   }

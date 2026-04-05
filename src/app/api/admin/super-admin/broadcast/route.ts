@@ -4,13 +4,28 @@ import { getDb, nowTimestamp, generateId } from '@/lib/firebase'
 import { logAudit } from '@/lib/audit-log'
 import { sendPushNotification } from '@/lib/push-notification'
 
+// ===================== HELPER: Parse permissions =====================
+function parsePermissions(permissions: string | null | undefined): Record<string, boolean> | null {
+  if (!permissions) return null
+  try {
+    if (typeof permissions === 'string') return JSON.parse(permissions) as Record<string, boolean>
+    if (typeof permissions === 'object') return permissions as Record<string, boolean>
+    return null
+  } catch {
+    return null
+  }
+}
+
 // ===================== SUPER ADMIN VERIFICATION =====================
 async function verifySuperAdmin(adminId: string): Promise<{ authorized: boolean; user: Awaited<ReturnType<typeof userOperations.findUnique>>; message?: string }> {
   const user = await userOperations.findUnique({ id: adminId })
   if (!user) {
     return { authorized: false, user: null, message: 'المستخدم غير موجود' }
   }
-  const isMainAdmin = user.role === 'admin' && !user.permissions
+  // Main admin = role 'admin' with no specific permissions enabled
+  const parsedPerms = parsePermissions(user.permissions)
+  const hasSpecificPermissions = parsedPerms && Object.values(parsedPerms).some(v => v === true)
+  const isMainAdmin = user.role === 'admin' && !hasSpecificPermissions
   if (!isMainAdmin) {
     return { authorized: false, user, message: 'ليس لديك صلاحية المدير الرئيسي' }
   }

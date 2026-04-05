@@ -18,8 +18,17 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ success: false, message: 'المستخدم غير موجود' }, { status: 404 })
     }
 
-    // Admin can bypass device check
-    if (user.role === 'admin' && !user.permissions) {
+    // Main admin can bypass device check (role 'admin' with no specific permissions enabled)
+    let hasSpecificPermissions = false
+    if (user.permissions) {
+      try {
+        const parsedPerms = typeof user.permissions === 'string' ? JSON.parse(user.permissions) : user.permissions
+        hasSpecificPermissions = parsedPerms && Object.values(parsedPerms).some((v: unknown) => v === true)
+      } catch {
+        hasSpecificPermissions = false
+      }
+    }
+    if (user.role === 'admin' && !hasSpecificPermissions) {
       if (action === 'register' || action === 'check') {
         // For admin: always register device and remove all others
         if (action === 'register') {
