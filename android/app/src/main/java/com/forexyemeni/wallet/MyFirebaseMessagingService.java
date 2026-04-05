@@ -6,6 +6,7 @@ import android.app.PendingIntent;
 import android.content.Context;
 import android.content.Intent;
 import android.media.AudioAttributes;
+import android.media.RingtoneManager;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
@@ -20,13 +21,17 @@ import com.google.firebase.messaging.RemoteMessage;
 import java.util.Random;
 
 /**
- * Custom FirebaseMessagingService that ALWAYS delivers notifications with sound,
+ * Custom FirebaseMessagingService that ALWAYS delivers notifications with LOUD sound,
  * even when the app is completely killed by the user or system.
+ * 
+ * This service overrides Capacitor's default behavior which may not play sound
+ * reliably when the app is in foreground.
  */
 public class MyFirebaseMessagingService extends FirebaseMessagingService {
 
-    private static final String CHANNEL_ID = "forexyemeni_notifications";
-    private static final String CHANNEL_ID_URGENT = "forexyemeni_urgent";
+    // Use a unique channel ID to avoid cached channel settings
+    private static final String CHANNEL_ID = "fx_wallet_notif_v3";
+    private static final String CHANNEL_ID_URGENT = "fx_wallet_urgent_v3";
 
     @Override
     public void onCreate() {
@@ -37,19 +42,14 @@ public class MyFirebaseMessagingService extends FirebaseMessagingService {
     @Override
     public void onNewToken(@NonNull String token) {
         super.onNewToken(token);
-        // Start the keep-alive service when FCM token refreshes
         startKeepAliveService();
     }
 
     @Override
     public void onMessageReceived(@NonNull RemoteMessage remoteMessage) {
-        // 1. Ensure channels exist
         createNotificationChannels();
-
-        // 2. Wake up the device screen briefly for important notifications
         wakeUpDevice();
 
-        // 3. Extract notification data
         String title = null;
         String body = null;
 
@@ -70,26 +70,26 @@ public class MyFirebaseMessagingService extends FirebaseMessagingService {
         if (title == null) title = "فوركس يمني";
         if (body == null) body = "لديك إشعار جديد";
 
-        // 4. Determine if high-priority (transactions, transfers)
         String msgType = data.getString("type", "");
         boolean isUrgent = msgType.contains("transfer") || msgType.contains("deposit") 
             || msgType.contains("withdraw") || msgType.contains("payment")
             || (title != null && (title.contains("تحويل") || title.contains("إيداع") 
                 || title.contains("سحب") || title.contains("دف")));
 
-        // 5. Show heads-up notification with sound
         showNotification(title, body, data, isUrgent);
     }
 
     private void wakeUpDevice() {
-        PowerManager powerManager = (PowerManager) getSystemService(POWER_SERVICE);
-        if (powerManager != null && !powerManager.isInteractive()) {
-            PowerManager.WakeLock wakeLock = powerManager.newWakeLock(
-                PowerManager.SCREEN_DIM_WAKE_LOCK | PowerManager.ACQUIRE_CAUSES_WAKEUP,
-                "forexyemeni:notification_wake"
-            );
-            wakeLock.acquire(3000); // Wake for 3 seconds
-        }
+        try {
+            PowerManager powerManager = (PowerManager) getSystemService(POWER_SERVICE);
+            if (powerManager != null && !powerManager.isInteractive()) {
+                PowerManager.WakeLock wakeLock = powerManager.newWakeLock(
+                    PowerManager.SCREEN_DIM_WAKE_LOCK | PowerManager.ACQUIRE_CAUSES_WAKEUP,
+                    "forexyemeni:wake"
+                );
+                wakeLock.acquire(3000);
+            }
+        } catch (Exception ignored) {}
     }
 
     private void createNotificationChannels() {
@@ -98,14 +98,17 @@ public class MyFirebaseMessagingService extends FirebaseMessagingService {
         NotificationManager manager = (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
         if (manager == null) return;
 
+        // Use the DEFAULT notification sound as primary (always works)
+        Uri defaultSound = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION);
+        // Also use our custom sound
+        Uri customSound = Uri.parse("android.resource://" + getPackageName() + "/raw/notification");
+
         AudioAttributes audioAttributes = new AudioAttributes.Builder()
                 .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
                 .setUsage(AudioAttributes.USAGE_NOTIFICATION)
                 .build();
 
-        Uri soundUri = Uri.parse("android.resource://" + getPackageName() + "/raw/notification");
-
-        // Main notification channel - HIGH importance (shows heads-up)
+        // Main channel
         NotificationChannel channel = new NotificationChannel(
                 CHANNEL_ID,
                 "إشعارات فوركس يمني",
@@ -113,21 +116,23 @@ public class MyFirebaseMessagingService extends FirebaseMessagingService {
         );
         channel.setDescription("إشعارات المعاملات والأحداث المهمة");
         channel.enableLights(true);
-        channel.setLightColor(0xFFD4AF37); // Gold color
+        channel.setLightColor(0xFFD4AF37);
         channel.enableVibration(true);
         channel.setVibrationPattern(new long[]{0, 500, 200, 500, 200, 500});
-        channel.setSound(soundUri, audioAttributes);
-        channel.setBypassDnd(true); // Break through Do Not Disturb
+        channel.setSound(defaultSound, audioAttributes);
+        channel.setBypassDnd(true);
         channel.setLockscreenVisibility(NotificationCompat.VISIBILITY_PUBLIC);
         channel.setShowBadge(true);
 
-        manager.deleteNotificationChannel(CHANNEL_ID);
+        try {
+            manager.deleteNotificationChannel(CHANNEL_ID);
+        } catch (Exception ignored) {}
         manager.createNotificationChannel(channel);
 
-        // Urgent channel for transactions - MAX importance
+        // Urgent channel for transactions
         NotificationChannel urgentChannel = new NotificationChannel(
                 CHANNEL_ID_URGENT,
-                "إشعارات المعاملات",
+                "إشعارات المعاملات الحرجة",
                 NotificationManager.IMPORTANCE_MAX
         );
         urgentChannel.setDescription("إشعارات التحويلات والإيداعات والسحوبات");
@@ -135,12 +140,14 @@ public class MyFirebaseMessagingService extends FirebaseMessagingService {
         urgentChannel.setLightColor(0xFFD4AF37);
         urgentChannel.enableVibration(true);
         urgentChannel.setVibrationPattern(new long[]{0, 800, 200, 800});
-        urgentChannel.setSound(soundUri, audioAttributes);
+        urgentChannel.setSound(customSound, audioAttributes);
         urgentChannel.setBypassDnd(true);
         urgentChannel.setLockscreenVisibility(NotificationCompat.VISIBILITY_PUBLIC);
         urgentChannel.setShowBadge(true);
 
-        manager.deleteNotificationChannel(CHANNEL_ID_URGENT);
+        try {
+            manager.deleteNotificationChannel(CHANNEL_ID_URGENT);
+        } catch (Exception ignored) {}
         manager.createNotificationChannel(urgentChannel);
     }
 
@@ -152,7 +159,6 @@ public class MyFirebaseMessagingService extends FirebaseMessagingService {
 
         String channelId = isUrgent ? CHANNEL_ID_URGENT : CHANNEL_ID;
 
-        // Intent to open app when notification is tapped
         Intent intent = new Intent(context, MainActivity.class);
         intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP);
         intent.setAction(Intent.ACTION_MAIN);
@@ -162,7 +168,10 @@ public class MyFirebaseMessagingService extends FirebaseMessagingService {
         int flags = PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE;
         PendingIntent pendingIntent = PendingIntent.getActivity(context, 0, intent, flags);
 
-        Uri soundUri = Uri.parse("android.resource://" + getPackageName() + "/raw/notification");
+        // Use BOTH custom sound and default sound to guarantee sound plays
+        Uri customSound = Uri.parse("android.resource://" + getPackageName() + "/raw/notification");
+        Uri defaultSound = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION);
+
         int notificationId = new Random().nextInt(100000);
 
         NotificationCompat.Builder builder = new NotificationCompat.Builder(context, channelId)
@@ -171,8 +180,8 @@ public class MyFirebaseMessagingService extends FirebaseMessagingService {
                 .setContentText(body)
                 .setStyle(new NotificationCompat.BigTextStyle().bigText(body))
                 .setAutoCancel(true)
-                .setSound(soundUri)
-                .setDefaults(NotificationCompat.DEFAULT_VIBRATE | NotificationCompat.DEFAULT_LIGHTS)
+                .setSound(customSound)
+                .setDefaults(NotificationCompat.DEFAULT_VIBRATE | NotificationCompat.DEFAULT_LIGHTS | NotificationCompat.DEFAULT_SOUND)
                 .setContentIntent(pendingIntent)
                 .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
                 .setWhen(System.currentTimeMillis())
@@ -180,14 +189,12 @@ public class MyFirebaseMessagingService extends FirebaseMessagingService {
                 .setCategory(NotificationCompat.CATEGORY_MESSAGE)
                 .setOnlyAlertOnce(false);
 
-        // Full-screen intent for urgent notifications (shows over lock screen)
+        // Full-screen for urgent on lock screen
         if (isUrgent && Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            Intent fullScreenIntent = new Intent(context, MainActivity.class);
-            fullScreenIntent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP);
-            PendingIntent fullScreenPendingIntent = PendingIntent.getActivity(
-                context, notificationId, fullScreenIntent, flags
-            );
-            builder.setFullScreenIntent(fullScreenPendingIntent, true);
+            Intent fsIntent = new Intent(context, MainActivity.class);
+            fsIntent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP);
+            PendingIntent fsPendingIntent = PendingIntent.getActivity(context, notificationId, fsIntent, flags);
+            builder.setFullScreenIntent(fsPendingIntent, true);
         }
 
         try {
