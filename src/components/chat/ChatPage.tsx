@@ -291,6 +291,15 @@ export default function ChatPage() {
               (m: ChatMessageItem) => !messages.find(om => om.id === m.id)
             )
             if (newMsgs.length > 0) {
+              // Play sound for new messages from admin
+              const adminMsgs = newMsgs.filter((m: ChatMessageItem) => m.senderType !== 'user')
+              if (adminMsgs.length > 0) {
+                try {
+                  const { playNotificationSound, vibrate } = await import('@/lib/notification-sound')
+                  vibrate([200, 100, 200])
+                  playNotificationSound('general').catch(() => {})
+                } catch {}
+              }
               setMessages(msgData.messages)
               // Mark as read
               fetch(`/api/chats/${selectedChatId}`, {

@@ -44,6 +44,8 @@ import {
   type NotificationCategory,
 } from '@/lib/notification-settings'
 import { playNotificationSound } from '@/lib/notification-sound'
+import { toast } from 'sonner'
+import { Volume2 } from 'lucide-react'
 import TwoFactorSettings from '@/components/auth/TwoFactorSettings'
 import ChangeEmail from '@/components/settings/ChangeEmail'
 
@@ -422,6 +424,49 @@ export default function SettingsPage() {
                 />
               </button>
             </div>
+
+            {/* Test sound button */}
+            <button
+              onClick={async () => {
+                try {
+                  await playNotificationSound('general')
+                  toast.success('تم تشغيل صوت الإشعارات ✓')
+                } catch {
+                  toast.error('فشل تشغيل الصوت')
+                }
+              }}
+              className="w-full flex items-center justify-between p-3 rounded-xl bg-gold/5 hover:bg-gold/10 transition-colors border border-gold/10"
+            >
+              <span className="text-sm font-medium">🔔 اختبار صوت الإشعارات</span>
+              <Volume2 className="w-4 h-4 text-gold" />
+            </button>
+
+            {/* Test notification (server + FCM) */}
+            {user?.id && (
+              <button
+                onClick={async () => {
+                  try {
+                    const res = await fetch('/api/notifications/test', {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({ userId: user.id }),
+                    })
+                    const data = await res.json()
+                    if (data.success) {
+                      toast.success('تم إرسال إشعار اختبار — راقب الصوت خلال 5 ثواني')
+                    } else {
+                      toast.error(data.message || 'فشل إرسال الإشعار')
+                    }
+                  } catch {
+                    toast.error('حدث خطأ')
+                  }
+                }}
+                className="w-full flex items-center justify-between p-3 rounded-xl bg-gold/5 hover:bg-gold/10 transition-colors border border-gold/10"
+              >
+                <span className="text-sm font-medium">📱 اختبار إشعار كامل (FCM)</span>
+                <Volume2 className="w-4 h-4 text-gold" />
+              </button>
+            )}
 
             {/* Per-category toggles */}
             {soundSettings.soundEnabled && (
