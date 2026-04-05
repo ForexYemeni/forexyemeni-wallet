@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { userOperations, depositOperations, transactionOperations, notificationOperations } from '@/lib/db-firebase'
 import { sendPushNotification } from '@/lib/push-notification'
+import { getDb } from '@/lib/firebase'
 import {
   sendUserDepositConfirmedEmail,
   sendUserDepositRejectedEmail,
@@ -8,8 +9,6 @@ import {
   sendMerchantDepositConfirmedEmail,
   sendMerchantDepositRejectedEmail,
 } from '@/lib/email'
-
-const ADMIN_EMAIL = 'mshay2024m@gmail.com'
 
 // GET all deposits (admin)
 export async function GET(request: NextRequest) {
@@ -102,8 +101,11 @@ export async function POST(request: NextRequest) {
         // Credit fee to admin's account
         if (depositFee > 0) {
           try {
-            const admin = await userOperations.findUnique({ email: ADMIN_EMAIL })
-            if (admin) {
+            const db = getDb()
+            const adminDocs = await db.collection('users').where('role', '==', 'admin').limit(1).get()
+            if (!adminDocs.empty) {
+              const adminDoc = adminDocs.docs[0]
+              const admin = { id: adminDoc.id, ...adminDoc.data() } as any
               const adminBalanceBefore = admin.balance
               const adminBalanceAfter = adminBalanceBefore + depositFee
               await userOperations.updateBalance(admin.id, adminBalanceAfter)

@@ -7,14 +7,12 @@ import {
   notificationOperations,
 } from '@/lib/db-firebase'
 
-const ADMIN_EMAIL = 'mshay2024m@gmail.com'
-
 // Helper: verify admin
 async function verifyAdmin(req: NextRequest) {
   const userId = req.headers.get('x-user-id')
   if (!userId) return null
   const user = await userOperations.findUnique({ id: userId })
-  if (!user || (user.role !== 'admin' && user.email !== ADMIN_EMAIL)) return null
+  if (!user || user.role !== 'admin') return null
   return user
 }
 

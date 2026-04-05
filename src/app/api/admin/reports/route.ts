@@ -1,8 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getDb } from '@/lib/firebase'
 
-const ADMIN_EMAIL = 'mshay2024m@gmail.com'
-
 // Helper to format a date as YYYY-MM-DD
 function formatDateKey(date: Date): string {
   const y = date.getFullYear()
@@ -42,7 +40,7 @@ export async function GET(request: NextRequest) {
 
     const db = getDb()
     const adminDoc = await db.collection('users').doc(adminId).get()
-    if (!adminDoc.exists || (adminDoc.data()?.email !== ADMIN_EMAIL && adminDoc.data()?.role !== 'admin')) {
+    if (!adminDoc.exists || adminDoc.data()?.role !== 'admin') {
       return NextResponse.json({ success: false, message: 'غير مصرح' }, { status: 403 })
     }
 

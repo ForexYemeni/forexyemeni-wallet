@@ -2,8 +2,6 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getDb } from '@/lib/firebase'
 import { userOperations } from '@/lib/db-firebase'
 
-const ADMIN_EMAIL = 'mshay2024m@gmail.com'
-
 // POST /api/auth/device - Check or register device
 // Body: { userId, fingerprint, deviceName }
 export async function POST(request: NextRequest) {

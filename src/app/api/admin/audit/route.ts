@@ -1,8 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getDb, generateId, nowTimestamp } from '@/lib/firebase'
 
-const ADMIN_EMAIL = 'mshay2024m@gmail.com'
-
 // Valid action types for audit logging
 const VALID_ACTION_TYPES = [
   'user_suspend', 'user_activate', 'user_promote', 'user_demote',
@@ -39,7 +37,7 @@ export async function GET(request: NextRequest) {
 
     const db = getDb()
     const adminDoc = await db.collection('users').doc(adminId).get()
-    if (!adminDoc.exists || (adminDoc.data()?.email !== ADMIN_EMAIL && adminDoc.data()?.role !== 'admin')) {
+    if (!adminDoc.exists || adminDoc.data()?.role !== 'admin') {
       return NextResponse.json({ success: false, message: 'غير مصرح' }, { status: 403 })
     }
 

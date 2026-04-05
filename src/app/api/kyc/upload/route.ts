@@ -2,8 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { userOperations, kycRecordOperations, notificationOperations } from '@/lib/db-firebase'
 import { sendPushNotification } from '@/lib/push-notification'
 import { sendAdminNewKycEmail } from '@/lib/email'
-
-const ADMIN_EMAIL = 'mshay2024m@gmail.com'
+import { getDb } from '@/lib/firebase'
 
 export async function POST(request: NextRequest) {
   try {
@@ -54,7 +53,6 @@ export async function POST(request: NextRequest) {
     })
 
     // Store the actual file data in a separate collection for retrieval
-    const { getDb } = await import('@/lib/firebase')
     const db = getDb()
     await db.collection('kycFiles').doc(fileName).set({
       userId,
@@ -71,19 +69,21 @@ export async function POST(request: NextRequest) {
       await userOperations.update({ id: userId }, { kycSelfie: storageUrl })
     }
 
-    // Notify admin about new KYC upload
+    // Notify admin(s) about new KYC upload
     try {
-      const admin = await userOperations.findUnique({ email: ADMIN_EMAIL })
-      if (admin) {
+      const adminDocs = await db.collection('users').where('role', '==', 'admin').get()
+      for (const adminDoc of adminDocs.docs) {
+        const admin = adminDoc.data() as any
+        const adminId = adminDoc.id
         const typeLabel = type === 'id_photo' ? 'صورة الهوية' : 'الصورة الشخصية'
         const title = 'طلب توثيق جديد'
         const message = `${typeLabel} جديدة من ${user.fullName || user.email}`
-        await notificationOperations.create({ userId: admin.id, title, message, type: 'info' })
-        sendPushNotification(admin.id, title, message, 'info').catch(() => {})
+        await notificationOperations.create({ userId: adminId, title, message, type: 'info' })
+        sendPushNotification(adminId, title, message, 'info').catch(() => {})
 
         // Send email to admin
         sendAdminNewKycEmail(
-          ADMIN_EMAIL,
+          admin.email,
           user.fullName || user.email,
           user.email,
           type,

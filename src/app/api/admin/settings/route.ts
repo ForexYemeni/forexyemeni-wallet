@@ -3,8 +3,6 @@ import { userOperations, otpCodeOperations } from '@/lib/db-firebase'
 import { getDb, nowTimestamp } from '@/lib/firebase'
 import bcrypt from 'bcryptjs'
 
-const ADMIN_EMAIL = 'mshay2024m@gmail.com'
-
 // GET - admin settings (phone, email, hasPIN)
 export async function GET(request: NextRequest) {
   try {

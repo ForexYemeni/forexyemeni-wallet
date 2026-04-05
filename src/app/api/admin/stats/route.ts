@@ -1,8 +1,6 @@
 import { NextResponse } from 'next/server'
 import { getDb, initializeFirebase } from '@/lib/firebase'
 
-const ADMIN_EMAIL = 'mshay2024m@gmail.com'
-
 export async function GET() {
   try {
     const db = getDb()
@@ -135,7 +133,7 @@ export async function GET() {
 
     // Get admin balance
     let adminBalance = 0
-    const adminSnap = await db.collection('users').where('email', '==', ADMIN_EMAIL).limit(1).get()
+    const adminSnap = await db.collection('users').where('role', '==', 'admin').limit(1).get()
     if (!adminSnap.empty) {
       adminBalance = adminSnap.docs[0].data().balance || 0
     }

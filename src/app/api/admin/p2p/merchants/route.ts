@@ -2,14 +2,12 @@ import { NextRequest, NextResponse } from 'next/server'
 import { userOperations, merchantApplicationOperations, notificationOperations } from '@/lib/db-firebase'
 import { sendPushNotification } from '@/lib/push-notification'
 
-const ADMIN_EMAIL = 'mshay2024m@gmail.com'
-
 // Helper: verify admin
 async function verifyAdmin(req: NextRequest) {
   const userId = req.headers.get('x-user-id')
   if (!userId) return null
   const user = await userOperations.findUnique({ id: userId })
-  if (!user || (user.role !== 'admin' && user.email !== ADMIN_EMAIL)) return null
+  if (!user || user.role !== 'admin') return null
   return user
 }
 
@@ -80,7 +78,7 @@ export async function POST(req: NextRequest) {
     }
 
     // Verify admin
-    if (admin.id !== adminId && admin.email !== ADMIN_EMAIL) {
+    if (admin.id !== adminId) {
       return NextResponse.json({ success: false, message: 'غير مصرح' }, { status: 403 })
     }
 

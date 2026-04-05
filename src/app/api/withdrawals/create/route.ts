@@ -5,8 +5,6 @@ import { sendPushNotification } from '@/lib/push-notification'
 import { sendAdminNewWithdrawalEmail } from '@/lib/email'
 import bcrypt from 'bcryptjs'
 
-const ADMIN_EMAIL = 'mshay2024m@gmail.com'
-
 export async function POST(request: NextRequest) {
   try {
     const { userId, amount, toAddress, method = 'blockchain', network, paymentMethodId, paymentMethodName, pin } = await request.json()
@@ -95,18 +93,20 @@ export async function POST(request: NextRequest) {
       status: 'pending',
     })
 
-    // Notify admin about new withdrawal request
+    // Notify admin(s) about new withdrawal request
     try {
-      const admin = await userOperations.findUnique({ email: ADMIN_EMAIL })
-      if (admin) {
+      const adminDocs = await db.collection('users').where('role', '==', 'admin').get()
+      for (const adminDoc of adminDocs.docs) {
+        const admin = adminDoc.data() as any
+        const adminId = adminDoc.id
         const title = 'طلب سحب جديد'
         const message = `طلب سحب بقيمة ${amount} USDT من ${user.fullName || user.email} (الصافي: ${netAmount.toFixed(2)} USDT)`
-        await notificationOperations.create({ userId: admin.id, title, message, type: 'warning', read: false })
-        sendPushNotification(admin.id, title, message, 'warning').catch(() => {})
+        await notificationOperations.create({ userId: adminId, title, message, type: 'warning', read: false })
+        sendPushNotification(adminId, title, message, 'warning').catch(() => {})
 
         // Send email to admin
         sendAdminNewWithdrawalEmail(
-          ADMIN_EMAIL,
+          admin.email,
           user.fullName || user.email,
           user.email,
           amount,

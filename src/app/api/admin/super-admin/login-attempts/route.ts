@@ -3,8 +3,6 @@ import { userOperations } from '@/lib/db-firebase'
 import { getDb, nowTimestamp } from '@/lib/firebase'
 import { logAudit } from '@/lib/audit-log'
 
-const ADMIN_EMAIL = 'mshay2024m@gmail.com'
-
 // ===================== SUPER ADMIN VERIFICATION =====================
 async function verifySuperAdmin(adminId: string): Promise<{ authorized: boolean; user: Awaited<ReturnType<typeof userOperations.findUnique>>; message?: string }> {
   const user = await userOperations.findUnique({ id: adminId })
@@ -12,8 +10,7 @@ async function verifySuperAdmin(adminId: string): Promise<{ authorized: boolean;
     return { authorized: false, user: null, message: 'المستخدم غير موجود' }
   }
   const isMainAdmin = user.role === 'admin' && !user.permissions
-  const isByEmail = user.email === ADMIN_EMAIL
-  if (!isMainAdmin && !isByEmail) {
+  if (!isMainAdmin) {
     return { authorized: false, user, message: 'ليس لديك صلاحية المدير الرئيسي' }
   }
   return { authorized: true, user }

@@ -3,8 +3,6 @@ import { userOperations, notificationOperations } from '@/lib/db-firebase'
 import { getDb, nowTimestamp, generateId } from '@/lib/firebase'
 import { logAudit } from '@/lib/audit-log'
 
-const ADMIN_EMAIL = 'mshay2024m@gmail.com'
-
 // ===================== TYPES =====================
 interface AdminPermissions {
   manageUsers?: boolean
@@ -68,10 +66,9 @@ async function verifySuperAdmin(adminId: string): Promise<{ authorized: boolean;
   if (!user) {
     return { authorized: false, user: null, message: 'المستخدم غير موجود' }
   }
-  // Super admin = role 'admin' with no permissions (main admin) OR email matches ADMIN_EMAIL
+  // Super admin = role 'admin' with no permissions (main admin)
   const isMainAdmin = user.role === 'admin' && !user.permissions
-  const isByEmail = user.email === ADMIN_EMAIL
-  if (!isMainAdmin && !isByEmail) {
+  if (!isMainAdmin) {
     return { authorized: false, user, message: 'ليس لديك صلاحية المدير الرئيسي' }
   }
   return { authorized: true, user }

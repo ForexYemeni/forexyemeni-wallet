@@ -2,8 +2,6 @@ import { NextRequest, NextResponse } from 'next/server'
 import { userOperations, referralOperations, systemSettingsOperations, transactionOperations, notificationOperations } from '@/lib/db-firebase'
 import { sendPushNotification } from '@/lib/push-notification'
 
-const ADMIN_EMAIL = 'mshay2024m@gmail.com'
-
 // GET /api/referral?action=get_settings|my_stats|my_commissions|validate_code
 export async function GET(request: NextRequest) {
   try {
@@ -207,7 +205,7 @@ export async function POST(request: NextRequest) {
       }
 
       const admin = await userOperations.findUnique({ id: adminId })
-      if (!admin || (admin.role !== 'admin' && admin.email !== ADMIN_EMAIL)) {
+      if (!admin || admin.role !== 'admin') {
         return NextResponse.json({ success: false, message: 'غير مصرح' }, { status: 403 })
       }
 

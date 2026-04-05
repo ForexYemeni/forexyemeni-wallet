@@ -4,8 +4,6 @@ import { sendPushNotification } from '@/lib/push-notification'
 import { getDb } from '@/lib/firebase'
 import { sendAdminNewDepositEmail } from '@/lib/email'
 
-const ADMIN_EMAIL = 'mshay2024m@gmail.com'
-
 export async function POST(request: NextRequest) {
   try {
     const { userId, amount, method = 'blockchain', txId, screenshot, network } = await request.json()
@@ -65,19 +63,21 @@ export async function POST(request: NextRequest) {
       status: 'pending',
     })
 
-    // Notify admin about new deposit request
+    // Notify admin(s) about new deposit request
     try {
-      const admin = await userOperations.findUnique({ email: ADMIN_EMAIL })
-      if (admin) {
+      const adminDocs = await db.collection('users').where('role', '==', 'admin').get()
+      for (const adminDoc of adminDocs.docs) {
+        const admin = adminDoc.data() as any
+        const adminId = adminDoc.id
         const title = 'طلب إيداع جديد'
         const feeInfo = depositFeePercentage > 0 ? ` (الرسوم: ${fee.toFixed(2)} USDT - الصافي: ${netAmount.toFixed(2)} USDT)` : ''
         const message = `طلب إيداع بقيمة ${amount} USDT من ${user.fullName || user.email}${feeInfo}`
-        await notificationOperations.create({ userId: admin.id, title, message, type: 'info', read: false })
-        sendPushNotification(admin.id, title, message, 'info').catch(() => {})
+        await notificationOperations.create({ userId: adminId, title, message, type: 'info', read: false })
+        sendPushNotification(adminId, title, message, 'info').catch(() => {})
 
         // Send email to admin
         sendAdminNewDepositEmail(
-          ADMIN_EMAIL,
+          admin.email,
           user.fullName || user.email,
           user.email,
           amount,

@@ -11,8 +11,6 @@ import {
   sendMerchantWithdrawalRejectedEmail,
 } from '@/lib/email'
 
-const ADMIN_EMAIL = 'mshay2024m@gmail.com'
-
 // GET all withdrawals (admin)
 export async function GET(request: NextRequest) {
   try {
@@ -120,8 +118,11 @@ export async function POST(request: NextRequest) {
       // Credit fee to admin's account
       if (withdrawalFee > 0) {
         try {
-          const admin = await userOperations.findUnique({ email: ADMIN_EMAIL })
-          if (admin) {
+          const db = getDb()
+          const adminDocs = await db.collection('users').where('role', '==', 'admin').limit(1).get()
+          if (!adminDocs.empty) {
+            const adminDoc = adminDocs.docs[0]
+            const admin = { id: adminDoc.id, ...adminDoc.data() } as any
             const adminBalanceBefore = admin.balance
             const adminBalanceAfter = adminBalanceBefore + withdrawalFee
             await userOperations.updateBalance(admin.id, adminBalanceAfter)

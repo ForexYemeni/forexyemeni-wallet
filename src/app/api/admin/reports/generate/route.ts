@@ -1,8 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getDb } from '@/lib/firebase'
 
-const ADMIN_EMAIL = 'mshay2024m@gmail.com'
-
 // POST: Generate a summary report for a given period
 export async function POST(request: NextRequest) {
   try {
@@ -21,7 +19,7 @@ export async function POST(request: NextRequest) {
 
     // Verify admin
     const adminDoc = await db.collection('users').doc(adminId).get()
-    if (!adminDoc.exists || (adminDoc.data()?.email !== ADMIN_EMAIL && adminDoc.data()?.role !== 'admin')) {
+    if (!adminDoc.exists || adminDoc.data()?.role !== 'admin') {
       return NextResponse.json({ success: false, message: 'غير مصرح' }, { status: 403 })
     }
 
