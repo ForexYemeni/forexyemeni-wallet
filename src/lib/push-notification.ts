@@ -2,6 +2,12 @@
  * Send FCM push notification to a user (server-side utility).
  * This is called by admin operations (deposit confirmation, withdrawal, etc.)
  * to send real push notifications to the user's Android device.
+ *
+ * IMPORTANT: We send DATA-ONLY messages (no "notification" field).
+ * This ensures onMessageReceived() is ALWAYS called in our custom
+ * MyFirebaseMessagingService, which plays sound + shows notification.
+ * If we include "notification" field, Android handles it directly
+ * in background WITHOUT calling onMessageReceived() → NO SOUND.
  */
 import { getDb, initializeFirebase } from '@/lib/firebase'
 import { getMessaging, Message } from 'firebase-admin/messaging'
@@ -40,37 +46,17 @@ export async function sendPushNotification(
       return { sent: false, count: 0 }
     }
 
-    // Determine channel based on notification type
-    const isUrgent = ['transfer', 'deposit', 'withdraw', 'payment'].some(t => 
-      (type || '').includes(t)
-    ) || ['تحويل', 'إيداع', 'سحب', 'دف'].some(w => title.includes(w))
-    // Use v6 channel IDs (matching MyFirebaseMessagingService.java)
-    const channelId = isUrgent ? 'fx_urgent_v6' : 'fx_v6'
-
-    // Build the message
+    // Build DATA-ONLY message — NO "notification" field!
+    // This guarantees onMessageReceived() is always called.
+    // All title/body info goes in the "data" payload.
     const message: Message = {
-      notification: {
-        title,
-        body,
-      },
+      // ❌ NO "notification" field — Android would handle it without sound
       android: {
-        // High priority ensures immediate delivery even when device is in Doze
+        // High priority ensures immediate delivery even in Doze
         priority: 'high' as const,
-        // TTL: 24 hours — retry delivery if device is offline
+        // TTL: 24 hours
         ttl: 86400,
-        notification: {
-          channelId,
-          sound: 'notification',
-          priority: 'max' as const,
-          // Enable default sound and vibration
-          defaultSound: true,
-          defaultVibrateTimings: true,
-          notificationCount: 1,
-          // Show on lock screen
-          visibility: 'public' as const,
-          // Vibration pattern
-          vibrateTimingsMillis: [0, 500, 200, 500, 200, 500],
-        },
+        // No android.notification either — our Java code handles everything
         data: {
           type: type || 'info',
           userId,
@@ -80,7 +66,7 @@ export async function sendPushNotification(
           ...(data || {}),
         },
       },
-      // Also include data payload at top level for our custom FCM service
+      // Top-level data payload — this is what our Java service reads
       data: {
         type: type || 'info',
         userId,

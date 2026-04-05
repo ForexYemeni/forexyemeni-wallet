@@ -4,6 +4,10 @@ import { getMessaging } from 'firebase-admin/messaging'
 
 // POST /api/fcm/send - Send FCM push notification to a user
 // Body: { userId, title, message, type?, data? }
+//
+// IMPORTANT: Sends DATA-ONLY messages (no "notification" field).
+// This ensures our custom MyFirebaseMessagingService.onMessageReceived()
+// is ALWAYS called, where we play sound + show notification manually.
 export async function POST(request: NextRequest) {
   try {
     const { userId, title, message, type = 'info', data = {} } = await request.json()
@@ -39,23 +43,12 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ success: true, sent: false, message: 'FCM not configured' })
     }
 
-    // Send multicast message to all user devices
+    // Send DATA-ONLY multicast message — NO "notification" field!
     const multicastMessage = {
-      notification: {
-        title,
-        body: message,
-      },
+      // ❌ NO "notification" field — ensures onMessageReceived() is always called
       android: {
         priority: 'high' as const,
         ttl: 86400,
-        notification: {
-          channelId: 'fx_v6',
-          sound: 'notification',
-          priority: 'high' as const,
-          defaultSound: true,
-          defaultVibrateTimings: true,
-          notificationCount: 1,
-        },
         data: {
           type: type || 'info',
           userId,
@@ -64,13 +57,13 @@ export async function POST(request: NextRequest) {
           ...data,
         },
       },
-      apns: {
-        payload: {
-          aps: {
-            sound: 'notification.wav',
-            'content-available': 1,
-          },
-        },
+      // Top-level data payload
+      data: {
+        type: type || 'info',
+        userId,
+        title,
+        body: message,
+        ...data,
       },
       tokens,
     }
