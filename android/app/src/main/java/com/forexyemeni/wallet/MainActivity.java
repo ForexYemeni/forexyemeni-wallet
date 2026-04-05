@@ -15,9 +15,9 @@ import com.getcapacitor.BridgeActivity;
 
 public class MainActivity extends BridgeActivity {
 
-    // Channel IDs must match MyFirebaseMessagingService.java (fx_v6)
-    private static final String CHANNEL_ID = "fx_v6";
-    private static final String CHANNEL_ID_URGENT = "fx_urgent_v6";
+    // Channel IDs must match MyFirebaseMessagingService.java (fx_v7)
+    private static final String CHANNEL_ID = "fx_v7";
+    private static final String CHANNEL_ID_URGENT = "fx_urgent_v7";
 
     @Override
     public void onCreate(Bundle savedInstanceState) {

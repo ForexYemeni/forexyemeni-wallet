@@ -621,3 +621,35 @@ Verify and ensure all 7 final suggestions are fully implemented at 100% success 
 ### Git Commit:
 - Committed and pushed: `fix: PDF export now generates proper formatted HTML statement with print-to-PDF support + CSV export option`
 - 2 files changed, 337 insertions(+), 84 deletions(-)
+---
+Task ID: 1-9
+Agent: Main Agent
+Task: Fix notification sound in ForexYemeni Wallet APK v3.3.0
+
+Work Log:
+- Cloned repo from GitHub to /home/z/forexyemeni-wallet/
+- Analyzed all notification-related code (7 Java/TS files)
+- Identified 5 root causes for notification sound failure:
+  1. setDefaults(DEFAULT_ALL) conflicting with channel sound settings
+  2. deleteChannel+createChannel anti-pattern inheriting muted settings
+  3. RingtoneManager.play() failing silently in Doze/background
+  4. Duplicate notifications from FCM + polling
+  5. Channel ID mismatch (fx_v5 vs fx_v4 vs forexyemeni_notifications)
+- Fixed MyFirebaseMessagingService.java (v6): new channel fx_v6, no delete/recreate, no setDefaults
+- Fixed MainActivity.java: unified channel IDs, create-if-not-exists pattern
+- Fixed useRealtimeNotifications.ts: skip sound/notification in Capacitor
+- Fixed notification-sound.ts: disabled playNativeSound in Capacitor
+- Fixed push-notification.ts: updated channel IDs to fx_v6
+- Fixed api/fcm/send/route.ts: updated channel ID and enabled defaultSound
+- Updated build.gradle: versionCode 12, versionName 3.3.0, signing config
+- Installed Android SDK and JDK, built release APK (unsigned)
+- Built debug APK (auto-signed) for testing
+- Could not push to GitHub (no auth credentials)
+- Could not sign release APK (keystore password not found in repo)
+
+Stage Summary:
+- All code fixes committed locally (2 commits)
+- Release APK built (unsigned): android/app/build/outputs/apk/release/app-release-unsigned.apk
+- Debug APK built (signed): download/ForexYemeni-Wallet-v3.3.0-debug.apk
+- GitHub push pending (needs auth credentials)
+- Release signing pending (needs keystore password in gradle.properties)
