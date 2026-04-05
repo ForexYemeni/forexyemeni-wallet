@@ -16,10 +16,32 @@ android {
             ignoreAssetsPattern = '!.svn:!.git:!.ds_store:!*.scc:.*:!CVS:!thumbs.db:!picasa.ini:!*~'
         }
     }
+
+    // Signing configuration for release builds
+    signingConfigs {
+        // Create a release signing config from key.properties file (if it exists)
+        // Create android/key.properties with:
+        //   storeFile=path/to/forexyemeni-release.jks
+        //   storePassword=YOUR_STORE_PASSWORD
+        //   keyAlias=forexyemeni
+        //   keyPassword=YOUR_KEY_PASSWORD
+        if (project.hasProperty('KEYSTORE_FILE') && project.hasProperty('KEYSTORE_PASSWORD')) {
+            release {
+                storeFile file(project.property('KEYSTORE_FILE'))
+                storePassword project.property('KEYSTORE_PASSWORD')
+                keyAlias project.hasProperty('KEY_ALIAS') ? project.property('KEY_ALIAS') : 'forexyemeni'
+                keyPassword project.hasProperty('KEY_PASSWORD') ? project.property('KEY_PASSWORD') : project.property('KEYSTORE_PASSWORD')
+            }
+        }
+    }
+
     buildTypes {
         release {
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
+            if (project.hasProperty('KEYSTORE_FILE') && project.hasProperty('KEYSTORE_PASSWORD')) {
+                signingConfig signingConfigs.release
+            }
         }
         debug {
             debuggable true
@@ -41,7 +63,7 @@ dependencies {
     implementation "androidx.core:core-splashscreen:$coreSplashScreenVersion"
     implementation project(':capacitor-android')
     testImplementation "junit:junit:$junitVersion"
-    androidTestImplementation "androidx.test.ext:junit:$androidxJunitVersion"
+    androidTestImplementation "androidx.test.ext:junit:$junitVersion"
     androidTestImplementation "androidx.test.espresso:espresso-core:$androidxEspressoCoreVersion"
     implementation project(':capacitor-cordova-android-plugins')
     // Firebase Messaging — needed for custom MyFirebaseMessagingService
