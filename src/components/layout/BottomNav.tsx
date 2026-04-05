@@ -18,6 +18,8 @@ import {
   X,
   Clock,
   Repeat,
+  Send,
+  HelpCircle,
 } from 'lucide-react'
 import { useState, useEffect, useRef } from 'react'
 
@@ -37,8 +39,10 @@ const merchantNavItems = [
 
 // Extra items shown in the "More" popup menu
 const userExtraItems = [
+  { key: 'transfer', label: 'تحويل', icon: Send },
   { key: 'p2p', label: 'سوق P2P', icon: Repeat },
   { key: 'referral', label: 'برنامج الدعوات', icon: Gift },
+  { key: 'help', label: 'مركز المساعدة', icon: HelpCircle },
   { key: 'chat', label: 'الدعم الفني', icon: MessageCircle },
   { key: 'kyc', label: 'التحقق (KYC)', icon: Shield },
   { key: 'transactions', label: 'المعاملات', icon: Clock },
@@ -48,10 +52,12 @@ const userExtraItems = [
 
 const merchantExtraItems = [
   { key: 'withdraw', label: 'سحب', icon: ArrowUpRight },
+  { key: 'transfer', label: 'تحويل', icon: Send },
   { key: 'p2p', label: 'سوق P2P', icon: Repeat },
   { key: 'transactions', label: 'المعاملات', icon: Clock },
   { key: 'kyc', label: 'التحقق (KYC)', icon: Shield },
   { key: 'chat', label: 'الدعم الفني', icon: MessageCircle },
+  { key: 'help', label: 'مركز المساعدة', icon: HelpCircle },
   { key: 'notifications', label: 'الإشعارات', icon: Bell },
   { key: 'settings', label: 'الإعدادات', icon: Settings },
 ]

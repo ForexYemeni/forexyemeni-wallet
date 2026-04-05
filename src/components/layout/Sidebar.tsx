@@ -18,6 +18,8 @@ import {
   MessageCircle,
   Sun,
   Moon,
+  Send,
+  HelpCircle,
 } from 'lucide-react'
 import { useState, useEffect } from 'react'
 
@@ -25,11 +27,13 @@ const userNavItems = [
   { key: 'dashboard', label: 'الرئيسية', icon: Home },
   { key: 'deposit', label: 'إيداع', icon: ArrowDownLeft },
   { key: 'withdraw', label: 'سحب', icon: ArrowUpRight },
+  { key: 'transfer', label: 'تحويل', icon: Send },
   { key: 'p2p', label: 'P2P', icon: Repeat },
   { key: 'transactions', label: 'المعاملات', icon: Clock },
   { key: 'referral', label: 'الدعوات', icon: Gift },
   { key: 'kyc', label: 'التحقق (KYC)', icon: Shield },
   { key: 'chat', label: 'الدعم الفني', icon: MessageCircle },
+  { key: 'help', label: 'المساعدة', icon: HelpCircle },
   { key: 'notifications', label: 'الإشعارات', icon: Bell },
   { key: 'settings', label: 'الإعدادات', icon: Settings },
 ]

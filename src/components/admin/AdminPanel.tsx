@@ -187,7 +187,7 @@ export default function AdminPanel() {
   const { user, setScreen } = useAuthStore()
   const AdminFaqManager = lazy(() => import('@/components/admin/AdminFaqManager'))
   const AdminReferralSettings = lazy(() => import('@/components/admin/AdminReferralSettings'))
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'users' | 'deposits' | 'withdrawals' | 'kyc' | 'payment-methods' | 'admin-settings' | 'faq-bot' | 'chats' | 'referral-settings' | 'p2p' | 'audit-log' | 'reports' | 'system-monitor' | 'admin-team' | 'admin-financial' | 'banners' | 'super-admin'>('dashboard')
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'users' | 'deposits' | 'withdrawals' | 'kyc' | 'payment-methods' | 'admin-settings' | 'faq-bot' | 'chats' | 'referral-settings' | 'p2p' | 'audit-log' | 'reports' | 'system-monitor' | 'admin-team' | 'admin-financial' | 'banners' | 'super-admin' | 'promo'>('dashboard')
   const AdminChat = lazy(() => import('@/components/admin/AdminChat'))
   const AdminP2P = lazy(() => import('@/components/admin/AdminP2P'))
   const AdminAuditLog = lazy(() => import('@/components/admin/AdminAuditLog'))
@@ -197,6 +197,7 @@ export default function AdminPanel() {
   const AdminTeam = lazy(() => import('@/components/admin/AdminTeam'))
   const AdminFinancial = lazy(() => import('@/components/admin/AdminFinancial'))
   const BannerManager = lazy(() => import('@/components/admin/BannerManager'))
+  const PromoManager = lazy(() => import('@/components/admin/PromoManager'))
   const [chatUnreadCount, setChatUnreadCount] = useState(0)
 
   // Fetch data when switching tabs (lazy load)
@@ -938,6 +939,7 @@ export default function AdminPanel() {
     { key: 'admin-team' as const, label: '👥 فريق الإدارة', icon: Users, count: 0 },
     { key: 'admin-financial' as const, label: '💰 الملخص المالي', icon: CreditCard, count: 0 },
     { key: 'banners' as const, label: 'إدارة البانرات', icon: Store, count: 0 },
+    { key: 'promo' as const, label: 'أكواد ترويجية', icon: Gift, count: 0 },
     { key: 'super-admin' as const, label: '🛡️ تحكم خارق', icon: Shield, count: 0 },
   ]
 
@@ -1854,6 +1856,19 @@ export default function AdminPanel() {
               </div>
             }>
               <BannerManager />
+            </Suspense>
+          )}
+
+          {/* ===================== PROMO TAB ===================== */}
+          {effectiveActiveTab === 'promo' && (
+            <Suspense fallback={
+              <div className="space-y-3">
+                {[...Array(3)].map((_, i) => (
+                  <div key={i} className="glass-card p-4 shimmer h-32 rounded-xl" />
+                ))}
+              </div>
+            }>
+              <PromoManager />
             </Suspense>
           )}
 

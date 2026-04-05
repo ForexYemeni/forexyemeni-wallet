@@ -10,6 +10,9 @@ import {
   Filter,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import dynamic from 'next/dynamic'
+
+const ExportStatement = dynamic(() => import('@/components/transactions/ExportStatement'), { ssr: false })
 
 interface Transaction {
   id: string
@@ -96,6 +99,9 @@ export default function TransactionHistory() {
           <p className="text-sm text-muted-foreground">{transactions.length} معاملة</p>
         </div>
       </div>
+
+      {/* Export Statement */}
+      <ExportStatement />
 
       {/* Filters */}
       <div className="flex gap-2 overflow-x-auto pb-2">

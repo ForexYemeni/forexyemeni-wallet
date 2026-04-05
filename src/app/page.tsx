@@ -28,6 +28,8 @@ const FaqPage = dynamic(() => import('@/components/chat/FaqPage'), { ssr: false 
 const SupportBot = dynamic(() => import('@/components/chat/SupportBot'), { ssr: false })
 const P2PPage = dynamic(() => import('@/components/p2p/P2PPage'), { ssr: false })
 const WelcomeWizard = dynamic(() => import('@/components/auth/WelcomeWizard'), { ssr: false })
+const TransferScreen = dynamic(() => import('@/components/transfer/TransferScreen'), { ssr: false })
+const HelpCenter = dynamic(() => import('@/components/help/HelpCenter'), { ssr: false })
 
 interface PendingWithdrawal {
   amount: number
@@ -566,6 +568,8 @@ export default function Home() {
       {currentScreen === 'notifications' && <NotificationsPage />}
       {currentScreen === 'chat' && <ChatPage />}
       {currentScreen === 'faq' && <FaqPage />}
+      {currentScreen === 'help' && <HelpCenter />}
+      {currentScreen === 'transfer' && <TransferScreen />}
       {currentScreen === 'p2p' && <P2PPage />}
       {currentScreen === 'admin' && (
         <AdminErrorBoundary>

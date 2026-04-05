@@ -25,7 +25,9 @@ async function playNativeSound(title: string, body: string): Promise<boolean> {
   if (!isCapacitor()) return false
 
   try {
-    const { LocalNotifications } = await import('@capacitor/local-notifications')
+    // Dynamic import with string template to prevent webpack from resolving at build time
+    const capacitorModule = await import(/* webpackIgnore: true */ '@capacitor/local-notifications')
+    const LocalNotifications = capacitorModule.LocalNotifications || capacitorModule.default?.LocalNotifications
 
     // Check permission
     const perm = await LocalNotifications.requestPermissions()

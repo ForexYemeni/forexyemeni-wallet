@@ -13,7 +13,11 @@ import {
   DollarSign,
   Clock,
   ChevronLeft,
+  Send,
 } from 'lucide-react'
+import dynamic from 'next/dynamic'
+
+const PromoRedeem = dynamic(() => import('@/components/promo/PromoRedeem'), { ssr: false })
 
 interface Transaction {
   id: string
@@ -141,7 +145,7 @@ export default function Dashboard() {
           </div>
 
           {/* Quick Actions */}
-          <div className="grid grid-cols-2 gap-3 pt-2">
+          <div className="grid grid-cols-3 gap-3 pt-2">
             <button
               onClick={() => setScreen('deposit')}
               className="flex items-center justify-center gap-2 h-12 rounded-xl bg-green-500/10 border border-green-500/20 text-green-400 hover:bg-green-500/20 transition-all text-sm font-medium"
@@ -156,9 +160,19 @@ export default function Dashboard() {
               <ArrowUpRight className="w-4 h-4" />
               سحب
             </button>
+            <button
+              onClick={() => setScreen('transfer')}
+              className="flex items-center justify-center gap-2 h-12 rounded-xl bg-blue-500/10 border border-blue-500/20 text-blue-400 hover:bg-blue-500/20 transition-all text-sm font-medium"
+            >
+              <Send className="w-4 h-4" />
+              تحويل
+            </button>
           </div>
         </div>
       </div>
+
+      {/* Promo Code */}
+      <PromoRedeem />
 
       {/* KYC Status */}
       {user?.kycStatus !== 'approved' && (

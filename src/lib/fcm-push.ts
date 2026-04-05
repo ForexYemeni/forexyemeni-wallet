@@ -22,7 +22,9 @@ export async function registerFCMPushNotifications(): Promise<boolean> {
   if (fcmRegistered) return true
 
   try {
-    const { PushNotifications } = await import('@capacitor/push-notifications')
+    // Dynamic import with webpackIgnore to prevent build-time resolution on web
+    const pushModule = await import(/* webpackIgnore: true */ '@capacitor/push-notifications')
+    const PushNotifications = pushModule.PushNotifications || pushModule.default?.PushNotifications
 
     // Request permission
     const permResult = await PushNotifications.requestPermissions()
