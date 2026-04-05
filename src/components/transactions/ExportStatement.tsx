@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import { useAuthStore } from '@/lib/store'
 import { toast } from 'sonner'
-import { FileDown, Calendar, Loader2 } from 'lucide-react'
+import { FileText, Calendar, Loader2, FileDown } from 'lucide-react'
 
 export default function ExportStatement() {
   const { user } = useAuthStore()
@@ -11,7 +11,7 @@ export default function ExportStatement() {
   const [endDate, setEndDate] = useState('')
   const [loading, setLoading] = useState(false)
 
-  const handleExport = async () => {
+  const handleExportPDF = async () => {
     if (!startDate || !endDate) {
       toast.error('يرجى اختيار فترة التاريخ')
       return
@@ -28,7 +28,6 @@ export default function ExportStatement() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           userId: user?.id,
-          token: useAuthStore.getState().token,
           startDate,
           endDate,
         }),
@@ -40,11 +39,86 @@ export default function ExportStatement() {
         return
       }
 
-      const blob = await res.blob()
+      const html = await res.text()
+
+      // Open in new window for PDF print
+      const printWindow = window.open('', '_blank')
+      if (!printWindow) {
+        toast.error('يرجى السماح بالنوافذ المنبثقة في المتصفح')
+        setLoading(false)
+        return
+      }
+
+      printWindow.document.write(html)
+      printWindow.document.close()
+
+      // Wait for content to load then trigger print
+      printWindow.onload = () => {
+        setTimeout(() => {
+          printWindow.print()
+        }, 500)
+      }
+
+      toast.success('تم تحميل كشف الحساب - اختر Save as PDF من نافذة الطباعة')
+    } catch {
+      toast.error('حدث خطأ أثناء التصدير')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleExportCSV = async () => {
+    if (!startDate || !endDate) {
+      toast.error('يرجى اختيار فترة التاريخ')
+      return
+    }
+
+    setLoading(true)
+    try {
+      const res = await fetch('/api/transactions/export-pdf', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          userId: user?.id,
+          startDate,
+          endDate,
+        }),
+      })
+
+      if (!res.ok) {
+        const data = await res.json()
+        toast.error(data.message || 'حدث خطأ')
+        return
+      }
+
+      const html = await res.text()
+
+      // Parse HTML table to extract data for CSV
+      const parser = new DOMParser()
+      const doc = parser.parseFromString(html, 'text/html')
+      const rows = doc.querySelectorAll('table tbody tr')
+
+      if (rows.length === 0) {
+        toast.error('لا توجد معاملات للتصدير')
+        setLoading(false)
+        return
+      }
+
+      let csv = '\uFEFF' // BOM for Arabic support
+      csv += 'التاريخ,النوع,المبلغ (USDT),الرصيد (USDT)\n'
+
+      rows.forEach((row) => {
+        const cells = row.querySelectorAll('td')
+        if (cells.length >= 4) {
+          csv += `"${cells[0].textContent?.trim()}","${cells[1].textContent?.trim()}","${cells[2].textContent?.trim()}","${cells[3].textContent?.trim()}"\n`
+        }
+      })
+
+      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
       const url = window.URL.createObjectURL(blob)
       const a = document.createElement('a')
       a.href = url
-      a.download = `account_statement_${new Date().toISOString().split('T')[0]}.txt`
+      a.download = `account_statement_${new Date().toISOString().split('T')[0]}.csv`
       document.body.appendChild(a)
       a.click()
       document.body.removeChild(a)
@@ -69,11 +143,11 @@ export default function ExportStatement() {
     <div className="glass-card p-4 rounded-xl space-y-4">
       <div className="flex items-center gap-3">
         <div className="w-10 h-10 rounded-xl bg-blue-500/10 flex items-center justify-center">
-          <FileDown className="w-5 h-5 text-blue-400" />
+          <FileText className="w-5 h-5 text-blue-400" />
         </div>
         <div>
           <h3 className="text-sm font-bold">تصدير كشف حساب</h3>
-          <p className="text-xs text-muted-foreground">تنزيل كشف المعاملات</p>
+          <p className="text-xs text-muted-foreground">PDF أو CSV</p>
         </div>
       </div>
 
@@ -125,20 +199,30 @@ export default function ExportStatement() {
         </div>
       </div>
 
-      <button
-        onClick={handleExport}
-        disabled={loading || !startDate || !endDate}
-        className="w-full h-10 gold-gradient text-gray-900 font-bold rounded-xl hover:opacity-90 transition-all flex items-center justify-center gap-2 text-sm disabled:opacity-50"
-      >
-        {loading ? (
-          <Loader2 className="w-4 h-4 animate-spin" />
-        ) : (
-          <>
-            <FileDown className="w-4 h-4" />
-            تصدير الكشف
-          </>
-        )}
-      </button>
+      <div className="flex gap-2">
+        <button
+          onClick={handleExportPDF}
+          disabled={loading || !startDate || !endDate}
+          className="flex-1 h-10 gold-gradient text-gray-900 font-bold rounded-xl hover:opacity-90 transition-all flex items-center justify-center gap-2 text-sm disabled:opacity-50"
+        >
+          {loading ? (
+            <Loader2 className="w-4 h-4 animate-spin" />
+          ) : (
+            <>
+              <FileText className="w-4 h-4" />
+              تصدير PDF
+            </>
+          )}
+        </button>
+        <button
+          onClick={handleExportCSV}
+          disabled={loading || !startDate || !endDate}
+          className="h-10 px-3 bg-white/5 border border-white/10 text-muted-foreground font-medium rounded-xl hover:bg-white/10 transition-all flex items-center justify-center gap-1.5 text-xs disabled:opacity-50"
+        >
+          <FileDown className="w-3.5 h-3.5" />
+          CSV
+        </button>
+      </div>
     </div>
   )
 }
