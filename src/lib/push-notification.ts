@@ -44,8 +44,8 @@ export async function sendPushNotification(
     const isUrgent = ['transfer', 'deposit', 'withdraw', 'payment'].some(t => 
       (type || '').includes(t)
     ) || ['تحويل', 'إيداع', 'سحب', 'دف'].some(w => title.includes(w))
-    // Use new channel IDs (v3) to avoid cached old channels without sound
-    const channelId = isUrgent ? 'fx_wallet_urgent_v3' : 'fx_wallet_notif_v3'
+    // Use v4 channel IDs
+    const channelId = isUrgent ? 'fx_urgent_v4' : 'fx_v4'
 
     // Build the message
     const message: Message = {

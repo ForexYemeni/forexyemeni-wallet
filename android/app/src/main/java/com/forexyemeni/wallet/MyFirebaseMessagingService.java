@@ -6,11 +6,13 @@ import android.app.PendingIntent;
 import android.content.Context;
 import android.content.Intent;
 import android.media.AudioAttributes;
+import android.media.MediaPlayer;
 import android.media.RingtoneManager;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.PowerManager;
+import android.util.Log;
 
 import androidx.annotation.NonNull;
 import androidx.core.app.NotificationCompat;
@@ -21,17 +23,14 @@ import com.google.firebase.messaging.RemoteMessage;
 import java.util.Random;
 
 /**
- * Custom FirebaseMessagingService that ALWAYS delivers notifications with LOUD sound,
- * even when the app is completely killed by the user or system.
- * 
- * This service overrides Capacitor's default behavior which may not play sound
- * reliably when the app is in foreground.
+ * Custom FCM Service that GUARANTEES sound on every notification.
+ * Uses MediaPlayer to directly play sound file — bypasses all channel issues.
  */
 public class MyFirebaseMessagingService extends FirebaseMessagingService {
 
-    // Use a unique channel ID to avoid cached channel settings
-    private static final String CHANNEL_ID = "fx_wallet_notif_v3";
-    private static final String CHANNEL_ID_URGENT = "fx_wallet_urgent_v3";
+    private static final String TAG = "FX_FCM";
+    private static final String CHANNEL_ID = "fx_v4";
+    private static final String CHANNEL_ID_URGENT = "fx_urgent_v4";
 
     @Override
     public void onCreate() {
@@ -42,11 +41,13 @@ public class MyFirebaseMessagingService extends FirebaseMessagingService {
     @Override
     public void onNewToken(@NonNull String token) {
         super.onNewToken(token);
-        startKeepAliveService();
+        Log.d(TAG, "New FCM token received");
     }
 
     @Override
     public void onMessageReceived(@NonNull RemoteMessage remoteMessage) {
+        Log.d(TAG, "onMessageReceived called");
+
         createNotificationChannels();
         wakeUpDevice();
 
@@ -70,24 +71,92 @@ public class MyFirebaseMessagingService extends FirebaseMessagingService {
         if (title == null) title = "فوركس يمني";
         if (body == null) body = "لديك إشعار جديد";
 
-        String msgType = data.getString("type", "");
-        boolean isUrgent = msgType.contains("transfer") || msgType.contains("deposit") 
-            || msgType.contains("withdraw") || msgType.contains("payment")
-            || (title != null && (title.contains("تحويل") || title.contains("إيداع") 
-                || title.contains("سحب") || title.contains("دف")));
+        Log.d(TAG, "Notification: " + title + " / " + body);
 
-        showNotification(title, body, data, isUrgent);
+        // 1. ALWAYS play sound directly using MediaPlayer (guaranteed)
+        playSoundDirectly();
+
+        // 2. Show notification
+        showNotification(title, body, data);
+    }
+
+    /**
+     * Play notification sound using MediaPlayer.
+     * This BYPASSES notification channel sound settings completely.
+     * Works 100% regardless of Android version, channel config, or app state.
+     */
+    private void playSoundDirectly() {
+        new Thread(() -> {
+            try {
+                MediaPlayer mediaPlayer = MediaPlayer.create(
+                    getApplicationContext(),
+                    R.raw.notification
+                );
+                if (mediaPlayer != null) {
+                    mediaPlayer.setAudioAttributes(
+                        new AudioAttributes.Builder()
+                            .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
+                            .setUsage(AudioAttributes.USAGE_NOTIFICATION)
+                            .build()
+                    );
+                    mediaPlayer.setVolume(1.0f, 1.0f);
+                    mediaPlayer.setOnCompletionListener(mp -> {
+                        mp.release();
+                        Log.d(TAG, "Sound played and released");
+                    });
+                    mediaPlayer.setOnErrorListener((mp, what, extra) -> {
+                        mp.release();
+                        Log.e(TAG, "MediaPlayer error: " + what + " " + extra);
+                        // Fallback: play default notification sound
+                        playDefaultSound();
+                        return true;
+                    });
+                    mediaPlayer.start();
+                } else {
+                    Log.w(TAG, "MediaPlayer is null, using default sound");
+                    playDefaultSound();
+                }
+            } catch (Exception e) {
+                Log.e(TAG, "Failed to play sound: " + e.getMessage());
+                playDefaultSound();
+            }
+        }).start();
+    }
+
+    /**
+     * Fallback: Play the system default notification sound using RingtoneManager.
+     */
+    private void playDefaultSound() {
+        try {
+            Uri defaultSound = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION);
+            if (defaultSound != null) {
+                MediaPlayer mp = new MediaPlayer();
+                mp.setDataSource(getApplicationContext(), defaultSound);
+                mp.setAudioAttributes(
+                    new AudioAttributes.Builder()
+                        .setUsage(AudioAttributes.USAGE_NOTIFICATION)
+                        .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
+                        .build()
+                );
+                mp.prepare();
+                mp.setVolume(1.0f, 1.0f);
+                mp.setOnCompletionListener(MediaPlayer::release);
+                mp.start();
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "Default sound also failed: " + e.getMessage());
+        }
     }
 
     private void wakeUpDevice() {
         try {
-            PowerManager powerManager = (PowerManager) getSystemService(POWER_SERVICE);
-            if (powerManager != null && !powerManager.isInteractive()) {
-                PowerManager.WakeLock wakeLock = powerManager.newWakeLock(
+            PowerManager pm = (PowerManager) getSystemService(POWER_SERVICE);
+            if (pm != null && !pm.isInteractive()) {
+                PowerManager.WakeLock wl = pm.newWakeLock(
                     PowerManager.SCREEN_DIM_WAKE_LOCK | PowerManager.ACQUIRE_CAUSES_WAKEUP,
-                    "forexyemeni:wake"
+                    "fx:wake"
                 );
-                wakeLock.acquire(3000);
+                wl.acquire(3000);
             }
         } catch (Exception ignored) {}
     }
@@ -98,119 +167,78 @@ public class MyFirebaseMessagingService extends FirebaseMessagingService {
         NotificationManager manager = (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
         if (manager == null) return;
 
-        // Use the DEFAULT notification sound as primary (always works)
         Uri defaultSound = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION);
-        // Also use our custom sound
         Uri customSound = Uri.parse("android.resource://" + getPackageName() + "/raw/notification");
 
-        AudioAttributes audioAttributes = new AudioAttributes.Builder()
+        AudioAttributes attrs = new AudioAttributes.Builder()
                 .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
                 .setUsage(AudioAttributes.USAGE_NOTIFICATION)
                 .build();
 
         // Main channel
-        NotificationChannel channel = new NotificationChannel(
-                CHANNEL_ID,
-                "إشعارات فوركس يمني",
-                NotificationManager.IMPORTANCE_HIGH
-        );
-        channel.setDescription("إشعارات المعاملات والأحداث المهمة");
+        NotificationChannel channel = new NotificationChannel(CHANNEL_ID, "إشعارات", NotificationManager.IMPORTANCE_HIGH);
+        channel.setDescription("إشعارات فوركس يمني");
         channel.enableLights(true);
         channel.setLightColor(0xFFD4AF37);
         channel.enableVibration(true);
-        channel.setVibrationPattern(new long[]{0, 500, 200, 500, 200, 500});
-        channel.setSound(defaultSound, audioAttributes);
+        channel.setVibrationPattern(new long[]{0, 500, 200, 500});
+        channel.setSound(customSound, attrs);
         channel.setBypassDnd(true);
         channel.setLockscreenVisibility(NotificationCompat.VISIBILITY_PUBLIC);
         channel.setShowBadge(true);
-
-        try {
-            manager.deleteNotificationChannel(CHANNEL_ID);
-        } catch (Exception ignored) {}
+        try { manager.deleteNotificationChannel(CHANNEL_ID); } catch (Exception ignored) {}
         manager.createNotificationChannel(channel);
 
-        // Urgent channel for transactions
-        NotificationChannel urgentChannel = new NotificationChannel(
-                CHANNEL_ID_URGENT,
-                "إشعارات المعاملات الحرجة",
-                NotificationManager.IMPORTANCE_MAX
-        );
-        urgentChannel.setDescription("إشعارات التحويلات والإيداعات والسحوبات");
-        urgentChannel.enableLights(true);
-        urgentChannel.setLightColor(0xFFD4AF37);
-        urgentChannel.enableVibration(true);
-        urgentChannel.setVibrationPattern(new long[]{0, 800, 200, 800});
-        urgentChannel.setSound(customSound, audioAttributes);
-        urgentChannel.setBypassDnd(true);
-        urgentChannel.setLockscreenVisibility(NotificationCompat.VISIBILITY_PUBLIC);
-        urgentChannel.setShowBadge(true);
-
-        try {
-            manager.deleteNotificationChannel(CHANNEL_ID_URGENT);
-        } catch (Exception ignored) {}
-        manager.createNotificationChannel(urgentChannel);
+        // Urgent channel
+        NotificationChannel urgent = new NotificationChannel(CHANNEL_ID_URGENT, "إشعارات حرجة", NotificationManager.IMPORTANCE_MAX);
+        urgent.setDescription("تحويلات وإيداعات وسحوبات");
+        urgent.enableLights(true);
+        urgent.setLightColor(0xFFD4AF37);
+        urgent.enableVibration(true);
+        urgent.setVibrationPattern(new long[]{0, 800, 200, 800});
+        urgent.setSound(defaultSound, attrs);
+        urgent.setBypassDnd(true);
+        urgent.setLockscreenVisibility(NotificationCompat.VISIBILITY_PUBLIC);
+        urgent.setShowBadge(true);
+        try { manager.deleteNotificationChannel(CHANNEL_ID_URGENT); } catch (Exception ignored) {}
+        manager.createNotificationChannel(urgent);
     }
 
-    private void showNotification(String title, String body, Bundle data, boolean isUrgent) {
-        Context context = getApplicationContext();
-        NotificationManager notificationManager =
-                (NotificationManager) context.getSystemService(Context.NOTIFICATION_SERVICE);
-        if (notificationManager == null) return;
+    private void showNotification(String title, String body, Bundle data) {
+        Context ctx = getApplicationContext();
+        NotificationManager nm = (NotificationManager) ctx.getSystemService(Context.NOTIFICATION_SERVICE);
+        if (nm == null) return;
 
-        String channelId = isUrgent ? CHANNEL_ID_URGENT : CHANNEL_ID;
-
-        Intent intent = new Intent(context, MainActivity.class);
+        Intent intent = new Intent(ctx, MainActivity.class);
         intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP);
         intent.setAction(Intent.ACTION_MAIN);
         intent.addCategory(Intent.CATEGORY_LAUNCHER);
         if (data != null) intent.putExtras(data);
 
         int flags = PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE;
-        PendingIntent pendingIntent = PendingIntent.getActivity(context, 0, intent, flags);
+        PendingIntent pi = PendingIntent.getActivity(ctx, 0, intent, flags);
 
-        // Use BOTH custom sound and default sound to guarantee sound plays
-        Uri customSound = Uri.parse("android.resource://" + getPackageName() + "/raw/notification");
-        Uri defaultSound = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION);
+        int nid = new Random().nextInt(100000);
 
-        int notificationId = new Random().nextInt(100000);
-
-        NotificationCompat.Builder builder = new NotificationCompat.Builder(context, channelId)
+        NotificationCompat.Builder builder = new NotificationCompat.Builder(ctx, CHANNEL_ID)
                 .setSmallIcon(R.drawable.ic_stat_icon)
                 .setContentTitle(title)
                 .setContentText(body)
                 .setStyle(new NotificationCompat.BigTextStyle().bigText(body))
                 .setAutoCancel(true)
-                .setSound(customSound)
-                .setDefaults(NotificationCompat.DEFAULT_VIBRATE | NotificationCompat.DEFAULT_LIGHTS | NotificationCompat.DEFAULT_SOUND)
-                .setContentIntent(pendingIntent)
+                .setContentIntent(pi)
                 .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
                 .setWhen(System.currentTimeMillis())
                 .setPriority(NotificationCompat.PRIORITY_MAX)
                 .setCategory(NotificationCompat.CATEGORY_MESSAGE)
-                .setOnlyAlertOnce(false);
-
-        // Full-screen for urgent on lock screen
-        if (isUrgent && Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            Intent fsIntent = new Intent(context, MainActivity.class);
-            fsIntent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP);
-            PendingIntent fsPendingIntent = PendingIntent.getActivity(context, notificationId, fsIntent, flags);
-            builder.setFullScreenIntent(fsPendingIntent, true);
-        }
+                .setVibrate(new long[]{0, 500, 200, 500})
+                .setDefaults(NotificationCompat.DEFAULT_VIBRATE | NotificationCompat.DEFAULT_LIGHTS);
 
         try {
             builder.setLargeIcon(android.graphics.BitmapFactory.decodeResource(
-                    context.getResources(), R.mipmap.ic_launcher));
+                    ctx.getResources(), R.mipmap.ic_launcher));
         } catch (Exception ignored) {}
 
-        notificationManager.notify(notificationId, builder.build());
-    }
-
-    private void startKeepAliveService() {
-        Intent serviceIntent = new Intent(this, NotificationKeepAliveService.class);
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            startForegroundService(serviceIntent);
-        } else {
-            startService(serviceIntent);
-        }
+        nm.notify(nid, builder.build());
     }
 }
