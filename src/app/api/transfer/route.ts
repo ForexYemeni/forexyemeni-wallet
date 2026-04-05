@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getDb, generateId, nowTimestamp } from '@/lib/firebase'
+import bcrypt from 'bcryptjs'
 
 export async function POST(request: NextRequest) {
   try {
@@ -35,16 +36,14 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ success: false, message: 'حسابك غير مفعّل' }, { status: 403 })
     }
 
-    // Verify PIN using bcrypt-like comparison (stored as hash)
+    // Verify PIN using bcrypt (same method used in set-pin)
     const pinHash = senderData.pinHash
     if (!pinHash) {
       return NextResponse.json({ success: false, message: 'لم يتم إعداد رمز PIN. يرجى إعداده أولاً' }, { status: 400 })
     }
 
-    // Simple PIN verification (compare hashed values)
-    const crypto = await import('crypto')
-    const inputHash = crypto.createHash('sha256').update(pin).digest('hex')
-    if (inputHash !== pinHash) {
+    const isPinValid = await bcrypt.compare(pin, pinHash)
+    if (!isPinValid) {
       return NextResponse.json({ success: false, message: 'رمز PIN غير صحيح' }, { status: 401 })
     }
 
