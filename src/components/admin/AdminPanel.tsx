@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useRef, lazy, Suspense } from 'react'
+import dynamic from 'next/dynamic'
 import { useAuthStore } from '@/lib/store'
 import { toast } from 'sonner'
 import { convertUSDTtoYER, formatYER } from '@/lib/currency'
@@ -193,8 +194,8 @@ export default function AdminPanel() {
   const AdminAuditLog = lazy(() => import('@/components/admin/AdminAuditLog'))
   const AdminReports = lazy(() => import('@/components/admin/AdminReports'))
   const AdminSystemMonitor = lazy(() => import('@/components/admin/AdminSystemMonitor'))
-  const SuperAdminPanel = lazy(() => import('@/components/admin/SuperAdminPanel'))
-  const AdminTeam = lazy(() => import('@/components/admin/AdminTeam'))
+  const SuperAdminPanel = dynamic(() => import('@/components/admin/SuperAdminPanel'), { ssr: false })
+  const AdminTeam = dynamic(() => import('@/components/admin/AdminTeam'), { ssr: false })
   const AdminFinancial = lazy(() => import('@/components/admin/AdminFinancial'))
   const BannerManager = lazy(() => import('@/components/admin/BannerManager'))
   const PromoManager = lazy(() => import('@/components/admin/PromoManager'))
