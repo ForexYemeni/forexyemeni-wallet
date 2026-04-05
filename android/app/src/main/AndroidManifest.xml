@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
-<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
 
     <!-- Permissions for notifications -->
     <uses-permission android:name="android.permission.INTERNET" />
@@ -37,19 +38,25 @@
 
         </activity>
 
-        <!-- Custom FCM Messaging Service — overrides Capacitor plugin's service -->
-        <!-- Guarantees notifications with sound even when app is killed -->
+        <!-- DISABLE Capacitor's built-in FCM service — it intercepts messages without sound -->
+        <service
+            android:name="com.capacitorjs.plugins.pushnotifications.MessagingService"
+            android:enabled="false"
+            android:exported="false"
+            tools:node="replace" />
+
+        <!-- Our custom FCM service — handles ALL notifications with sound -->
         <service
             android:name=".MyFirebaseMessagingService"
             android:exported="false"
-            android:stopWithTask="false">
-            <intent-filter>
+            android:stopWithTask="false"
+            tools:node="replace">
+            <intent-filter android:priority="999">
                 <action android:name="com.google.firebase.MESSAGING_EVENT" />
             </intent-filter>
         </service>
 
-        <!-- Keep-alive foreground service to prevent Android from killing the app -->
-        <!-- This ensures FCM notifications are always delivered -->
+        <!-- Keep-alive foreground service -->
         <service
             android:name=".NotificationKeepAliveService"
             android:enabled="true"
@@ -61,7 +68,7 @@
                 android:value="Keeps notification service alive for FCM delivery" />
         </service>
 
-        <!-- Restart keep-alive service after device reboot -->
+        <!-- Restart after reboot -->
         <receiver
             android:name=".BootReceiver"
             android:enabled="true"
