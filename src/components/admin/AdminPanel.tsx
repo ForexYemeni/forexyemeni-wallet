@@ -241,6 +241,9 @@ export default function AdminPanel() {
   const [proofLoading, setProofLoading] = useState(false)
   // Full image preview
   const [previewImage, setPreviewImage] = useState<string | null>(null)
+  // More tabs dropdown
+  const [showMoreMenu, setShowMoreMenu] = useState(false)
+  const moreMenuRef = useRef<HTMLDivElement>(null)
   // Stats state
   const [stats, setStats] = useState<AdminStats | null>(null)
   const [statsLoading, setStatsLoading] = useState(false)
@@ -254,6 +257,17 @@ export default function AdminPanel() {
   const [removeMerchantLoading, setRemoveMerchantLoading] = useState(false)
   // PIN reset requests state
   const [pinResetRequests, setPinResetRequests] = useState<any[]>([])
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (moreMenuRef.current && !moreMenuRef.current.contains(e.target as Node)) {
+        setShowMoreMenu(false)
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [])
 
   // Track which tabs have been loaded to avoid re-fetching
   const [loadedTabs, setLoadedTabs] = useState<Set<string>>(new Set())
@@ -922,16 +936,16 @@ export default function AdminPanel() {
   // Determine if user has specific permissions
   const hasPermissions = user?.permissions && Object.keys(user.permissions).length > 0
 
-  const tabs = [
+  const allTabs = [
     { key: 'dashboard' as const, label: 'الإحصائيات', icon: BarChart3, count: stats?.pendingActions || 0 },
     { key: 'users' as const, label: 'المستخدمون', icon: Users, count: users.length },
     { key: 'deposits' as const, label: 'الإيداعات', icon: ArrowDownLeft, count: deposits.filter(d => d.status === 'pending' || d.status === 'reviewing').length },
     { key: 'withdrawals' as const, label: 'السحوبات', icon: ArrowUpRight, count: withdrawals.filter(w => w.status === 'pending' || w.status === 'approved').length },
     { key: 'kyc' as const, label: 'التحقق', icon: Shield, count: kycRecords.filter(k => k.status === 'pending').length },
+    { key: 'chats' as const, label: 'المحادثات', icon: MessageCircle, count: chatUnreadCount },
     { key: 'payment-methods' as const, label: 'طرق الدفع', icon: CreditCard, count: paymentMethods.filter(p => p.isActive).length },
     { key: 'referral-settings' as const, label: 'برنامج الدعوات', icon: Gift, count: 0 },
     { key: 'admin-settings' as const, label: 'إعدادات الإدارة', icon: Settings, count: 0 },
-    { key: 'chats' as const, label: 'المحادثات', icon: MessageCircle, count: chatUnreadCount },
     { key: 'faq-bot' as const, label: 'البوت والأسئلة', icon: MessageSquare, count: 0 },
     { key: 'p2p' as const, label: 'P2P والنزاعات', icon: Repeat, count: 0 },
     { key: 'audit-log' as const, label: 'سجل العمليات', icon: Clock, count: 0 },
@@ -944,7 +958,12 @@ export default function AdminPanel() {
     { key: 'super-admin' as const, label: '🛡️ تحكم خارق', icon: Shield, count: 0 },
   ]
 
-  const allowedTabKeys = tabs.map(t => t.key)
+  // Split into main tabs (6) and more tabs (13)
+  const MAIN_TABS_COUNT = 6
+  const mainTabs = allTabs.slice(0, MAIN_TABS_COUNT)
+  const moreTabs = allTabs.slice(MAIN_TABS_COUNT)
+
+  const allowedTabKeys = allTabs.map(t => t.key)
   const effectiveActiveTab = allowedTabKeys.includes(activeTab) ? activeTab : allowedTabKeys[0] || 'dashboard'
 
   // NEVER show admin accounts in users list — admin is not a user
@@ -1019,9 +1038,9 @@ export default function AdminPanel() {
         </div>
       </div>
 
-      {/* FIX 10: Scrollable horizontal tabs */}
-      <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-none">
-        {tabs.map((tab) => (
+      {/* Main tabs (6) + More dropdown */}
+      <div className="flex gap-2 pb-2 scrollbar-none">
+        {mainTabs.map((tab) => (
           <button
             key={tab.key}
             onClick={() => setActiveTab(tab.key)}
@@ -1040,6 +1059,45 @@ export default function AdminPanel() {
             )}
           </button>
         ))}
+
+        {/* المزيد button */}
+        <div className="relative flex-shrink-0" ref={moreMenuRef}>
+          <button
+            onClick={() => setShowMoreMenu(!showMoreMenu)}
+            className={`flex items-center gap-2 px-4 py-3 rounded-xl text-xs transition-all whitespace-nowrap ${
+              showMoreMenu
+                ? 'bg-gold/10 text-gold border border-gold/20'
+                : 'text-muted-foreground hover:text-foreground hover:bg-white/5 border border-transparent'
+            }`}
+          >
+            المزيد
+            <ChevronDown className={`w-4 h-4 transition-transform ${showMoreMenu ? 'rotate-180' : ''}`} />
+          </button>
+
+          {showMoreMenu && (
+            <div className="absolute top-full right-0 mt-2 glass-card rounded-xl border border-white/10 py-2 min-w-[200px] z-50 max-h-[70vh] overflow-y-auto shadow-2xl">
+              {moreTabs.map((tab) => (
+                <button
+                  key={tab.key}
+                  onClick={() => { setActiveTab(tab.key); setShowMoreMenu(false) }}
+                  className={`flex items-center gap-2.5 px-4 py-2.5 text-xs w-full text-right transition-colors ${
+                    effectiveActiveTab === tab.key
+                      ? 'text-gold bg-gold/5'
+                      : 'text-muted-foreground hover:text-foreground hover:bg-white/5'
+                  }`}
+                >
+                  <tab.icon className="w-4 h-4 flex-shrink-0" />
+                  <span className="flex-1">{tab.label}</span>
+                  {tab.count > 0 && (
+                    <span className="w-5 h-5 bg-gold text-gray-900 text-[10px] font-bold rounded-full flex items-center justify-center flex-shrink-0">
+                      {tab.count}
+                    </span>
+                  )}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
       </div>
 
       {loading ? (
