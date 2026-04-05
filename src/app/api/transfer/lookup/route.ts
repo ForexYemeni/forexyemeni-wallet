@@ -11,7 +11,7 @@ export async function POST(request: NextRequest) {
 
     const db = getDb()
     const receiverInput = receiver.trim()
-    let found: { id: string; fullName: string | null; email: string; phone: string | null; accountNumber: number | null } | null = null
+    let found: { id: string; fullName: string | null; email: string; phone: string | null; accountNumber: number | null; status: string; role: string } | null = null
 
     // Try 1: Account Number (numeric)
     if (/^\d{4,10}$/.test(receiverInput)) {
@@ -21,7 +21,7 @@ export async function POST(request: NextRequest) {
         .get()
       if (!snap.empty) {
         const d = snap.docs[0].data()
-        found = { id: snap.docs[0].id, fullName: d.fullName, email: d.email, phone: d.phone, accountNumber: d.accountNumber }
+        found = { id: snap.docs[0].id, fullName: d.fullName, email: d.email, phone: d.phone, accountNumber: d.accountNumber, status: d.status || 'active', role: d.role || 'user' }
       }
     }
 
@@ -33,7 +33,7 @@ export async function POST(request: NextRequest) {
         .get()
       if (!snap.empty) {
         const d = snap.docs[0].data()
-        found = { id: snap.docs[0].id, fullName: d.fullName, email: d.email, phone: d.phone, accountNumber: d.accountNumber }
+        found = { id: snap.docs[0].id, fullName: d.fullName, email: d.email, phone: d.phone, accountNumber: d.accountNumber, status: d.status || 'active', role: d.role || 'user' }
       }
     }
 
@@ -57,7 +57,7 @@ export async function POST(request: NextRequest) {
           .get()
         if (!snap.empty) {
           const d = snap.docs[0].data()
-          found = { id: snap.docs[0].id, fullName: d.fullName, email: d.email, phone: d.phone, accountNumber: d.accountNumber }
+          found = { id: snap.docs[0].id, fullName: d.fullName, email: d.email, phone: d.phone, accountNumber: d.accountNumber, status: d.status || 'active', role: d.role || 'user' }
           break
         }
       }
