@@ -17,9 +17,19 @@ import {
   Hash,
   Copy,
   Check as CheckIcon,
+  User,
+  Search,
 } from 'lucide-react'
 
 type Step = 'input' | 'confirm' | 'pin' | 'success' | 'error'
+
+interface ReceiverInfo {
+  id: string
+  fullName: string | null
+  email: string
+  phone: string | null
+  accountNumber: number | null
+}
 
 export default function TransferScreen() {
   const { user, setScreen, updateBalance } = useAuthStore()
@@ -31,6 +41,8 @@ export default function TransferScreen() {
   const [error, setError] = useState('')
   const [result, setResult] = useState<{ senderBalance: number; receiverBalance: number } | null>(null)
   const [copiedAccount, setCopiedAccount] = useState(false)
+  const [receiverInfo, setReceiverInfo] = useState<ReceiverInfo | null>(null)
+  const [lookupLoading, setLookupLoading] = useState(false)
 
   const transferAmount = parseFloat(amount) || 0
 
@@ -66,7 +78,8 @@ export default function TransferScreen() {
 
   const InputIcon = getInputIcon()
 
-  const handleNext = () => {
+  // Step 1: Validate input → lookup receiver → show confirm
+  const handleNext = async () => {
     setError('')
     if (!receiver.trim()) {
       setError('يرجى إدخال بريد أو رقم هاتف أو رقم حساب المستلم')
@@ -84,14 +97,36 @@ export default function TransferScreen() {
       setError('رصيدك غير كافي')
       return
     }
-    setStep('confirm')
+
+    // Lookup receiver to show their info before PIN
+    setLookupLoading(true)
+    try {
+      const res = await fetch('/api/transfer/lookup', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ receiver: receiver.trim(), senderId: user?.id }),
+      })
+      const data = await res.json()
+      if (data.success) {
+        setReceiverInfo(data.receiver)
+        setStep('confirm')
+      } else {
+        setError(data.message)
+      }
+    } catch {
+      setError('حدث خطأ في البحث عن المستلم')
+    } finally {
+      setLookupLoading(false)
+    }
   }
 
+  // Step 2: User confirmed receiver info → go to PIN
   const handleConfirm = () => {
     setStep('pin')
     setPin('')
   }
 
+  // Step 3: Enter PIN → execute transfer
   const handleTransfer = async () => {
     if (!pin) {
       toast.error('يرجى إدخال رمز PIN')
@@ -144,11 +179,12 @@ export default function TransferScreen() {
     setPin('')
     setError('')
     setResult(null)
+    setReceiverInfo(null)
   }
 
   const copyAccountNumber = () => {
     if (user?.accountNumber) {
-      navigator.clipboard.writeText(user.accountNumber)
+      navigator.clipboard.writeText(String(user.accountNumber))
       setCopiedAccount(true)
       toast.success('تم نسخ رقم الحساب')
       setTimeout(() => setCopiedAccount(false), 2000)
@@ -261,10 +297,20 @@ export default function TransferScreen() {
 
           <button
             onClick={handleNext}
-            className="w-full h-12 gold-gradient text-gray-900 font-bold rounded-xl hover:opacity-90 transition-all gold-glow flex items-center justify-center gap-2"
+            disabled={lookupLoading}
+            className="w-full h-12 gold-gradient text-gray-900 font-bold rounded-xl hover:opacity-90 transition-all gold-glow flex items-center justify-center gap-2 disabled:opacity-50"
           >
-            <ArrowRightLeft className="w-5 h-5" />
-            متابعة
+            {lookupLoading ? (
+              <>
+                <Loader2 className="w-5 h-5 animate-spin" />
+                جاري البحث عن المستلم...
+              </>
+            ) : (
+              <>
+                <ArrowRightLeft className="w-5 h-5" />
+                متابعة
+              </>
+            )}
           </button>
 
           {/* Help text */}
@@ -276,30 +322,57 @@ export default function TransferScreen() {
         </div>
       )}
 
-      {/* Step: Confirm */}
-      {step === 'confirm' && (
+      {/* Step: Confirm — shows receiver info */}
+      {step === 'confirm' && receiverInfo && (
         <div className="glass-card p-6 rounded-xl space-y-5">
           <div className="text-center space-y-2">
-            <div className="w-16 h-16 mx-auto rounded-2xl bg-gold/10 flex items-center justify-center">
-              <ArrowRightLeft className="w-8 h-8 text-gold" />
+            <div className="w-16 h-16 mx-auto rounded-2xl bg-green-500/10 flex items-center justify-center">
+              <CheckCircle className="w-8 h-8 text-green-400" />
             </div>
-            <h2 className="text-lg font-bold gold-text">تأكيد التحويل</h2>
+            <h2 className="text-lg font-bold text-green-400">تم العثور على المستلم</h2>
           </div>
 
+          {/* Receiver Info Card */}
+          <div className="p-4 rounded-xl bg-green-500/5 border border-green-500/20 space-y-3">
+            <div className="flex items-center gap-3">
+              <div className="w-12 h-12 rounded-xl bg-green-500/10 flex items-center justify-center">
+                <User className="w-6 h-6 text-green-400" />
+              </div>
+              <div className="flex-1">
+                <p className="text-base font-bold">{receiverInfo.fullName || 'بدون اسم'}</p>
+                <p className="text-xs text-muted-foreground" dir="ltr">{receiverInfo.email}</p>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              {receiverInfo.accountNumber && (
+                <div className="p-2.5 rounded-lg bg-white/5">
+                  <p className="text-[10px] text-muted-foreground">رقم الحساب</p>
+                  <p className="text-sm font-bold font-mono text-gold">{receiverInfo.accountNumber}</p>
+                </div>
+              )}
+              {receiverInfo.phone && (
+                <div className="p-2.5 rounded-lg bg-white/5">
+                  <p className="text-[10px] text-muted-foreground">رقم الهاتف</p>
+                  <p className="text-sm font-medium" dir="ltr">+967 {receiverInfo.phone}</p>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Transfer Details */}
           <div className="p-4 rounded-xl bg-white/5 border border-white/10 space-y-3">
             <div className="flex items-center justify-between">
-              <span className="text-sm text-muted-foreground">إلى</span>
-              <span className="text-sm font-medium" dir="ltr">{receiver}</span>
-            </div>
-            <div className="flex items-center justify-between">
-              <span className="text-sm text-muted-foreground">طريقة التعريف</span>
-              <span className="text-xs text-gold">
-                {inputType === 'email' ? 'بريد إلكتروني' : inputType === 'phone' ? 'رقم هاتف' : 'رقم حساب'}
-              </span>
-            </div>
-            <div className="border-t border-white/10 pt-3 flex items-center justify-between">
               <span className="text-sm text-muted-foreground">المبلغ</span>
               <span className="text-xl font-bold gold-text">{transferAmount.toFixed(2)} USDT</span>
+            </div>
+            <div className="border-t border-white/10 pt-3 flex items-center justify-between">
+              <span className="text-sm text-muted-foreground">سيُخصم من رصيدك</span>
+              <span className="text-sm font-medium">{(user?.balance ?? 0).toFixed(2)} USDT</span>
+            </div>
+            <div className="flex items-center justify-between">
+              <span className="text-sm text-muted-foreground">الرصيد بعد التحويل</span>
+              <span className="text-sm font-bold text-blue-400">{((user?.balance ?? 0) - transferAmount).toFixed(2)} USDT</span>
             </div>
           </div>
 
@@ -315,7 +388,7 @@ export default function TransferScreen() {
               className="flex-1 h-12 gold-gradient text-gray-900 font-bold rounded-xl hover:opacity-90 transition-all gold-glow flex items-center justify-center gap-2"
             >
               <Shield className="w-5 h-5" />
-              تأكيد
+              تأكيد وإدخال PIN
             </button>
           </div>
         </div>
@@ -331,6 +404,14 @@ export default function TransferScreen() {
             <h2 className="text-lg font-bold gold-text">أدخل رمز PIN</h2>
             <p className="text-sm text-muted-foreground">لإتمام عملية التحويل</p>
           </div>
+
+          {/* Reminder of transfer details */}
+          {receiverInfo && (
+            <div className="p-3 rounded-xl bg-white/[0.03] border border-white/5 text-center space-y-1">
+              <p className="text-xs text-muted-foreground">تحويل إلى <span className="text-foreground font-medium">{receiverInfo.fullName || receiverInfo.email}</span></p>
+              <p className="text-lg font-bold gold-text">{transferAmount.toFixed(2)} USDT</p>
+            </div>
+          )}
 
           <div className="flex justify-center gap-3">
             {[0, 1, 2, 3, 4, 5].map((i) => (
@@ -392,7 +473,14 @@ export default function TransferScreen() {
           <div className="space-y-2">
             <h2 className="text-xl font-bold text-green-400">تم التحويل بنجاح!</h2>
             <p className="text-2xl font-bold gold-text">{transferAmount.toFixed(2)} USDT</p>
-            <p className="text-sm text-muted-foreground" dir="ltr">إلى {receiver}</p>
+            {receiverInfo && (
+              <p className="text-sm text-muted-foreground">
+                إلى {receiverInfo.fullName || receiverInfo.email}
+                {receiverInfo.accountNumber && (
+                  <span className="text-gold font-mono mr-2">({receiverInfo.accountNumber})</span>
+                )}
+              </p>
+            )}
           </div>
 
           {result && (
