@@ -5,6 +5,7 @@ const EMAIL_SECRET = process.env.EMAIL_SECRET || 'fxwallet2024'
 
 async function sendEmailViaScript(to: string, subject: string, htmlContent: string): Promise<boolean> {
   if (!SCRIPT_URL) {
+    console.error('[EMAIL] GOOGLE_APPS_SCRIPT_URL is not configured. Email cannot be sent to:', to, 'subject:', subject)
     return false
   }
 
@@ -31,11 +32,14 @@ async function sendEmailViaScript(to: string, subject: string, htmlContent: stri
     }
 
     if (result.success) {
+      console.log('[EMAIL] Successfully sent to:', to, 'subject:', subject)
       return true
     } else {
+      console.error('[EMAIL] Script returned failure for:', to, 'subject:', subject, 'error:', result.error)
       return false
     }
   } catch (error) {
+    console.error('[EMAIL] Failed to send email to:', to, 'subject:', subject, 'error:', error)
     return false
   }
 }
