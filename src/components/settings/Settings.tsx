@@ -31,6 +31,7 @@ import {
   EyeOff,
   Volume2,
   VolumeX,
+  Mail,
 } from 'lucide-react'
 import {
   getNotificationSoundSettings,
@@ -41,6 +42,7 @@ import {
 } from '@/lib/notification-settings'
 import { playNotificationSound } from '@/lib/notification-sound'
 import TwoFactorSettings from '@/components/auth/TwoFactorSettings'
+import ChangeEmail from '@/components/settings/ChangeEmail'
 
 export default function SettingsPage() {
   const { user, logout, updateUser, setScreen } = useAuthStore()
@@ -53,6 +55,7 @@ export default function SettingsPage() {
   const [showNewPassword, setShowNewPassword] = useState(false)
   const [logoutDialogOpen, setLogoutDialogOpen] = useState(false)
   const [show2FASettings, setShow2FASettings] = useState(false)
+  const [showChangeEmail, setShowChangeEmail] = useState(false)
 
   // Notification sound settings
   const [soundSettings, setSoundSettings] = useState<NotificationSoundSettings>(() => getNotificationSoundSettings())
@@ -169,8 +172,8 @@ export default function SettingsPage() {
       </div>
 
       {/* Profile Tab */}
-      {activeTab === 'profile' && (
-        <div className="glass-card p-5 space-y-4">
+      {activeTab === 'profile' && !showChangeEmail && (
+        <div className="glass-card p-5 space-y-4 animate-fade-in">
           <h3 className="text-sm font-bold">المعلومات الشخصية</h3>
           <form onSubmit={handleUpdateProfile} className="space-y-4">
             <div className="space-y-2">
@@ -183,7 +186,16 @@ export default function SettingsPage() {
               />
             </div>
             <div className="space-y-2">
-              <Label className="text-sm text-muted-foreground">البريد الإلكتروني</Label>
+              <div className="flex items-center justify-between">
+                <Label className="text-sm text-muted-foreground">البريد الإلكتروني</Label>
+                <button
+                  type="button"
+                  onClick={() => setShowChangeEmail(true)}
+                  className="text-xs text-gold hover:text-gold/80 font-medium transition-colors"
+                >
+                  تغيير
+                </button>
+              </div>
               <Input
                 value={user?.email || ''}
                 disabled
@@ -208,7 +220,30 @@ export default function SettingsPage() {
               {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : 'حفظ التغييرات'}
             </Button>
           </form>
+
+          {/* Change Email Button */}
+          <div className="pt-3 border-t border-white/5">
+            <button
+              onClick={() => setShowChangeEmail(true)}
+              className="w-full flex items-center justify-between p-4 rounded-xl bg-white/5 hover:bg-white/10 transition-colors"
+            >
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-gold/10 flex items-center justify-center">
+                  <Mail className="w-5 h-5 text-gold" />
+                </div>
+                <div className="text-right">
+                  <p className="text-sm font-bold">تغيير البريد الإلكتروني</p>
+                  <p className="text-xs text-muted-foreground">تحديث البريد الإلكتروني المرتبط بحسابك</p>
+                </div>
+              </div>
+              <ChevronLeft className="w-4 h-4 text-muted-foreground" />
+            </button>
+          </div>
         </div>
+      )}
+
+      {activeTab === 'profile' && showChangeEmail && (
+        <ChangeEmail onClose={() => setShowChangeEmail(false)} />
       )}
 
       {/* Password Tab */}

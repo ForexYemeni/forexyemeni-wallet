@@ -758,6 +758,17 @@ export async function sendMerchantWithdrawalRejectedEmail(
 
 // ===================== 2FA EMAIL FUNCTIONS =====================
 
+export async function sendChangeEmailCodeEmail(to: string, code: string): Promise<boolean> {
+  const html = buildOtpEmail(
+    'تغيير البريد الإلكتروني',
+    'أدخل الرمز أدناه لتأكيد تغيير البريد الإلكتروني المرتبط بحسابك في محفظة فوركس يمني.',
+    code,
+    '#d4af37',
+    'إذا لم تطلب هذا التغيير، يرجى تجاهل هذه الرسالة وتأمين حسابك فوراً.'
+  )
+  return sendEmailViaScript(to, 'تغيير البريد الإلكتروني - فوركس يمني', html)
+}
+
 export async function send2FACodeEmail(to: string, code: string): Promise<boolean> {
   const html = buildOtpEmail(
     'رمز المصادقة الثنائية',
