@@ -62,6 +62,13 @@ export default function Dashboard() {
         if (data.balance !== null && data.balance !== undefined && data.balance !== user?.balance) {
           updateBalance(data.balance)
         }
+        // Also update accountNumber from server if available
+        if (data.accountNumber && data.accountNumber !== user?.accountNumber) {
+          useAuthStore.getState().updateUser({ accountNumber: data.accountNumber } as any)
+        }
+        if (data.frozenBalance !== null && data.frozenBalance !== undefined && data.frozenBalance !== user?.frozenBalance) {
+          useAuthStore.getState().updateUser({ frozenBalance: data.frozenBalance } as any)
+        }
       }
     } catch {
       // silently fail
@@ -75,9 +82,23 @@ export default function Dashboard() {
     try {
       const res = await fetch(`/api/transactions?userId=${user.id}`)
       const data = await res.json()
-      if (data.success && data.balance !== null && data.balance !== undefined) {
-        if (data.balance !== user?.balance) {
-          updateBalance(data.balance)
+      if (data.success) {
+        const updates: Record<string, unknown> = {}
+        let needsUpdate = false
+        if (data.balance !== null && data.balance !== undefined && data.balance !== user?.balance) {
+          updates.balance = data.balance
+          needsUpdate = true
+        }
+        if (data.frozenBalance !== null && data.frozenBalance !== undefined && data.frozenBalance !== user?.frozenBalance) {
+          updates.frozenBalance = data.frozenBalance
+          needsUpdate = true
+        }
+        if (data.accountNumber && data.accountNumber !== user?.accountNumber) {
+          updates.accountNumber = data.accountNumber
+          needsUpdate = true
+        }
+        if (needsUpdate) {
+          useAuthStore.getState().updateUser(updates as any)
         }
       }
     } catch {
