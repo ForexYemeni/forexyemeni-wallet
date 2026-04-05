@@ -2,12 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { useAuthStore } from '@/lib/store'
-import { playNotificationSound, playSuccessSound, showBrowserNotification, vibrate, initAudioOnInteraction } from '@/lib/notification-sound'
-
-// Check if running inside Capacitor native app
-function isCapacitor(): boolean {
-  return typeof window !== 'undefined' && !!(window as any).Capacitor
-}
+import { playNotificationSound, playSuccessSound, playAlertSound, showBrowserNotification, vibrate, initAudioOnInteraction } from '@/lib/notification-sound'
 
 interface NotificationItem {
   id: string
@@ -22,7 +17,10 @@ interface NotificationItem {
 /**
  * Real-time notification listener hook.
  * Polls every 5 seconds to detect new notifications.
- * Plays native sound (APK) or Web Audio (browser) on new items.
+ * Plays sound (HTML5 Audio in Capacitor, Web Audio in browser) on new items.
+ *
+ * IMPORTANT: Sound plays from HERE (JS/WebView) when app is in foreground.
+ * When app is in background, native FCM handles sound.
  */
 export function useRealtimeNotifications() {
   const user = useAuthStore(s => s.user)
@@ -54,22 +52,21 @@ export function useRealtimeNotifications() {
       // Get the latest notification
       const latest = newOnes[0]
 
-      // In Capacitor APK: native FCM (MyFirebaseMessagingService) already
-      // handles sound + vibration + notification display. Do NOT duplicate here.
-      if (isCapacitor()) {
-        // Only update internal state, no sound/notification from JS side
-        lastCheckedRef.current = newOnes[0].createdAt
-        return
+      // Play sound based on notification type
+      // This works in BOTH web and Capacitor (foreground)
+      try {
+        if (latest.type === 'success') {
+          await playSuccessSound(latest.type)
+        } else if (latest.type === 'warning' || latest.type === 'error') {
+          await playAlertSound(latest.type)
+        } else {
+          await playNotificationSound(latest.type)
+        }
+      } catch {
+        // Sound failed silently
       }
 
-      // Web-only: play sound and show browser notification
-      if (latest.type === 'success') {
-        await playSuccessSound(latest.type)
-      } else {
-        await playNotificationSound(latest.type)
-      }
-
-      // Show browser notification (web only)
+      // Show browser notification (web only — skipped in Capacitor)
       await showBrowserNotification(latest.title, latest.message)
 
       // Update last checked timestamp

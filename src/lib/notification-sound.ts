@@ -1,11 +1,15 @@
 /**
- * Notification sound system - v2.7.0
+ * Notification sound system - v3.4.0
  * 
  * Priority chain for playing sounds:
  * 1. Check user sound preferences (notification-settings.ts)
- * 2. Capacitor native notifications (Android APK) — with sound file
- * 3. HTML5 Audio element — uses WAV files from /sounds/ (most reliable on web)
- * 4. Web Audio API oscillators — fallback if no audio files available
+ * 2. HTML5 Audio element — uses WAV files from /sounds/ (works in WebView)
+ * 3. Web Audio API oscillators — fallback if no audio files available
+ *
+ * IMPORTANT: In Capacitor APK, we use HTML5 Audio (not LocalNotifications)
+ * to avoid creating duplicate notifications. The native FCM service
+ * already handles notification display with sound in background.
+ * In foreground, this JS code handles sound.
  */
 
 import { shouldPlaySound } from '@/lib/notification-settings'
@@ -15,23 +19,7 @@ function isCapacitor(): boolean {
   return typeof window !== 'undefined' && !!(window as any).Capacitor
 }
 
-// ============ Capacitor Native Sound ============
-
-/**
- * Play notification sound using Capacitor native notifications.
- * Works reliably in Android APK even in background.
- */
-async function playNativeSound(title: string, body: string): Promise<boolean> {
-  // In Capacitor APK: native FCM (MyFirebaseMessagingService) already handles
-  // notification display with sound. Do NOT create duplicate local notifications.
-  // This function is intentionally disabled in Capacitor to prevent double notifications.
-  if (isCapacitor()) return false
-
-  // Only for web — not applicable (web doesn't have Capacitor local notifications)
-  return false
-}
-
-// ============ HTML5 Audio Element (Primary Web Method) ============
+// ============ HTML5 Audio Element (Primary Method - works in both Web and Capacitor) ============
 
 // Preload audio elements for instant playback
 const audioElements: Record<string, HTMLAudioElement | null> = {
@@ -60,7 +48,7 @@ function preloadAudioFiles() {
     try {
       const audio = new Audio(src)
       audio.preload = 'auto'
-      audio.volume = 0.6
+      audio.volume = 1.0  // MAX volume for notification reliability
       // Store reference
       audioElements[key as keyof typeof audioElements] = audio
     } catch (error) {
@@ -69,7 +57,8 @@ function preloadAudioFiles() {
 }
 
 /**
- * Play sound using HTML5 Audio element (most reliable on web).
+ * Play sound using HTML5 Audio element.
+ * Works in both web browser and Capacitor WebView.
  */
 function playAudioElement(type: 'notification' | 'success' | 'alert'): Promise<boolean> {
   return new Promise((resolve) => {
@@ -79,22 +68,23 @@ function playAudioElement(type: 'notification' | 'success' | 'alert'): Promise<b
         // Try creating on the fly
         const src = `/sounds/${type}.wav`
         const fallback = new Audio(src)
-        fallback.volume = 0.6
+        fallback.volume = 1.0
         fallback.onended = () => resolve(true)
         fallback.onerror = () => resolve(false)
         fallback.play().catch(() => resolve(false))
         // Timeout fallback
-        setTimeout(() => resolve(true), 2000)
+        setTimeout(() => resolve(true), 3000)
         return
       }
 
       // Reset to beginning in case it was played before
       audio.currentTime = 0
+      audio.volume = 1.0
       audio.onended = () => resolve(true)
       audio.onerror = () => resolve(false)
       audio.play().catch(() => resolve(false))
       // Timeout fallback
-      setTimeout(() => resolve(true), 2000)
+      setTimeout(() => resolve(true), 3000)
     } catch {
       resolve(false)
     }
@@ -151,7 +141,7 @@ if (typeof document !== 'undefined') {
 /**
  * Play a beep using Web Audio API oscillators (fallback method).
  */
-async function playWebAudioBeep(frequencies: number[], type: OscillatorType = 'sine', volume = 0.3) {
+async function playWebAudioBeep(frequencies: number[], type: OscillatorType = 'sine', volume = 0.5) {
   const ctx = await getAudioContext()
   if (!ctx) return
 
@@ -161,13 +151,13 @@ async function playWebAudioBeep(frequencies: number[], type: OscillatorType = 's
       const osc = ctx.createOscillator()
       const gain = ctx.createGain()
       osc.type = type
-      osc.frequency.setValueAtTime(freq, now + i * 0.12)
-      gain.gain.setValueAtTime(volume, now + i * 0.12)
-      gain.gain.exponentialRampToValueAtTime(0.01, now + i * 0.12 + 0.25)
+      osc.frequency.setValueAtTime(freq, now + i * 0.15)
+      gain.gain.setValueAtTime(volume, now + i * 0.15)
+      gain.gain.exponentialRampToValueAtTime(0.01, now + i * 0.15 + 0.3)
       osc.connect(gain)
       gain.connect(ctx.destination)
-      osc.start(now + i * 0.12)
-      osc.stop(now + i * 0.12 + 0.25)
+      osc.start(now + i * 0.15)
+      osc.stop(now + i * 0.15 + 0.3)
     })
   } catch (error) {
   }
@@ -177,73 +167,58 @@ async function playWebAudioBeep(frequencies: number[], type: OscillatorType = 's
 
 /**
  * Play notification chime sound.
- * Tries native Android → HTML5 Audio → Web Audio API.
- * @param type - Notification type ('deposit', 'withdrawal', 'kyc', etc.)
- *               Used to check user's sound preferences.
+ * Tries HTML5 Audio → Web Audio API.
+ * Works in BOTH web browser and Capacitor WebView (foreground).
  */
 export async function playNotificationSound(type: string = 'general') {
   // Check user preferences first
   if (!shouldPlaySound(type)) return
 
-  // 1. Try native sound first (Capacitor APK)
-  const nativeOk = await playNativeSound('🔔', 'لديك إشعار جديد')
-  if (nativeOk) return
-
-  // 2. Try HTML5 Audio element (web - most reliable)
+  // 1. Try HTML5 Audio element (works in both web and Capacitor)
   const audioOk = await playAudioElement('notification')
   if (audioOk) {
     vibrate([200, 100, 200])
     return
   }
 
-  // 3. Fallback: Web Audio API oscillators
-  await playWebAudioBeep([880, 1046.5, 1318.5], 'sine', 0.4)
+  // 2. Fallback: Web Audio API oscillators
+  await playWebAudioBeep([880, 1046.5, 1318.5], 'sine', 0.5)
   vibrate([200, 100, 200])
 }
 
 /**
  * Play success sound.
- * @param type - Notification type for preference check
  */
 export async function playSuccessSound(type: string = 'general') {
   if (!shouldPlaySound(type)) return
 
-  // 1. Try native
-  const nativeOk = await playNativeSound('✅', 'تمت العملية بنجاح')
-  if (nativeOk) return
-
-  // 2. Try HTML5 Audio
+  // 1. Try HTML5 Audio
   const audioOk = await playAudioElement('success')
   if (audioOk) {
     vibrate([200, 100, 200])
     return
   }
 
-  // 3. Fallback: Web Audio
-  await playWebAudioBeep([523.25, 659.25, 783.99], 'sine', 0.35)
+  // 2. Fallback: Web Audio
+  await playWebAudioBeep([523.25, 659.25, 783.99], 'sine', 0.5)
   vibrate([200, 100, 200])
 }
 
 /**
  * Play alert/warning sound.
- * @param type - Notification type for preference check
  */
 export async function playAlertSound(type: string = 'general') {
   if (!shouldPlaySound(type)) return
 
-  // 1. Try native
-  const nativeOk = await playNativeSound('⚠️', 'تنبيه مهم')
-  if (nativeOk) return
-
-  // 2. Try HTML5 Audio
+  // 1. Try HTML5 Audio
   const audioOk = await playAudioElement('alert')
   if (audioOk) {
     vibrate([300, 100, 300, 100, 300])
     return
   }
 
-  // 3. Fallback: Web Audio
-  await playWebAudioBeep([600, 600], 'square', 0.2)
+  // 2. Fallback: Web Audio
+  await playWebAudioBeep([600, 600], 'square', 0.3)
   vibrate([300, 100, 300, 100, 300])
 }
 
@@ -261,6 +236,7 @@ export async function requestNotificationPermission(): Promise<boolean> {
 
 /**
  * Show a browser/system notification.
+ * In Capacitor, this is skipped (native FCM handles display).
  */
 export async function showBrowserNotification(title: string, body: string, icon?: string) {
   // In Capacitor, native notification already handles display
