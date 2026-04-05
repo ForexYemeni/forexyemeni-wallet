@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
+import { createPortal } from 'react-dom'
 import { useAuthStore } from '@/lib/store'
 import { toast } from 'sonner'
 import { UserCog, UserMinus, Shield, Check, X, RefreshCw, Crown, Eye, CreditCard, FileCheck, Sliders, Users } from 'lucide-react'
@@ -336,7 +337,7 @@ export default function AdminTeam() {
       )}
 
       {/* ===================== PERMISSIONS DIALOG ===================== */}
-      {showPermissionsDialog && editingAdmin && (
+      {showPermissionsDialog && editingAdmin && createPortal(
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-end sm:items-center justify-center p-0 sm:p-4" onClick={() => setShowPermissionsDialog(false)}>
           <div
             className="glass-card bg-background/95 backdrop-blur-xl border-gold/20 w-full sm:max-w-md sm:rounded-2xl rounded-t-2xl p-6 space-y-4 animate-scale-in"
@@ -406,7 +407,8 @@ export default function AdminTeam() {
               </button>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   )

@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
+import { createPortal } from 'react-dom'
 import { useAuthStore } from '@/lib/store'
 import { toast } from 'sonner'
 import {
@@ -1637,7 +1638,7 @@ export default function SuperAdminPanel() {
       {/* ===================== DIALOGS ===================== */}
 
       {/* Announcement Dialog */}
-      {showAnnouncementDialog && (
+      {showAnnouncementDialog && createPortal(
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-end sm:items-center justify-center p-0 sm:p-4" onClick={() => setShowAnnouncementDialog(false)}>
           <div className="glass-card bg-background/95 backdrop-blur-xl border-gold/20 w-full sm:max-w-md sm:rounded-2xl rounded-t-2xl p-6 space-y-4 animate-scale-in max-h-[80vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
             <div className="text-center space-y-2">
@@ -1680,11 +1681,12 @@ export default function SuperAdminPanel() {
               <button onClick={() => setShowAnnouncementDialog(false)} className="w-full h-10 bg-white/10 hover:bg-white/20 text-foreground rounded-xl text-sm">إلغاء</button>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
       {/* Broadcast Dialog */}
-      {showBroadcastDialog && (
+      {showBroadcastDialog && createPortal(
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-end sm:items-center justify-center p-0 sm:p-4" onClick={() => setShowBroadcastDialog(false)}>
           <div className="glass-card bg-background/95 backdrop-blur-xl border-blue-500/20 w-full sm:max-w-md sm:rounded-2xl rounded-t-2xl p-6 space-y-4 animate-scale-in" onClick={e => e.stopPropagation()}>
             <div className="text-center space-y-2">
@@ -1721,11 +1723,12 @@ export default function SuperAdminPanel() {
               <button onClick={() => setShowBroadcastDialog(false)} className="w-full h-10 bg-white/10 hover:bg-white/20 text-foreground rounded-xl text-sm">إلغاء</button>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
       {/* Ban IP Dialog */}
-      {showBanIpDialog && (
+      {showBanIpDialog && createPortal(
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={() => setShowBanIpDialog(false)}>
           <div className="glass-card bg-background/95 backdrop-blur-xl border-red-500/20 w-full max-w-sm rounded-2xl p-6 space-y-4 animate-scale-in" onClick={e => e.stopPropagation()}>
             <div className="text-center space-y-2">
@@ -1744,11 +1747,12 @@ export default function SuperAdminPanel() {
               <button onClick={() => setShowBanIpDialog(false)} className="w-full h-10 bg-white/10 hover:bg-white/20 text-foreground rounded-xl text-sm">إلغاء</button>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
       {/* Permissions Dialog */}
-      {showPermissionsDialog && editingAdmin && (
+      {showPermissionsDialog && editingAdmin && createPortal(
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={() => setShowPermissionsDialog(false)}>
           <div className="glass-card bg-background/95 backdrop-blur-xl border-blue-500/20 w-full max-w-md rounded-2xl p-6 space-y-4 animate-scale-in" onClick={e => e.stopPropagation()}>
             <div className="text-center space-y-2">
@@ -1779,11 +1783,12 @@ export default function SuperAdminPanel() {
               <button onClick={() => { setShowPermissionsDialog(false); setEditingAdmin(null) }} className="w-full h-10 bg-white/10 hover:bg-white/20 text-foreground rounded-xl text-sm">إلغاء</button>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
       {/* User Search Dialog */}
-      {showUserSearchDialog && (
+      {showUserSearchDialog && createPortal(
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-end sm:items-center justify-center p-0 sm:p-4" onClick={() => { setShowUserSearchDialog(false); setSelectedUser(null); setUserSearchResults([]); setUserSearchQuery('') }}>
           <div className="glass-card bg-background/95 backdrop-blur-xl border-purple-500/20 w-full sm:max-w-md sm:rounded-2xl rounded-t-2xl p-6 space-y-4 animate-scale-in max-h-[85vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
             <div className="text-center space-y-2">
@@ -1907,7 +1912,8 @@ export default function SuperAdminPanel() {
               إغلاق
             </button>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   )
