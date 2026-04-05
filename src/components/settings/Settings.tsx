@@ -44,8 +44,6 @@ import {
   type NotificationCategory,
 } from '@/lib/notification-settings'
 import { playNotificationSound } from '@/lib/notification-sound'
-import { toast } from 'sonner'
-import { Volume2 } from 'lucide-react'
 import TwoFactorSettings from '@/components/auth/TwoFactorSettings'
 import ChangeEmail from '@/components/settings/ChangeEmail'
 
