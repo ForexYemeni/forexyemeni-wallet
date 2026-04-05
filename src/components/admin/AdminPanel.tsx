@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef, lazy, Suspense } from 'react'
 import dynamic from 'next/dynamic'
 import { useAuthStore } from '@/lib/store'
+import { Portal } from '@/components/ui/portal'
 import { toast } from 'sonner'
 import { convertUSDTtoYER, formatYER } from '@/lib/currency'
 import { Button } from '@/components/ui/button'
@@ -243,7 +244,8 @@ export default function AdminPanel() {
   const [previewImage, setPreviewImage] = useState<string | null>(null)
   // More tabs dropdown
   const [showMoreMenu, setShowMoreMenu] = useState(false)
-  const moreMenuRef = useRef<HTMLDivElement>(null)
+  const [menuPosition, setMenuPosition] = useState({ top: 0, right: 0 })
+  const moreMenuRef = useRef<HTMLButtonElement>(null)
   // Stats state
   const [stats, setStats] = useState<AdminStats | null>(null)
   const [statsLoading, setStatsLoading] = useState(false)
@@ -268,6 +270,14 @@ export default function AdminPanel() {
     document.addEventListener('mousedown', handleClickOutside)
     return () => document.removeEventListener('mousedown', handleClickOutside)
   }, [])
+
+  const openMoreMenu = () => {
+    if (moreMenuRef.current) {
+      const rect = moreMenuRef.current.getBoundingClientRect()
+      setMenuPosition({ top: rect.bottom + 8, right: window.innerWidth - rect.right })
+    }
+    setShowMoreMenu(true)
+  }
 
   // Track which tabs have been loaded to avoid re-fetching
   const [loadedTabs, setLoadedTabs] = useState<Set<string>>(new Set())
@@ -1063,21 +1073,26 @@ export default function AdminPanel() {
         </div>
 
         {/* المزيد button — always visible */}
-        <div className="relative flex-shrink-0" ref={moreMenuRef}>
-          <button
-            onClick={() => setShowMoreMenu(!showMoreMenu)}
-            className={`flex items-center gap-1.5 px-3 py-2.5 rounded-xl text-xs transition-all whitespace-nowrap ${
-              showMoreMenu
-                ? 'bg-gold/10 text-gold border border-gold/20'
-                : 'text-muted-foreground hover:text-foreground hover:bg-white/5 border border-transparent'
-            }`}
-          >
-            المزيد
-            <ChevronDown className={`w-3.5 h-3.5 transition-transform ${showMoreMenu ? 'rotate-180' : ''}`} />
-          </button>
+        <button
+          ref={moreMenuRef}
+          onClick={openMoreMenu}
+          className={`flex items-center gap-1.5 px-3 py-2.5 rounded-xl text-xs transition-all whitespace-nowrap flex-shrink-0 ${
+            showMoreMenu
+              ? 'bg-gold/10 text-gold border border-gold/20'
+              : 'text-muted-foreground hover:text-foreground hover:bg-white/5 border border-transparent'
+          }`}
+        >
+          المزيد
+          <ChevronDown className={`w-3.5 h-3.5 transition-transform ${showMoreMenu ? 'rotate-180' : ''}`} />
+        </button>
 
-          {showMoreMenu && (
-            <div className="absolute top-full right-0 mt-2 glass-card rounded-xl border border-white/10 py-2 min-w-[200px] z-50 max-h-[70vh] overflow-y-auto shadow-2xl">
+        {/* Dropdown rendered via Portal to avoid overflow clipping */}
+        {showMoreMenu && (
+          <Portal>
+            <div
+              className="fixed glass-card rounded-xl border border-white/10 py-2 min-w-[200px] z-[9999] max-h-[70vh] overflow-y-auto shadow-2xl"
+              style={{ top: menuPosition.top, right: menuPosition.right }}
+            >
               {moreTabs.map((tab) => (
                 <button
                   key={tab.key}
@@ -1098,8 +1113,8 @@ export default function AdminPanel() {
                 </button>
               ))}
             </div>
-          )}
-        </div>
+          </Portal>
+        )}
       </div>
 
       {loading ? (
