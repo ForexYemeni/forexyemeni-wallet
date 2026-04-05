@@ -248,10 +248,10 @@ export default function TransferScreen() {
           </div>
 
           <div className="flex justify-center gap-3">
-            {[0, 1, 2, 3].map((i) => (
+            {[0, 1, 2, 3, 4, 5].map((i) => (
               <div
                 key={i}
-                className={`w-14 h-14 rounded-xl border-2 flex items-center justify-center text-2xl font-bold transition-all ${
+                className={`w-12 h-12 rounded-xl border-2 flex items-center justify-center text-xl font-bold transition-all ${
                   pin.length > i
                     ? 'border-gold bg-gold/10 text-gold'
                     : 'border-white/10 bg-white/5'
@@ -264,9 +264,9 @@ export default function TransferScreen() {
 
           <input
             type="password"
-            maxLength={4}
+            maxLength={6}
             value={pin}
-            onChange={(e) => setPin(e.target.value.replace(/\D/g, '').slice(0, 4))}
+            onChange={(e) => setPin(e.target.value.replace(/\D/g, '').slice(0, 6))}
             className="w-full h-12 rounded-xl glass-input px-4 text-center text-lg tracking-[1em] opacity-0 absolute -z-10"
             autoFocus
             dir="ltr"
