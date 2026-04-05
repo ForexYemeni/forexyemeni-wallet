@@ -193,12 +193,12 @@ export async function POST(request: NextRequest) {
       createdAt: now,
     })
 
-    // Send email notifications (non-blocking — don't fail the transfer if email fails)
+    // Send email notifications (awaited but won't fail the transfer)
     try {
       const { sendTransferSenderEmail, sendTransferReceiverEmail } = await import('@/lib/email')
 
       // Sender email: "تم خصم مبلغ من حسابك"
-      sendTransferSenderEmail(
+      await sendTransferSenderEmail(
         senderData.email,
         senderData.fullName || 'مستخدم',
         transferAmount,
@@ -206,10 +206,10 @@ export async function POST(request: NextRequest) {
         receiverData.accountNumber || null,
         newSenderBalance,
         senderTxId,
-      ).catch(() => {})
+      )
 
       // Receiver email: "تحويل وارد إلى حسابك"
-      sendTransferReceiverEmail(
+      await sendTransferReceiverEmail(
         receiverData.email,
         receiverData.fullName || 'مستخدم',
         transferAmount,
@@ -217,8 +217,10 @@ export async function POST(request: NextRequest) {
         senderData.accountNumber || null,
         newReceiverBalance,
         senderTxId,
-      ).catch(() => {})
-    } catch {}
+      )
+    } catch (emailErr) {
+      console.error('Transfer email notification failed:', emailErr)
+    }
 
     return NextResponse.json({
       success: true,
