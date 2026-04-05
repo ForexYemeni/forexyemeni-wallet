@@ -37,7 +37,7 @@ export default function TransferScreen() {
   // Detect input type
   const detectInputType = (value: string): 'email' | 'phone' | 'account' | '' => {
     const trimmed = value.trim()
-    if (/^fx-\d+$/i.test(trimmed)) return 'account'
+    if (/^\d{4,10}$/.test(trimmed)) return 'account'
     if (trimmed.includes('@')) return 'email'
     if (/^[\d\+\-\s]{7,15}$/.test(trimmed.replace(/\s/g, ''))) return 'phone'
     return ''
@@ -73,7 +73,7 @@ export default function TransferScreen() {
       return
     }
     if (!inputType) {
-      setError('صيغة غير صحيحة. أدخل بريد إلكتروني أو رقم هاتف أو رقم حساب (FX-XXXX)')
+      setError('صيغة غير صحيحة. أدخل بريد إلكتروني أو رقم هاتف أو رقم حساب')
       return
     }
     if (!amount || transferAmount <= 0) {
@@ -219,7 +219,7 @@ export default function TransferScreen() {
             </label>
             <input
               type="text"
-              placeholder="example@email.com  أو  FX-1001  أو  +967..."
+              placeholder="example@email.com  أو  100001  أو  +967..."
               value={receiver}
               onChange={(e) => setReceiver(e.target.value)}
               className="w-full h-12 rounded-xl glass-input px-4 text-sm"
@@ -270,7 +270,7 @@ export default function TransferScreen() {
           {/* Help text */}
           <div className="p-3 rounded-xl bg-white/[0.03] border border-white/5">
             <p className="text-xs text-muted-foreground leading-relaxed">
-              يمكنك التحويل عبر: <span className="text-foreground font-medium">البريد الإلكتروني</span> أو <span className="text-foreground font-medium">رقم الهاتف</span> أو <span className="text-foreground font-medium">رقم الحساب (FX-XXXX)</span>
+              يمكنك التحويل عبر: <span className="text-foreground font-medium">البريد الإلكتروني</span> أو <span className="text-foreground font-medium">رقم الهاتف</span> أو <span className="text-foreground font-medium">رقم الحساب</span>
             </p>
           </div>
         </div>

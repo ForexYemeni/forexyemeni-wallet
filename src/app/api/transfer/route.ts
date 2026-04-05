@@ -57,10 +57,10 @@ export async function POST(request: NextRequest) {
     const receiverInput = receiver.trim().toLowerCase()
     let receiverDoc_snap: FirebaseFirestore.QueryDocumentSnapshot | null = null
 
-    // Try 1: Account Number (FX-XXXX) — exact match
-    if (/^fx-\d+$/i.test(receiverInput)) {
+    // Try 1: Account Number (numeric) — exact match
+    if (/^\d{4,10}$/.test(receiver.trim())) {
       const snap = await db.collection('users')
-        .where('accountNumber', '==', receiverInput.toUpperCase())
+        .where('accountNumber', '==', parseInt(receiver.trim(), 10))
         .limit(1)
         .get()
       if (!snap.empty) receiverDoc_snap = snap.docs[0]
@@ -88,7 +88,7 @@ export async function POST(request: NextRequest) {
     if (!receiverDoc_snap) {
       return NextResponse.json({
         success: false,
-        message: 'المستلم غير موجود. تأكد من البريد الإلكتروني أو رقم الهاتف أو رقم الحساب (FX-XXXX)',
+        message: 'المستلم غير موجود. تأكد من البريد الإلكتروني أو رقم الهاتف أو رقم الحساب',
       }, { status: 404 })
     }
 

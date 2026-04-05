@@ -221,7 +221,7 @@ export default function SettingsPage() {
                 <Label className="text-sm text-muted-foreground">رقم الحساب</Label>
                 <div className="flex items-center gap-2">
                   <Input
-                    value={user.accountNumber}
+                    value={String(user.accountNumber)}
                     disabled
                     className="glass-input h-12 text-base opacity-60 font-mono font-bold"
                     dir="ltr"
@@ -229,7 +229,7 @@ export default function SettingsPage() {
                   <button
                     type="button"
                     onClick={() => {
-                      navigator.clipboard.writeText(user.accountNumber!)
+                      navigator.clipboard.writeText(String(user.accountNumber!))
                       setCopiedAccount(true)
                       toast.success('تم نسخ رقم الحساب')
                       setTimeout(() => setCopiedAccount(false), 2000)

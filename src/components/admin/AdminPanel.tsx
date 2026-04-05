@@ -1445,7 +1445,7 @@ export default function AdminPanel() {
                               <Hash className="w-4 h-4 text-blue-400" />
                               <div>
                                 <p className="text-[10px] text-muted-foreground">رقم الحساب</p>
-                                <p className="text-xs font-medium font-mono">{u.merchantId ? `FX-0000` : (u.accountNumber || 'غير محدد')}</p>
+                                <p className="text-xs font-medium font-mono">{u.accountNumber || 'غير محدد'}</p>
                               </div>
                             </div>
                             <div className="flex items-center gap-2 p-2.5 rounded-lg bg-white/5">

@@ -14,6 +14,8 @@ import {
   Clock,
   ChevronLeft,
   Send,
+  Copy,
+  Check as CheckIcon,
 } from 'lucide-react'
 import dynamic from 'next/dynamic'
 
@@ -31,6 +33,7 @@ export default function Dashboard() {
   const { user, setScreen, updateBalance } = useAuthStore()
   const [transactions, setTransactions] = useState<Transaction[]>([])
   const [loading, setLoading] = useState(true)
+  const [copiedAccount, setCopiedAccount] = useState(false)
 
   useEffect(() => {
     if (user?.id) {
@@ -173,6 +176,45 @@ export default function Dashboard() {
 
       {/* Promo Code */}
       <PromoRedeem />
+
+      {/* Account Number Card */}
+      {user?.accountNumber && (
+        <div className="glass-card p-4 rounded-xl">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-blue-500/10 flex items-center justify-center">
+                <span className="text-lg font-bold text-blue-400">#</span>
+              </div>
+              <div>
+                <p className="text-xs text-muted-foreground">رقم حسابك</p>
+                <p className="text-lg font-bold font-mono tracking-wider">{user.accountNumber}</p>
+              </div>
+            </div>
+            <button
+              onClick={() => {
+                navigator.clipboard.writeText(String(user.accountNumber))
+                setCopiedAccount(true)
+                toast.success('تم نسخ رقم الحساب')
+                setTimeout(() => setCopiedAccount(false), 2000)
+              }}
+              className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-white/5 hover:bg-white/10 transition-colors text-xs"
+            >
+              {copiedAccount ? (
+                <>
+                  <CheckIcon className="w-3.5 h-3.5 text-green-400" />
+                  <span className="text-green-400">تم النسخ</span>
+                </>
+              ) : (
+                <>
+                  <Copy className="w-3.5 h-3.5 text-muted-foreground" />
+                  <span className="text-muted-foreground">نسخ</span>
+                </>
+              )}
+            </button>
+          </div>
+          <p className="text-[10px] text-muted-foreground mt-2">شارك هذا الرقم مع الآخرين ليحوّلوا لك مباشرة</p>
+        </div>
+      )}
 
       {/* KYC Status */}
       {user?.kycStatus !== 'approved' && (
