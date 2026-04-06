@@ -183,18 +183,15 @@ export async function POST(request: NextRequest) {
     // Commit batch
     await batch.commit()
 
-    const senderLabel = senderData.fullName || senderData.email
-    const receiverLabel = receiverData.fullName || receiverData.email
-
     // Notify receiver about incoming transfer
     const recvTitle = '💰 تحويل وارد'
-    const recvMessage = `لقد استلمت ${transferAmount.toFixed(2)} USDT من ${senderLabel}`
+    const recvMessage = `لقد استلمت ${transferAmount.toFixed(2)} USDT من ${senderData.fullName || senderData.email}`
     await notificationOperations.create({ userId: receiverId, title: recvTitle, message: recvMessage, type: 'success', read: false })
     sendPushNotification(receiverId, recvTitle, recvMessage, 'success').catch(() => {})
 
     // Notify sender about sent transfer
     const sendTitle = '💰 تحويل صادر'
-    const sendMessage = `تم تحويل ${transferAmount.toFixed(2)} USDT إلى ${receiverLabel}`
+    const sendMessage = `تم تحويل ${transferAmount.toFixed(2)} USDT إلى ${receiverLabel}${receiverData.accountNumber ? ` (${receiverData.accountNumber})` : ''}`
     await notificationOperations.create({ userId: senderId, title: sendTitle, message: sendMessage, type: 'transfer', read: false })
     sendPushNotification(senderId, sendTitle, sendMessage, 'info').catch(() => {})
 
