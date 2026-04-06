@@ -21,6 +21,7 @@ import {
   X,
   Check,
   Shield,
+  Clock,
 } from 'lucide-react'
 
 const CRYPTO_NETWORKS = [
@@ -56,6 +57,7 @@ export default function WithdrawForm() {
   const [loading, setLoading] = useState(false)
   const [loadingMethods, setLoadingMethods] = useState(true)
   const [feePercentage, setFeePercentage] = useState(0.1)
+  const [hasPending, setHasPending] = useState(false)
   // PIN dialog state
   const [showPinDialog, setShowPinDialog] = useState(false)
   const [pinCode, setPinCode] = useState('')
@@ -73,7 +75,17 @@ export default function WithdrawForm() {
   useEffect(() => {
     fetchMethods()
     fetchSettings()
+    checkPendingWithdrawal()
   }, [])
+
+  const checkPendingWithdrawal = async () => {
+    if (!user?.id) return
+    try {
+      const res = await fetch(`/api/withdrawals/create?checkPending=true&userId=${user.id}`)
+      const data = await res.json()
+      if (data.hasPending) setHasPending(true)
+    } catch { /* silent */ }
+  }
 
   const fetchSettings = async () => {
     try {
@@ -299,6 +311,29 @@ export default function WithdrawForm() {
 
   return (
     <div className="space-y-6 animate-fade-in">
+      {/* Pending Withdrawal Dialog */}
+      {hasPending && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="glass-card bg-background/95 backdrop-blur-xl border-gold/20 w-full max-w-sm rounded-2xl p-6 space-y-5 animate-scale-in text-center">
+            <div className="w-16 h-16 rounded-2xl bg-yellow-500/10 flex items-center justify-center mx-auto">
+              <Clock className="w-8 h-8 text-yellow-400" />
+            </div>
+            <div className="space-y-2">
+              <h3 className="text-lg font-bold">لديك طلب سحب معلق</h3>
+              <p className="text-sm text-muted-foreground">
+                يوجد طلب سحب قيد المعالجة حالياً، يرجى الانتظار حتى يتم إتمامه قبل تقديم طلب جديد.
+              </p>
+            </div>
+            <Button
+              onClick={() => setHasPending(false)}
+              className="w-full h-11 gold-gradient text-gray-900 font-bold rounded-xl hover:opacity-90"
+            >
+              فهمت
+            </Button>
+          </div>
+        </div>
+      )}
+
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">

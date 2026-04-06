@@ -20,6 +20,7 @@ import {
   X,
   Landmark,
   Coins,
+  Clock,
 } from 'lucide-react'
 import { compressImage } from '@/lib/image-compress'
 
@@ -104,11 +105,24 @@ export default function DepositForm() {
   const [screenshot, setScreenshot] = useState<File | null>(null)
   const [screenshotPreview, setScreenshotPreview] = useState<string | null>(null)
   const [feePercentage, setFeePercentage] = useState(0)
+  const [hasPending, setHasPending] = useState(false)
+  const [pendingLoading, setPendingLoading] = useState(true)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
     fetchSettings()
+    checkPendingDeposit()
   }, [])
+
+  const checkPendingDeposit = async () => {
+    if (!user?.id) { setPendingLoading(false); return }
+    try {
+      const res = await fetch(`/api/deposits/create?checkPending=true&userId=${user.id}`)
+      const data = await res.json()
+      if (data.hasPending) setHasPending(true)
+    } catch { /* silent */ }
+    finally { setPendingLoading(false) }
+  }
 
   const fetchSettings = async () => {
     try {
@@ -255,6 +269,29 @@ export default function DepositForm() {
 
   return (
     <div className="space-y-6 animate-fade-in pb-24">
+      {/* Pending Deposit Dialog */}
+      {hasPending && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="glass-card bg-background/95 backdrop-blur-xl border-gold/20 w-full max-w-sm rounded-2xl p-6 space-y-5 animate-scale-in text-center">
+            <div className="w-16 h-16 rounded-2xl bg-yellow-500/10 flex items-center justify-center mx-auto">
+              <Clock className="w-8 h-8 text-yellow-400" />
+            </div>
+            <div className="space-y-2">
+              <h3 className="text-lg font-bold">لديك طلب إيداع معلق</h3>
+              <p className="text-sm text-muted-foreground">
+                يوجد طلب إيداع قيد المراجعة حالياً، يرجى الانتظار حتى يتم معالجته قبل تقديم طلب جديد.
+              </p>
+            </div>
+            <Button
+              onClick={() => setHasPending(false)}
+              className="w-full h-11 gold-gradient text-gray-900 font-bold rounded-xl hover:opacity-90"
+            >
+              فهمت
+            </Button>
+          </div>
+        </div>
+      )}
+
       {/* Header */}
       <div className="flex items-center gap-3">
         <div className="w-10 h-10 rounded-xl bg-green-500/10 flex items-center justify-center">

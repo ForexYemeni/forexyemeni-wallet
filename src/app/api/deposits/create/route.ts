@@ -4,6 +4,38 @@ import { sendPushNotification } from '@/lib/push-notification'
 import { getDb } from '@/lib/firebase'
 import { sendAdminNewDepositEmail } from '@/lib/email'
 
+// GET - Check if user has a pending deposit
+export async function GET(request: NextRequest) {
+  try {
+    const { searchParams } = new URL(request.url)
+    const userId = searchParams.get('userId')
+
+    if (!userId) {
+      return NextResponse.json({ success: false, message: 'معرف المستخدم مطلوب' }, { status: 400 })
+    }
+
+    const db = getDb()
+    const pendingDocs = await db.collection('deposits')
+      .where('userId', '==', userId)
+      .where('status', 'in', ['pending', 'reviewing'])
+      .limit(1)
+      .get()
+
+    if (!pendingDocs.empty) {
+      const deposit = pendingDocs.docs[0].data()
+      return NextResponse.json({
+        hasPending: true,
+        deposit: { id: pendingDocs.docs[0].id, amount: deposit.amount, status: deposit.status, createdAt: deposit.createdAt }
+      })
+    }
+
+    return NextResponse.json({ hasPending: false })
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : 'حدث خطأ'
+    return NextResponse.json({ success: false, message }, { status: 500 })
+  }
+}
+
 export async function POST(request: NextRequest) {
   try {
     const { userId, amount, method = 'blockchain', txId, screenshot, network } = await request.json()

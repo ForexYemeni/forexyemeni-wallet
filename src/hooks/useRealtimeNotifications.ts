@@ -80,6 +80,11 @@ export function useRealtimeNotifications() {
 
       // Update last checked timestamp
       lastCheckedRef.current = newOnes[0].createdAt
+
+      // Dispatch global event so other components (like AdminPanel) refresh immediately
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('app-data-changed', { detail: { type: latest.type, notification: latest } }))
+      }
     } catch {
       // Silently fail — will retry on next poll
     }

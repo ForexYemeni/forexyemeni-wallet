@@ -3601,14 +3601,24 @@ function AdminDevicesSection() {
   useEffect(() => {
     if (user?.role !== 'admin' && !user?.permissions) return
 
-    const autoRefresh = setInterval(() => {
+    // Refresh immediately when a new notification arrives (real-time)
+    const handleDataChanged = () => {
       fetchStatsRef.current()
       fetchDepositsRef.current()
       fetchWithdrawalsRef.current()
       fetchKYCRef.current()
-    }, 8000) // every 8 seconds
+    }
 
-    return () => clearInterval(autoRefresh)
+    // Periodic refresh as backup (every 8 seconds)
+    const autoRefresh = setInterval(handleDataChanged, 8000)
+
+    // Listen for real-time notification events
+    window.addEventListener('app-data-changed', handleDataChanged)
+
+    return () => {
+      clearInterval(autoRefresh)
+      window.removeEventListener('app-data-changed', handleDataChanged)
+    }
   }, [user?.role, user?.permissions])
 
   const handleRemoveDevice = async (deviceId: string) => {
