@@ -1870,15 +1870,14 @@ export default function AdminPanel() {
                             <div className="flex items-center gap-2 min-w-0">
                               <span className="text-[10px] text-muted-foreground flex-shrink-0">الطريقة</span>
                               <span className="text-xs font-medium truncate">
-                                {w.paymentMethodName
-                                  ? (w.network && !w.paymentMethodName.includes(w.network)
-                                    ? `${w.paymentMethodName} - ${w.network}`
-                                    : w.paymentMethodName)
-                                  : (w.method === 'crypto' || w.method === 'blockchain'
-                                    ? (w.network ? `عملات رقمية - ${w.network}` : 'عملات رقمية')
-                                    : w.method === 'bank_deposit' ? 'إيداع لمحفظة' :
+                                {(w.method === 'crypto' || w.method === 'blockchain')
+                                  ? (w.paymentMethodName
+                                    ? (w.network ? `${w.paymentMethodName} - ${w.network}` : w.paymentMethodName)
+                                    : (w.network ? `عملات رقمية - ${w.network}` : 'عملات رقمية'))
+                                  : (w.paymentMethodName || (
+                                    w.method === 'bank_deposit' ? 'إيداع لمحفظة' :
                                       w.method === 'atm_transfer' ? 'تحويل عبر صراف' :
-                                        w.method === 'bank_transfer' ? 'تحويل بنكي' : w.method)}
+                                        w.method === 'bank_transfer' ? 'تحويل بنكي' : w.method))}
                               </span>
                             </div>
                           </div>
