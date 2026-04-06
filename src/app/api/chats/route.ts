@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { chatOperations, userOperations } from '@/lib/db-firebase'
+import { chatOperations, userOperations, notificationOperations } from '@/lib/db-firebase'
+import { sendPushNotification } from '@/lib/push-notification'
 
 // GET - list chats for user or admin
 export async function GET(request: NextRequest) {
@@ -96,6 +97,15 @@ export async function POST(request: NextRequest) {
       if (openChat) {
         // Send message to existing open chat instead
         const msg = await chatOperations.sendMessage(openChat.id, userId, 'user', message)
+
+        // Notify admin
+        try {
+          const pushTitle = '📩 رسالة جديدة من العميل'
+          const pushBody = message.length > 100 ? message.substring(0, 100) + '...' : message
+          await notificationOperations.create({ userId: openChat.adminId, title: pushTitle, message: pushBody, type: 'chat', read: false })
+          sendPushNotification(openChat.adminId, pushTitle, pushBody, 'info').catch(() => {})
+        } catch {}
+
         return NextResponse.json({
           success: true,
           chat: openChat,
@@ -105,6 +115,14 @@ export async function POST(request: NextRequest) {
       }
 
       const chat = await chatOperations.createChat(userId, admin.id, message)
+
+      // Notify admin about new chat
+      try {
+        const pushTitle = '📩 محادثة جديدة'
+        const pushBody = message.length > 100 ? message.substring(0, 100) + '...' : message
+        await notificationOperations.create({ userId: admin.id, title: pushTitle, message: pushBody, type: 'chat', read: false })
+        sendPushNotification(admin.id, pushTitle, pushBody, 'info').catch(() => {})
+      } catch {}
       return NextResponse.json({
         success: true,
         chat,
@@ -202,6 +220,17 @@ export async function POST(request: NextRequest) {
       }
 
       const msg = await chatOperations.sendMessage(chatId, senderId, senderType, message, type || 'text')
+
+      // Notify recipient
+      try {
+        const recipientId = senderType === 'user' ? chat.adminId : chat.userId
+        const senderName = senderType === 'admin' ? 'الدعم الفني' : 'العميل'
+        const pushTitle = `📩 رسالة جديدة من ${senderName}`
+        const pushBody = message.length > 100 ? message.substring(0, 100) + '...' : message
+        await notificationOperations.create({ userId: recipientId, title: pushTitle, message: pushBody, type: 'chat', read: false })
+        sendPushNotification(recipientId, pushTitle, pushBody, 'info').catch(() => {})
+      } catch {}
+
       return NextResponse.json({ success: true, message: msg })
     }
 

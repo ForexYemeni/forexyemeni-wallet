@@ -52,31 +52,31 @@ export function useRealtimeNotifications() {
       // Get the latest notification
       const latest = newOnes[0]
 
-      // v3.5.0 FIX: Force AudioContext resume BEFORE playing sound
-      // This ensures sound plays even when app has been in background
-      try {
-        await initAudioOnInteraction()
-      } catch {}
+      // v3.6.2 FIX: In native app (APK), FCM handles sound + notification display.
+      // Skip sound/banner here to avoid DUPLICATE notifications.
+      // Polling still updates the notification list (badge count).
+      const isNative = typeof window !== 'undefined' && !!(window as any).Capacitor?.isNativePlatform?.()
 
-      // Play sound based on notification type
-      try {
-        if (latest.type === 'success') {
-          await playSuccessSound(latest.type)
-        } else if (latest.type === 'warning' || latest.type === 'error') {
-          await playAlertSound(latest.type)
-        } else {
-          await playNotificationSound(latest.type)
-        }
-      } catch {
-        // Sound failed — try Web Audio fallback directly
+      if (!isNative) {
+        // Web only: play sound and show browser notification
         try {
-          const { getAudioContext } = await import('@/lib/notification-sound')
-          // AudioContext is not exported, but playNotificationSound already handles fallback
+          await initAudioOnInteraction()
         } catch {}
-      }
 
-      // Show browser notification (web only — skipped in Capacitor)
-      await showBrowserNotification(latest.title, latest.message)
+        try {
+          if (latest.type === 'success') {
+            await playSuccessSound(latest.type)
+          } else if (latest.type === 'warning' || latest.type === 'error') {
+            await playAlertSound(latest.type)
+          } else {
+            await playNotificationSound(latest.type)
+          }
+        } catch {
+          // Sound failed silently
+        }
+
+        await showBrowserNotification(latest.title, latest.message)
+      }
 
       // Update last checked timestamp
       lastCheckedRef.current = newOnes[0].createdAt

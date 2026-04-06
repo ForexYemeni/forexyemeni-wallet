@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { chatOperations, userOperations } from '@/lib/db-firebase'
+import { chatOperations, userOperations, notificationOperations } from '@/lib/db-firebase'
 import { sendPushNotification } from '@/lib/push-notification'
 
 // GET - get chat messages (with pagination)
@@ -114,13 +114,24 @@ export async function POST(
 
       const msg = await chatOperations.sendMessage(id, senderId, senderType, message, type || 'text')
 
-      // Send FCM push notification to the RECIPIENT
+      // Send FCM push notification + save notification record for the RECIPIENT
       try {
         // Determine recipient: if sender is user, notify admin; if admin, notify user
         const recipientId = senderType === 'user' ? chat.adminId : chat.userId
         const senderName = senderType === 'admin' ? 'الدعم الفني' : 'العميل'
         const pushTitle = `📩 رسالة جديدة من ${senderName}`
         const pushBody = message.length > 100 ? message.substring(0, 100) + '...' : message
+
+        // Save notification record so polling hook picks it up
+        await notificationOperations.create({
+          userId: recipientId,
+          title: pushTitle,
+          message: pushBody,
+          type: 'chat',
+          read: false,
+        })
+
+        // Send FCM push notification
         sendPushNotification(recipientId, pushTitle, pushBody, 'info').catch(() => {})
       } catch {}
 
