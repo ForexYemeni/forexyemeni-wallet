@@ -80,14 +80,15 @@ export const useAuthStore = create<AuthState>()(
         // Don't push duplicate consecutive screens
         const prev = state.currentScreen
         if (screen === prev) return { currentScreen: screen }
+        const history = state.navigationHistory || []
         return {
           currentScreen: screen,
-          navigationHistory: [...state.navigationHistory, prev],
+          navigationHistory: [...history, prev],
         }
       }),
       goBack: () => {
         const state = useAuthStore.getState()
-        const history = state.navigationHistory
+        const history = state.navigationHistory || []
         if (history.length === 0) return null
         const prev = history[history.length - 1]
         set({
@@ -109,6 +110,13 @@ export const useAuthStore = create<AuthState>()(
         isAuthenticated: state.isAuthenticated,
         currentScreen: state.currentScreen,
         pendingWithdrawalConfirmation: state.pendingWithdrawalConfirmation,
+        // Don't persist navigationHistory - reset on each app launch
+      }),
+      merge: (persisted, current) => ({
+        ...current,
+        ...(persisted as Partial<AuthState>),
+        // Always ensure navigationHistory has a valid value
+        navigationHistory: [],
       }),
     }
   )
