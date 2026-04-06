@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { chatOperations, userOperations, notificationOperations } from '@/lib/db-firebase'
 import { sendPushNotification } from '@/lib/push-notification'
+import { getDb } from '@/lib/firebase'
 
 // GET - list chats for user or admin
 export async function GET(request: NextRequest) {
@@ -41,8 +42,24 @@ export async function GET(request: NextRequest) {
         ...chat,
         user: userMap.get(chat.userId) || null,
       }))
-      // Filter out chats with deleted users
+      // Filter out chats with deleted users (user document no longer exists)
       const validChats = enrichedChats.filter(c => c.user !== null)
+
+      // Cleanup: delete orphan chats where user no longer exists
+      const orphanChats = enrichedChats.filter(c => c.user === null)
+      if (orphanChats.length > 0) {
+        try {
+          const db = getDb()
+          const batch = db.batch()
+          for (const chat of orphanChats) {
+            batch.delete(db.collection('chats').doc(chat.id))
+          }
+          await batch.commit()
+        } catch (cleanupErr) {
+          console.warn('[chats] Failed to cleanup orphan chats:', cleanupErr)
+        }
+      }
+
       return NextResponse.json({ success: true, chats: validChats })
     }
 

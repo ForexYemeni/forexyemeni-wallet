@@ -173,6 +173,36 @@ export async function POST(request: NextRequest) {
         await doc.ref.delete()
       }
 
+      // Delete user's chats and messages
+      const userChats = await db.collection('chats')
+        .where('userId', '==', userId)
+        .limit(50)
+        .get()
+      for (const chatDoc of userChats.docs) {
+        // Delete messages in this chat
+        const chatMsgs = await db.collection('chatMessages')
+          .where('chatId', '==', chatDoc.id)
+          .limit(200)
+          .get()
+        const batch = db.batch()
+        for (const msgDoc of chatMsgs.docs) {
+          batch.delete(msgDoc.ref)
+        }
+        batch.delete(chatDoc.ref)
+        if (chatMsgs.docs.length > 0 || true) {
+          await batch.commit()
+        }
+      }
+
+      // Delete user's FCM tokens
+      const userFcm = await db.collection('fcmTokens')
+        .where('userId', '==', userId)
+        .limit(10)
+        .get()
+      for (const doc of userFcm.docs) {
+        await doc.ref.delete()
+      }
+
       // Finally delete the user
       await db.collection('users').doc(userId).delete()
 
