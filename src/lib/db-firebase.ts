@@ -874,10 +874,11 @@ export interface ChatMessage {
 
 export const chatOperations = {
   // Create a new chat
-  async createChat(userId: string, adminId: string, firstMessage: string): Promise<Chat> {
+  async createChat(userId: string, adminId: string, firstMessage: string, senderType: string = 'user'): Promise<Chat> {
     const db = getDb()
     const id = generateId()
     const now = nowTimestamp()
+    const isFromAdmin = senderType === 'admin'
     const chat: Chat = {
       id,
       userId,
@@ -885,9 +886,9 @@ export const chatOperations = {
       participants: [userId, adminId],
       lastMessage: firstMessage,
       lastMessageAt: now,
-      lastMessageBy: 'user',
-      userUnreadCount: 0,
-      adminUnreadCount: 1,
+      lastMessageBy: isFromAdmin ? 'admin' : 'user',
+      userUnreadCount: isFromAdmin ? 1 : 0,
+      adminUnreadCount: isFromAdmin ? 0 : 1,
       status: 'open',
       createdAt: now,
       updatedAt: now,
@@ -898,8 +899,8 @@ export const chatOperations = {
     const message: ChatMessage = {
       id: messageId,
       chatId: id,
-      senderId: userId,
-      senderType: 'user',
+      senderId: isFromAdmin ? adminId : userId,
+      senderType,
       message: firstMessage,
       type: 'text',
       read: false,

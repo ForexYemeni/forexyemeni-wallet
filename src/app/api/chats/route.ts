@@ -194,12 +194,56 @@ export async function POST(request: NextRequest) {
 
       // Create new chat with admin's welcome message
       const welcomeMsg = 'مرحباً! كيف يمكننا مساعدتك؟'
-      const chat = await chatOperations.createChat(targetUserId, admin.id, welcomeMsg)
+      const chat = await chatOperations.createChat(targetUserId, admin.id, welcomeMsg, 'admin')
+
+      // Notify user about new admin message
+      try {
+        const pushTitle = '📩 رسالة جديدة من الدعم الفني'
+        await notificationOperations.create({ userId: targetUserId, title: pushTitle, message: welcomeMsg, type: 'chat', read: false })
+        sendPushNotification(targetUserId, pushTitle, welcomeMsg, 'info').catch(() => {})
+      } catch {}
+
       return NextResponse.json({
         success: true,
         chat,
         existingChat: false,
       })
+    }
+
+    // === REOPEN CHAT ===
+    if (action === 'reopen_chat') {
+      const { chatId, userId, role } = body
+
+      if (!chatId || !userId) {
+        return NextResponse.json(
+          { success: false, message: 'معرف المحادثة والمستخدم مطلوبان' },
+          { status: 400 }
+        )
+      }
+
+      // Only admin can reopen
+      if (role !== 'admin') {
+        return NextResponse.json(
+          { success: false, message: 'غير مصرح - المدير فقط' },
+          { status: 403 }
+        )
+      }
+
+      const db = getDb()
+      const chatDoc = await db.collection('chats').doc(chatId).get()
+      if (!chatDoc.exists) {
+        return NextResponse.json(
+          { success: false, message: 'المحادثة غير موجودة' },
+          { status: 404 }
+        )
+      }
+
+      await chatDoc.ref.update({
+        status: 'open',
+        updatedAt: new Date().toISOString(),
+      })
+
+      return NextResponse.json({ success: true, message: 'تم إعادة فتح المحادثة' })
     }
 
     // === SEND MESSAGE (existing chat) ===

@@ -17,6 +17,7 @@ import {
   Users,
   MessageSquare,
   UserCircle,
+  RotateCcw,
 } from 'lucide-react'
 
 // ===================== TYPES =====================
@@ -443,6 +444,31 @@ export default function AdminChat() {
     }
   }
 
+  // Reopen chat
+  const handleReopenChat = async () => {
+    if (!selectedChatId || !user?.id || closingChat) return
+    setClosingChat(true)
+    try {
+      const res = await fetch(`/api/chats/${selectedChatId}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'reopen_chat', userId: user.id, role: 'admin' }),
+      })
+      const data = await res.json()
+      if (data.success) {
+        toast.success('تم إعادة فتح المحادثة')
+        fetchChats()
+        if (selectedChatData) setSelectedChatData({ ...selectedChatData, status: 'open' })
+      } else {
+        toast.error(data.message)
+      }
+    } catch {
+      toast.error('حدث خطأ')
+    } finally {
+      setClosingChat(false)
+    }
+  }
+
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault()
@@ -613,10 +639,16 @@ export default function AdminChat() {
                     إغلاق
                   </Button>
                 ) : (
-                  <span className="text-[10px] text-muted-foreground flex items-center gap-1 bg-muted/20 px-2 py-1 rounded-md">
-                    <X className="w-3 h-3 text-red-400" />
-                    مغلقة
-                  </span>
+                  <Button
+                    onClick={handleReopenChat}
+                    disabled={closingChat}
+                    variant="ghost"
+                    size="sm"
+                    className="text-green-400 hover:text-green-300 hover:bg-green-500/10 h-8 text-xs gap-1"
+                  >
+                    {closingChat ? <Loader2 className="w-3 h-3 animate-spin" /> : <RotateCcw className="w-3 h-3" />}
+                    إعادة فتح
+                  </Button>
                 )}
               </div>
 
