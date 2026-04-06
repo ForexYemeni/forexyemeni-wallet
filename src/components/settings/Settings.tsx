@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useEffect } from 'react'
 import { useAuthStore } from '@/lib/store'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
@@ -85,6 +85,17 @@ export default function SettingsPage() {
     toast.success(updated.soundEnabled ? 'تم تفعيل أصوات الإشعارات' : 'تم إيقاف أصوات الإشعارات')
     if (updated.soundEnabled) playNotificationSound('general').catch(() => {})
   }, [soundSettings])
+
+  // Android back button for Settings internal navigation
+  useEffect(() => {
+    const handleBackButton = (e: Event) => {
+      if (showChangeEmail) { setShowChangeEmail(false); e.preventDefault(); return }
+      if (show2FASettings) { setShow2FASettings(false); e.preventDefault(); return }
+      if (activeTab !== 'profile') { setActiveTab('profile'); e.preventDefault(); return }
+    }
+    window.addEventListener('app:backbutton', handleBackButton)
+    return () => window.removeEventListener('app:backbutton', handleBackButton)
+  }, [showChangeEmail, show2FASettings, activeTab])
 
   const handleToggleCategory = useCallback((category: NotificationCategory) => {
     const updated = {

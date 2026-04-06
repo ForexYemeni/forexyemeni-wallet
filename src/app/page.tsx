@@ -508,6 +508,30 @@ export default function Home() {
     )
   }
 
+  // Android back button on auth screens (login/register) → exit app
+  useEffect(() => {
+    if (isAuthenticated) return
+    const isNativeApp = typeof window !== 'undefined' && (() => {
+      try {
+        const w = window as any
+        if (w.Capacitor?.isNativePlatform?.()) return true
+        if (w.Capacitor?.getPlatform?.() === 'android') return true
+        if (w.Capacitor?.Plugins) return true
+        return false
+      } catch { return false }
+    })()
+    if (!isNativeApp) return
+    let listenerHandle: any = null
+    const setup = async () => {
+      try {
+        const { App } = await import('@capacitor/app')
+        listenerHandle = await App.addListener('backButton', () => App.exitApp())
+      } catch {}
+    }
+    setup()
+    return () => { listenerHandle?.remove?.() }
+  }, [isAuthenticated])
+
   // Authentication Screens
   if (!isAuthenticated) {
     return (

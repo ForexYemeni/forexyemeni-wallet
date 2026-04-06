@@ -279,6 +279,31 @@ export default function AdminPanel() {
     return () => document.removeEventListener('mousedown', handleClickOutside)
   }, [])
 
+  // Android back button: close modals first, then go back tab, then let parent handle exit
+  useEffect(() => {
+    const handleBackButton = (e: Event) => {
+      // Close open dialogs/modals first
+      if (showMoreMenu) { setShowMoreMenu(false); e.preventDefault(); return }
+      if (previewImage) { setPreviewImage(null); e.preventDefault(); return }
+      if (kycDetailUser) { setKycDetailUser(null); e.preventDefault(); return }
+      if (rejectDialog) { setRejectDialog(null); e.preventDefault(); return }
+      if (kycRejectDialog) { setKycRejectDialog(null); e.preventDefault(); return }
+      if (deleteDialogUser) { closeDeleteDialog(); e.preventDefault(); return }
+      if (roleDialogUser) { setRoleDialogUser(null); e.preventDefault(); return }
+      if (balanceDialogUser) { setBalanceDialogUser(null); e.preventDefault(); return }
+      if (removeMerchantDialogUser) { setRemoveMerchantDialogUser(null); e.preventDefault(); return }
+      if (deviceDialogUser) { setDeviceDialogUser(null); e.preventDefault(); return }
+      if (proofDialogWithdrawal) { setProofDialogWithdrawal(null); e.preventDefault(); return }
+      // Close expanded user card
+      if (expandedUserId && activeTab === 'users') { setExpandedUserId(null); e.preventDefault(); return }
+      // Go back from non-dashboard tab
+      if (activeTab !== 'dashboard') { setActiveTab('dashboard'); e.preventDefault(); return }
+      // On dashboard tab - let AppLayout handle (exit confirm)
+    }
+    window.addEventListener('app:backbutton', handleBackButton)
+    return () => window.removeEventListener('app:backbutton', handleBackButton)
+  }, [showMoreMenu, previewImage, kycDetailUser, rejectDialog, kycRejectDialog, deleteDialogUser, roleDialogUser, balanceDialogUser, removeMerchantDialogUser, deviceDialogUser, proofDialogWithdrawal, expandedUserId, activeTab])
+
   const openMoreMenu = () => {
     if (moreMenuRef.current) {
       const rect = moreMenuRef.current.getBoundingClientRect()
