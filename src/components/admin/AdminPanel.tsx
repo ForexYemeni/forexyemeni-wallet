@@ -94,7 +94,7 @@ interface AdminDeposit {
   status: string
   createdAt: string
   screenshot?: string | null
-  user: { id: string; email: string; fullName: string | null }
+  user: { id: string; email: string; fullName: string | null; accountNumber?: string | null; merchantId?: string | null }
 }
 
 interface AdminWithdrawal {
@@ -110,7 +110,7 @@ interface AdminWithdrawal {
   screenshot?: string | null
   adminNote?: string | null
   paymentMethodName?: string | null
-  user: { id: string; email: string; fullName: string | null; phone: string | null }
+  user: { id: string; email: string; fullName: string | null; phone: string | null; accountNumber?: string | null; merchantId?: string | null }
 }
 
 interface AdminStats {
@@ -1753,7 +1753,7 @@ export default function AdminPanel() {
                         </div>
                         <div className="min-w-0">
                           <p className="text-sm font-medium truncate">{d.user.fullName || 'بدون اسم'}</p>
-                          <p className="text-[10px] text-muted-foreground truncate" dir="ltr">{d.txId || d.id.substring(0, 16)}...</p>
+                          <p className="text-[10px] text-muted-foreground truncate" dir="ltr">{d.user.merchantId || d.user.accountNumber || d.txId || d.id.substring(0, 16)}</p>
                         </div>
                       </div>
                       <div className="flex items-center gap-2 flex-shrink-0">
@@ -1778,8 +1778,8 @@ export default function AdminPanel() {
                             <span className="text-xs font-medium truncate">{d.user.fullName || '—'}</span>
                           </div>
                           <div className="p-2 rounded-lg bg-white/5">
-                            <span className="text-[10px] text-muted-foreground block">البريد</span>
-                            <span className="text-xs font-mono truncate" dir="ltr">{d.user.email}</span>
+                            <span className="text-[10px] text-muted-foreground block">رقم الحساب / التاجر</span>
+                            <span className="text-xs font-mono truncate" dir="ltr">{d.user.merchantId || d.user.accountNumber || d.user.email}</span>
                           </div>
                         </div>
                         {/* Fee breakdown */}
@@ -1853,6 +1853,8 @@ export default function AdminPanel() {
                         <div className="min-w-0">
                           <p className="text-sm font-medium truncate">سحب: {w.user.fullName || 'بدون اسم'}</p>
                           <p className="text-[10px] text-muted-foreground truncate">
+                            {w.user.merchantId || w.user.accountNumber || ''}
+                            {w.user.merchantId || w.user.accountNumber ? ' · ' : ''}
                             {(w.method === 'crypto' || w.method === 'blockchain')
                               ? (w.network ? `عملات رقمية - ${w.network}` : 'عملات رقمية')
                               : w.paymentMethodName || (w.method === 'bank_deposit' ? 'إيداع لمحفظة' :
@@ -1903,11 +1905,11 @@ export default function AdminPanel() {
                           )}
                           <div className="flex items-center justify-between p-2 rounded-lg bg-white/5">
                             <div className="min-w-0">
-                              <span className="text-[10px] text-muted-foreground block">البريد</span>
-                              <span className="text-xs font-mono truncate" dir="ltr">{w.user.email}</span>
+                              <span className="text-[10px] text-muted-foreground block">رقم الحساب / التاجر</span>
+                              <span className="text-xs font-mono truncate" dir="ltr">{w.user.merchantId || w.user.accountNumber || w.user.email}</span>
                             </div>
-                            <button onClick={() => copyField(`${w.id}-email`, w.user.email)} className="text-muted-foreground hover:text-gold transition-colors flex-shrink-0">
-                              {copiedField === `${w.id}-email` ? <CheckIcon className="w-3.5 h-3.5 text-green-400" /> : <Copy className="w-3.5 h-3.5" />}
+                            <button onClick={() => copyField(`${w.id}-account`, w.user.merchantId || w.user.accountNumber || w.user.email)} className="text-muted-foreground hover:text-gold transition-colors flex-shrink-0">
+                              {copiedField === `${w.id}-account` ? <CheckIcon className="w-3.5 h-3.5 text-green-400" /> : <Copy className="w-3.5 h-3.5" />}
                             </button>
                           </div>
                         </div>
