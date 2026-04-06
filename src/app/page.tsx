@@ -167,6 +167,36 @@ export default function Home() {
     }
   }, [])
 
+  // Auto-check for pending withdrawal confirmation every 20 seconds
+  // This ensures the confirmation dialog appears immediately when admin approves a withdrawal
+  useEffect(() => {
+    if (!isAuthenticated || !user?.id) return
+    if (user.pendingConfirmation) return // Already showing dialog, no need to poll
+
+    const checkPending = async () => {
+      try {
+        const res = await fetch('/api/user/check-pending', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ userId: user!.id }),
+        })
+        const data = await res.json()
+        if (data.success && data.pendingConfirmation) {
+          // New withdrawal confirmed by admin — update store to trigger the dialog
+          updateUser({ pendingConfirmation: data.pendingConfirmation } as any)
+          setPendingWithdrawalConfirmation(data.pendingConfirmation)
+        }
+      } catch {
+        // Silent — will retry on next interval
+      }
+    }
+
+    // Check immediately once, then every 20 seconds
+    checkPending()
+    const interval = setInterval(checkPending, 20000)
+    return () => clearInterval(interval)
+  }, [isAuthenticated, user?.id, user?.pendingConfirmation])
+
   // Global error handler — only for truly critical errors
   // Many browser/runtime errors are non-critical and should be silently ignored
   useEffect(() => {
