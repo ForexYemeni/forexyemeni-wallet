@@ -455,6 +455,15 @@ export default function SettingsPage() {
 
             {/* Developer Tools (hidden — enable via 7 taps on app name in About tab) */}
             {showDevTools && (<>
+              {/* Close dev tools */}
+              <button
+                onClick={() => { setShowDevTools(false); setDevTapCount(0); toast.success('تم إغلاق وضع المطور', { duration: 1500 }) }}
+                className="w-full flex items-center justify-between p-3 rounded-xl bg-red-500/5 hover:bg-red-500/10 transition-colors border border-red-500/10"
+              >
+                <span className="text-sm font-medium">🔒 إغلاق وضع المطور</span>
+                <span className="text-xs text-red-400">close</span>
+              </button>
+
               {/* FCM Registration Debug */}
               <button
                 onClick={async () => {
