@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useRef, lazy, Suspense } from 'react'
+import { useState, useEffect, useRef, useCallback, lazy, Suspense } from 'react'
 import dynamic from 'next/dynamic'
 import { useAuthStore } from '@/lib/store'
 import { Portal } from '@/components/ui/portal'
