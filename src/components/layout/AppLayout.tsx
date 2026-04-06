@@ -46,62 +46,47 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
   // Android hardware back button handler
   useEffect(() => {
-    const isNativeApp = typeof window !== 'undefined' && (
-      /Android/i.test(navigator.userAgent) &&
-      window.location.protocol !== 'https:' ? false : /Android/i.test(navigator.userAgent)
-    )
+    // Check if running inside native Capacitor app
+    const isNativeApp = typeof window !== 'undefined' && (() => {
+      try {
+        const w = window as any
+        if (w.Capacitor?.isNativePlatform?.()) return true
+        if (w.Capacitor?.getPlatform?.() === 'android') return true
+        if (w.Capacitor?.Plugins) return true
+        return false
+      } catch { return false }
+    })()
     if (!isNativeApp) return
 
-    // Screen hierarchy: which screens are "main" (exit confirm) vs sub-screens (go back)
-    const mainScreens = ['dashboard', 'admin', 'p2p']
-    const isMainScreen = mainScreens.includes(currentScreen)
+    const goBack = useAuthStore.getState().goBack
 
     const handleBackButton = () => {
-      if (isMainScreen) {
-        // On main screen → show exit confirmation
-        setExitDialogOpen(true)
-      } else {
-        // On sub-screen → go back to appropriate parent
-        const parentMap: Record<string, string> = {
-          'deposit': 'dashboard',
-          'withdraw': 'dashboard',
-          'transactions': 'dashboard',
-          'kyc': 'dashboard',
-          'referral': 'dashboard',
-          'settings': 'dashboard',
-          'notifications': 'dashboard',
-          'chat': 'dashboard',
-          'faq': 'dashboard',
-          'help': 'dashboard',
-          'transfer': 'dashboard',
-        }
-        const parent = parentMap[currentScreen]
-        if (parent) {
-          setScreen(parent)
-        } else {
-          // Unknown screen → go to dashboard
-          setScreen('dashboard')
-        }
-      }
+      // 1. Dispatch custom event for child components (Admin, P2P, Settings) to handle internal navigation
+      const backEvent = new CustomEvent('app:backbutton', { cancelable: true })
+      window.dispatchEvent(backEvent)
+
+      // If a child component handled it (called preventDefault), stop here
+      if (backEvent.defaultPrevented) return
+
+      // 2. Try to go back in navigation history
+      const prevScreen = goBack()
+      if (prevScreen) return
+
+      // 3. No history left → show exit confirmation
+      setExitDialogOpen(true)
     }
 
     // Listen for Android back button via Capacitor
     const setupBackButton = async () => {
       try {
         const { App } = await import('@capacitor/app')
-        App.addListener('backButton', ({ canGoBack }) => {
-          if (canGoBack) {
-            window.history.back()
-          } else {
-            handleBackButton()
-          }
-        })
+        App.addListener('backButton', handleBackButton)
       } catch {
         // Capacitor not available (web browser)
       }
     }
     setupBackButton()
-  }, [currentScreen, setScreen])
+  }, [currentScreen])
 
   // Session timeout check (7 days)
   useEffect(() => {

@@ -31,9 +31,11 @@ interface AuthState {
   isAuthenticated: boolean
   pendingRegistration: { email: string; fullName: string; password: string } | null
   pendingWithdrawalConfirmation: string | null
+  navigationHistory: string[]
   setAuth: (user: User, token: string, mustChangePassword?: boolean) => void
   logout: () => void
   setScreen: (screen: string) => void
+  goBack: () => string | null
   updateBalance: (balance: number) => void
   updateUser: (updates: Partial<User>) => void
   setPendingRegistration: (data: { email: string; fullName: string; password: string } | null) => void
@@ -50,6 +52,7 @@ export const useAuthStore = create<AuthState>()(
       isAuthenticated: false,
       pendingRegistration: null,
       pendingWithdrawalConfirmation: null,
+      navigationHistory: [],
       setAuth: (user, token, mustChangePassword = false) => {
         if (typeof window !== 'undefined') {
           localStorage.setItem('forexyameni-session-start', Date.now().toString())
@@ -71,9 +74,28 @@ export const useAuthStore = create<AuthState>()(
         pendingWithdrawalConfirmation: user?.pendingConfirmation || null,
       })
       },
-      logout: () => set({ user: null, token: null, isAuthenticated: false, currentScreen: 'login', pendingRegistration: null, pendingWithdrawalConfirmation: null }),
-      clearForLock: () => set({ user: null, token: null, isAuthenticated: false, currentScreen: 'device-locked', pendingRegistration: null, pendingWithdrawalConfirmation: null }),
-      setScreen: (screen) => set({ currentScreen: screen }),
+      logout: () => set({ user: null, token: null, isAuthenticated: false, currentScreen: 'login', pendingRegistration: null, pendingWithdrawalConfirmation: null, navigationHistory: [] }),
+      clearForLock: () => set({ user: null, token: null, isAuthenticated: false, currentScreen: 'device-locked', pendingRegistration: null, pendingWithdrawalConfirmation: null, navigationHistory: [] }),
+      setScreen: (screen) => set((state) => {
+        // Don't push duplicate consecutive screens
+        const prev = state.currentScreen
+        if (screen === prev) return { currentScreen: screen }
+        return {
+          currentScreen: screen,
+          navigationHistory: [...state.navigationHistory, prev],
+        }
+      }),
+      goBack: () => {
+        const state = useAuthStore.getState()
+        const history = state.navigationHistory
+        if (history.length === 0) return null
+        const prev = history[history.length - 1]
+        set({
+          currentScreen: prev,
+          navigationHistory: history.slice(0, -1),
+        })
+        return prev
+      },
       updateBalance: (balance) => set((state) => ({ user: state.user ? { ...state.user, balance } : null })),
       updateUser: (updates) => set((state) => ({ user: state.user ? { ...state.user, ...updates } : null })),
       setPendingRegistration: (data) => set({ pendingRegistration: data }),

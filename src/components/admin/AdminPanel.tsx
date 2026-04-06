@@ -279,6 +279,90 @@ export default function AdminPanel() {
     return () => document.removeEventListener('mousedown', handleClickOutside)
   }, [])
 
+  // Android back button handler for internal admin navigation
+  useEffect(() => {
+    const handleBackButton = (e: Event) => {
+      // Priority 1: Close any open dialog/modal
+      if (showMoreMenu) {
+        setShowMoreMenu(false)
+        e.preventDefault()
+        return
+      }
+      if (previewImage) {
+        setPreviewImage(null)
+        e.preventDefault()
+        return
+      }
+      if (kycDetailUser) {
+        setKycDetailUser(null)
+        e.preventDefault()
+        return
+      }
+      if (rejectDialog) {
+        setRejectDialog(null)
+        e.preventDefault()
+        return
+      }
+      if (kycRejectDialog) {
+        setKycRejectDialog(null)
+        e.preventDefault()
+        return
+      }
+      if (deleteDialogUser) {
+        closeDeleteDialog()
+        e.preventDefault()
+        return
+      }
+      if (roleDialogUser) {
+        setRoleDialogUser(null)
+        e.preventDefault()
+        return
+      }
+      if (balanceDialogUser) {
+        setBalanceDialogUser(null)
+        e.preventDefault()
+        return
+      }
+      if (removeMerchantDialogUser) {
+        setRemoveMerchantDialogUser(null)
+        e.preventDefault()
+        return
+      }
+      if (deviceDialogUser) {
+        setDeviceDialogUser(null)
+        e.preventDefault()
+        return
+      }
+      if (proofDialogWithdrawal) {
+        setProofDialogWithdrawal(null)
+        e.preventDefault()
+        return
+      }
+      if (copiedWithdrawalId) {
+        // Not a modal, skip
+      }
+
+      // Priority 2: Close expanded user card in users tab
+      if (expandedUserId && activeTab === 'users') {
+        setExpandedUserId(null)
+        e.preventDefault()
+        return
+      }
+
+      // Priority 3: Navigate back from non-dashboard tab to dashboard
+      if (activeTab !== 'dashboard') {
+        setActiveTab('dashboard')
+        e.preventDefault()
+        return
+      }
+
+      // Don't prevent default - let AppLayout handle it (exit confirmation)
+    }
+
+    window.addEventListener('app:backbutton', handleBackButton)
+    return () => window.removeEventListener('app:backbutton', handleBackButton)
+  }, [showMoreMenu, previewImage, kycDetailUser, rejectDialog, kycRejectDialog, deleteDialogUser, roleDialogUser, balanceDialogUser, removeMerchantDialogUser, deviceDialogUser, proofDialogWithdrawal, expandedUserId, activeTab])
+
   const openMoreMenu = () => {
     if (moreMenuRef.current) {
       const rect = moreMenuRef.current.getBoundingClientRect()
