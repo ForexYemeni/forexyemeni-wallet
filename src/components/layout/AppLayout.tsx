@@ -1,13 +1,13 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { useAuthStore } from '@/lib/store'
 import { useRealtimeNotifications, useUnreadCount } from '@/hooks/useRealtimeNotifications'
 import { setupFCMAutoRegister } from '@/lib/fcm-push'
 import BottomNav from './BottomNav'
 import Sidebar from './Sidebar'
 import SocialFloatingButton from './SocialFloatingButton'
-import { Bell, LogOut } from 'lucide-react'
+import { Bell, LogOut, Loader2 } from 'lucide-react'
 import {
   AlertDialog,
   AlertDialogAction,
@@ -23,6 +23,12 @@ import {
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   const { user, setScreen, logout } = useAuthStore()
   const [logoutDialogOpen, setLogoutDialogOpen] = useState(false)
+
+  // Pull-to-refresh
+  const [refreshing, setRefreshing] = useState(false)
+  const [pullDistance, setPullDistance] = useState(0)
+  const startY = useRef(0)
+  const mainRef = useRef<HTMLDivElement | null>(null)
 
   const isAdmin = user?.role === 'admin' || (user?.permissions && Object.values(user.permissions).some(v => v))
 
@@ -41,13 +47,69 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     logout()
   }
 
+  // Pull-to-refresh handlers
+  const onTouchStart = useCallback((e: React.TouchEvent) => {
+    const main = mainRef.current
+    if (!main) return
+    // Only trigger at top of scroll
+    if (main.scrollTop <= 0) {
+      startY.current = e.touches[0].clientY
+    }
+  }, [])
+
+  const onTouchMove = useCallback((e: React.TouchEvent) => {
+    if (startY.current === 0 || refreshing) return
+    const main = mainRef.current
+    if (!main || main.scrollTop > 0) {
+      startY.current = 0
+      setPullDistance(0)
+      return
+    }
+    const diff = e.touches[0].clientY - startY.current
+    if (diff > 0 && diff < 150) {
+      setPullDistance(Math.min(diff * 0.5, 80))
+    }
+  }, [refreshing])
+
+  const onTouchEnd = useCallback(async () => {
+    if (pullDistance > 50 && !refreshing) {
+      setRefreshing(true)
+      setPullDistance(80)
+      try {
+        window.location.reload()
+      } catch {
+        setRefreshing(false)
+      }
+    } else {
+      setPullDistance(0)
+    }
+    startY.current = 0
+  }, [pullDistance, refreshing])
+
   return (
     <div className="min-h-screen bg-background">
       {/* Desktop Sidebar */}
       <Sidebar />
 
       {/* Main Content */}
-      <main className="md:mr-64 min-h-screen pb-24 md:pb-6">
+      <main
+        ref={mainRef}
+        className="md:mr-64 min-h-screen pb-24 md:pb-6"
+        onTouchStart={onTouchStart}
+        onTouchMove={onTouchMove}
+        onTouchEnd={onTouchEnd}
+        style={{ touchAction: 'pan-y' }}
+      >
+        {/* Pull-to-refresh indicator */}
+        {pullDistance > 0 && (
+          <div
+            className="flex items-center justify-center gap-2 transition-all duration-200"
+            style={{ height: pullDistance, opacity: Math.min(pullDistance / 50, 1) }}
+          >
+            <Loader2 className="w-4 h-4 text-gold animate-spin" />
+            <span className="text-xs text-muted-foreground">جاري التحديث...</span>
+          </div>
+        )}
         {/* Top Bar */}
         <header className="sticky top-0 z-40 px-4 md:px-6 py-3 glass-card rounded-none border-x-0 border-t-0">
           <div className="flex items-center justify-between max-w-2xl mx-auto">

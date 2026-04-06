@@ -80,9 +80,9 @@ export async function POST(request: NextRequest) {
         )
       }
 
-      // Find admin user
-      const adminSnapshot = await userOperations.findMany({ take: 1 })
-      const admin = adminSnapshot.find(u => u.role === 'admin' && !u.permissions)
+      // Find admin user — search specifically for admin role
+      const adminSnapshot = await userOperations.findMany({ take: 50 })
+      const admin = adminSnapshot.find(u => u.role === 'admin')
       if (!admin) {
         return NextResponse.json(
           { success: false, message: 'لم يتم العثور على الإدارة' },
