@@ -246,13 +246,26 @@ export default function ChatPage() {
     fetchChats()
   }, [fetchChats])
 
-  // Select first chat if none selected
+  // Select first chat if none selected (but NOT on initial load if coming from back)
   useEffect(() => {
     if (chats.length > 0 && !selectedChatId) {
       const openChat = chats.find(c => c.status === 'open')
       setSelectedChatId(openChat?.id || chats[0]?.id || null)
     }
-  }, [chats, selectedChatId])
+  }, [chats.length])
+
+  // Handle device back button — go back to chat list instead of same chat
+  useEffect(() => {
+    if (!selectedChatId) return
+    history.pushState({ chatOpen: true }, '')
+    const onPopState = () => {
+      setSelectedChatId(null)
+    }
+    window.addEventListener('popstate', onPopState)
+    return () => {
+      window.removeEventListener('popstate', onPopState)
+    }
+  }, [selectedChatId])
 
   // Fetch messages when chat selected
   useEffect(() => {

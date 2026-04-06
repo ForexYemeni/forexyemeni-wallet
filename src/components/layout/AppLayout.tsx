@@ -42,25 +42,59 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     setupFCMAutoRegister()
   }, [])
 
+  // Deep link: navigate to relevant screen when notification is tapped
+  useEffect(() => {
+    const screenMap: Record<string, string> = {
+      success: 'dashboard',
+      warning: 'dashboard',
+      error: 'dashboard',
+      info: 'notifications',
+      chat: 'chat',
+      deposit: 'deposit',
+      withdrawal: 'withdraw',
+      transfer: 'dashboard',
+      kyc: 'kyc',
+    }
+
+    const handleNotificationTap = (e: Event | null) => {
+      const detail = e ? (e as CustomEvent).detail : null
+      const data = detail?.data || (window as any).__pendingNotification?.data || {}
+      const type = detail?.type || (window as any).__pendingNotification?.type || ''
+
+      if (type) {
+        const target = screenMap[type] || 'notifications'
+        setScreen(target)
+        ;(window as any).__pendingNotification = null
+      }
+    }
+
+    // Check if there's a pending notification (from cold start)
+    if ((window as any).__pendingNotification) {
+      handleNotificationTap(null)
+    }
+
+    // Listen for notification taps (warm start)
+    window.addEventListener('notificationTap', handleNotificationTap)
+    return () => window.removeEventListener('notificationTap', handleNotificationTap)
+  }, [])
+
   const handleLogout = () => {
     setLogoutDialogOpen(false)
     logout()
   }
 
-  // Pull-to-refresh handlers
+  // Pull-to-refresh handlers (uses window scroll since <main> is not the scroll container)
   const onTouchStart = useCallback((e: React.TouchEvent) => {
-    const main = mainRef.current
-    if (!main) return
-    // Only trigger at top of scroll
-    if (main.scrollTop <= 0) {
+    // Only trigger at very top of page
+    if (window.scrollY <= 0) {
       startY.current = e.touches[0].clientY
     }
   }, [])
 
   const onTouchMove = useCallback((e: React.TouchEvent) => {
     if (startY.current === 0 || refreshing) return
-    const main = mainRef.current
-    if (!main || main.scrollTop > 0) {
+    // Stop if user scrolled down
+    if (window.scrollY > 0) {
       startY.current = 0
       setPullDistance(0)
       return
@@ -68,6 +102,8 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     const diff = e.touches[0].clientY - startY.current
     if (diff > 0 && diff < 150) {
       setPullDistance(Math.min(diff * 0.5, 80))
+      // Prevent native scroll while pulling
+      e.preventDefault()
     }
   }, [refreshing])
 
@@ -98,16 +134,15 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         onTouchStart={onTouchStart}
         onTouchMove={onTouchMove}
         onTouchEnd={onTouchEnd}
-        style={{ touchAction: 'pan-y' }}
       >
         {/* Pull-to-refresh indicator */}
-        {pullDistance > 0 && (
+        {(pullDistance > 0 || refreshing) && (
           <div
-            className="flex items-center justify-center gap-2 transition-all duration-200"
-            style={{ height: pullDistance, opacity: Math.min(pullDistance / 50, 1) }}
+            className="fixed top-0 left-0 right-0 z-50 flex items-center justify-center gap-2 bg-background/90 backdrop-blur-sm transition-all duration-200"
+            style={{ height: Math.max(pullDistance, refreshing ? 48 : 0), opacity: Math.min(pullDistance / 40, 1) || (refreshing ? 1 : 0) }}
           >
-            <Loader2 className="w-4 h-4 text-gold animate-spin" />
-            <span className="text-xs text-muted-foreground">جاري التحديث...</span>
+            <Loader2 className="w-5 h-5 text-gold animate-spin" />
+            <span className="text-sm text-muted-foreground">جاري التحديث...</span>
           </div>
         )}
         {/* Top Bar */}

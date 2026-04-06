@@ -218,6 +218,30 @@ export function setupFCMAutoRegister(): void {
       unregisterFCM()
     }
   })
+
+  // Listen for notification taps — dispatch event for AppLayout to handle
+  const setupNotificationListener = async () => {
+    try {
+      const PushNotifications = getPushPlugin()
+      if (!PushNotifications) return
+
+      await PushNotifications.addListener('pushNotificationActionPerformed', (notification: any) => {
+        console.log('[FCM] Notification tapped:', JSON.stringify(notification?.data))
+        const data = notification?.notification?.data || notification?.data || {}
+        const type = data.type || data.notificationType || ''
+        if (type) {
+          ;(window as any).__pendingNotification = { type, data }
+          window.dispatchEvent(new CustomEvent('notificationTap', { detail: { type, data } }))
+        }
+      })
+    } catch (e) {
+      console.log('[FCM] Could not setup notification listener:', e)
+    }
+  }
+
+  // Try to setup listener after plugins load
+  setTimeout(setupNotificationListener, 3000)
+  setTimeout(setupNotificationListener, 6000)
 }
 
 /**

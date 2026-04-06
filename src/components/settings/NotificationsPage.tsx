@@ -122,7 +122,16 @@ export default function NotificationsPage() {
           {notifications.map((notif) => (
             <div
               key={notif.id}
-              className={`glass-card glass-card-hover p-4 rounded-xl space-y-2 ${
+              onClick={() => {
+                const screenMap: Record<string, string> = {
+                  success: 'dashboard', warning: 'dashboard', error: 'dashboard',
+                  info: 'notifications', chat: 'chat', deposit: 'deposit',
+                  withdrawal: 'withdraw', transfer: 'dashboard', kyc: 'kyc',
+                }
+                const target = screenMap[notif.type] || 'dashboard'
+                useAuthStore.getState().setScreen(target)
+              }}
+              className={`glass-card glass-card-hover p-4 rounded-xl space-y-2 cursor-pointer active:scale-[0.98] transition-transform ${
                 !notif.read ? 'border-gold/20 bg-gold/[0.02]' : ''
               }`}
             >
