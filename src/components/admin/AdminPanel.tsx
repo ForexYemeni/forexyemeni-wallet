@@ -3844,29 +3844,22 @@ function AdminDevicesSection() {
 
   useEffect(() => { fetchDevices() }, [fetchDevices])
 
-  // Auto-refresh critical data every 8 seconds (deposits, withdrawals, stats, KYC)
-  const fetchStatsRef = useRef(fetchStats)
-  const fetchDepositsRef = useRef(fetchDeposits)
-  const fetchWithdrawalsRef = useRef(fetchWithdrawals)
-  const fetchKYCRef = useRef(fetchKYC)
-  fetchStatsRef.current = fetchStats
-  fetchDepositsRef.current = fetchDeposits
-  fetchWithdrawalsRef.current = fetchWithdrawals
-  fetchKYCRef.current = fetchKYC
+  // Auto-refresh current tab data on a 30-second interval
+  const fetchTabDataRef = useRef(fetchTabData)
+  const activeTabRef = useRef(activeTab)
+  fetchTabDataRef.current = fetchTabData
+  activeTabRef.current = activeTab
 
   useEffect(() => {
     if (user?.role !== 'admin' && !user?.permissions) return
 
-    // Refresh immediately when a new notification arrives (real-time)
+    // Refresh only the currently active tab's data
     const handleDataChanged = () => {
-      fetchStatsRef.current()
-      fetchDepositsRef.current()
-      fetchWithdrawalsRef.current()
-      fetchKYCRef.current()
+      fetchTabDataRef.current(activeTabRef.current)
     }
 
-    // Periodic refresh as backup (every 5 seconds)
-    const autoRefresh = setInterval(handleDataChanged, 5000)
+    // Periodic refresh as backup (every 30 seconds)
+    const autoRefresh = setInterval(handleDataChanged, 30000)
 
     // Listen for real-time notification events
     window.addEventListener('app-data-changed', handleDataChanged)

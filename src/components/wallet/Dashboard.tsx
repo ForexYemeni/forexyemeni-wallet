@@ -38,7 +38,6 @@ export default function Dashboard() {
   useEffect(() => {
     if (user?.id) {
       fetchTransactions()
-      fetchLatestUserData()
     }
   }, [user?.id])
 
@@ -46,7 +45,6 @@ export default function Dashboard() {
   useEffect(() => {
     if (user?.id) {
       fetchTransactions()
-      fetchLatestUserData()
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user?.currentScreen])
@@ -77,34 +75,6 @@ export default function Dashboard() {
     }
   }
 
-  const fetchLatestUserData = async () => {
-    if (!user?.id) return
-    try {
-      const res = await fetch(`/api/transactions?userId=${user.id}`)
-      const data = await res.json()
-      if (data.success) {
-        const updates: Record<string, unknown> = {}
-        let needsUpdate = false
-        if (data.balance !== null && data.balance !== undefined && data.balance !== user?.balance) {
-          updates.balance = data.balance
-          needsUpdate = true
-        }
-        if (data.frozenBalance !== null && data.frozenBalance !== undefined && data.frozenBalance !== user?.frozenBalance) {
-          updates.frozenBalance = data.frozenBalance
-          needsUpdate = true
-        }
-        if (data.accountNumber && data.accountNumber !== user?.accountNumber) {
-          updates.accountNumber = data.accountNumber
-          needsUpdate = true
-        }
-        if (needsUpdate) {
-          useAuthStore.getState().updateUser(updates as any)
-        }
-      }
-    } catch {
-      // silently fail
-    }
-  }
 
   const formatDate = (dateStr: string) => {
     const date = new Date(dateStr)
