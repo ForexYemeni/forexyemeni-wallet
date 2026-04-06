@@ -1041,6 +1041,22 @@ export const chatOperations = {
     })
   },
 
+  // Delete a chat and all its messages
+  async deleteChat(chatId: string): Promise<void> {
+    const db = getDb()
+    // Delete all messages in this chat
+    const messagesSnapshot = await db.collection('chatMessages').where('chatId', '==', chatId).limit(500).get()
+    if (!messagesSnapshot.empty) {
+      const batch = db.batch()
+      for (const doc of messagesSnapshot.docs) {
+        batch.delete(doc.ref)
+      }
+      await batch.commit()
+    }
+    // Delete the chat itself
+    await db.collection('chats').doc(chatId).delete()
+  },
+
   // Count total unread for admin
   async countAdminUnread(adminId: string): Promise<number> {
     const db = getDb()

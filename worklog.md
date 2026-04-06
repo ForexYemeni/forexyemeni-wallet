@@ -725,3 +725,24 @@ Stage Summary:
 - Admin panel properly handles: close modals → close user cards → back to dashboard tab → exit confirm
 - P2P properly handles: close dialogs → back from trade detail → back to default tab
 - Settings properly handles: close sub-views → back to profile tab
+
+
+---
+
+Task ID: Chat Fix - Delete Chat + Filter Closed + Welcome Message
+Agent: Main Agent
+Task: Fix admin chat panel - hide closed chats, add delete button, add welcome message for user new chats
+
+Work Log:
+- Read AdminChat.tsx, ChatPage.tsx, /api/chats/route.ts, /api/chats/[id]/route.ts, db-firebase.ts
+- Added deleteChat() method in db-firebase.ts that deletes chat doc + all chatMessages
+- Added delete_chat action in /api/chats/[id]/route.ts (admin only, verifies participant)
+- Updated AdminChat.tsx: filtered closed chats from list (openChats), added Trash2/AlertTriangle imports, added deletingChat/showDeleteConfirm states, added handleDeleteChat function, added delete button next to close/reopen buttons, added delete confirmation dialog
+- Updated /api/chats/route.ts: added automatic welcome message from admin when user creates new chat via create_chat action
+
+Stage Summary:
+- Admin chat list now only shows open chats (closed chats hidden)
+- Admin can delete any chat completely with confirmation dialog
+- When user opens a new support chat, they automatically receive a welcome message from admin: "مرحباً! كيف يمكننا مساعدتك اليوم؟ 😊"
+- Build verified successfully
+

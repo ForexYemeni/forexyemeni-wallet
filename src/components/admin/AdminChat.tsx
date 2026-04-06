@@ -18,6 +18,8 @@ import {
   MessageSquare,
   UserCircle,
   RotateCcw,
+  Trash2,
+  AlertTriangle,
 } from 'lucide-react'
 
 // ===================== TYPES =====================
@@ -225,6 +227,8 @@ export default function AdminChat() {
   const [loadingMessages, setLoadingMessages] = useState(false)
   const [sendingMessage, setSendingMessage] = useState(false)
   const [closingChat, setClosingChat] = useState(false)
+  const [deletingChat, setDeletingChat] = useState(false)
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
   const [selectedChatData, setSelectedChatData] = useState<AdminChatItem | null>(null)
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
@@ -444,6 +448,34 @@ export default function AdminChat() {
     }
   }
 
+  // Delete chat completely
+  const handleDeleteChat = async () => {
+    if (!selectedChatId || !user?.id || deletingChat) return
+    setDeletingChat(true)
+    try {
+      const res = await fetch(`/api/chats/${selectedChatId}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'delete_chat', userId: user.id, role: 'admin' }),
+      })
+      const data = await res.json()
+      if (data.success) {
+        toast.success('تم حذف المحادثة بالكامل')
+        setSelectedChatId(null)
+        setSelectedChatData(null)
+        setMessages([])
+        fetchChats()
+      } else {
+        toast.error(data.message)
+      }
+    } catch {
+      toast.error('حدث خطأ')
+    } finally {
+      setDeletingChat(false)
+      setShowDeleteConfirm(false)
+    }
+  }
+
   // Reopen chat
   const handleReopenChat = async () => {
     if (!selectedChatId || !user?.id || closingChat) return
@@ -485,6 +517,8 @@ export default function AdminChat() {
       u.id.includes(userSearch)
     )
 
+  // Filter only open chats for the list
+  const openChats = chats.filter(c => c.status !== 'closed')
   // Set of user IDs that already have chats
   const chatUserIds = new Set(chats.map(c => c.userId))
   const totalUnread = chats.reduce((sum, c) => sum + (c.adminUnreadCount || 0), 0)
@@ -503,7 +537,7 @@ export default function AdminChat() {
           >
             <span className="flex items-center gap-1.5">
               <MessageSquare className="w-3.5 h-3.5" />
-              المحادثات ({chats.length})
+              المحادثات ({openChats.length})
             </span>
           </button>
           <button
@@ -537,7 +571,7 @@ export default function AdminChat() {
                   <div className="flex justify-center py-8">
                     <Loader2 className="w-6 h-6 animate-spin text-gold" />
                   </div>
-                ) : chats.length === 0 ? (
+                ) : openChats.length === 0 ? (
                   <div className="flex flex-col items-center justify-center py-8 space-y-2">
                     <MessageCircle className="w-8 h-8 text-muted-foreground/30" />
                     <p className="text-xs text-muted-foreground">لا توجد محادثات بعد</p>
@@ -549,7 +583,7 @@ export default function AdminChat() {
                     </button>
                   </div>
                 ) : (
-                  chats.map(chat => (
+                  openChats.map(chat => (
                     <AdminChatListItem
                       key={chat.id}
                       chat={chat}
@@ -627,29 +661,40 @@ export default function AdminChat() {
                     </p>
                   </div>
                 </div>
-                {selectedChatData.status === 'open' ? (
+                <div className="flex items-center gap-1">
+                  {selectedChatData.status === 'open' ? (
+                    <Button
+                      onClick={handleCloseChat}
+                      disabled={closingChat}
+                      variant="ghost"
+                      size="sm"
+                      className="text-red-400 hover:text-red-300 hover:bg-red-500/10 h-8 text-xs gap-1"
+                    >
+                      {closingChat ? <Loader2 className="w-3 h-3 animate-spin" /> : <X className="w-3 h-3" />}
+                      إغلاق
+                    </Button>
+                  ) : (
+                    <Button
+                      onClick={handleReopenChat}
+                      disabled={closingChat}
+                      variant="ghost"
+                      size="sm"
+                      className="text-green-400 hover:text-green-300 hover:bg-green-500/10 h-8 text-xs gap-1"
+                    >
+                      {closingChat ? <Loader2 className="w-3 h-3 animate-spin" /> : <RotateCcw className="w-3 h-3" />}
+                      إعادة فتح
+                    </Button>
+                  )}
                   <Button
-                    onClick={handleCloseChat}
-                    disabled={closingChat}
+                    onClick={() => setShowDeleteConfirm(true)}
                     variant="ghost"
                     size="sm"
-                    className="text-red-400 hover:text-red-300 hover:bg-red-500/10 h-8 text-xs gap-1"
+                    className="text-red-500 hover:text-red-400 hover:bg-red-500/10 h-8 text-xs gap-1"
                   >
-                    {closingChat ? <Loader2 className="w-3 h-3 animate-spin" /> : <X className="w-3 h-3" />}
-                    إغلاق
+                    <Trash2 className="w-3 h-3" />
+                    حذف
                   </Button>
-                ) : (
-                  <Button
-                    onClick={handleReopenChat}
-                    disabled={closingChat}
-                    variant="ghost"
-                    size="sm"
-                    className="text-green-400 hover:text-green-300 hover:bg-green-500/10 h-8 text-xs gap-1"
-                  >
-                    {closingChat ? <Loader2 className="w-3 h-3 animate-spin" /> : <RotateCcw className="w-3 h-3" />}
-                    إعادة فتح
-                  </Button>
-                )}
+                </div>
               </div>
 
               {/* Messages */}
@@ -714,6 +759,40 @@ export default function AdminChat() {
           )}
         </div>
       </div>
+
+      {/* Delete Confirmation Dialog */}
+      {showDeleteConfirm && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" onClick={() => setShowDeleteConfirm(false)}>
+          <div className="glass-card p-6 space-y-4 w-full max-w-sm animate-scale-in" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-center">
+              <div className="w-14 h-14 rounded-full bg-red-500/10 flex items-center justify-center">
+                <AlertTriangle className="w-7 h-7 text-red-500" />
+              </div>
+            </div>
+            <h3 className="text-lg font-bold text-center">حذف المحادثة</h3>
+            <p className="text-sm text-muted-foreground text-center">
+              هل أنت متأكد من حذف هذه المحادثة بالكامل؟ سيتم حذف جميع الرسائل نهائياً ولا يمكن التراجع عن هذا الإجراء.
+            </p>
+            <div className="flex items-center gap-3">
+              <Button
+                onClick={() => setShowDeleteConfirm(false)}
+                variant="outline"
+                className="flex-1 h-10 rounded-xl border-gold/20 text-xs"
+              >
+                إلغاء
+              </Button>
+              <Button
+                onClick={handleDeleteChat}
+                disabled={deletingChat}
+                className="flex-1 h-10 rounded-xl bg-red-500 hover:bg-red-600 text-white text-xs gap-2"
+              >
+                {deletingChat ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
+                حذف نهائياً
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

@@ -135,6 +135,10 @@ export async function POST(request: NextRequest) {
 
       const chat = await chatOperations.createChat(userId, admin.id, message)
 
+      // Send automatic welcome message from admin to user
+      const welcomeMsg = 'مرحباً! كيف يمكننا مساعدتك اليوم؟ 😊'
+      await chatOperations.sendMessage(chat.id, admin.id, 'admin', welcomeMsg)
+
       // Notify admin about new chat
       try {
         const pushTitle = '📩 محادثة جديدة'

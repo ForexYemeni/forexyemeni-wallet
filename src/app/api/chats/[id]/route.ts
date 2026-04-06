@@ -153,6 +153,29 @@ export async function POST(
       return NextResponse.json({ success: true })
     }
 
+    // === DELETE CHAT (admin only) ===
+    if (action === 'delete_chat') {
+      const { userId, role } = body
+
+      if (!userId || role !== 'admin') {
+        return NextResponse.json(
+          { success: false, message: 'غير مصرح - المدير فقط يمكنه حذف المحادثة' },
+          { status: 403 }
+        )
+      }
+
+      // Verify the user is a participant
+      if (!chat.participants.includes(userId)) {
+        return NextResponse.json(
+          { success: false, message: 'غير مصرح بالدخول' },
+          { status: 403 }
+        )
+      }
+
+      await chatOperations.deleteChat(id)
+      return NextResponse.json({ success: true, message: 'تم حذف المحادثة بالكامل' })
+    }
+
     // === CLOSE CHAT (admin only) ===
     if (action === 'close_chat') {
       const { userId, role } = body
