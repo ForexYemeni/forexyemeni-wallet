@@ -26,8 +26,9 @@ export async function POST(request: NextRequest) {
     const user = await userOperations.findUnique({ email })
     if (!user) {
       rateLimit.recordFailedAttempt(ip, email)
+      const rlAfter = rateLimit.checkLoginRateLimit(ip, email)
       return NextResponse.json(
-        { success: false, message: 'البريد الإلكتروني أو كلمة المرور غير صحيحة' },
+        { success: false, message: 'البريد الإلكتروني أو كلمة المرور غير صحيحة', remaining: rlAfter.remaining },
         { status: 401 }
       )
     }
@@ -71,8 +72,9 @@ export async function POST(request: NextRequest) {
       const isPinValid = await bcrypt.compare(pin, user.tempPinHash)
       if (!isPinValid) {
         rateLimit.recordFailedAttempt(ip, email)
+        const rlAfter = rateLimit.checkLoginRateLimit(ip, email)
         return NextResponse.json(
-          { success: false, message: 'رمز PIN غير صحيح' },
+          { success: false, message: 'رمز PIN غير صحيح', remaining: rlAfter.remaining },
           { status: 401 }
         )
       }
@@ -120,8 +122,9 @@ export async function POST(request: NextRequest) {
     const isValid = await bcrypt.compare(password, user.passwordHash)
     if (!isValid) {
       rateLimit.recordFailedAttempt(ip, email)
+      const rlAfter = rateLimit.checkLoginRateLimit(ip, email)
       return NextResponse.json(
-        { success: false, message: 'البريد الإلكتروني أو كلمة المرور غير صحيحة' },
+        { success: false, message: 'كلمة المرور غير صحيحة', remaining: rlAfter.remaining },
         { status: 401 }
       )
     }

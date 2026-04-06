@@ -6,7 +6,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { useAuthStore } from '@/lib/store'
 import { toast } from 'sonner'
-import { Loader2, Eye, EyeOff, Wallet, Smartphone } from 'lucide-react'
+import { Loader2, Eye, EyeOff, Wallet, Smartphone, ShieldAlert, Lock } from 'lucide-react'
 import { generateDeviceFingerprint, getDeviceName } from '@/lib/device-fingerprint'
 import { playSuccessSound, playAlertSound, vibrate } from '@/lib/notification-sound'
 import TwoFactorVerify from '@/components/auth/TwoFactorVerify'
@@ -16,6 +16,7 @@ export default function LoginForm() {
   const [password, setPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
   const [loading, setLoading] = useState(false)
+  const [loginError, setLoginError] = useState<{ message: string; remaining: number } | null>(null)
   const [twoFAPending, setTwoFAPending] = useState<{ userId: string; pendingToken: string } | null>(null)
   const { setAuth, setScreen, setPendingRegistration, clearForLock } = useAuthStore()
 
@@ -49,19 +50,18 @@ export default function LoginForm() {
         setTwoFAPending({ userId: data.userId, pendingToken: data.pendingToken })
         toast.info(data.message, { duration: 5000 })
       } else if (data.success) {
+        setLoginError(null)
         setAuth(data.user, data.token, data.mustChangePassword)
         if (data.mustChangePassword) {
           toast.warning('⚠️ يجب تغيير كلمة المرور المؤقتة الآن!', { duration: 5000 })
         } else {
           toast.success('مرحباً بك، تم تسجيل الدخول بنجاح!')
-          // Play welcome sound on successful login
           playSuccessSound('general').catch(() => {})
           vibrate([200, 100, 200])
         }
       } else if (data.lockedDevice) {
         toast.error(data.message, { duration: 8000 })
         playAlertSound('general').catch(() => {})
-        // Clear ALL auth state and show locked device screen
         clearForLock()
         setPendingRegistration({ email, fullName: '', password })
       } else if (data.mustChangePassword) {
@@ -72,7 +72,9 @@ export default function LoginForm() {
         setScreen('verify-email')
         toast.error('يرجى تفعيل البريد الإلكتروني أولاً')
       } else {
-        toast.error(data.message || 'حدث خطأ في تسجيل الدخول')
+        const remaining = data.remaining ?? null
+        setLoginError({ message: data.message || 'حدث خطأ في تسجيل الدخول', remaining })
+        playAlertSound('general').catch(() => {})
       }
     } catch {
       toast.error('حدث خطأ في الاتصال بالخادم')
@@ -107,6 +109,51 @@ export default function LoginForm() {
 
   return (
     <div className="animate-slide-up w-full max-w-sm mx-auto space-y-6 p-6">
+      {/* Login Error Alert */}
+      {loginError && (
+        <div className={`animate-slide-up p-4 rounded-2xl border text-center space-y-2 ${
+          loginError.remaining !== null && loginError.remaining <= 1
+            ? 'bg-red-500/10 border-red-500/30'
+            : loginError.remaining !== null && loginError.remaining <= 3
+            ? 'bg-orange-500/10 border-orange-500/30'
+            : 'bg-amber-500/10 border-amber-500/30'
+        }`}>
+          {loginError.remaining !== null && loginError.remaining <= 1 ? (
+            <Lock className="w-8 h-8 text-red-400 mx-auto" />
+          ) : (
+            <ShieldAlert className={`w-8 h-8 mx-auto ${
+              loginError.remaining !== null && loginError.remaining <= 3 ? 'text-orange-400' : 'text-amber-400'
+            }`} />
+          )}
+          <p className={`text-sm font-bold ${
+            loginError.remaining !== null && loginError.remaining <= 1
+              ? 'text-red-400'
+              : loginError.remaining !== null && loginError.remaining <= 3
+              ? 'text-orange-400'
+              : 'text-amber-400'
+          }`}>
+            {loginError.message}
+          </p>
+          {loginError.remaining !== null && loginError.remaining > 0 && (
+            <div className="flex items-center justify-center gap-1.5">
+              {Array.from({ length: 5 }).map((_, i) => (
+                <div key={i} className={`w-2.5 h-2.5 rounded-full transition-all ${
+                  i < loginError.remaining
+                    ? (loginError.remaining <= 2 ? 'bg-red-400' : loginError.remaining <= 3 ? 'bg-orange-400' : 'bg-amber-400')
+                    : 'bg-white/10'
+                }`} />
+              ))}
+            </div>
+          )}
+          <p className="text-xs text-muted-foreground">
+            {loginError.remaining !== null && loginError.remaining > 0
+              ? `متبقي ${loginError.remaining} محاول${loginError.remaining === 1 ? 'ة' : loginError.remaining === 2 ? 'تان' : 'ات'} قبل قفل الحساب`
+              : loginError.remaining === 0
+              ? 'تم قفل الحساب لمدة 15 دقيقة. حاول لاحقاً أو غيّر الشبكة'
+              : ''}
+          </p>
+        </div>
+      )}
       <div className="text-center space-y-3">
         <div className="w-20 h-20 mx-auto rounded-2xl gold-gradient flex items-center justify-center gold-glow">
           <Wallet className="w-10 h-10 text-gray-900" />
