@@ -4,14 +4,17 @@ import { getDb } from '@/lib/firebase'
 import { sendPushNotification } from '@/lib/push-notification'
 import { logAudit } from '@/lib/audit-log'
 
-// GET all users (admin)
+// GET all users (admin) — excludes admin accounts from the list
 export async function GET() {
   try {
     const users = await userOperations.findMany({
       take: 200,
     })
 
-    return NextResponse.json({ success: true, users })
+    // Exclude admin users from the users list
+    const regularUsers = users.filter(u => u.role !== 'admin')
+
+    return NextResponse.json({ success: true, users: regularUsers })
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : 'حدث خطأ'
     return NextResponse.json({ success: false, message }, { status: 500 })
