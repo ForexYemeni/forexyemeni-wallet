@@ -1836,7 +1836,7 @@ export default function AdminPanel() {
                               <span className="text-[10px] text-muted-foreground flex-shrink-0">الاسم</span>
                               <span className="text-xs font-medium truncate">{w.user.fullName}</span>
                             </div>
-                            <button onClick={() => copyField(`${w.id}-name`, w.user.fullName!)} className="text-muted-foreground hover:text-gold transition-colors flex-shrink-0 opacity-0 group-hover:opacity-100">
+                            <button onClick={() => copyField(`${w.id}-name`, w.user.fullName!)} className="text-muted-foreground hover:text-gold transition-colors flex-shrink-0">
                               {copiedField === `${w.id}-name` ? <CheckIcon className="w-3.5 h-3.5 text-green-400" /> : <Copy className="w-3.5 h-3.5" />}
                             </button>
                           </div>
@@ -1847,7 +1847,7 @@ export default function AdminPanel() {
                               <span className="text-[10px] text-muted-foreground flex-shrink-0">الهاتف</span>
                               <span className="text-xs font-medium truncate" dir="ltr">{w.user.phone}</span>
                             </div>
-                            <button onClick={() => copyField(`${w.id}-phone`, w.user.phone!)} className="text-muted-foreground hover:text-gold transition-colors flex-shrink-0 opacity-0 group-hover:opacity-100">
+                            <button onClick={() => copyField(`${w.id}-phone`, w.user.phone!)} className="text-muted-foreground hover:text-gold transition-colors flex-shrink-0">
                               {copiedField === `${w.id}-phone` ? <CheckIcon className="w-3.5 h-3.5 text-green-400" /> : <Copy className="w-3.5 h-3.5" />}
                             </button>
                           </div>
@@ -1857,7 +1857,7 @@ export default function AdminPanel() {
                             <span className="text-[10px] text-muted-foreground flex-shrink-0">البريد</span>
                             <span className="text-xs font-medium truncate" dir="ltr">{w.user.email}</span>
                           </div>
-                          <button onClick={() => copyField(`${w.id}-email`, w.user.email)} className="text-muted-foreground hover:text-gold transition-colors flex-shrink-0 opacity-0 group-hover:opacity-100">
+                          <button onClick={() => copyField(`${w.id}-email`, w.user.email)} className="text-muted-foreground hover:text-gold transition-colors flex-shrink-0">
                             {copiedField === `${w.id}-email` ? <CheckIcon className="w-3.5 h-3.5 text-green-400" /> : <Copy className="w-3.5 h-3.5" />}
                           </button>
                         </div>
@@ -1867,19 +1867,20 @@ export default function AdminPanel() {
                         <p className="text-xs text-muted-foreground font-medium mb-2">بيانات السحب:</p>
                         <div className="grid grid-cols-1 gap-1.5">
                           <div className="flex items-center justify-between p-2 rounded-lg bg-white/5">
-                            <div className="flex items-center gap-2">
-                              <span className="text-[10px] text-muted-foreground">الطريقة</span>
-                              <span className="text-xs font-medium">
-                                {w.paymentMethodName ||
-                                 (w.method === 'crypto' || w.method === 'blockchain' ? 'عملات رقمية' :
-                                  w.method === 'bank_deposit' ? 'إيداع لمحفظة' :
-                                  w.method === 'atm_transfer' ? 'تحويل عبر صراف' :
-                                  w.method === 'bank_transfer' ? 'تحويل بنكي' : w.method)}
+                            <div className="flex items-center gap-2 min-w-0">
+                              <span className="text-[10px] text-muted-foreground flex-shrink-0">الطريقة</span>
+                              <span className="text-xs font-medium truncate">
+                                {w.paymentMethodName
+                                  ? (w.network && !w.paymentMethodName.includes(w.network)
+                                    ? `${w.paymentMethodName} - ${w.network}`
+                                    : w.paymentMethodName)
+                                  : (w.method === 'crypto' || w.method === 'blockchain'
+                                    ? (w.network ? `عملات رقمية - ${w.network}` : 'عملات رقمية')
+                                    : w.method === 'bank_deposit' ? 'إيداع لمحفظة' :
+                                      w.method === 'atm_transfer' ? 'تحويل عبر صراف' :
+                                        w.method === 'bank_transfer' ? 'تحويل بنكي' : w.method)}
                               </span>
                             </div>
-                            {w.network && (
-                              <span className="text-[10px] px-1.5 py-0.5 rounded-md bg-gold/10 text-gold">{w.network}</span>
-                            )}
                           </div>
                           {/* toAddress - parsed structured display */}
                           {(() => {
@@ -1909,7 +1910,7 @@ export default function AdminPanel() {
                                         <span className="text-[10px] text-muted-foreground flex-shrink-0">اسم المستلم</span>
                                         <span className="text-xs font-medium truncate">{parts[0]}</span>
                                       </div>
-                                      <button onClick={() => copyField(`${w.id}-recipient`, parts[0])} className="text-muted-foreground hover:text-gold transition-colors flex-shrink-0 opacity-0 group-hover:opacity-100">
+                                      <button onClick={() => copyField(`${w.id}-recipient`, parts[0])} className="text-muted-foreground hover:text-gold transition-colors flex-shrink-0">
                                         {copiedField === `${w.id}-recipient` ? <CheckIcon className="w-3.5 h-3.5 text-green-400" /> : <Copy className="w-3.5 h-3.5" />}
                                       </button>
                                     </div>
@@ -1920,7 +1921,7 @@ export default function AdminPanel() {
                                         <span className="text-[10px] text-muted-foreground flex-shrink-0">رقم الجوال</span>
                                         <span className="text-xs font-medium font-mono truncate" dir="ltr">{parts[1]}</span>
                                       </div>
-                                      <button onClick={() => copyField(`${w.id}-rphone`, parts[1])} className="text-muted-foreground hover:text-gold transition-colors flex-shrink-0 opacity-0 group-hover:opacity-100">
+                                      <button onClick={() => copyField(`${w.id}-rphone`, parts[1])} className="text-muted-foreground hover:text-gold transition-colors flex-shrink-0">
                                         {copiedField === `${w.id}-rphone` ? <CheckIcon className="w-3.5 h-3.5 text-green-400" /> : <Copy className="w-3.5 h-3.5" />}
                                       </button>
                                     </div>
@@ -1944,7 +1945,7 @@ export default function AdminPanel() {
                                       <span className="text-[10px] text-muted-foreground flex-shrink-0">اسم المستفيد</span>
                                       <span className="text-xs font-medium truncate">{parts[0]}</span>
                                     </div>
-                                    <button onClick={() => copyField(`${w.id}-beneficiary`, parts[0])} className="text-muted-foreground hover:text-gold transition-colors flex-shrink-0 opacity-0 group-hover:opacity-100">
+                                    <button onClick={() => copyField(`${w.id}-beneficiary`, parts[0])} className="text-muted-foreground hover:text-gold transition-colors flex-shrink-0">
                                       {copiedField === `${w.id}-beneficiary` ? <CheckIcon className="w-3.5 h-3.5 text-green-400" /> : <Copy className="w-3.5 h-3.5" />}
                                     </button>
                                   </div>
@@ -1955,7 +1956,7 @@ export default function AdminPanel() {
                                       <span className="text-[10px] text-muted-foreground flex-shrink-0">رقم الحساب</span>
                                       <span className="text-xs font-medium font-mono" dir="ltr">{parts[1]}</span>
                                     </div>
-                                    <button onClick={() => copyField(`${w.id}-account`, parts[1])} className="text-muted-foreground hover:text-gold transition-colors flex-shrink-0 opacity-0 group-hover:opacity-100">
+                                    <button onClick={() => copyField(`${w.id}-account`, parts[1])} className="text-muted-foreground hover:text-gold transition-colors flex-shrink-0">
                                       {copiedField === `${w.id}-account` ? <CheckIcon className="w-3.5 h-3.5 text-green-400" /> : <Copy className="w-3.5 h-3.5" />}
                                     </button>
                                   </div>
