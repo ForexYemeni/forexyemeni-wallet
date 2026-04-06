@@ -147,6 +147,11 @@ interface AdminStats {
   totalFees: number
   adminBalance: number
   pendingActions: number
+  depositsPending: number
+  depositsReviewing: number
+  withdrawalsPending: number
+  withdrawalsApproved: number
+  kycRecordsPending: number
   recentActivity: any[]
 }
 
@@ -231,6 +236,10 @@ export default function AdminPanel() {
   const [rejectDialog, setRejectDialog] = useState<{ withdrawalId: string; amount: number } | null>(null)
   const [rejectReason, setRejectReason] = useState('')
   const [rejectLoading, setRejectLoading] = useState(false)
+  // Deposit confirmation dialog (confirm with PIN)
+  const [depositConfirmDialog, setDepositConfirmDialog] = useState<{ depositId: string; amount: number; fee: number; netAmount: number; userEmail: string; userName: string } | null>(null)
+  const [depositConfirmPin, setDepositConfirmPin] = useState('')
+  const [depositConfirmLoading, setDepositConfirmLoading] = useState(false)
   // Deposit rejection dialog
   const [depositRejectDialog, setDepositRejectDialog] = useState<{ depositId: string; amount: number; userEmail: string } | null>(null)
   const [depositRejectReason, setDepositRejectReason] = useState('')
@@ -474,6 +483,45 @@ export default function AdminPanel() {
       toast.error('خطأ في رفض الإيداع')
     } finally {
       setDepositRejectLoading(false)
+    }
+  }
+
+  // Confirm deposit with PIN
+  const handleConfirmDeposit = async () => {
+    if (!depositConfirmDialog || depositConfirmPin.length < 4) return
+    setDepositConfirmLoading(true)
+    try {
+      // First verify admin PIN
+      const pinRes = await fetch('/api/auth/verify-pin', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId: user?.id, pin: depositConfirmPin }),
+      })
+      const pinData = await pinRes.json()
+      if (!pinData.success) {
+        toast.error(pinData.message || 'رمز PIN غير صحيح')
+        setDepositConfirmLoading(false)
+        return
+      }
+      // PIN verified, proceed with confirmation
+      const res = await fetch('/api/admin/deposits', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ depositId: depositConfirmDialog.depositId, status: 'confirmed' }),
+      })
+      const data = await res.json()
+      if (data.success) {
+        toast.success('تم تأكيد الإيداع بنجاح')
+        fetchDeposits(); fetchUsers(); fetchStats()
+        setDepositConfirmDialog(null)
+        setDepositConfirmPin('')
+      } else {
+        toast.error(data.message)
+      }
+    } catch {
+      toast.error('خطأ في تأكيد الإيداع')
+    } finally {
+      setDepositConfirmLoading(false)
     }
   }
 
@@ -1082,11 +1130,20 @@ export default function AdminPanel() {
         <div className="flex items-center gap-2">
           {stats?.pendingActions ? (
             <button
-              onClick={() => setActiveTab('deposits')}
+              onClick={() => {
+                // Navigate to the tab with most pending items
+                const depPending = (stats.depositsPending || 0) + (stats.depositsReviewing || 0)
+                const witPending = (stats.withdrawalsPending || 0) + (stats.withdrawalsApproved || 0)
+                const kycPending = stats.kycRecordsPending || 0
+                if (depPending >= witPending && depPending >= kycPending) setActiveTab('deposits')
+                else if (witPending >= kycPending) setActiveTab('withdrawals')
+                else setActiveTab('kyc')
+              }}
               className="glass-card px-3 py-2 flex items-center gap-2 text-xs cursor-pointer hover:bg-white/10 transition-colors"
             >
               <Activity className="w-4 h-4 text-yellow-400" />
-              <span className="text-yellow-400 font-bold">{stats.pendingActions} عملية معلقة</span>
+              <span className="text-yellow-400 font-bold">{stats.pendingActions} إجراء معلق</span>
+              <span className="text-muted-foreground hidden sm:inline">({(stats.depositsPending || 0) + (stats.depositsReviewing || 0)} إيداع، {(stats.withdrawalsPending || 0) + (stats.withdrawalsApproved || 0)} سحب، {stats.kycRecordsPending || 0} توثيق)</span>
             </button>
           ) : null}
           <button
@@ -1696,7 +1753,7 @@ export default function AdminPanel() {
                     )}
                     {d.status === 'reviewing' && (
                       <div className="flex gap-2 pt-1">
-                        <button onClick={() => handleUpdateDeposit(d.id, 'confirmed')} disabled={actionLoading === d.id} className="flex-1 flex items-center justify-center gap-1 text-xs py-2 rounded-lg bg-green-500/10 text-green-400 hover:bg-green-500/20 transition-colors font-medium">
+                        <button onClick={() => { setDepositConfirmDialog({ depositId: d.id, amount: d.amount, fee: d.fee || 0, netAmount: d.netAmount || d.amount, userEmail: d.user.email, userName: d.user.fullName || d.user.email }); setDepositConfirmPin('') }} disabled={actionLoading === d.id} className="flex-1 flex items-center justify-center gap-1 text-xs py-2 rounded-lg bg-green-500/10 text-green-400 hover:bg-green-500/20 transition-colors font-medium">
                           <Check className="w-3 h-3" /> تأكيد
                         </button>
                         <button onClick={() => setDepositRejectDialog({ depositId: d.id, amount: d.amount, userEmail: d.user.email })} disabled={actionLoading === d.id} className="flex-1 flex items-center justify-center gap-1 text-xs py-2 rounded-lg bg-red-500/10 text-red-400 hover:bg-red-500/20 transition-colors font-medium">
@@ -1793,20 +1850,88 @@ export default function AdminPanel() {
                               <span className="text-[10px] px-1.5 py-0.5 rounded-md bg-gold/10 text-gold">{w.network}</span>
                             )}
                           </div>
-                          <div className="flex items-center justify-between p-2 rounded-lg bg-white/5 group">
-                            <div className="flex-1 min-w-0">
-                              <span className="text-[10px] text-muted-foreground block mb-0.5">
-                                {w.method === 'crypto' || w.method === 'blockchain' ? 'عنوان المحفظة' : 'بيانات الاستلام'}
-                              </span>
-                              <p className={`text-xs font-medium ${w.method === 'crypto' || w.method === 'blockchain' ? 'font-mono' : ''}`}
-                                 dir={w.method === 'crypto' || w.method === 'blockchain' ? 'ltr' : 'rtl'}>
-                                {w.toAddress}
-                              </p>
-                            </div>
-                            <button onClick={() => copyWithdrawalAddress(w)} className="text-gold hover:text-gold-light transition-colors flex-shrink-0 mr-2">
-                              {copiedWithdrawalId === w.id ? <CheckIcon className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
-                            </button>
-                          </div>
+                          {/* toAddress - parsed structured display */}
+                          {(() => {
+                            const isCrypto = w.method === 'crypto' || w.method === 'blockchain'
+                            if (isCrypto) {
+                              return (
+                                <div className="flex items-center justify-between p-2 rounded-lg bg-white/5 group">
+                                  <div className="flex-1 min-w-0">
+                                    <span className="text-[10px] text-muted-foreground block mb-0.5">عنوان المحفظة</span>
+                                    <p className="text-xs font-medium font-mono" dir="ltr">{w.toAddress}</p>
+                                  </div>
+                                  <button onClick={() => copyWithdrawalAddress(w)} className="text-gold hover:text-gold-light transition-colors flex-shrink-0 mr-2">
+                                    {copiedWithdrawalId === w.id ? <CheckIcon className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
+                                  </button>
+                                </div>
+                              )
+                            }
+                            const isAtm = w.toAddress.startsWith('صراف')
+                            const prefix = isAtm ? 'صراف: ' : 'بنكي: '
+                            const parts = w.toAddress.replace(prefix, '').split(' - ').filter(Boolean)
+                            if (isAtm) {
+                              return (
+                                <div className="space-y-1">
+                                  {parts[0] && (
+                                    <div className="flex items-center justify-between p-2 rounded-lg bg-white/5 group">
+                                      <div className="flex items-center gap-2 min-w-0">
+                                        <span className="text-[10px] text-muted-foreground flex-shrink-0">اسم المستلم</span>
+                                        <span className="text-xs font-medium truncate">{parts[0]}</span>
+                                      </div>
+                                      <button onClick={() => copyField(`${w.id}-recipient`, parts[0])} className="text-muted-foreground hover:text-gold transition-colors flex-shrink-0 opacity-0 group-hover:opacity-100">
+                                        {copiedField === `${w.id}-recipient` ? <CheckIcon className="w-3.5 h-3.5 text-green-400" /> : <Copy className="w-3.5 h-3.5" />}
+                                      </button>
+                                    </div>
+                                  )}
+                                  {parts[1] && (
+                                    <div className="flex items-center justify-between p-2 rounded-lg bg-white/5 group">
+                                      <div className="flex items-center gap-2 min-w-0">
+                                        <span className="text-[10px] text-muted-foreground flex-shrink-0">رقم الجوال</span>
+                                        <span className="text-xs font-medium font-mono truncate" dir="ltr">{parts[1]}</span>
+                                      </div>
+                                      <button onClick={() => copyField(`${w.id}-rphone`, parts[1])} className="text-muted-foreground hover:text-gold transition-colors flex-shrink-0 opacity-0 group-hover:opacity-100">
+                                        {copiedField === `${w.id}-rphone` ? <CheckIcon className="w-3.5 h-3.5 text-green-400" /> : <Copy className="w-3.5 h-3.5" />}
+                                      </button>
+                                    </div>
+                                  )}
+                                  {parts[2] && (
+                                    <div className="flex items-center justify-between p-2 rounded-lg bg-white/5">
+                                      <div className="flex items-center gap-2">
+                                        <span className="text-[10px] text-muted-foreground">الشبكة / البنك</span>
+                                        <span className="text-xs font-medium">{parts[2]}</span>
+                                      </div>
+                                    </div>
+                                  )}
+                                </div>
+                              )
+                            }
+                            return (
+                              <div className="space-y-1">
+                                {parts[0] && (
+                                  <div className="flex items-center justify-between p-2 rounded-lg bg-white/5 group">
+                                    <div className="flex items-center gap-2 min-w-0">
+                                      <span className="text-[10px] text-muted-foreground flex-shrink-0">اسم المستفيد</span>
+                                      <span className="text-xs font-medium truncate">{parts[0]}</span>
+                                    </div>
+                                    <button onClick={() => copyField(`${w.id}-beneficiary`, parts[0])} className="text-muted-foreground hover:text-gold transition-colors flex-shrink-0 opacity-0 group-hover:opacity-100">
+                                      {copiedField === `${w.id}-beneficiary` ? <CheckIcon className="w-3.5 h-3.5 text-green-400" /> : <Copy className="w-3.5 h-3.5" />}
+                                    </button>
+                                  </div>
+                                )}
+                                {parts[1] && (
+                                  <div className="flex items-center justify-between p-2 rounded-lg bg-white/5 group">
+                                    <div className="flex items-center gap-2 min-w-0">
+                                      <span className="text-[10px] text-muted-foreground flex-shrink-0">رقم الحساب</span>
+                                      <span className="text-xs font-medium font-mono" dir="ltr">{parts[1]}</span>
+                                    </div>
+                                    <button onClick={() => copyField(`${w.id}-account`, parts[1])} className="text-muted-foreground hover:text-gold transition-colors flex-shrink-0 opacity-0 group-hover:opacity-100">
+                                      {copiedField === `${w.id}-account` ? <CheckIcon className="w-3.5 h-3.5 text-green-400" /> : <Copy className="w-3.5 h-3.5" />}
+                                    </button>
+                                  </div>
+                                )}
+                              </div>
+                            )
+                          })()}
                           <div className="p-2 rounded-lg bg-white/5 text-xs space-y-1">
                             <div className="flex items-center justify-between">
                               <span className="text-muted-foreground">الرسوم → حساب الإدارة: <strong className="text-gold">{(w.fee ?? 0).toFixed(2)} USDT</strong></span>
@@ -2536,6 +2661,56 @@ export default function AdminPanel() {
               >
                 إلغاء
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ===================== CONFIRM DEPOSIT DIALOG (with PIN) ===================== */}
+      {depositConfirmDialog && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={() => { setDepositConfirmDialog(null); setDepositConfirmPin('') }}>
+          <div className="glass-card bg-background/95 backdrop-blur-xl border-green-500/20 w-full max-w-sm rounded-2xl p-6 space-y-5 animate-scale-in" onClick={(e) => e.stopPropagation()}>
+            <div className="text-center space-y-2">
+              <div className="w-14 h-14 rounded-2xl bg-green-500/10 flex items-center justify-center mx-auto">
+                <Check className="w-7 h-7 text-green-400" />
+              </div>
+              <h3 className="text-lg font-bold text-green-400">تأكيد الإيداع</h3>
+              <p className="text-xs text-muted-foreground">{depositConfirmDialog.userName}</p>
+            </div>
+            {/* Amount details */}
+            <div className="p-3 rounded-xl bg-white/5 text-sm space-y-2">
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">المبلغ المدفوع</span>
+                <span className="font-bold">{depositConfirmDialog.amount.toFixed(2)} USDT</span>
+              </div>
+              {depositConfirmDialog.fee > 0 && (
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">الرسوم → حساب الإدارة</span>
+                  <span className="font-bold text-gold">-{depositConfirmDialog.fee.toFixed(2)} USDT</span>
+                </div>
+              )}
+              <div className="border-t border-white/10 pt-2 flex justify-between">
+                <span className="text-muted-foreground">المبلغ الصافي الذي سيُضاف</span>
+                <span className="font-bold text-green-400">{depositConfirmDialog.netAmount.toFixed(2)} USDT</span>
+              </div>
+            </div>
+            {/* PIN input */}
+            <div className="space-y-3">
+              <Label className="text-sm text-muted-foreground">أدخل رمز PIN للتأكيد</Label>
+              <input
+                type="password"
+                value={depositConfirmPin}
+                onChange={(e) => setDepositConfirmPin(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                placeholder="• • • •"
+                className="w-full h-12 rounded-xl glass-input px-4 text-sm tracking-widest text-center text-xl"
+                dir="ltr"
+                maxLength={6}
+                autoFocus
+              />
+              <button onClick={handleConfirmDeposit} disabled={depositConfirmLoading || depositConfirmPin.length < 4} className="w-full h-11 bg-green-500 text-white font-bold rounded-xl hover:bg-green-600 transition-all disabled:opacity-50">
+                {depositConfirmLoading ? <Loader2 className="w-4 h-4 animate-spin mx-auto" /> : 'تأكيد الإيداع'}
+              </button>
+              <button onClick={() => { setDepositConfirmDialog(null); setDepositConfirmPin('') }} className="w-full h-10 bg-white/10 hover:bg-white/20 text-foreground font-medium rounded-xl transition-all text-sm">إلغاء</button>
             </div>
           </div>
         </div>

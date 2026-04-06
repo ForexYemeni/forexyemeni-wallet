@@ -767,3 +767,23 @@ Stage Summary:
 - Files modified: AdminPanel.tsx, DepositForm.tsx, WithdrawForm.tsx, useRealtimeNotifications.ts, notifications API route, admin deposits API route, admin withdrawals API route, admin stats API route, admin KYC API route
 - Root cause of real-time issue: Capacitor WebView HTTP caching preventing fresh data from being fetched
 - Solution: Multi-layer cache busting (URL timestamp params + fetch cache option + response headers + visibility change handler)
+
+---
+Task ID: 2
+Agent: Main Agent
+Task: 3 admin panel improvements - pending actions badge, deposit confirm dialog, withdrawal display
+
+Work Log:
+- Updated header "pending actions" badge to show breakdown: "(X إيداع، Y سحب، Z توثيق)" next to total count
+- Badge now navigates to the tab with the most pending items (not always deposits)
+- Added `AdminStats` interface fields: depositsPending, depositsReviewing, withdrawalsPending, withdrawalsApproved, kycRecordsPending
+- Created deposit confirmation dialog: when admin clicks "تأكيد", a modal shows deposit amount, fee deduction (if any), net amount, and requires PIN entry before confirming
+- Added state: depositConfirmDialog, depositConfirmPin, depositConfirmLoading
+- Added handler: handleConfirmDeposit() - verifies PIN via /api/auth/verify-pin, then confirms deposit
+- Improved withdrawal toAddress display: parsed the concatenated string into structured fields (اسم المستفيد, رقم الحساب for bank deposits; اسم المستلم, رقم الجوال, الشبكة for ATM transfers; wallet address for crypto)
+- Each parsed field has its own copy button on hover
+- Build verified successfully
+
+Stage Summary:
+- Files modified: AdminPanel.tsx (states, handlers, JSX for confirm dialog, withdrawal display, header badge)
+- Key patterns: PIN verification before deposit confirmation, IIFE for inline parsing of toAddress strings
