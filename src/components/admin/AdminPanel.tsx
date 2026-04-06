@@ -227,10 +227,14 @@ export default function AdminPanel() {
   const [deleteLoading, setDeleteLoading] = useState(false)
   const [copiedWithdrawalId, setCopiedWithdrawalId] = useState<string | null>(null)
   const [copiedField, setCopiedField] = useState<string | null>(null)
-  // Rejection reason dialog
+  // Rejection reason dialog (withdrawals)
   const [rejectDialog, setRejectDialog] = useState<{ withdrawalId: string; amount: number } | null>(null)
   const [rejectReason, setRejectReason] = useState('')
   const [rejectLoading, setRejectLoading] = useState(false)
+  // Deposit rejection dialog
+  const [depositRejectDialog, setDepositRejectDialog] = useState<{ depositId: string; amount: number; userEmail: string } | null>(null)
+  const [depositRejectReason, setDepositRejectReason] = useState('')
+  const [depositRejectLoading, setDepositRejectLoading] = useState(false)
   // KYC rejection dialog
   const [kycRejectDialog, setKycRejectDialog] = useState<{ recordId: string; userId: string } | null>(null)
   const [kycRejectReason, setKycRejectReason] = useState('')
@@ -440,6 +444,36 @@ export default function AdminPanel() {
       toast.error('خطأ في تحديث الإيداع')
     } finally {
       setActionLoading(null)
+    }
+  }
+
+  // Reject deposit with reason
+  const handleRejectDeposit = async () => {
+    if (!depositRejectDialog || !depositRejectReason.trim()) return
+    setDepositRejectLoading(true)
+    try {
+      const res = await fetch('/api/admin/deposits', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          depositId: depositRejectDialog.depositId,
+          status: 'rejected',
+          adminNote: depositRejectReason.trim(),
+        }),
+      })
+      const data = await res.json()
+      if (data.success) {
+        toast.success('تم رفض الإيداع')
+        fetchDeposits(); fetchUsers(); fetchStats()
+        setDepositRejectDialog(null)
+        setDepositRejectReason('')
+      } else {
+        toast.error(data.message)
+      }
+    } catch {
+      toast.error('خطأ في رفض الإيداع')
+    } finally {
+      setDepositRejectLoading(false)
     }
   }
 
@@ -1665,7 +1699,7 @@ export default function AdminPanel() {
                         <button onClick={() => handleUpdateDeposit(d.id, 'confirmed')} disabled={actionLoading === d.id} className="flex-1 flex items-center justify-center gap-1 text-xs py-2 rounded-lg bg-green-500/10 text-green-400 hover:bg-green-500/20 transition-colors font-medium">
                           <Check className="w-3 h-3" /> تأكيد
                         </button>
-                        <button onClick={() => handleUpdateDeposit(d.id, 'rejected')} disabled={actionLoading === d.id} className="flex-1 flex items-center justify-center gap-1 text-xs py-2 rounded-lg bg-red-500/10 text-red-400 hover:bg-red-500/20 transition-colors font-medium">
+                        <button onClick={() => setDepositRejectDialog({ depositId: d.id, amount: d.amount, userEmail: d.user.email })} disabled={actionLoading === d.id} className="flex-1 flex items-center justify-center gap-1 text-xs py-2 rounded-lg bg-red-500/10 text-red-400 hover:bg-red-500/20 transition-colors font-medium">
                           <X className="w-3 h-3" /> رفض
                         </button>
                       </div>
@@ -2502,6 +2536,38 @@ export default function AdminPanel() {
               >
                 إلغاء
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ===================== REJECT DEPOSIT DIALOG ===================== */}
+      {depositRejectDialog && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={() => { setDepositRejectDialog(null); setDepositRejectReason('') }}>
+          <div className="glass-card bg-background/95 backdrop-blur-xl border-red-500/20 w-full max-w-sm rounded-2xl p-6 space-y-5 animate-scale-in" onClick={(e) => e.stopPropagation()}>
+            <div className="text-center space-y-2">
+              <div className="w-14 h-14 rounded-2xl bg-red-500/10 flex items-center justify-center mx-auto">
+                <X className="w-7 h-7 text-red-400" />
+              </div>
+              <h3 className="text-lg font-bold text-red-400">رفض الإيداع</h3>
+              <p className="text-sm text-muted-foreground">
+                مبلغ: <strong className="text-foreground">{(depositRejectDialog.amount ?? 0).toFixed(2)} USDT</strong>
+              </p>
+            </div>
+            <div className="space-y-3">
+              <div className="space-y-2">
+                <Label className="text-sm text-muted-foreground">سبب الرفض</Label>
+                <textarea
+                  value={depositRejectReason}
+                  onChange={(e) => setDepositRejectReason(e.target.value)}
+                  className="w-full h-24 rounded-lg bg-white/5 border border-white/10 px-3 py-2 text-sm text-foreground resize-none"
+                  placeholder="أدخل سبب رفض الإيداع..."
+                />
+              </div>
+              <button onClick={handleRejectDeposit} disabled={depositRejectLoading || !depositRejectReason.trim()} className="w-full h-11 bg-red-500 text-white font-bold rounded-xl hover:bg-red-600 transition-all">
+                {depositRejectLoading ? <Loader2 className="w-4 h-4 animate-spin mx-auto" /> : 'تأكيد الرفض'}
+              </button>
+              <button onClick={() => { setDepositRejectDialog(null); setDepositRejectReason('') }} className="w-full h-10 bg-white/10 hover:bg-white/20 text-foreground font-medium rounded-xl transition-all text-sm">إلغاء</button>
             </div>
           </div>
         </div>
@@ -3522,20 +3588,28 @@ function AdminDevicesSection() {
 
   useEffect(() => { fetchDevices() }, [fetchDevices])
 
-  // Auto-refresh critical data every 10 seconds (deposits, withdrawals, stats, KYC)
+  // Auto-refresh critical data every 8 seconds (deposits, withdrawals, stats, KYC)
+  const fetchStatsRef = useRef(fetchStats)
+  const fetchDepositsRef = useRef(fetchDeposits)
+  const fetchWithdrawalsRef = useRef(fetchWithdrawals)
+  const fetchKYCRef = useRef(fetchKYC)
+  fetchStatsRef.current = fetchStats
+  fetchDepositsRef.current = fetchDeposits
+  fetchWithdrawalsRef.current = fetchWithdrawals
+  fetchKYCRef.current = fetchKYC
+
   useEffect(() => {
     if (user?.role !== 'admin' && !user?.permissions) return
 
     const autoRefresh = setInterval(() => {
-      fetchStats()
-      fetchDeposits()
-      fetchWithdrawals()
-      fetchKYC()
-    }, 10000) // every 10 seconds
+      fetchStatsRef.current()
+      fetchDepositsRef.current()
+      fetchWithdrawalsRef.current()
+      fetchKYCRef.current()
+    }, 8000) // every 8 seconds
 
     return () => clearInterval(autoRefresh)
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+  }, [user?.role, user?.permissions])
 
   const handleRemoveDevice = async (deviceId: string) => {
     if (devices.length <= 1) {
