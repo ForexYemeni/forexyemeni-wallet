@@ -1248,18 +1248,49 @@ export default function AdminPanel() {
                 <div className="space-y-4">
                   {/* Pending Actions Banner */}
                   {stats.pendingActions > 0 && (
-                    <button
-                      onClick={() => setActiveTab('deposits')}
-                      className="w-full glass-card p-4 rounded-xl border border-gold/20 bg-gold/5 flex items-center gap-3 cursor-pointer hover:bg-gold/10 transition-colors text-right"
-                    >
-                      <div className="w-10 h-10 rounded-xl bg-gold/10 flex items-center justify-center flex-shrink-0">
-                        <AlertTriangle className="w-5 h-5 text-gold" />
+                    <div className="glass-card p-4 rounded-xl border border-gold/20 bg-gold/5 space-y-3">
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-xl bg-gold/10 flex items-center justify-center flex-shrink-0">
+                          <AlertTriangle className="w-5 h-5 text-gold" />
+                        </div>
+                        <div>
+                          <p className="text-sm font-bold text-gold">{stats.pendingActions} إجراء معلق</p>
+                          <p className="text-xs text-muted-foreground">طلبات تحتاج مراجعتك</p>
+                        </div>
                       </div>
-                      <div>
-                        <p className="text-sm font-bold text-gold">{stats.pendingActions} إجراء معلق</p>
-                        <p className="text-xs text-muted-foreground">اضغط لعرض الإيداعات والسحوبات والتوثيقات المعلقة</p>
+                      <div className="flex flex-wrap gap-2">
+                        {/* Pending Deposits */}
+                        {(stats.depositsPending + stats.depositsReviewing) > 0 && (
+                          <button
+                            onClick={() => setActiveTab('deposits')}
+                            className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-green-500/10 border border-green-500/20 hover:bg-green-500/20 transition-colors"
+                          >
+                            <ArrowDownLeft className="w-3.5 h-3.5 text-green-400" />
+                            <span className="text-xs font-medium text-green-400">{stats.depositsPending + stats.depositsReviewing} إيداع معلق</span>
+                          </button>
+                        )}
+                        {/* Pending Withdrawals */}
+                        {(stats.withdrawalsPending + stats.withdrawalsApproved) > 0 && (
+                          <button
+                            onClick={() => setActiveTab('withdrawals')}
+                            className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-red-500/10 border border-red-500/20 hover:bg-red-500/20 transition-colors"
+                          >
+                            <ArrowUpRight className="w-3.5 h-3.5 text-red-400" />
+                            <span className="text-xs font-medium text-red-400">{stats.withdrawalsPending + stats.withdrawalsApproved} سحب معلق</span>
+                          </button>
+                        )}
+                        {/* Pending KYC */}
+                        {stats.kycRecordsPending > 0 && (
+                          <button
+                            onClick={() => setActiveTab('kyc')}
+                            className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-blue-500/10 border border-blue-500/20 hover:bg-blue-500/20 transition-colors"
+                          >
+                            <BadgeCheck className="w-3.5 h-3.5 text-blue-400" />
+                            <span className="text-xs font-medium text-blue-400">{stats.kycRecordsPending} توثيق معلق</span>
+                          </button>
+                        )}
                       </div>
-                    </button>
+                    </div>
                   )}
 
                   {/* Summary Cards */}
