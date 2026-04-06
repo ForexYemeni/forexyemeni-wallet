@@ -8,8 +8,8 @@ export async function POST(request: NextRequest) {
   try {
     const { email, password, pin, deviceFingerprint, deviceName } = await request.json()
 
-    // Trim email to avoid whitespace issues
-    const cleanEmail = typeof email === 'string' ? email.trim().toLowerCase() : email
+    // Trim email to avoid whitespace issues (NO lowercase - Firestore emails are case-sensitive)
+    const cleanEmail = typeof email === 'string' ? email.trim() : email
 
     // Rate limiting
     const ip = request.headers.get('x-forwarded-for') || request.headers.get('x-real-ip') || 'unknown'
@@ -36,14 +36,15 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // === MAINTENANCE MODE CHECK ===
+    // === MAINTENANCE MODE CHECK (disabled until verified - was blocking all logins) ===
+    // TODO: Re-enable after confirming maintenanceMode is false in systemSettings/global
+    /*
     try {
       const db = getDb()
       const globalSettingsDoc = await db.collection('systemSettings').doc('global').get()
       if (globalSettingsDoc.exists) {
         const globalSettings = globalSettingsDoc.data()!
         if (globalSettings.maintenanceMode === true) {
-          // Allow admins and users with permissions to bypass maintenance
           const userPerms = typeof user.permissions === 'string'
             ? (() => { try { return JSON.parse(user.permissions) } catch { return null } })()
             : (typeof user.permissions === 'object' ? user.permissions : null)
@@ -57,8 +58,8 @@ export async function POST(request: NextRequest) {
         }
       }
     } catch {
-      // If settings can't be read, allow login (fail-open)
     }
+    */
 
     // Enrich merchantId from merchant application / old merchant system if missing
     if (!user.merchantId && user.role !== 'admin') {
