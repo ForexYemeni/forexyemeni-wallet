@@ -232,6 +232,9 @@ export default function AdminPanel() {
   const [deleteLoading, setDeleteLoading] = useState(false)
   const [copiedWithdrawalId, setCopiedWithdrawalId] = useState<string | null>(null)
   const [copiedField, setCopiedField] = useState<string | null>(null)
+  // Expanded items in admin lists
+  const [expandedWithdrawal, setExpandedWithdrawal] = useState<string | null>(null)
+  const [expandedDeposit, setExpandedDeposit] = useState<string | null>(null)
   // Rejection reason dialog (withdrawals)
   const [rejectDialog, setRejectDialog] = useState<{ withdrawalId: string; amount: number } | null>(null)
   const [rejectReason, setRejectReason] = useState('')
@@ -1733,63 +1736,95 @@ export default function AdminPanel() {
 
           {/* ===================== DEPOSITS TAB ===================== */}
           {effectiveActiveTab === 'deposits' && (
-            <div className="space-y-2 max-h-[500px] overflow-y-auto">
+            <div className="space-y-2 max-h-[600px] overflow-y-auto">
               {deposits.length === 0 ? (
                 <div className="glass-card p-8 text-center text-muted-foreground text-sm">لا توجد إيداعات</div>
               ) : (
                 deposits.map((d) => (
-                  <div key={d.id} className="glass-card p-4 rounded-xl space-y-2">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <p className="text-sm font-medium">{d.user.fullName || d.user.email}</p>
-                        <p className="text-xs text-muted-foreground" dir="ltr">{d.txId || d.id.substring(0, 12)}</p>
-                      </div>
-                      <div className="text-left">
-                        <p className="text-sm font-bold gold-text">{(d.netAmount ?? d.amount ?? 0).toFixed(2)} USDT</p>
-                        <span className={`text-xs px-2 py-0.5 rounded-md font-medium ${DEPOSIT_STATUS_MAP[d.status]?.color || ''}`}>
-                          {DEPOSIT_STATUS_MAP[d.status]?.label || d.status}
-                        </span>
-                      </div>
-                    </div>
-                    {/* Fee breakdown */}
-                    {(d.fee ?? 0) > 0 && (
-                      <div className="p-2 rounded-lg bg-white/5 text-xs space-y-1">
-                        <div className="flex items-center justify-between">
-                          <span className="text-muted-foreground">المبلغ المدفوع: <strong className="text-foreground">{(d.amount ?? 0).toFixed(2)} USDT</strong></span>
+                  <div key={d.id} className="glass-card rounded-xl overflow-hidden">
+                    {/* Compact summary row - always visible */}
+                    <button
+                      onClick={() => setExpandedDeposit(expandedDeposit === d.id ? null : d.id)}
+                      className="w-full p-3.5 flex items-center justify-between text-right hover:bg-white/[0.02] transition-colors"
+                    >
+                      <div className="flex items-center gap-3 min-w-0">
+                        <div className="w-9 h-9 rounded-xl bg-green-500/10 flex items-center justify-center text-sm font-bold text-green-400 flex-shrink-0">
+                          {(d.user.fullName || d.user.email).charAt(0).toUpperCase()}
                         </div>
-                        <div className="flex items-center justify-between">
-                          <span className="text-muted-foreground">المبلغ الصافي للمستخدم: <strong className="text-green-400">{(d.netAmount ?? 0).toFixed(2)} USDT</strong></span>
-                          <span className="text-muted-foreground">الرسوم → حساب الإدارة: <strong className="text-gold">{(d.fee ?? 0).toFixed(2)} USDT</strong></span>
+                        <div className="min-w-0">
+                          <p className="text-sm font-medium truncate">{d.user.fullName || 'بدون اسم'}</p>
+                          <p className="text-[10px] text-muted-foreground truncate" dir="ltr">{d.txId || d.id.substring(0, 16)}...</p>
                         </div>
                       </div>
-                    )}
-                    {/* Screenshot */}
-                    {d.screenshot && (
-                      <div className="pt-1">
-                        <button
-                          onClick={() => setPreviewImage(d.screenshot)}
-                          className="rounded-xl overflow-hidden border border-white/10 block"
-                        >
-                          <img src={d.screenshot} alt="إثبات الدفع" className="w-full h-32 object-cover" />
-                        </button>
+                      <div className="flex items-center gap-2 flex-shrink-0">
+                        <div className="text-left">
+                          <p className="text-sm font-bold gold-text">{(d.netAmount ?? d.amount ?? 0).toFixed(2)} USDT</p>
+                          <span className={`text-[10px] px-1.5 py-0.5 rounded-md font-medium ${DEPOSIT_STATUS_MAP[d.status]?.color || ''}`}>
+                            {DEPOSIT_STATUS_MAP[d.status]?.label || d.status}
+                          </span>
+                        </div>
+                        {expandedDeposit === d.id ? <ChevronUp className="w-4 h-4 text-muted-foreground" /> : <ChevronDown className="w-4 h-4 text-muted-foreground" />}
                       </div>
-                    )}
-                    {/* Actions */}
-                    {d.status === 'pending' && (
-                      <div className="flex gap-2 pt-1">
-                        <button onClick={() => handleUpdateDeposit(d.id, 'reviewing')} disabled={actionLoading === d.id} className="flex-1 flex items-center justify-center gap-1 text-xs py-2 rounded-lg bg-blue-500/10 text-blue-400 hover:bg-blue-500/20 transition-colors font-medium">
-                          <Eye className="w-3 h-3" /> مراجعة
-                        </button>
-                      </div>
-                    )}
-                    {d.status === 'reviewing' && (
-                      <div className="flex gap-2 pt-1">
-                        <button onClick={() => { setDepositConfirmDialog({ depositId: d.id, amount: d.amount, fee: d.fee || 0, netAmount: d.netAmount || d.amount, userEmail: d.user.email, userName: d.user.fullName || d.user.email }); setDepositConfirmPin('') }} disabled={actionLoading === d.id} className="flex-1 flex items-center justify-center gap-1 text-xs py-2 rounded-lg bg-green-500/10 text-green-400 hover:bg-green-500/20 transition-colors font-medium">
-                          <Check className="w-3 h-3" /> تأكيد
-                        </button>
-                        <button onClick={() => setDepositRejectDialog({ depositId: d.id, amount: d.amount, userEmail: d.user.email })} disabled={actionLoading === d.id} className="flex-1 flex items-center justify-center gap-1 text-xs py-2 rounded-lg bg-red-500/10 text-red-400 hover:bg-red-500/20 transition-colors font-medium">
-                          <X className="w-3 h-3" /> رفض
-                        </button>
+                    </button>
+
+                    {/* Expanded details */}
+                    {expandedDeposit === d.id && (
+                      <div className="px-3.5 pb-3.5 space-y-2 border-t border-white/5 pt-3">
+                        {/* User info */}
+                        <div className="text-xs text-muted-foreground font-medium">بيانات المستخدم:</div>
+                        <div className="grid grid-cols-2 gap-1.5">
+                          <div className="p-2 rounded-lg bg-white/5">
+                            <span className="text-[10px] text-muted-foreground block">الاسم</span>
+                            <span className="text-xs font-medium truncate">{d.user.fullName || '—'}</span>
+                          </div>
+                          <div className="p-2 rounded-lg bg-white/5">
+                            <span className="text-[10px] text-muted-foreground block">البريد</span>
+                            <span className="text-xs font-mono truncate" dir="ltr">{d.user.email}</span>
+                          </div>
+                        </div>
+                        {/* Fee breakdown */}
+                        <div className="p-2 rounded-lg bg-white/5 text-xs space-y-1">
+                          <div className="flex justify-between">
+                            <span className="text-muted-foreground">المبلغ المدفوع</span>
+                            <span className="font-bold">{(d.amount ?? 0).toFixed(2)} USDT</span>
+                          </div>
+                          {(d.fee ?? 0) > 0 && (
+                            <div className="flex justify-between">
+                              <span className="text-muted-foreground">الرسوم → الإدارة</span>
+                              <span className="font-bold text-gold">-{(d.fee ?? 0).toFixed(2)} USDT</span>
+                            </div>
+                          )}
+                          <div className="flex justify-between border-t border-white/10 pt-1">
+                            <span className="text-muted-foreground">الصافي للمستخدم</span>
+                            <span className="font-bold text-green-400">{(d.netAmount ?? 0).toFixed(2)} USDT</span>
+                          </div>
+                        </div>
+                        {/* Screenshot */}
+                        {d.screenshot && (
+                          <div>
+                            <button onClick={() => setPreviewImage(d.screenshot)} className="rounded-xl overflow-hidden border border-white/10 block w-full">
+                              <img src={d.screenshot} alt="إثبات الدفع" className="w-full h-32 object-cover" />
+                            </button>
+                          </div>
+                        )}
+                        {/* Actions */}
+                        {d.status === 'pending' && (
+                          <div className="flex gap-2 pt-1">
+                            <button onClick={() => handleUpdateDeposit(d.id, 'reviewing')} disabled={actionLoading === d.id} className="flex-1 flex items-center justify-center gap-1 text-xs py-2.5 rounded-lg bg-blue-500/10 text-blue-400 hover:bg-blue-500/20 transition-colors font-medium">
+                              <Eye className="w-3 h-3" /> مراجعة
+                            </button>
+                          </div>
+                        )}
+                        {d.status === 'reviewing' && (
+                          <div className="flex gap-2 pt-1">
+                            <button onClick={() => { setDepositConfirmDialog({ depositId: d.id, amount: d.amount, fee: d.fee || 0, netAmount: d.netAmount || d.amount, userEmail: d.user.email, userName: d.user.fullName || d.user.email }); setDepositConfirmPin('') }} disabled={actionLoading === d.id} className="flex-1 flex items-center justify-center gap-1 text-xs py-2.5 rounded-lg bg-green-500/10 text-green-400 hover:bg-green-500/20 transition-colors font-medium">
+                              <Check className="w-3 h-3" /> تأكيد
+                            </button>
+                            <button onClick={() => setDepositRejectDialog({ depositId: d.id, amount: d.amount, userEmail: d.user.email })} disabled={actionLoading === d.id} className="flex-1 flex items-center justify-center gap-1 text-xs py-2.5 rounded-lg bg-red-500/10 text-red-400 hover:bg-red-500/20 transition-colors font-medium">
+                              <X className="w-3 h-3" /> رفض
+                            </button>
+                          </div>
+                        )}
                       </div>
                     )}
                   </div>
@@ -1806,87 +1841,99 @@ export default function AdminPanel() {
               ) : (
                 withdrawals.map((w) => (
                   <div key={w.id} className="glass-card rounded-xl overflow-hidden">
-                    <div className="p-4 flex items-center justify-between border-b border-white/5">
-                      <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-xl bg-gold/10 flex items-center justify-center text-sm font-bold gold-text">
+                    {/* Compact summary row - always visible */}
+                    <button
+                      onClick={() => setExpandedWithdrawal(expandedWithdrawal === w.id ? null : w.id)}
+                      className="w-full p-3.5 flex items-center justify-between text-right hover:bg-white/[0.02] transition-colors"
+                    >
+                      <div className="flex items-center gap-3 min-w-0">
+                        <div className="w-9 h-9 rounded-xl bg-gold/10 flex items-center justify-center text-sm font-bold gold-text flex-shrink-0">
                           {(w.user.fullName || w.user.email).charAt(0).toUpperCase()}
                         </div>
-                        <div>
-                          <p className="text-sm font-medium">{w.user.fullName || 'بدون اسم'}</p>
-                          <p className="text-xs text-muted-foreground" dir="ltr">{w.user.email}</p>
+                        <div className="min-w-0">
+                          <p className="text-sm font-medium truncate">سحب: {w.user.fullName || 'بدون اسم'}</p>
+                          <p className="text-[10px] text-muted-foreground truncate">
+                            {(w.method === 'crypto' || w.method === 'blockchain')
+                              ? (w.network ? `عملات رقمية - ${w.network}` : 'عملات رقمية')
+                              : w.paymentMethodName || (w.method === 'bank_deposit' ? 'إيداع لمحفظة' :
+                                  w.method === 'atm_transfer' ? 'تحويل عبر صراف' :
+                                    w.method === 'bank_transfer' ? 'تحويل بنكي' : w.method)}
+                            {' · '}{formatDate(w.createdAt)}
+                          </p>
                         </div>
                       </div>
-                      <div className="text-left">
-                        <p className="text-sm font-bold gold-text">{(w.amount ?? 0).toFixed(2)} USDT</p>
-                        {(w.fee ?? 0) > 0 && (
-                          <p className="text-[10px] text-muted-foreground">الصافي: {(w.netAmount ?? (w.amount - w.fee) ?? 0).toFixed(2)} USDT</p>
-                        )}
-                        <span className={`text-xs px-2 py-0.5 rounded-md font-medium ${WITHDRAWAL_STATUS_MAP[w.status]?.color || ''}`}>
-                          {WITHDRAWAL_STATUS_MAP[w.status]?.label || w.status}
-                        </span>
-                      </div>
-                    </div>
-
-                    <div className="p-4 space-y-2">
-                      <p className="text-xs text-muted-foreground font-medium mb-2">بيانات الساحب:</p>
-                      <div className="grid grid-cols-1 gap-1.5">
-                        {w.user.fullName && (
-                          <div className="flex items-center justify-between p-2 rounded-lg bg-white/5 group">
-                            <div className="flex items-center gap-2 min-w-0">
-                              <span className="text-[10px] text-muted-foreground flex-shrink-0">الاسم</span>
-                              <span className="text-xs font-medium truncate">{w.user.fullName}</span>
-                            </div>
-                            <button onClick={() => copyField(`${w.id}-name`, w.user.fullName!)} className="text-muted-foreground hover:text-gold transition-colors flex-shrink-0">
-                              {copiedField === `${w.id}-name` ? <CheckIcon className="w-3.5 h-3.5 text-green-400" /> : <Copy className="w-3.5 h-3.5" />}
-                            </button>
-                          </div>
-                        )}
-                        {w.user.phone && (
-                          <div className="flex items-center justify-between p-2 rounded-lg bg-white/5 group">
-                            <div className="flex items-center gap-2 min-w-0">
-                              <span className="text-[10px] text-muted-foreground flex-shrink-0">الهاتف</span>
-                              <span className="text-xs font-medium truncate" dir="ltr">{w.user.phone}</span>
-                            </div>
-                            <button onClick={() => copyField(`${w.id}-phone`, w.user.phone!)} className="text-muted-foreground hover:text-gold transition-colors flex-shrink-0">
-                              {copiedField === `${w.id}-phone` ? <CheckIcon className="w-3.5 h-3.5 text-green-400" /> : <Copy className="w-3.5 h-3.5" />}
-                            </button>
-                          </div>
-                        )}
-                        <div className="flex items-center justify-between p-2 rounded-lg bg-white/5 group">
-                          <div className="flex items-center gap-2 min-w-0">
-                            <span className="text-[10px] text-muted-foreground flex-shrink-0">البريد</span>
-                            <span className="text-xs font-medium truncate" dir="ltr">{w.user.email}</span>
-                          </div>
-                          <button onClick={() => copyField(`${w.id}-email`, w.user.email)} className="text-muted-foreground hover:text-gold transition-colors flex-shrink-0">
-                            {copiedField === `${w.id}-email` ? <CheckIcon className="w-3.5 h-3.5 text-green-400" /> : <Copy className="w-3.5 h-3.5" />}
-                          </button>
+                      <div className="flex items-center gap-2 flex-shrink-0">
+                        <div className="text-left">
+                          <p className="text-sm font-bold gold-text">{(w.amount ?? 0).toFixed(2)} USDT</p>
+                          <span className={`text-[10px] px-1.5 py-0.5 rounded-md font-medium ${WITHDRAWAL_STATUS_MAP[w.status]?.color || ''}`}>
+                            {WITHDRAWAL_STATUS_MAP[w.status]?.label || w.status}
+                          </span>
                         </div>
+                        {expandedWithdrawal === w.id ? <ChevronUp className="w-4 h-4 text-muted-foreground" /> : <ChevronDown className="w-4 h-4 text-muted-foreground" />}
                       </div>
+                    </button>
 
-                      <div className="border-t border-white/5 pt-2 mt-2">
-                        <p className="text-xs text-muted-foreground font-medium mb-2">بيانات السحب:</p>
+                    {/* Expanded details */}
+                    {expandedWithdrawal === w.id && (
+                      <div className="px-3.5 pb-3.5 space-y-2 border-t border-white/5 pt-3">
+                        {/* Sender info */}
+                        <div className="text-xs text-muted-foreground font-medium">بيانات الساحب:</div>
+                        <div className="grid grid-cols-2 gap-1.5">
+                          {w.user.fullName && (
+                            <div className="flex items-center justify-between p-2 rounded-lg bg-white/5">
+                              <div className="min-w-0">
+                                <span className="text-[10px] text-muted-foreground block">الاسم</span>
+                                <span className="text-xs font-medium truncate">{w.user.fullName}</span>
+                              </div>
+                              <button onClick={() => copyField(`${w.id}-name`, w.user.fullName!)} className="text-muted-foreground hover:text-gold transition-colors flex-shrink-0">
+                                {copiedField === `${w.id}-name` ? <CheckIcon className="w-3.5 h-3.5 text-green-400" /> : <Copy className="w-3.5 h-3.5" />}
+                              </button>
+                            </div>
+                          )}
+                          {w.user.phone && (
+                            <div className="flex items-center justify-between p-2 rounded-lg bg-white/5">
+                              <div className="min-w-0">
+                                <span className="text-[10px] text-muted-foreground block">الهاتف</span>
+                                <span className="text-xs font-mono truncate" dir="ltr">{w.user.phone}</span>
+                              </div>
+                              <button onClick={() => copyField(`${w.id}-phone`, w.user.phone!)} className="text-muted-foreground hover:text-gold transition-colors flex-shrink-0">
+                                {copiedField === `${w.id}-phone` ? <CheckIcon className="w-3.5 h-3.5 text-green-400" /> : <Copy className="w-3.5 h-3.5" />}
+                              </button>
+                            </div>
+                          )}
+                          <div className="flex items-center justify-between p-2 rounded-lg bg-white/5">
+                            <div className="min-w-0">
+                              <span className="text-[10px] text-muted-foreground block">البريد</span>
+                              <span className="text-xs font-mono truncate" dir="ltr">{w.user.email}</span>
+                            </div>
+                            <button onClick={() => copyField(`${w.id}-email`, w.user.email)} className="text-muted-foreground hover:text-gold transition-colors flex-shrink-0">
+                              {copiedField === `${w.id}-email` ? <CheckIcon className="w-3.5 h-3.5 text-green-400" /> : <Copy className="w-3.5 h-3.5" />}
+                            </button>
+                          </div>
+                        </div>
+
+                        {/* Withdrawal details */}
+                        <div className="text-xs text-muted-foreground font-medium mt-1">بيانات السحب:</div>
                         <div className="grid grid-cols-1 gap-1.5">
                           <div className="flex items-center justify-between p-2 rounded-lg bg-white/5">
-                            <div className="flex items-center gap-2 min-w-0">
-                              <span className="text-[10px] text-muted-foreground flex-shrink-0">الطريقة</span>
-                              <span className="text-xs font-medium truncate">
-                                {(w.method === 'crypto' || w.method === 'blockchain')
-                                  ? (w.paymentMethodName
-                                    ? (w.network ? `${w.paymentMethodName} - ${w.network}` : w.paymentMethodName)
-                                    : (w.network ? `عملات رقمية - ${w.network}` : 'عملات رقمية'))
-                                  : (w.paymentMethodName || (
-                                    w.method === 'bank_deposit' ? 'إيداع لمحفظة' :
-                                      w.method === 'atm_transfer' ? 'تحويل عبر صراف' :
-                                        w.method === 'bank_transfer' ? 'تحويل بنكي' : w.method))}
-                              </span>
-                            </div>
+                            <span className="text-[10px] text-muted-foreground">الطريقة</span>
+                            <span className="text-xs font-medium">
+                              {(w.method === 'crypto' || w.method === 'blockchain')
+                                ? (w.paymentMethodName
+                                  ? (w.network ? `${w.paymentMethodName} - ${w.network}` : w.paymentMethodName)
+                                  : (w.network ? `عملات رقمية - ${w.network}` : 'عملات رقمية'))
+                                : (w.paymentMethodName || (
+                                  w.method === 'bank_deposit' ? 'إيداع لمحفظة' :
+                                    w.method === 'atm_transfer' ? 'تحويل عبر صراف' :
+                                      w.method === 'bank_transfer' ? 'تحويل بنكي' : w.method))}
+                            </span>
                           </div>
                           {/* toAddress - parsed structured display */}
                           {(() => {
                             const isCrypto = w.method === 'crypto' || w.method === 'blockchain'
                             if (isCrypto) {
                               return (
-                                <div className="flex items-center justify-between p-2 rounded-lg bg-white/5 group">
+                                <div className="flex items-center justify-between p-2 rounded-lg bg-white/5">
                                   <div className="flex-1 min-w-0">
                                     <span className="text-[10px] text-muted-foreground block mb-0.5">عنوان المحفظة</span>
                                     <p className="text-xs font-medium font-mono" dir="ltr">{w.toAddress}</p>
@@ -1904,7 +1951,7 @@ export default function AdminPanel() {
                               return (
                                 <div className="space-y-1">
                                   {parts[0] && (
-                                    <div className="flex items-center justify-between p-2 rounded-lg bg-white/5 group">
+                                    <div className="flex items-center justify-between p-2 rounded-lg bg-white/5">
                                       <div className="flex items-center gap-2 min-w-0">
                                         <span className="text-[10px] text-muted-foreground flex-shrink-0">اسم المستلم</span>
                                         <span className="text-xs font-medium truncate">{parts[0]}</span>
@@ -1915,7 +1962,7 @@ export default function AdminPanel() {
                                     </div>
                                   )}
                                   {parts[1] && (
-                                    <div className="flex items-center justify-between p-2 rounded-lg bg-white/5 group">
+                                    <div className="flex items-center justify-between p-2 rounded-lg bg-white/5">
                                       <div className="flex items-center gap-2 min-w-0">
                                         <span className="text-[10px] text-muted-foreground flex-shrink-0">رقم الجوال</span>
                                         <span className="text-xs font-medium font-mono truncate" dir="ltr">{parts[1]}</span>
@@ -1926,11 +1973,9 @@ export default function AdminPanel() {
                                     </div>
                                   )}
                                   {parts[2] && (
-                                    <div className="flex items-center justify-between p-2 rounded-lg bg-white/5">
-                                      <div className="flex items-center gap-2">
-                                        <span className="text-[10px] text-muted-foreground">الشبكة / البنك</span>
-                                        <span className="text-xs font-medium">{parts[2]}</span>
-                                      </div>
+                                    <div className="p-2 rounded-lg bg-white/5">
+                                      <span className="text-[10px] text-muted-foreground">الشبكة / البنك: </span>
+                                      <span className="text-xs font-medium">{parts[2]}</span>
                                     </div>
                                   )}
                                 </div>
@@ -1939,7 +1984,7 @@ export default function AdminPanel() {
                             return (
                               <div className="space-y-1">
                                 {parts[0] && (
-                                  <div className="flex items-center justify-between p-2 rounded-lg bg-white/5 group">
+                                  <div className="flex items-center justify-between p-2 rounded-lg bg-white/5">
                                     <div className="flex items-center gap-2 min-w-0">
                                       <span className="text-[10px] text-muted-foreground flex-shrink-0">اسم المستفيد</span>
                                       <span className="text-xs font-medium truncate">{parts[0]}</span>
@@ -1950,7 +1995,7 @@ export default function AdminPanel() {
                                   </div>
                                 )}
                                 {parts[1] && (
-                                  <div className="flex items-center justify-between p-2 rounded-lg bg-white/5 group">
+                                  <div className="flex items-center justify-between p-2 rounded-lg bg-white/5">
                                     <div className="flex items-center gap-2 min-w-0">
                                       <span className="text-[10px] text-muted-foreground flex-shrink-0">رقم الحساب</span>
                                       <span className="text-xs font-medium font-mono" dir="ltr">{parts[1]}</span>
@@ -1963,49 +2008,52 @@ export default function AdminPanel() {
                               </div>
                             )
                           })()}
+                          {/* Fees */}
                           <div className="p-2 rounded-lg bg-white/5 text-xs space-y-1">
-                            <div className="flex items-center justify-between">
-                              <span className="text-muted-foreground">الرسوم → حساب الإدارة: <strong className="text-gold">{(w.fee ?? 0).toFixed(2)} USDT</strong></span>
+                            <div className="flex justify-between">
+                              <span className="text-muted-foreground">الرسوم → الإدارة</span>
+                              <span className="font-bold text-gold">{(w.fee ?? 0).toFixed(2)} USDT</span>
                             </div>
-                            <div className="flex items-center justify-between">
-                              <span className="text-muted-foreground">الصافي للمستلم: <strong className="text-green-400">{(w.netAmount ?? ((w.amount ?? 0) - (w.fee ?? 0))).toFixed(2)} USDT</strong></span>
+                            <div className="flex justify-between border-t border-white/10 pt-1">
+                              <span className="text-muted-foreground">الصافي للمستلم</span>
+                              <span className="font-bold text-green-400">{(w.netAmount ?? ((w.amount ?? 0) - (w.fee ?? 0))).toFixed(2)} USDT</span>
                             </div>
                           </div>
                         </div>
-                      </div>
 
-                      {/* Payment proof */}
-                      {w.screenshot && (
-                        <div className="pt-2">
-                          <button onClick={() => setPreviewImage(w.screenshot)} className="rounded-xl overflow-hidden border border-white/10 block">
-                            <img src={w.screenshot} alt="إثبات الدفع" className="w-full h-32 object-cover" />
-                          </button>
-                        </div>
-                      )}
+                        {/* Payment proof */}
+                        {w.screenshot && (
+                          <div>
+                            <button onClick={() => setPreviewImage(w.screenshot)} className="rounded-xl overflow-hidden border border-white/10 block w-full">
+                              <img src={w.screenshot} alt="إثبات الدفع" className="w-full h-32 object-cover" />
+                            </button>
+                          </div>
+                        )}
 
-                      {/* Date */}
-                      <div className="text-[10px] text-muted-foreground pt-1">{formatDate(w.createdAt)}</div>
-                    </div>
+                        {/* Date */}
+                        <div className="text-[10px] text-muted-foreground">{formatDate(w.createdAt)}</div>
 
-                    {/* Withdrawal Actions */}
-                    {w.status === 'pending' && (
-                      <div className="flex gap-2 p-4 pt-0">
-                        <button onClick={() => handleUpdateWithdrawal(w.id, 'approved')} disabled={actionLoading === w.id} className="flex-1 flex items-center justify-center gap-1 text-xs py-2.5 rounded-lg bg-blue-500/10 text-blue-400 hover:bg-blue-500/20 transition-colors font-medium">
-                          {actionLoading === w.id ? <Loader2 className="w-3 h-3 animate-spin" /> : <Check className="w-3 h-3" />} قبول
-                        </button>
-                        <button onClick={() => openRejectDialog(w)} className="flex-1 flex items-center justify-center gap-1 text-xs py-2.5 rounded-lg bg-red-500/10 text-red-400 hover:bg-red-500/20 transition-colors font-medium">
-                          <X className="w-3 h-3" /> رفض
-                        </button>
-                      </div>
-                    )}
-                    {w.status === 'approved' && (
-                      <div className="flex gap-2 p-4 pt-0">
-                        <button onClick={() => openProofDialog(w)} className="flex-1 flex items-center justify-center gap-1 text-xs py-2.5 rounded-lg bg-gold/10 text-gold hover:bg-gold/20 transition-colors font-medium">
-                          <Upload className="w-3 h-3" /> رفع صورة الدفع
-                        </button>
-                        <button onClick={() => openRejectDialog(w)} className="flex-1 flex items-center justify-center gap-1 text-xs py-2.5 rounded-lg bg-red-500/10 text-red-400 hover:bg-red-500/20 transition-colors font-medium">
-                          <X className="w-3 h-3" /> رفض
-                        </button>
+                        {/* Actions */}
+                        {w.status === 'pending' && (
+                          <div className="flex gap-2 pt-1">
+                            <button onClick={() => handleUpdateWithdrawal(w.id, 'approved')} disabled={actionLoading === w.id} className="flex-1 flex items-center justify-center gap-1 text-xs py-2.5 rounded-lg bg-blue-500/10 text-blue-400 hover:bg-blue-500/20 transition-colors font-medium">
+                              {actionLoading === w.id ? <Loader2 className="w-3 h-3 animate-spin" /> : <Check className="w-3 h-3" />} قبول
+                            </button>
+                            <button onClick={() => openRejectDialog(w)} className="flex-1 flex items-center justify-center gap-1 text-xs py-2.5 rounded-lg bg-red-500/10 text-red-400 hover:bg-red-500/20 transition-colors font-medium">
+                              <X className="w-3 h-3" /> رفض
+                            </button>
+                          </div>
+                        )}
+                        {w.status === 'approved' && (
+                          <div className="flex gap-2 pt-1">
+                            <button onClick={() => openProofDialog(w)} className="flex-1 flex items-center justify-center gap-1 text-xs py-2.5 rounded-lg bg-gold/10 text-gold hover:bg-gold/20 transition-colors font-medium">
+                              <Upload className="w-3 h-3" /> رفع صورة الدفع
+                            </button>
+                            <button onClick={() => openRejectDialog(w)} className="flex-1 flex items-center justify-center gap-1 text-xs py-2.5 rounded-lg bg-red-500/10 text-red-400 hover:bg-red-500/20 transition-colors font-medium">
+                              <X className="w-3 h-3" /> رفض
+                            </button>
+                          </div>
+                        )}
                       </div>
                     )}
                   </div>
