@@ -653,3 +653,26 @@ Stage Summary:
 - Debug APK built (signed): download/ForexYemeni-Wallet-v3.3.0-debug.apk
 - GitHub push pending (needs auth credentials)
 - Release signing pending (needs keystore password in gradle.properties)
+
+---
+Task ID: 1
+Agent: Main Agent
+Task: Fix FCM token registration - Capacitor Push Notifications v8 API change
+
+Work Log:
+- Identified root cause: Capacitor Push Notifications v8 removed `getToken()` method
+- Error `e.getToken is not a function` confirms the plugin exists but method doesn't
+- Checked `@capacitor/push-notifications` v8 type definitions - confirmed no `getToken()` method
+- In v8, token is received via `addListener('registration', callback)` after calling `register()`
+- Rewrote `fcm-push.ts` to use correct v8 API flow:
+  1. `requestPermissions()` → 2. `addListener('registration')` → 3. `register()` → 4. token from event
+- Added 15s timeout for token registration
+- Added debug logging for available plugin methods
+- Built APK successfully (5.8MB)
+- Created GitHub release v3.6.2 with APK uploaded
+
+Stage Summary:
+- Fixed: `ERROR: e.getToken is not a function` — now uses v8 `registration` event
+- APK: https://github.com/ForexYemeni/forexyemeni-wallet/releases/tag/v3.6.2
+- Key file changed: src/lib/fcm-push.ts (correct Capacitor v8 Push API)
+- Vercel deployment confirmed (200 OK)
