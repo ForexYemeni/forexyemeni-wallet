@@ -50,7 +50,11 @@ export const useAuthStore = create<AuthState>()(
       isAuthenticated: false,
       pendingRegistration: null,
       pendingWithdrawalConfirmation: null,
-      setAuth: (user, token, mustChangePassword = false) => set({
+      setAuth: (user, token, mustChangePassword = false) => {
+        if (typeof window !== 'undefined') {
+          localStorage.setItem('forexyameni-session-start', Date.now().toString())
+        }
+        return set({
         user,
         token,
         isAuthenticated: true,
@@ -65,7 +69,8 @@ export const useAuthStore = create<AuthState>()(
                 : 'dashboard',
         // Clear stale withdrawal confirmation from previous sessions
         pendingWithdrawalConfirmation: user?.pendingConfirmation || null,
-      }),
+      })
+      },
       logout: () => set({ user: null, token: null, isAuthenticated: false, currentScreen: 'login', pendingRegistration: null, pendingWithdrawalConfirmation: null }),
       clearForLock: () => set({ user: null, token: null, isAuthenticated: false, currentScreen: 'device-locked', pendingRegistration: null, pendingWithdrawalConfirmation: null }),
       setScreen: (screen) => set({ currentScreen: screen }),

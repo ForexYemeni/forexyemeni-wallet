@@ -8,6 +8,14 @@ export async function POST(request: NextRequest) {
   try {
     const { email, password, pin, deviceFingerprint, deviceName } = await request.json()
 
+    // Rate limiting
+    const ip = request.headers.get('x-forwarded-for') || request.headers.get('x-real-ip') || 'unknown'
+    const { rateLimit } = await import('@/lib/rate-limit')
+    const rl = rateLimit.checkLoginRateLimit(ip, email)
+    if (rl.blocked) {
+      return NextResponse.json({ success: false, message: `محاولات كثيرة. حاول بعد ${Math.ceil(rl.retryAfter / 60)} دقيقة.` }, { status: 429 })
+    }
+
     if (!email || (!password && !pin)) {
       return NextResponse.json(
         { success: false, message: 'البريد الإلكتروني وكلمة المرور أو رمز PIN مطلوبان' },
@@ -17,6 +25,7 @@ export async function POST(request: NextRequest) {
 
     const user = await userOperations.findUnique({ email })
     if (!user) {
+      rateLimit.recordFailedAttempt(ip, email)
       return NextResponse.json(
         { success: false, message: 'البريد الإلكتروني أو كلمة المرور غير صحيحة' },
         { status: 401 }
@@ -61,6 +70,7 @@ export async function POST(request: NextRequest) {
 
       const isPinValid = await bcrypt.compare(pin, user.tempPinHash)
       if (!isPinValid) {
+        rateLimit.recordFailedAttempt(ip, email)
         return NextResponse.json(
           { success: false, message: 'رمز PIN غير صحيح' },
           { status: 401 }
@@ -69,6 +79,7 @@ export async function POST(request: NextRequest) {
 
       // Clear temp PIN after successful use
       await userOperations.update({ id: user.id }, { tempPinHash: null as any, tempPinExpiresAt: null as any, mustChangePassword: true })
+      rateLimit.clearLoginAttempts(ip, email)
 
       // Bypass password check, proceed with login but force password change
       const parsePermissions = (perm: any) => {
@@ -94,7 +105,7 @@ export async function POST(request: NextRequest) {
       const { otpCodeOperations } = await import('@/lib/db-firebase')
       await otpCodeOperations.create({
         userId: user.id, email: user.email, code: token, type: 'login', verified: false,
-        expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
+        expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
       })
 
       return NextResponse.json({
@@ -108,6 +119,7 @@ export async function POST(request: NextRequest) {
     // === NORMAL PASSWORD LOGIN ===
     const isValid = await bcrypt.compare(password, user.passwordHash)
     if (!isValid) {
+      rateLimit.recordFailedAttempt(ip, email)
       return NextResponse.json(
         { success: false, message: 'البريد الإلكتروني أو كلمة المرور غير صحيحة' },
         { status: 401 }
@@ -274,6 +286,7 @@ export async function POST(request: NextRequest) {
       await send2FACodeEmail(user.email, twoFactorCode)
 
       // Return with requires2FA flag - do NOT give full access yet
+      rateLimit.clearLoginAttempts(ip, email)
       return NextResponse.json({
         success: true,
         requires2FA: true,
@@ -284,13 +297,14 @@ export async function POST(request: NextRequest) {
     }
 
     const token = crypto.randomUUID()
+    rateLimit.clearLoginAttempts(ip, email)
     await otpCodeOperations.create({
       userId: user.id,
       email: user.email,
       code: token,
       type: 'login',
       verified: false,
-      expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
+      expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
     })
 
     return NextResponse.json({

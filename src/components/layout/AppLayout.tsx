@@ -42,6 +42,23 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     setupFCMAutoRegister()
   }, [])
 
+  // Session timeout check (7 days)
+  useEffect(() => {
+    if (!user?.id) return
+    const SESSION_KEY = 'forexyameni-session-start'
+    const start = localStorage.getItem(SESSION_KEY)
+    if (!start) {
+      localStorage.setItem(SESSION_KEY, Date.now().toString())
+      return
+    }
+    const daysSinceLogin = (Date.now() - parseInt(start)) / (1000 * 60 * 60 * 24)
+    if (daysSinceLogin > 7) {
+      localStorage.removeItem(SESSION_KEY)
+      logout()
+      return
+    }
+  }, [user?.id])
+
   // Deep link: navigate to relevant screen when notification is tapped
   useEffect(() => {
     const screenMap: Record<string, string> = {

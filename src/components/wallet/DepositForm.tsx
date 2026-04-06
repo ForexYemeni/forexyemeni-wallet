@@ -18,7 +18,49 @@ import {
   ArrowRight,
   Upload,
   X,
+  Landmark,
+  Coins,
 } from 'lucide-react'
+import { compressImage } from '@/lib/image-compress'
+
+type DepositCategory = 'bank_deposit' | 'bank_transfer' | 'crypto'
+type Step = 'category' | 'methods' | 'details'
+
+interface CategoryOption {
+  key: DepositCategory
+  label: string
+  icon: React.ReactNode
+  description: string
+  matchTypes: string[]
+  matchCategory?: string
+}
+
+const CATEGORIES: CategoryOption[] = [
+  {
+    key: 'bank_deposit',
+    label: 'إيداع بنكي',
+    icon: <Building className="w-7 h-7" />,
+    description: 'إيداع مباشر في الحساب البنكي',
+    matchTypes: ['bank_deposit'],
+    matchCategory: 'bank',
+  },
+  {
+    key: 'bank_transfer',
+    label: 'تحويل بنكي',
+    icon: <Landmark className="w-7 h-7" />,
+    description: 'تحويل عبر البنك أو الصراف',
+    matchTypes: ['bank_transfer', 'atm_transfer'],
+    matchCategory: 'bank',
+  },
+  {
+    key: 'crypto',
+    label: 'إيداع بالعملات الرقمية',
+    icon: <Coins className="w-7 h-7" />,
+    description: 'USDT وغيرها من العملات الرقمية',
+    matchTypes: [],
+    matchCategory: 'crypto',
+  },
+]
 
 function getMethodLabel(m: any): string {
   if (m.type === 'bank_deposit') return 'إيداع بنكي'
@@ -27,17 +69,16 @@ function getMethodLabel(m: any): string {
   return 'إيداع'
 }
 
-import { compressImage } from '@/lib/image-compress'
-
 export default function DepositForm() {
   const { user } = useAuthStore()
   const [methods, setMethods] = useState<any[]>([])
   const [selectedMethod, setSelectedMethod] = useState<any>(null)
-  const [step, setStep] = useState<'select' | 'details' | 'confirm'>('select')
+  const [selectedCategory, setSelectedCategory] = useState<DepositCategory | null>(null)
+  const [step, setStep] = useState<Step>('category')
   const [amount, setAmount] = useState('')
   const [txId, setTxId] = useState('')
   const [loading, setLoading] = useState(false)
-  const [loadingMethods, setLoadingMethods] = useState(true)
+  const [loadingMethods, setLoadingMethods] = useState(false)
   const [copiedField, setCopiedField] = useState<string | null>(null)
   const [screenshot, setScreenshot] = useState<File | null>(null)
   const [screenshotPreview, setScreenshotPreview] = useState<string | null>(null)
@@ -45,7 +86,6 @@ export default function DepositForm() {
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
-    fetchMethods()
     fetchSettings()
   }, [])
 
@@ -59,16 +99,48 @@ export default function DepositForm() {
     } catch { /* silent */ }
   }
 
-  const fetchMethods = async () => {
+  const fetchMethods = async (category: DepositCategory) => {
     setLoadingMethods(true)
     try {
       const res = await fetch('/api/payment-methods?purpose=deposit')
       const data = await res.json()
-      if (data.success) setMethods(data.methods || [])
+      if (data.success) {
+        const allMethods = data.methods || []
+        const catConfig = CATEGORIES.find(c => c.key === category)
+        const filtered = allMethods.filter((m: any) => {
+          if (catConfig?.matchCategory === 'crypto') return m.category === 'crypto'
+          if (catConfig?.matchTypes.includes(m.type)) return true
+          if (catConfig?.matchCategory && m.category === catConfig.matchCategory) return true
+          return false
+        })
+        setMethods(filtered)
+      }
     } catch {
       // silent
     } finally {
       setLoadingMethods(false)
+    }
+  }
+
+  const handleCategorySelect = (category: DepositCategory) => {
+    setSelectedCategory(category)
+    setStep('methods')
+    fetchMethods(category)
+  }
+
+  const handleMethodSelect = (method: any) => {
+    setSelectedMethod(method)
+    setStep('details')
+  }
+
+  const handleBack = () => {
+    if (step === 'details') {
+      setStep('methods')
+      setSelectedMethod(null)
+    } else if (step === 'methods') {
+      setStep('category')
+      setSelectedCategory(null)
+      setMethods([])
     }
   }
 
@@ -93,22 +165,24 @@ export default function DepositForm() {
       toast.error('يرجى إدخال مبلغ صحيح')
       return
     }
-    if (!screenshot) {
+
+    const isCrypto = selectedMethod?.category === 'crypto'
+    if (!isCrypto && !screenshot) {
       toast.error('يرجى رفع صورة إثبات الدفع')
       return
     }
+
     setLoading(true)
     try {
-      // Convert screenshot to base64
-      const reader = new FileReader()
-      const base64Promise = new Promise<string>((resolve) => {
-        reader.onload = () => {
-          const result = reader.result as string
-          resolve(result)
-        }
-        reader.readAsDataURL(screenshot)
-      })
-      const screenshotBase64 = await base64Promise
+      let screenshotBase64: string | undefined
+      if (screenshot) {
+        const reader = new FileReader()
+        const base64Promise = new Promise<string>((resolve) => {
+          reader.onload = () => resolve(reader.result as string)
+          reader.readAsDataURL(screenshot)
+        })
+        screenshotBase64 = await base64Promise
+      }
 
       const res = await fetch('/api/deposits/create', {
         method: 'POST',
@@ -125,8 +199,11 @@ export default function DepositForm() {
       const data = await res.json()
       if (data.success) {
         toast.success('تم إنشاء طلب الإيداع بنجاح. سيتم مراجعته قريباً.')
-        setStep('select')
+        // Reset everything
+        setStep('category')
+        setSelectedCategory(null)
         setSelectedMethod(null)
+        setMethods([])
         setAmount('')
         setTxId('')
         setScreenshot(null)
@@ -143,6 +220,14 @@ export default function DepositForm() {
 
   const depositFee = amount && feePercentage > 0 ? (parseFloat(amount) * (feePercentage / 100)).toFixed(2) : '0.00'
   const netAmount = amount ? (parseFloat(amount) - parseFloat(depositFee)).toFixed(2) : '0.00'
+  const isCrypto = selectedMethod?.category === 'crypto'
+
+  const getCategoryInfo = () => {
+    if (!selectedCategory) return null
+    return CATEGORIES.find(c => c.key === selectedCategory)
+  }
+
+  const currentCategoryInfo = getCategoryInfo()
 
   return (
     <div className="space-y-6 animate-fade-in pb-24">
@@ -157,9 +242,89 @@ export default function DepositForm() {
         </div>
       </div>
 
-      {/* Step: Select Method */}
-      {step === 'select' && (
-        <div className="space-y-3">
+      {/* Step Indicator */}
+      <div className="flex items-center gap-2">
+        {[
+          { key: 'category', label: 'النوع' },
+          { key: 'methods', label: 'الطريقة' },
+          { key: 'details', label: 'التفاصيل' },
+        ].map((s, idx) => {
+          const stepOrder: Step[] = ['category', 'methods', 'details']
+          const currentIdx = stepOrder.indexOf(step)
+          const thisIdx = idx
+          const isActive = step === s.key
+          const isDone = thisIdx < currentIdx
+          return (
+            <div key={s.key} className="flex items-center gap-2 flex-1">
+              <div className={`flex items-center gap-2 flex-1 justify-center p-2 rounded-xl transition-all ${
+                isActive ? 'bg-gold/10 border border-gold/30' : isDone ? 'bg-green-500/5 border border-green-500/20' : 'bg-white/5 border border-transparent'
+              }`}>
+                <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${
+                  isActive ? 'bg-gold text-gray-900' : isDone ? 'bg-green-500 text-white' : 'bg-white/10 text-muted-foreground'
+                }`}>
+                  {isDone ? <Check className="w-3.5 h-3.5" /> : thisIdx + 1}
+                </div>
+                <span className={`text-xs font-medium hidden sm:inline ${isActive ? 'text-gold' : isDone ? 'text-green-400' : 'text-muted-foreground'}`}>
+                  {s.label}
+                </span>
+              </div>
+              {idx < 2 && <ChevronLeft className="w-4 h-4 text-muted-foreground/30 -ml-2 flex-shrink-0" />}
+            </div>
+          )
+        })}
+      </div>
+
+      {/* Step 1: Category Selection */}
+      {step === 'category' && (
+        <div className="space-y-3 animate-fade-in">
+          <p className="text-sm text-muted-foreground mb-2">اختر نوع الإيداع</p>
+          {CATEGORIES.map((cat) => (
+            <button
+              key={cat.key}
+              onClick={() => handleCategorySelect(cat.key)}
+              className="w-full glass-card p-5 rounded-xl flex items-center gap-4 hover:border-gold/30 transition-all text-right group"
+            >
+              <div className={`w-14 h-14 rounded-2xl flex items-center justify-center flex-shrink-0 transition-colors ${
+                cat.key === 'bank_deposit' ? 'bg-blue-500/10 text-blue-400 group-hover:bg-blue-500/20' :
+                cat.key === 'bank_transfer' ? 'bg-purple-500/10 text-purple-400 group-hover:bg-purple-500/20' :
+                'bg-orange-500/10 text-orange-400 group-hover:bg-orange-500/20'
+              }`}>
+                {cat.icon}
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-base font-bold">{cat.label}</p>
+                <p className="text-xs text-muted-foreground mt-0.5">{cat.description}</p>
+              </div>
+              <ChevronLeft className="w-5 h-5 text-muted-foreground group-hover:text-gold transition-colors flex-shrink-0" />
+            </button>
+          ))}
+        </div>
+      )}
+
+      {/* Step 2: Payment Methods */}
+      {step === 'methods' && (
+        <div className="space-y-4 animate-fade-in">
+          {/* Back Button */}
+          <button onClick={handleBack} className="flex items-center gap-1 text-sm text-muted-foreground hover:text-gold transition-colors">
+            <ArrowRight className="w-4 h-4" />
+            رجوع لاختيار نوع الإيداع
+          </button>
+
+          {/* Category Badge */}
+          {currentCategoryInfo && (
+            <div className="flex items-center gap-2">
+              <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${
+                selectedCategory === 'bank_deposit' ? 'bg-blue-500/10 text-blue-400' :
+                selectedCategory === 'bank_transfer' ? 'bg-purple-500/10 text-purple-400' :
+                'bg-orange-500/10 text-orange-400'
+              }`}>
+                {currentCategoryInfo.icon && <div className="scale-75">{currentCategoryInfo.icon}</div>}
+              </div>
+              <p className="text-sm font-bold">{currentCategoryInfo.label}</p>
+            </div>
+          )}
+
+          {/* Methods List */}
           {loadingMethods ? (
             <div className="space-y-3">
               {[...Array(3)].map((_, i) => (
@@ -169,43 +334,50 @@ export default function DepositForm() {
           ) : methods.length === 0 ? (
             <div className="glass-card p-8 text-center">
               <CreditCard className="w-10 h-10 text-muted-foreground/30 mx-auto mb-3" />
-              <p className="text-muted-foreground text-sm">لا توجد طرق إيداع متاحة حالياً</p>
+              <p className="text-muted-foreground text-sm">لا توجد طرق إيداع متاحة لهذا النوع حالياً</p>
+              <button onClick={handleBack} className="mt-4 text-sm text-gold hover:text-gold/80 transition-colors">
+                اختر نوع إيداع آخر
+              </button>
             </div>
           ) : (
-            methods.map((m) => (
-              <button
-                key={m.id}
-                onClick={() => { setSelectedMethod(m); setStep('details') }}
-                className="w-full glass-card p-4 rounded-xl flex items-center justify-between hover:border-gold/30 transition-all text-right"
-              >
-                <div className="flex items-center gap-3">
-                  <div className={`w-11 h-11 rounded-xl flex items-center justify-center ${
-                    m.category === 'crypto' ? 'bg-orange-500/10 text-orange-400' : 'bg-blue-500/10 text-blue-400'
-                  }`}>
-                    {m.category === 'crypto' ? <Wallet className="w-5 h-5" /> : <Building className="w-5 h-5" />}
+            <div className="space-y-3">
+              {methods.map((m) => (
+                <button
+                  key={m.id}
+                  onClick={() => handleMethodSelect(m)}
+                  className="w-full glass-card p-4 rounded-xl flex items-center justify-between hover:border-gold/30 transition-all text-right group"
+                >
+                  <div className="flex items-center gap-3">
+                    <div className={`w-11 h-11 rounded-xl flex items-center justify-center ${
+                      m.category === 'crypto' ? 'bg-orange-500/10 text-orange-400' : 'bg-blue-500/10 text-blue-400'
+                    }`}>
+                      {m.category === 'crypto' ? <Wallet className="w-5 h-5" /> : <Building className="w-5 h-5" />}
+                    </div>
+                    <div className="text-right">
+                      <p className="text-sm font-medium">{m.name || getMethodLabel(m)}</p>
+                      <div className="flex items-center gap-2 mt-0.5">
+                        <p className="text-[10px] text-muted-foreground">
+                          {m.network || m.type || ''}
+                        </p>
+                        {m.isActive !== false && (
+                          <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-green-500/10 text-green-400 font-medium">نشط</span>
+                        )}
+                      </div>
+                    </div>
                   </div>
-                  <div>
-                    <p className="text-sm font-medium">{m.name || getMethodLabel(m)}</p>
-                    <p className="text-[10px] text-muted-foreground">
-                      {m.type === 'bank_deposit' ? (m.accountName || m.network || '') :
-                       m.category === 'crypto' ? (m.network || '') :
-                       m.type === 'atm_transfer' ? (m.network || 'تحويل نقدي') :
-                       m.network || ''}
-                    </p>
-                  </div>
-                </div>
-                <ChevronLeft className="w-5 h-5 text-muted-foreground" />
-              </button>
-            ))
+                  <ChevronLeft className="w-5 h-5 text-muted-foreground group-hover:text-gold transition-colors" />
+                </button>
+              ))}
+            </div>
           )}
         </div>
       )}
 
-      {/* Step: Payment Details */}
+      {/* Step 3: Deposit Details + Form */}
       {step === 'details' && selectedMethod && (
-        <div className="space-y-4">
+        <div className="space-y-4 animate-fade-in">
           {/* Back Button */}
-          <button onClick={() => { setStep('select'); setSelectedMethod(null) }} className="flex items-center gap-1 text-sm text-muted-foreground hover:text-gold transition-colors">
+          <button onClick={handleBack} className="flex items-center gap-1 text-sm text-muted-foreground hover:text-gold transition-colors">
             <ArrowRight className="w-4 h-4" />
             رجوع لاختيار طريقة أخرى
           </button>
@@ -308,9 +480,10 @@ export default function DepositForm() {
                 </div>
               )}
 
-              {selectedMethod.category === 'crypto' && (
+              {/* TX ID for crypto */}
+              {isCrypto && (
                 <div className="space-y-2">
-                  <Label className="text-sm text-muted-foreground">معرف المعاملة (TxID)</Label>
+                  <Label className="text-sm text-muted-foreground">معرف المعاملة (TxID) <span className="text-red-400">*</span></Label>
                   <Input
                     placeholder="أدخل TxID من المحفظة"
                     value={txId}
@@ -321,38 +494,71 @@ export default function DepositForm() {
                 </div>
               )}
 
-              {/* Screenshot Upload */}
-              <div className="space-y-2">
-                <Label className="text-sm text-muted-foreground">صورة إثبات الدفع <span className="text-red-400">*</span></Label>
-                {screenshotPreview ? (
-                  <div className="relative rounded-xl overflow-hidden border border-gold/20">
-                    <img src={screenshotPreview} alt="Screenshot" className="w-full h-40 object-cover" />
-                    <button
-                      type="button"
-                      onClick={() => { setScreenshot(null); setScreenshotPreview(null) }}
-                      className="absolute top-2 left-2 w-8 h-8 bg-red-500/80 rounded-full flex items-center justify-center"
-                    >
-                      <X className="w-4 h-4" />
-                    </button>
-                  </div>
-                ) : (
-                  <label className="flex flex-col items-center justify-center h-32 rounded-xl border-2 border-dashed border-gold/30 hover:border-gold/50 transition-colors cursor-pointer bg-gold/5">
-                    <Upload className="w-8 h-8 text-gold/60 mb-2" />
-                    <span className="text-xs text-gold/80">اضغط لرفع صورة إثبات الدفع</span>
-                    <input
-                      ref={fileInputRef}
-                      type="file"
-                      accept="image/*"
-                      className="hidden"
-                      onChange={(e) => e.target.files?.[0] && handleScreenshotChange(e.target.files[0])}
-                    />
-                  </label>
-                )}
-              </div>
+              {/* Screenshot Upload (for bank methods) */}
+              {!isCrypto && (
+                <div className="space-y-2">
+                  <Label className="text-sm text-muted-foreground">صورة إثبات الدفع <span className="text-red-400">*</span></Label>
+                  {screenshotPreview ? (
+                    <div className="relative rounded-xl overflow-hidden border border-gold/20">
+                      <img src={screenshotPreview} alt="Screenshot" className="w-full h-40 object-cover" />
+                      <button
+                        type="button"
+                        onClick={() => { setScreenshot(null); setScreenshotPreview(null) }}
+                        className="absolute top-2 left-2 w-8 h-8 bg-red-500/80 rounded-full flex items-center justify-center"
+                      >
+                        <X className="w-4 h-4" />
+                      </button>
+                    </div>
+                  ) : (
+                    <label className="flex flex-col items-center justify-center h-32 rounded-xl border-2 border-dashed border-gold/30 hover:border-gold/50 transition-colors cursor-pointer bg-gold/5">
+                      <Upload className="w-8 h-8 text-gold/60 mb-2" />
+                      <span className="text-xs text-gold/80">اضغط لرفع صورة إثبات الدفع</span>
+                      <input
+                        ref={fileInputRef}
+                        type="file"
+                        accept="image/*"
+                        className="hidden"
+                        onChange={(e) => e.target.files?.[0] && handleScreenshotChange(e.target.files[0])}
+                      />
+                    </label>
+                  )}
+                </div>
+              )}
+
+              {/* Optional screenshot for crypto */}
+              {isCrypto && (
+                <div className="space-y-2">
+                  <Label className="text-sm text-muted-foreground">صورة إثبات الدفع <span className="text-muted-foreground">(اختياري)</span></Label>
+                  {screenshotPreview ? (
+                    <div className="relative rounded-xl overflow-hidden border border-gold/20">
+                      <img src={screenshotPreview} alt="Screenshot" className="w-full h-40 object-cover" />
+                      <button
+                        type="button"
+                        onClick={() => { setScreenshot(null); setScreenshotPreview(null) }}
+                        className="absolute top-2 left-2 w-8 h-8 bg-red-500/80 rounded-full flex items-center justify-center"
+                      >
+                        <X className="w-4 h-4" />
+                      </button>
+                    </div>
+                  ) : (
+                    <label className="flex flex-col items-center justify-center h-24 rounded-xl border-2 border-dashed border-white/10 hover:border-gold/30 transition-colors cursor-pointer bg-white/[0.02]">
+                      <Upload className="w-6 h-6 text-muted-foreground/40 mb-1" />
+                      <span className="text-xs text-muted-foreground/60">رفع صورة اختياري</span>
+                      <input
+                        ref={fileInputRef}
+                        type="file"
+                        accept="image/*"
+                        className="hidden"
+                        onChange={(e) => e.target.files?.[0] && handleScreenshotChange(e.target.files[0])}
+                      />
+                    </label>
+                  )}
+                </div>
+              )}
 
               <Button
                 type="submit"
-                disabled={loading || !screenshot}
+                disabled={loading || (!isCrypto && !screenshot) || (isCrypto && !txId)}
                 className="w-full h-12 gold-gradient text-gray-900 font-bold text-base rounded-xl hover:opacity-90 transition-all gold-glow"
               >
                 {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : 'تأكيد الإيداع'}

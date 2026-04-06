@@ -559,7 +559,7 @@ export default function SettingsPage() {
             </div>
             <div className="flex justify-between">
               <span className="text-muted-foreground">الإصدار</span>
-              <span>1.0.0</span>
+              <span>3.6.2</span>
             </div>
             <div className="flex justify-between">
               <span className="text-muted-foreground">الشبكة</span>
