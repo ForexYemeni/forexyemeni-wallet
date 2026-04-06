@@ -22,7 +22,9 @@ import {
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   const { user, setScreen, logout } = useAuthStore()
+  const currentScreen = useAuthStore(s => s.currentScreen)
   const [logoutDialogOpen, setLogoutDialogOpen] = useState(false)
+  const [exitDialogOpen, setExitDialogOpen] = useState(false)
 
   // Pull-to-refresh
   const [refreshing, setRefreshing] = useState(false)
@@ -41,6 +43,65 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     setupFCMAutoRegister()
   }, [])
+
+  // Android hardware back button handler
+  useEffect(() => {
+    const isNativeApp = typeof window !== 'undefined' && (
+      /Android/i.test(navigator.userAgent) &&
+      window.location.protocol !== 'https:' ? false : /Android/i.test(navigator.userAgent)
+    )
+    if (!isNativeApp) return
+
+    // Screen hierarchy: which screens are "main" (exit confirm) vs sub-screens (go back)
+    const mainScreens = ['dashboard', 'admin', 'p2p']
+    const isMainScreen = mainScreens.includes(currentScreen)
+
+    const handleBackButton = () => {
+      if (isMainScreen) {
+        // On main screen → show exit confirmation
+        setExitDialogOpen(true)
+      } else {
+        // On sub-screen → go back to appropriate parent
+        const parentMap: Record<string, string> = {
+          'deposit': 'dashboard',
+          'withdraw': 'dashboard',
+          'transactions': 'dashboard',
+          'kyc': 'dashboard',
+          'referral': 'dashboard',
+          'settings': 'dashboard',
+          'notifications': 'dashboard',
+          'chat': 'dashboard',
+          'faq': 'dashboard',
+          'help': 'dashboard',
+          'transfer': 'dashboard',
+        }
+        const parent = parentMap[currentScreen]
+        if (parent) {
+          setScreen(parent)
+        } else {
+          // Unknown screen → go to dashboard
+          setScreen('dashboard')
+        }
+      }
+    }
+
+    // Listen for Android back button via Capacitor
+    const setupBackButton = async () => {
+      try {
+        const { App } = await import('@capacitor/app')
+        App.addListener('backButton', ({ canGoBack }) => {
+          if (canGoBack) {
+            window.history.back()
+          } else {
+            handleBackButton()
+          }
+        })
+      } catch {
+        // Capacitor not available (web browser)
+      }
+    }
+    setupBackButton()
+  }, [currentScreen, setScreen])
 
   // Session timeout check (7 days)
   useEffect(() => {
@@ -238,6 +299,42 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
       {/* Social Floating Button */}
       <SocialFloatingButton />
+
+      {/* Exit Confirmation Dialog */}
+      <AlertDialog open={exitDialogOpen} onOpenChange={setExitDialogOpen}>
+        <AlertDialogContent className="glass-card bg-background/95 backdrop-blur-xl border-gold/20 text-right" dir="rtl">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="text-lg font-bold gold-text flex items-center gap-2">
+              <LogOut className="w-5 h-5" />
+              الخروج من التطبيق
+            </AlertDialogTitle>
+            <AlertDialogDescription className="text-muted-foreground text-sm leading-relaxed">
+              هل تريد الخروج من التطبيق؟
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter className="flex gap-3 sm:gap-0">
+            <AlertDialogAction
+              onClick={() => {
+                setExitDialogOpen(false)
+                // Exit the app
+                try {
+                  import('@capacitor/app').then(({ App }) => App.exitApp())
+                } catch {
+                  window.close()
+                }
+              }}
+              className="flex-1 h-11 gold-gradient text-gray-900 font-bold rounded-xl hover:opacity-90 transition-all"
+            >
+              نعم، خروج
+            </AlertDialogAction>
+            <AlertDialogCancel
+              className="flex-1 h-11 bg-white/10 hover:bg-white/20 text-foreground font-medium rounded-xl transition-all"
+            >
+              إلغاء
+            </AlertDialogCancel>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }
