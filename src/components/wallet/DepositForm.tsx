@@ -62,9 +62,30 @@ const CATEGORIES: CategoryOption[] = [
   },
 ]
 
+function getMethodSubtitle(m: any): string {
+  // Build a useful subtitle from available fields
+  const parts: string[] = []
+  if (m.network) parts.push(m.network)
+  if (m.accountNumber) parts.push(m.accountNumber)
+  if (m.recipientPhone) parts.push(m.recipientPhone)
+  if (m.type === 'bank_deposit' && !m.network) parts.push('إيداع بنكي')
+  if (m.type === 'bank_transfer' && !m.network) parts.push('تحويل بنكي')
+  if (m.type === 'atm_transfer' && !m.network) parts.push('تحويل صراف')
+  if (m.category === 'crypto' && !m.network) parts.push('عملات رقمية')
+  return parts.join(' · ') || m.type || ''
+}
+
 function getMethodLabel(m: any): string {
+  // Use actual identifying info instead of generic labels
+  if (m.name) return m.name
+  if (m.accountName) return m.accountName
+  if (m.recipientName) return m.recipientName
+  if (m.walletAddress) return m.walletAddress.slice(0, 12) + '...'
+  if (m.network) return m.network
+  if (m.accountNumber) return 'حساب ' + m.accountNumber
   if (m.type === 'bank_deposit') return 'إيداع بنكي'
   if (m.type === 'atm_transfer') return 'تحويل عبر صراف'
+  if (m.type === 'bank_transfer') return 'تحويل بنكي'
   if (m.category === 'crypto') return 'عملات رقمية'
   return 'إيداع'
 }
@@ -108,15 +129,18 @@ export default function DepositForm() {
         const allMethods = data.methods || []
         const catConfig = CATEGORIES.find(c => c.key === category)
         const filtered = allMethods.filter((m: any) => {
+          // Crypto: match all crypto-category methods
           if (catConfig?.matchCategory === 'crypto') return m.category === 'crypto'
-          if (catConfig?.matchTypes.includes(m.type)) return true
-          if (catConfig?.matchCategory && m.category === catConfig.matchCategory) return true
+          // Bank categories: match ONLY the specific types listed in matchTypes
+          if (catConfig && catConfig.matchTypes.length > 0) {
+            return catConfig.matchTypes.includes(m.type)
+          }
           return false
         })
         setMethods(filtered)
       }
     } catch {
-      // silent
+      toast.error('فشل في تحميل طرق الدفع')
     } finally {
       setLoadingMethods(false)
     }
@@ -354,10 +378,10 @@ export default function DepositForm() {
                       {m.category === 'crypto' ? <Wallet className="w-5 h-5" /> : <Building className="w-5 h-5" />}
                     </div>
                     <div className="text-right">
-                      <p className="text-sm font-medium">{m.name || getMethodLabel(m)}</p>
+                      <p className="text-sm font-medium">{getMethodLabel(m)}</p>
                       <div className="flex items-center gap-2 mt-0.5">
                         <p className="text-[10px] text-muted-foreground">
-                          {m.network || m.type || ''}
+                          {getMethodSubtitle(m)}
                         </p>
                         {m.isActive !== false && (
                           <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-green-500/10 text-green-400 font-medium">نشط</span>
