@@ -439,6 +439,25 @@ export default function SettingsPage() {
               <Volume2 className="w-4 h-4 text-gold" />
             </button>
 
+            {/* FCM Registration Debug */}
+            <button
+              onClick={async () => {
+                try {
+                  const { getFCMDebugInfo } = await import('@/lib/fcm-push')
+                  const info = getFCMDebugInfo()
+                  const w = window as any
+                  const capacitorInfo = w.Capacitor ? `Platform: ${w.Capacitor.getPlatform?.() || '?'} | Plugins: ${Object.keys(w.Capacitor.Plugins || {}).join(', ') || 'none'}` : 'Capacitor NOT found'
+                  toast.info(`${capacitorInfo} | ${info.lastResult}`, { duration: 8000 })
+                } catch (e: any) {
+                  toast.error('Debug: ' + (e?.message || String(e)))
+                }
+              }}
+              className="w-full flex items-center justify-between p-3 rounded-xl bg-orange-500/5 hover:bg-orange-500/10 transition-colors border border-orange-500/10"
+            >
+              <span className="text-sm font-medium">🔧 تشخيص FCM (اضغط لعرض الحالة)</span>
+              <span className="text-xs text-orange-400">debug</span>
+            </button>
+
             {/* Test notification (server + FCM) */}
             {user?.id && (
               <button
@@ -451,9 +470,9 @@ export default function SettingsPage() {
                     })
                     const data = await res.json()
                     if (data.success) {
-                      toast.success('تم إرسال إشعار اختبار — راقب الصوت خلال 5 ثواني')
+                      toast.success('تم الإرسال إلى ' + (data.debug?.pushResult?.successCount || '?') + ' جهاز — راقب شريط الإشعارات')
                     } else {
-                      toast.error(data.message || 'فشل إرسال الإشعار')
+                      toast.error(data.message || 'فشل', { duration: 8000 })
                     }
                   } catch {
                     toast.error('حدث خطأ')

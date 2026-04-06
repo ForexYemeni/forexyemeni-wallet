@@ -1,14 +1,13 @@
 /**
- * FCM Push Notification Handler for Capacitor (Android APK)
+ * FCM Push Notification Handler - v3.6.2
  * 
- * IMPORTANT FIX: The app loads from Vercel URL (not local files),
- * so we MUST try to register FCM even when isCapacitor() might not
- * work perfectly. We use @capacitor/core's nativeBridge detection
- * as a more reliable check.
- *
- * v3.6.1 FIX: Relaxed Capacitor detection + added retry logic.
- * Previously, FCM token was NEVER registered because isCapacitor()
- * returned false in WebView mode (server.url config).
+ * ROOT CAUSE FOUND: The app loads from Vercel URL (server.url config),
+ * NOT from local files. So `import('@capacitor/push-notifications')` with
+ * webpackIgnore:true FAILS because the module doesn't exist on Vercel.
+ * 
+ * FIX: Use window.Capacitor.Plugins.PushNotifications directly.
+ * The Capacitor native bridge injects ALL installed plugins into the
+ * WebView at runtime — no import needed!
  */
 import { useAuthStore } from '@/lib/store'
 
@@ -16,26 +15,21 @@ let fcmRegistered = false
 let currentFcmToken: string | null = null
 
 /**
- * More reliable Capacitor detection.
- * Check for native bridge AND Capacitor object AND Android platform.
+ * Check if running inside native Android app (not browser).
  */
 function isNativeApp(): boolean {
   try {
     if (typeof window === 'undefined') return false
     const w = window as any
     
-    // Method 1: Check Capacitor native bridge
+    // Check if Capacitor bridge is injected by native layer
     if (w.Capacitor?.isNativePlatform?.()) return true
+    if (w.Capacitor?.getPlatform?.() === 'android') return true
+    if (w.Capacitor?.Plugins) return true
     
-    // Method 2: Check for Android WebView user agent
+    // Check Android WebView user agent
     const ua = navigator.userAgent.toLowerCase()
     if (ua.includes('wv') && ua.includes('android')) return true
-    
-    // Method 3: Check if running inside our APK package
-    if (w.Capacitor?.getPlatform?.() === 'android') return true
-    
-    // Method 4: Check for the Capacitor JS module loaded
-    if (w.Capacitor?.Plugins?.PushNotifications) return true
     
     return false
   } catch {
@@ -44,95 +38,106 @@ function isNativeApp(): boolean {
 }
 
 /**
- * Register for FCM push notifications.
- * Retries up to 3 times with delays.
+ * Get PushNotifications plugin from Capacitor bridge.
+ * This works because Capacitor injects all native plugins at runtime.
  */
-export async function registerFCMPushNotifications(): Promise<boolean> {
-  if (fcmRegistered) return true
-
-  for (let attempt = 1; attempt <= 3; attempt++) {
-    try {
-      console.log(`[FCM] Registration attempt ${attempt}/3`)
+function getPushPlugin(): any {
+  try {
+    const w = window as any
+    
+    // Method 1: Direct from Plugins registry (most reliable)
+    if (w.Capacitor?.Plugins?.PushNotifications) {
+      return w.Capacitor.Plugins.PushNotifications
+    }
+    
+    // Method 2: Try registerPlugin from @capacitor/core (bundled by Next.js)
+    // This is async-safe and works in server.url mode
+    if (w.Capacitor?.isNativePlatform?.()) {
+      // The plugin should be available, let's log what IS available
+      const pluginNames = Object.keys(w.Capacitor.Plugins || {})
+      console.log('[FCM] Available Capacitor plugins:', pluginNames)
       
-      // Try to load Capacitor Push Notifications plugin
-      const pushModule = await import(/* webpackIgnore: true */ '@capacitor/push-notifications')
-      const PushNotifications = pushModule.PushNotifications || pushModule.default?.PushNotifications
-
-      if (!PushNotifications) {
-        console.log('[FCM] PushNotifications plugin not available')
-        return false
-      }
-
-      // Request permission
-      const permResult = await PushNotifications.requestPermissions()
-      console.log('[FCM] Permission result:', permResult.receive)
-      if (permResult.receive !== 'granted') {
-        console.log('[FCM] Permission denied')
-        return false
-      }
-
-      // Register for push
-      await PushNotifications.register()
-      console.log('[FCM] Registered successfully')
-
-      // Get token
-      const tokenResult = await PushNotifications.getToken()
-      currentFcmToken = tokenResult.value
-      console.log('[FCM] Got token:', currentFcmToken?.substring(0, 20) + '...')
-
-      if (currentFcmToken) {
-        const user = useAuthStore.getState().user
-        if (user?.id) {
-          const ok = await sendTokenToServer(user.id, currentFcmToken)
-          if (ok) {
-            fcmRegistered = true
-            console.log('[FCM] Token registered to server ✓')
-          }
-        } else {
-          console.log('[FCM] No user ID yet, will retry')
-        }
-      }
-
-      // Listen for token refresh
-      PushNotifications.addListener('registration', async (token) => {
-        console.log('[FCM] Token refreshed:', token.value?.substring(0, 20) + '...')
-        currentFcmToken = token.value
-        const user = useAuthStore.getState().user
-        if (user?.id && currentFcmToken) {
-          await sendTokenToServer(user.id, currentFcmToken)
-          fcmRegistered = true
-        }
-      })
-
-      // Listen for foreground notifications → play sound
-      PushNotifications.addListener('pushNotificationReceived', async (notification) => {
-        console.log('[FCM] Notification received in foreground')
-        try {
-          const { playNotificationSound, vibrate } = await import('@/lib/notification-sound')
-          vibrate([300, 100, 300])
-          playNotificationSound('general').catch(() => {})
-        } catch {}
-      })
-
-      // Listen for notification tap
-      PushNotifications.addListener('pushNotificationActionPerformed', () => {})
-
-      if (fcmRegistered) return true
-    } catch (error) {
-      console.log(`[FCM] Attempt ${attempt} failed:`, error)
-      // Wait before retry (2s, 4s)
-      if (attempt < 3) {
-        await new Promise(r => setTimeout(r, 2000 * attempt))
+      if (pluginNames.includes('PushNotifications')) {
+        return w.Capacitor.Plugins.PushNotifications
       }
     }
+    
+    return null
+  } catch {
+    return null
   }
-
-  return false
 }
 
 /**
- * Send FCM token to server so push notifications can be sent.
- * Returns true if successful.
+ * Register for FCM push notifications using Capacitor bridge.
+ */
+export async function registerFCMPushNotifications(): Promise<string> {
+  if (fcmRegistered && currentFcmToken) {
+    return 'already registered: ' + currentFcmToken.substring(0, 20) + '...'
+  }
+
+  if (!isNativeApp()) {
+    return 'not a native app — running in browser'
+  }
+
+  try {
+    console.log('[FCM] Starting registration via Capacitor bridge...')
+    console.log('[FCM] Capacitor exists:', !!(window as any).Capacitor)
+    console.log('[FCM] Platform:', (window as any).Capacitor?.getPlatform?.())
+    console.log('[FCM] Plugins:', Object.keys((window as any).Capacitor?.Plugins || {}))
+    
+    const PushNotifications = getPushPlugin()
+    
+    if (!PushNotifications) {
+      const availablePlugins = Object.keys((window as any).Capacitor?.Plugins || {})
+      return 'PushNotifications plugin NOT found. Available: ' + availablePlugins.join(', ')
+    }
+
+    console.log('[FCM] PushNotifications plugin found!')
+
+    // Request permission
+    console.log('[FCM] Requesting permission...')
+    const permResult = await PushNotifications.requestPermissions()
+    console.log('[FCM] Permission result:', JSON.stringify(permResult))
+    
+    if (permResult.receive !== 'granted') {
+      return 'Permission denied: ' + permResult.receive
+    }
+
+    // Register
+    console.log('[FCM] Registering...')
+    await PushNotifications.register()
+    console.log('[FCM] Registered!')
+
+    // Get token
+    const tokenResult = await PushNotifications.getToken()
+    currentFcmToken = tokenResult.value
+    console.log('[FCM] Token:', currentFcmToken ? currentFcmToken.substring(0, 30) + '...' : 'NULL')
+
+    if (!currentFcmToken) {
+      return 'Got NULL token from getToken()'
+    }
+
+    // Send token to server
+    const user = useAuthStore.getState().user
+    if (user?.id) {
+      const ok = await sendTokenToServer(user.id, currentFcmToken)
+      if (ok) {
+        fcmRegistered = true
+        return 'SUCCESS — token registered! ' + currentFcmToken.substring(0, 20) + '...'
+      } else {
+        return 'Token received but server registration FAILED'
+      }
+    } else {
+      return 'Got token but no user ID yet'
+    }
+  } catch (error: any) {
+    return 'ERROR: ' + (error?.message || String(error))
+  }
+}
+
+/**
+ * Send FCM token to our server.
  */
 async function sendTokenToServer(userId: string, token: string): Promise<boolean> {
   try {
@@ -146,27 +151,23 @@ async function sendTokenToServer(userId: string, token: string): Promise<boolean
       }),
     })
     const data = await res.json()
-    console.log('[FCM] Server registration response:', data)
+    console.log('[FCM] Server response:', data)
     return data.success === true
-  } catch (error) {
-    console.log('[FCM] Failed to register token to server:', error)
+  } catch (error: any) {
+    console.log('[FCM] Server error:', error?.message)
     return false
   }
 }
 
 export async function unregisterFCM(): Promise<void> {
   if (!currentFcmToken) return
-
   try {
     const user = useAuthStore.getState().user
     if (user?.id) {
       await fetch('/api/fcm/register', {
         method: 'DELETE',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          userId: user.id,
-          fcmToken: currentFcmToken,
-        }),
+        body: JSON.stringify({ userId: user.id, fcmToken: currentFcmToken }),
       })
     }
     currentFcmToken = null
@@ -175,38 +176,42 @@ export async function unregisterFCM(): Promise<void> {
 }
 
 /**
- * Setup FCM auto-registration.
- * Tries to register immediately + watches for login events.
+ * Setup FCM auto-registration on app start and login.
  */
 export function setupFCMAutoRegister(): void {
-  // Try registration immediately (don't skip even if isNativeApp is uncertain)
-  const tryRegister = () => {
-    const user = useAuthStore.getState().user
-    if (user?.id) {
-      console.log('[FCM] setupFCMAutoRegister - attempting registration...')
-      registerFCMPushNotifications().then(ok => {
-        console.log('[FCM] setupFCMAutoRegister result:', ok)
-      })
-    }
+  const doRegister = async () => {
+    const result = await registerFCMPushNotifications()
+    console.log('[FCM] setupFCMAutoRegister result:', result)
+    
+    // Save result so debug page can show it
+    try {
+      (window as any).__fcm_debug = result
+    } catch {}
   }
 
-  // Try immediately
-  setTimeout(tryRegister, 2000)
+  // Try at 2s, 5s, and 10s (plugins may load late)
+  setTimeout(doRegister, 2000)
+  setTimeout(doRegister, 5000)
+  setTimeout(doRegister, 10000)
 
-  // Also try after a delay (in case Capacitor plugins load late)
-  setTimeout(tryRegister, 5000)
-
-  // Watch for login events
-  const unsubscribe = useAuthStore.subscribe((state, prevState) => {
-    const justLoggedIn = state.isAuthenticated && !prevState.isAuthenticated
-    const justLoggedOut = !state.isAuthenticated && prevState.isAuthenticated
-
-    if (justLoggedIn && state.user?.id) {
-      setTimeout(() => registerFCMPushNotifications(), 1500)
+  // Watch for login
+  useAuthStore.subscribe((state, prevState) => {
+    if (state.isAuthenticated && !prevState.isAuthenticated && state.user?.id) {
+      setTimeout(doRegister, 2000)
     }
-
-    if (justLoggedOut) {
+    if (!state.isAuthenticated && prevState.isAuthenticated) {
       unregisterFCM()
     }
   })
+}
+
+/**
+ * Get FCM debug info (for settings page).
+ */
+export function getFCMDebugInfo(): { registered: boolean; token: string | null; lastResult: string } {
+  return {
+    registered: fcmRegistered,
+    token: currentFcmToken,
+    lastResult: (window as any).__fcm_debug || 'not attempted',
+  }
 }
