@@ -1,14 +1,14 @@
 /**
  * FCM Push Notification Handler - v3.6.2
  * 
- * ROOT CAUSE FOUND: The app loads from Vercel URL (server.url config),
- * NOT from local files. So `import('@capacitor/push-notifications')` with
- * webpackIgnore:true FAILS because the module doesn't exist on Vercel.
+ * KEY FIX: Capacitor Push Notifications v8 API changed!
+ * - v5/v6: getToken() returned { value: string }  ← OLD, REMOVED
+ * - v8:    NO getToken() method! Token comes via 'registration' event after register()
  * 
- * FIX: Use window.Capacitor.Plugins.PushNotifications directly.
- * The Capacitor native bridge injects ALL installed plugins into the
- * WebView at runtime — no import needed!
+ * The app loads from Vercel URL (server.url config), but the Capacitor native bridge
+ * still injects all installed plugins into the WebView at runtime.
  */
+
 import { useAuthStore } from '@/lib/store'
 
 let fcmRegistered = false
@@ -22,12 +22,10 @@ function isNativeApp(): boolean {
     if (typeof window === 'undefined') return false
     const w = window as any
     
-    // Check if Capacitor bridge is injected by native layer
     if (w.Capacitor?.isNativePlatform?.()) return true
     if (w.Capacitor?.getPlatform?.() === 'android') return true
     if (w.Capacitor?.Plugins) return true
     
-    // Check Android WebView user agent
     const ua = navigator.userAgent.toLowerCase()
     if (ua.includes('wv') && ua.includes('android')) return true
     
@@ -39,27 +37,13 @@ function isNativeApp(): boolean {
 
 /**
  * Get PushNotifications plugin from Capacitor bridge.
- * This works because Capacitor injects all native plugins at runtime.
  */
 function getPushPlugin(): any {
   try {
     const w = window as any
     
-    // Method 1: Direct from Plugins registry (most reliable)
     if (w.Capacitor?.Plugins?.PushNotifications) {
       return w.Capacitor.Plugins.PushNotifications
-    }
-    
-    // Method 2: Try registerPlugin from @capacitor/core (bundled by Next.js)
-    // This is async-safe and works in server.url mode
-    if (w.Capacitor?.isNativePlatform?.()) {
-      // The plugin should be available, let's log what IS available
-      const pluginNames = Object.keys(w.Capacitor.Plugins || {})
-      console.log('[FCM] Available Capacitor plugins:', pluginNames)
-      
-      if (pluginNames.includes('PushNotifications')) {
-        return w.Capacitor.Plugins.PushNotifications
-      }
     }
     
     return null
@@ -69,7 +53,13 @@ function getPushPlugin(): any {
 }
 
 /**
- * Register for FCM push notifications using Capacitor bridge.
+ * Register for FCM push notifications using Capacitor v8 API.
+ * 
+ * v8 API Flow:
+ *   1. requestPermissions()  → get notification permission
+ *   2. register()            → trigger native registration
+ *   3. addListener('registration', cb) → receive token via callback
+ *   4. send token to server
  */
 export async function registerFCMPushNotifications(): Promise<string> {
   if (fcmRegistered && currentFcmToken) {
@@ -81,21 +71,23 @@ export async function registerFCMPushNotifications(): Promise<string> {
   }
 
   try {
-    console.log('[FCM] Starting registration via Capacitor bridge...')
-    console.log('[FCM] Capacitor exists:', !!(window as any).Capacitor)
-    console.log('[FCM] Platform:', (window as any).Capacitor?.getPlatform?.())
-    console.log('[FCM] Plugins:', Object.keys((window as any).Capacitor?.Plugins || {}))
+    const w = window as any
+    console.log('[FCM] Starting registration via Capacitor v8 API...')
+    console.log('[FCM] Capacitor exists:', !!w.Capacitor)
+    console.log('[FCM] Platform:', w.Capacitor?.getPlatform?.())
+    console.log('[FCM] Plugins:', Object.keys(w.Capacitor?.Plugins || {}))
     
     const PushNotifications = getPushPlugin()
     
     if (!PushNotifications) {
-      const availablePlugins = Object.keys((window as any).Capacitor?.Plugins || {})
+      const availablePlugins = Object.keys(w.Capacitor?.Plugins || {})
       return 'PushNotifications plugin NOT found. Available: ' + availablePlugins.join(', ')
     }
 
     console.log('[FCM] PushNotifications plugin found!')
+    console.log('[FCM] Available methods:', Object.getOwnPropertyNames(Object.getPrototypeOf(PushNotifications)).filter(m => m !== 'constructor'))
 
-    // Request permission
+    // Step 1: Request permission
     console.log('[FCM] Requesting permission...')
     const permResult = await PushNotifications.requestPermissions()
     console.log('[FCM] Permission result:', JSON.stringify(permResult))
@@ -104,21 +96,45 @@ export async function registerFCMPushNotifications(): Promise<string> {
       return 'Permission denied: ' + permResult.receive
     }
 
-    // Register
-    console.log('[FCM] Registering...')
-    await PushNotifications.register()
-    console.log('[FCM] Registered!')
+    // Step 2: Set up listener BEFORE calling register() (v8 API requirement)
+    // In v8, token comes via 'registration' event, not getToken()
+    const token = await new Promise<string>((resolve, reject) => {
+      const timeout = setTimeout(() => {
+        reject(new Error('Token registration timed out (15s)'))
+      }, 15000)
 
-    // Get token
-    const tokenResult = await PushNotifications.getToken()
-    currentFcmToken = tokenResult.value
-    console.log('[FCM] Token:', currentFcmToken ? currentFcmToken.substring(0, 30) + '...' : 'NULL')
+      PushNotifications.addListener('registration', (tokenObj: { value: string }) => {
+        clearTimeout(timeout)
+        console.log('[FCM] registration event received! Token:', tokenObj.value ? tokenObj.value.substring(0, 30) + '...' : 'NULL')
+        resolve(tokenObj.value)
+      })
+
+      PushNotifications.addListener('registrationError', (err: { error: string }) => {
+        clearTimeout(timeout)
+        console.error('[FCM] registrationError event:', err.error)
+        reject(new Error('Registration failed: ' + err.error))
+      })
+
+      // Step 3: Register — this triggers the 'registration' event with the token
+      console.log('[FCM] Calling register()...')
+      PushNotifications.register()
+        .then(() => {
+          console.log('[FCM] register() resolved — waiting for registration event...')
+        })
+        .catch((err: any) => {
+          clearTimeout(timeout)
+          reject(new Error('register() failed: ' + (err?.message || String(err))))
+        })
+    })
+
+    currentFcmToken = token
+    console.log('[FCM] Token obtained:', currentFcmToken ? currentFcmToken.substring(0, 30) + '...' : 'NULL')
 
     if (!currentFcmToken) {
-      return 'Got NULL token from getToken()'
+      return 'Got NULL token from registration event'
     }
 
-    // Send token to server
+    // Step 4: Send token to server
     const user = useAuthStore.getState().user
     if (user?.id) {
       const ok = await sendTokenToServer(user.id, currentFcmToken)
@@ -183,7 +199,6 @@ export function setupFCMAutoRegister(): void {
     const result = await registerFCMPushNotifications()
     console.log('[FCM] setupFCMAutoRegister result:', result)
     
-    // Save result so debug page can show it
     try {
       (window as any).__fcm_debug = result
     } catch {}
