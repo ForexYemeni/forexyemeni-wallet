@@ -8,26 +8,28 @@ export async function GET() {
     // ====== USER STATS ======
     const allUsersSnap = await db.collection('users').get()
     const allUsers = allUsersSnap.docs.map(d => d.data())
-    const totalUsers = allUsers.length
-    const activeUsers = allUsers.filter(u => u.status === 'active').length
-    const suspendedUsers = allUsers.filter(u => u.status === 'suspended').length
+    // Exclude admin users from user counts
+    const regularUsers = allUsers.filter(u => u.role !== 'admin')
+    const totalUsers = regularUsers.length
+    const activeUsers = regularUsers.filter(u => u.status === 'active').length
+    const suspendedUsers = regularUsers.filter(u => u.status === 'suspended').length
     const kycApproved = allUsers.filter(u => u.kycStatus === 'approved').length
     const kycPending = allUsers.filter(u => u.kycStatus === 'pending').length
     const kycRejected = allUsers.filter(u => u.kycStatus === 'rejected').length
-    const newUsersToday = allUsers.filter(u => {
+    const newUsersToday = regularUsers.filter(u => {
       if (!u.createdAt) return false
       const created = new Date(u.createdAt)
       const today = new Date()
       return created.toDateString() === today.toDateString()
     }).length
-    const newUsersThisWeek = allUsers.filter(u => {
+    const newUsersThisWeek = regularUsers.filter(u => {
       if (!u.createdAt) return false
       const created = new Date(u.createdAt)
       const weekAgo = new Date()
       weekAgo.setDate(weekAgo.getDate() - 7)
       return created >= weekAgo
     }).length
-    const newUsersThisMonth = allUsers.filter(u => {
+    const newUsersThisMonth = regularUsers.filter(u => {
       if (!u.createdAt) return false
       const created = new Date(u.createdAt)
       const now = new Date()

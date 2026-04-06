@@ -1048,17 +1048,20 @@ export default function AdminPanel() {
         <div className="flex items-center gap-2">
           {stats?.pendingActions ? (
             <button
-              onClick={() => setActiveTab('dashboard')}
+              onClick={() => setActiveTab('deposits')}
               className="glass-card px-3 py-2 flex items-center gap-2 text-xs cursor-pointer hover:bg-white/10 transition-colors"
             >
               <Activity className="w-4 h-4 text-yellow-400" />
               <span className="text-yellow-400 font-bold">{stats.pendingActions} عملية معلقة</span>
             </button>
           ) : null}
-          <div className="glass-card px-3 py-2 flex items-center gap-2 text-xs">
+          <button
+            onClick={() => setActiveTab('users')}
+            className="glass-card px-3 py-2 flex items-center gap-2 text-xs cursor-pointer hover:bg-white/10 transition-colors"
+          >
             <Users className="w-4 h-4 text-gold" />
-            <span>{users.length} مستخدم</span>
-          </div>
+            <span>{stats?.totalUsers ?? users.length} مستخدم</span>
+          </button>
         </div>
       </div>
 
@@ -1154,21 +1157,24 @@ export default function AdminPanel() {
                 <div className="space-y-4">
                   {/* Pending Actions Banner */}
                   {stats.pendingActions > 0 && (
-                    <div className="glass-card p-4 rounded-xl border border-gold/20 bg-gold/5 flex items-center gap-3">
+                    <button
+                      onClick={() => setActiveTab('deposits')}
+                      className="w-full glass-card p-4 rounded-xl border border-gold/20 bg-gold/5 flex items-center gap-3 cursor-pointer hover:bg-gold/10 transition-colors text-right"
+                    >
                       <div className="w-10 h-10 rounded-xl bg-gold/10 flex items-center justify-center flex-shrink-0">
                         <AlertTriangle className="w-5 h-5 text-gold" />
                       </div>
                       <div>
                         <p className="text-sm font-bold text-gold">{stats.pendingActions} إجراء معلق</p>
-                        <p className="text-xs text-muted-foreground">إيداعات وسحوبات وتوثيقات بانتظار المراجعة</p>
+                        <p className="text-xs text-muted-foreground">اضغط لعرض الإيداعات والسحوبات والتوثيقات المعلقة</p>
                       </div>
-                    </div>
+                    </button>
                   )}
 
                   {/* Summary Cards */}
                   <div className="grid grid-cols-2 gap-3">
                     {/* Users Card */}
-                    <div className="glass-card p-4 rounded-xl">
+                    <div onClick={() => setActiveTab('users')} className="glass-card p-4 rounded-xl cursor-pointer hover:bg-white/[0.04] transition-colors">
                       <div className="flex items-center gap-2 mb-2">
                         <Users className="w-4 h-4 text-blue-400" />
                         <span className="text-xs text-muted-foreground">إجمالي المستخدمين</span>
@@ -1185,7 +1191,7 @@ export default function AdminPanel() {
                     </div>
 
                     {/* Deposits Card */}
-                    <div className="glass-card p-4 rounded-xl">
+                    <div onClick={() => setActiveTab('deposits')} className="glass-card p-4 rounded-xl cursor-pointer hover:bg-white/[0.04] transition-colors">
                       <div className="flex items-center gap-2 mb-2">
                         <ArrowDownLeft className="w-4 h-4 text-green-400" />
                         <span className="text-xs text-muted-foreground">الإيداعات</span>
@@ -1200,7 +1206,7 @@ export default function AdminPanel() {
                     </div>
 
                     {/* Withdrawals Card */}
-                    <div className="glass-card p-4 rounded-xl">
+                    <div onClick={() => setActiveTab('withdrawals')} className="glass-card p-4 rounded-xl cursor-pointer hover:bg-white/[0.04] transition-colors">
                       <div className="flex items-center gap-2 mb-2">
                         <ArrowUpRight className="w-4 h-4 text-red-400" />
                         <span className="text-xs text-muted-foreground">السحوبات</span>
