@@ -107,6 +107,7 @@ export default function DepositForm() {
   const [feePercentage, setFeePercentage] = useState(0)
   const [hasPending, setHasPending] = useState(false)
   const [pendingLoading, setPendingLoading] = useState(true)
+  const [pendingCheckLoading, setPendingCheckLoading] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
@@ -160,7 +161,19 @@ export default function DepositForm() {
     }
   }
 
-  const handleCategorySelect = (category: DepositCategory) => {
+  const handleCategorySelect = async (category: DepositCategory) => {
+    // Check for pending deposit before allowing new deposit
+    setPendingCheckLoading(true)
+    try {
+      const res = await fetch(`/api/deposits/create?checkPending=true&userId=${user?.id}&_t=${Date.now()}`, { cache: 'no-store' })
+      const data = await res.json()
+      if (data.hasPending) {
+        setHasPending(true)
+        setPendingCheckLoading(false)
+        return
+      }
+    } catch { /* silent */ }
+    setPendingCheckLoading(false)
     setSelectedCategory(category)
     setStep('methods')
     fetchMethods(category)
@@ -288,6 +301,16 @@ export default function DepositForm() {
             >
               فهمت
             </Button>
+          </div>
+        </div>
+      )}
+
+      {/* Checking pending overlay */}
+      {pendingCheckLoading && (
+        <div className="fixed inset-0 bg-black/30 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="glass-card bg-background/95 backdrop-blur-xl border-gold/20 w-full max-w-xs rounded-2xl p-6 space-y-4 animate-scale-in text-center">
+            <Loader2 className="w-8 h-8 text-gold animate-spin mx-auto" />
+            <p className="text-sm text-muted-foreground">جاري التحقق...</p>
           </div>
         </div>
       )}

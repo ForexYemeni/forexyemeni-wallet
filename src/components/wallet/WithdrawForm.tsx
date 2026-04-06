@@ -58,6 +58,7 @@ export default function WithdrawForm() {
   const [loadingMethods, setLoadingMethods] = useState(true)
   const [feePercentage, setFeePercentage] = useState(0.1)
   const [hasPending, setHasPending] = useState(false)
+  const [pendingCheckLoading, setPendingCheckLoading] = useState(false)
   // PIN dialog state
   const [showPinDialog, setShowPinDialog] = useState(false)
   const [pinCode, setPinCode] = useState('')
@@ -334,6 +335,16 @@ export default function WithdrawForm() {
         </div>
       )}
 
+      {/* Checking pending overlay */}
+      {pendingCheckLoading && (
+        <div className="fixed inset-0 bg-black/30 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="glass-card bg-background/95 backdrop-blur-xl border-gold/20 w-full max-w-xs rounded-2xl p-6 space-y-4 animate-scale-in text-center">
+            <Loader2 className="w-8 h-8 text-gold animate-spin mx-auto" />
+            <p className="text-sm text-muted-foreground">جاري التحقق...</p>
+          </div>
+        </div>
+      )}
+
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
@@ -383,7 +394,22 @@ export default function WithdrawForm() {
               <div key={m.id} className="glass-card p-4 rounded-xl space-y-2">
                 <div className="flex items-center justify-between">
                   <button
-                    onClick={() => { setSelectedMethod(m); setStep('details') }}
+                    onClick={async () => {
+                      // Check for pending withdrawal before allowing new withdrawal
+                      setPendingCheckLoading(true)
+                      try {
+                        const res = await fetch(`/api/withdrawals/create?checkPending=true&userId=${user?.id}&_t=${Date.now()}`, { cache: 'no-store' })
+                        const data = await res.json()
+                        if (data.hasPending) {
+                          setHasPending(true)
+                          setPendingCheckLoading(false)
+                          return
+                        }
+                      } catch { /* silent */ }
+                      setPendingCheckLoading(false)
+                      setSelectedMethod(m)
+                      setStep('details')
+                    }}
                     className="flex items-center gap-3 flex-1 text-right"
                   >
                     <div className={`w-11 h-11 rounded-xl flex items-center justify-center ${

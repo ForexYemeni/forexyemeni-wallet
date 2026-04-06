@@ -19,7 +19,7 @@ export async function GET(request: NextRequest) {
     // Return unread count only (lightweight, for badge polling)
     if (countOnly === 'true') {
       const unreadCount = await notificationOperations.countUnread(userId)
-      return NextResponse.json({ success: true, unreadCount })
+      return NextResponse.json({ success: true, unreadCount }, { headers: { 'Cache-Control': 'no-cache, no-store, must-revalidate' } })
     }
 
     // Return notifications, optionally filtered by timestamp
@@ -28,7 +28,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({
       success: true,
       notifications,
-    })
+    }, { headers: { 'Cache-Control': 'no-cache, no-store, must-revalidate' } })
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : 'حدث خطأ'
     return NextResponse.json(

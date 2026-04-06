@@ -746,3 +746,24 @@ Stage Summary:
 - When user opens a new support chat, they automatically receive a welcome message from admin: "مرحباً! كيف يمكننا مساعدتك اليوم؟ 😊"
 - Build verified successfully
 
+
+---
+Task ID: 1
+Agent: Main Agent
+Task: Fix real-time admin updates + pending request modal dialog
+
+Work Log:
+- Identified root cause of real-time update failure: Capacitor WebView caches HTTP responses, making setInterval polling return stale data
+- Added `cache: 'no-store'` and `_t=${Date.now()}` cache-busting to all admin fetch calls (deposits, withdrawals, stats, KYC)
+- Added `Cache-Control: no-cache, no-store, must-revalidate` headers to API responses (deposits, withdrawals, stats, KYC, notifications)
+- Added `visibilitychange` listener to refresh data immediately when app/tab comes to foreground
+- Added cache-busting to useRealtimeNotifications hook (all 3 fetch calls)
+- Modified DepositForm: `handleCategorySelect` now checks for pending deposits before allowing user to proceed to payment details
+- Modified WithdrawForm: clicking a withdrawal method now checks for pending withdrawals first
+- Added "جاري التحقق..." loading overlay during pending check
+- Build verified successfully
+
+Stage Summary:
+- Files modified: AdminPanel.tsx, DepositForm.tsx, WithdrawForm.tsx, useRealtimeNotifications.ts, notifications API route, admin deposits API route, admin withdrawals API route, admin stats API route, admin KYC API route
+- Root cause of real-time issue: Capacitor WebView HTTP caching preventing fresh data from being fetched
+- Solution: Multi-layer cache busting (URL timestamp params + fetch cache option + response headers + visibility change handler)

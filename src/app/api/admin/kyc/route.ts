@@ -8,7 +8,7 @@ export async function GET() {
   try {
     const kycRecords = await kycRecordOperations.findMany()
 
-    return NextResponse.json({ success: true, kycRecords })
+    return NextResponse.json({ success: true, kycRecords }, { headers: { 'Cache-Control': 'no-cache, no-store, must-revalidate' } })
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : 'حدث خطأ'
     return NextResponse.json({ success: false, message }, { status: 500 })

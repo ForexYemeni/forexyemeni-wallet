@@ -225,7 +225,7 @@ export async function GET() {
         // Recent activity
         recentActivity,
       },
-    })
+    }, { headers: { 'Cache-Control': 'no-cache, no-store, must-revalidate' } })
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : 'حدث خطأ'
     return NextResponse.json({ success: false, message }, { status: 500 })

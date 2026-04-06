@@ -344,7 +344,7 @@ export default function AdminPanel() {
 
   const fetchDeposits = async () => {
     try {
-      const res = await fetch('/api/admin/deposits')
+      const res = await fetch(`/api/admin/deposits?_t=${Date.now()}`, { cache: 'no-store' })
       const data = await res.json()
       if (data.success) setDeposits(data.deposits || [])
     } catch { /* silent */ }
@@ -352,7 +352,7 @@ export default function AdminPanel() {
 
   const fetchWithdrawals = async () => {
     try {
-      const res = await fetch('/api/admin/withdrawals')
+      const res = await fetch(`/api/admin/withdrawals?_t=${Date.now()}`, { cache: 'no-store' })
       const data = await res.json()
       if (data.success) setWithdrawals(data.withdrawals || [])
     } catch { /* silent */ }
@@ -360,7 +360,7 @@ export default function AdminPanel() {
 
   const fetchKYC = async () => {
     try {
-      const res = await fetch('/api/admin/kyc')
+      const res = await fetch(`/api/admin/kyc?_t=${Date.now()}`, { cache: 'no-store' })
       const data = await res.json()
       if (data.success) setKycRecords(data.kycRecords || [])
     } catch { /* silent */ }
@@ -393,7 +393,7 @@ export default function AdminPanel() {
   const fetchStats = async () => {
     setStatsLoading(true)
     try {
-      const res = await fetch('/api/admin/stats')
+      const res = await fetch(`/api/admin/stats?_t=${Date.now()}`, { cache: 'no-store' })
       const data = await res.json()
       if (data.success) setStats(data.stats)
     } catch { /* silent */ }
@@ -3609,15 +3609,24 @@ function AdminDevicesSection() {
       fetchKYCRef.current()
     }
 
-    // Periodic refresh as backup (every 8 seconds)
-    const autoRefresh = setInterval(handleDataChanged, 8000)
+    // Periodic refresh as backup (every 5 seconds)
+    const autoRefresh = setInterval(handleDataChanged, 5000)
 
     // Listen for real-time notification events
     window.addEventListener('app-data-changed', handleDataChanged)
 
+    // Refresh immediately when app/tab comes to foreground (Capacitor resume / browser tab switch)
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        handleDataChanged()
+      }
+    }
+    document.addEventListener('visibilitychange', handleVisibilityChange)
+
     return () => {
       clearInterval(autoRefresh)
       window.removeEventListener('app-data-changed', handleDataChanged)
+      document.removeEventListener('visibilitychange', handleVisibilityChange)
     }
   }, [user?.role, user?.permissions])
 

@@ -18,7 +18,7 @@ export async function GET(request: NextRequest) {
 
     const deposits = await depositOperations.findMany(status ? { status } : undefined)
 
-    return NextResponse.json({ success: true, deposits })
+    return NextResponse.json({ success: true, deposits }, { headers: { 'Cache-Control': 'no-cache, no-store, must-revalidate' } })
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : 'حدث خطأ'
     return NextResponse.json({ success: false, message }, { status: 500 })

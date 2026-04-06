@@ -33,7 +33,7 @@ export function useRealtimeNotifications() {
     if (!userId) return
 
     try {
-      const res = await fetch(`/api/notifications?userId=${userId}&after=${encodeURIComponent(lastCheckedRef.current)}`)
+      const res = await fetch(`/api/notifications?userId=${userId}&after=${encodeURIComponent(lastCheckedRef.current)}&_t=${Date.now()}`, { cache: 'no-store' })
       const data = await res.json()
 
       if (!data.success || !data.notifications?.length) return
@@ -107,7 +107,7 @@ export function useRealtimeNotifications() {
     // Initial fetch to populate known IDs (don't play sound for existing)
     const initialize = async () => {
       try {
-        const res = await fetch(`/api/notifications?userId=${userId}`)
+        const res = await fetch(`/api/notifications?userId=${userId}&_t=${Date.now()}`, { cache: 'no-store' })
         const data = await res.json()
         if (data.success && data.notifications) {
           for (const notif of data.notifications) {
@@ -149,7 +149,7 @@ export function useUnreadCount() {
 
     const fetchCount = async () => {
       try {
-        const res = await fetch(`/api/notifications?userId=${user.id}&countOnly=true`)
+        const res = await fetch(`/api/notifications?userId=${user.id}&countOnly=true&_t=${Date.now()}`, { cache: 'no-store' })
         const data = await res.json()
         if (data.success) setCount(data.unreadCount || 0)
       } catch {
