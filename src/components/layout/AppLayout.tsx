@@ -4,7 +4,6 @@ import { useState, useEffect, useRef, useCallback } from 'react'
 import { useAuthStore } from '@/lib/store'
 import { useRealtimeNotifications, useUnreadCount } from '@/hooks/useRealtimeNotifications'
 import { setupFCMAutoRegister } from '@/lib/fcm-push'
-import { navPush, navBack, navClear } from '@/lib/nav-history'
 import BottomNav from './BottomNav'
 import Sidebar from './Sidebar'
 import SocialFloatingButton from './SocialFloatingButton'
@@ -43,60 +42,12 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     setupFCMAutoRegister()
   }, [])
 
-  // Track navigation history automatically
-  const prevScreenRef = useRef(currentScreen)
-  useEffect(() => {
-    if (currentScreen !== prevScreenRef.current) {
-      navPush(prevScreenRef.current)
-      prevScreenRef.current = currentScreen
-    }
-  }, [currentScreen])
-
-  // Clear history on logout
   const handleLogout = () => {
     setLogoutDialogOpen(false)
-    navClear()
     logout()
   }
 
-  // Android hardware back button handler
-  useEffect(() => {
-    const isNativeApp = typeof window !== 'undefined' && (() => {
-      try {
-        const w = window as any
-        if (w.Capacitor?.isNativePlatform?.()) return true
-        if (w.Capacitor?.getPlatform?.() === 'android') return true
-        if (w.Capacitor?.Plugins) return true
-        return false
-      } catch { return false }
-    })()
-    if (!isNativeApp) return
 
-    let listenerHandle: any = null
-    const setupBackButton = async () => {
-      try {
-        const { App } = await import('@capacitor/app')
-        listenerHandle = await App.addListener('backButton', () => {
-          // 1. Let child components handle internal navigation first
-          const backEvent = new CustomEvent('app:backbutton', { cancelable: true })
-          window.dispatchEvent(backEvent)
-          if (backEvent.defaultPrevented) return
-
-          // 2. Try going back in history
-          const prevScreen = navBack()
-          if (prevScreen) {
-            setScreen(prevScreen)
-            return
-          }
-
-          // 3. No history → show exit confirmation
-          setExitDialogOpen(true)
-        })
-      } catch { /* not native */ }
-    }
-    setupBackButton()
-    return () => { listenerHandle?.remove?.() }
-  }, [currentScreen])
 
   // Session timeout check (7 days)
   useEffect(() => {

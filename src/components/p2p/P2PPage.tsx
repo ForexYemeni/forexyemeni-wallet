@@ -65,16 +65,7 @@ export default function P2PPage() {
     }
   }, [isMerchant, subScreen])
 
-  // Android back button for P2P internal navigation
-  useEffect(() => {
-    const handleBackButton = (e: Event) => {
-      if (creatingTrade) { setCreatingTrade(null); e.preventDefault(); return }
-      if (subScreen === 'trade-detail') { setSubScreen('my-trades'); setSelectedTradeId(null); e.preventDefault(); return }
-      if (subScreen !== 'overview' && subScreen !== 'market') { setSubScreen(isMerchant ? 'overview' : 'market'); e.preventDefault(); return }
-    }
-    window.addEventListener('app:backbutton', handleBackButton)
-    return () => window.removeEventListener('app:backbutton', handleBackButton)
-  }, [creatingTrade, subScreen, isMerchant])
+
 
   const handleBuy = (listingId: string) => {
     setCreatingTrade({ listingId, type: 'buy' })
