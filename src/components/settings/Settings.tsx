@@ -60,6 +60,20 @@ export default function SettingsPage() {
   const [show2FASettings, setShow2FASettings] = useState(false)
   const [showChangeEmail, setShowChangeEmail] = useState(false)
   const [copiedAccount, setCopiedAccount] = useState(false)
+  // Developer mode: show FCM debug after 7 taps on app name
+  const [devTapCount, setDevTapCount] = useState(0)
+  const [showDevTools, setShowDevTools] = useState(false)
+  const handleDevTap = useCallback(() => {
+    setDevTapCount(prev => {
+      const next = prev + 1
+      if (next >= 7) {
+        setShowDevTools(true)
+        toast.success('🔧 تم تفعيل وضع المطور', { duration: 2000 })
+        return 0
+      }
+      return next
+    })
+  }, [])
 
   // Notification sound settings
   const [soundSettings, setSoundSettings] = useState<NotificationSoundSettings>(() => getNotificationSoundSettings())
@@ -439,51 +453,54 @@ export default function SettingsPage() {
               <Volume2 className="w-4 h-4 text-gold" />
             </button>
 
-            {/* FCM Registration Debug */}
-            <button
-              onClick={async () => {
-                try {
-                  const { getFCMDebugInfo } = await import('@/lib/fcm-push')
-                  const info = getFCMDebugInfo()
-                  const w = window as any
-                  const capacitorInfo = w.Capacitor ? `Platform: ${w.Capacitor.getPlatform?.() || '?'} | Plugins: ${Object.keys(w.Capacitor.Plugins || {}).join(', ') || 'none'}` : 'Capacitor NOT found'
-                  toast.info(`${capacitorInfo} | ${info.lastResult}`, { duration: 8000 })
-                } catch (e: any) {
-                  toast.error('Debug: ' + (e?.message || String(e)))
-                }
-              }}
-              className="w-full flex items-center justify-between p-3 rounded-xl bg-orange-500/5 hover:bg-orange-500/10 transition-colors border border-orange-500/10"
-            >
-              <span className="text-sm font-medium">🔧 تشخيص FCM (اضغط لعرض الحالة)</span>
-              <span className="text-xs text-orange-400">debug</span>
-            </button>
-
-            {/* Test notification (server + FCM) */}
-            {user?.id && (
+            {/* Developer Tools (hidden — enable via 7 taps on app name in About tab) */}
+            {showDevTools && (<>
+              {/* FCM Registration Debug */}
               <button
                 onClick={async () => {
                   try {
-                    const res = await fetch('/api/notifications/test', {
-                      method: 'POST',
-                      headers: { 'Content-Type': 'application/json' },
-                      body: JSON.stringify({ userId: user.id }),
-                    })
-                    const data = await res.json()
-                    if (data.success) {
-                      toast.success('تم الإرسال إلى ' + (data.debug?.pushResult?.successCount || '?') + ' جهاز — راقب شريط الإشعارات')
-                    } else {
-                      toast.error(data.message || 'فشل', { duration: 8000 })
-                    }
-                  } catch {
-                    toast.error('حدث خطأ')
+                    const { getFCMDebugInfo } = await import('@/lib/fcm-push')
+                    const info = getFCMDebugInfo()
+                    const w = window as any
+                    const capacitorInfo = w.Capacitor ? `Platform: ${w.Capacitor.getPlatform?.() || '?'} | Plugins: ${Object.keys(w.Capacitor.Plugins || {}).join(', ') || 'none'}` : 'Capacitor NOT found'
+                    toast.info(`${capacitorInfo} | ${info.lastResult}`, { duration: 8000 })
+                  } catch (e: any) {
+                    toast.error('Debug: ' + (e?.message || String(e)))
                   }
                 }}
-                className="w-full flex items-center justify-between p-3 rounded-xl bg-gold/5 hover:bg-gold/10 transition-colors border border-gold/10"
+                className="w-full flex items-center justify-between p-3 rounded-xl bg-orange-500/5 hover:bg-orange-500/10 transition-colors border border-orange-500/10"
               >
-                <span className="text-sm font-medium">📱 اختبار إشعار كامل (FCM)</span>
-                <Volume2 className="w-4 h-4 text-gold" />
+                <span className="text-sm font-medium">🔧 تشخيص FCM (اضغط لعرض الحالة)</span>
+                <span className="text-xs text-orange-400">debug</span>
               </button>
-            )}
+
+              {/* Test notification (server + FCM) */}
+              {user?.id && (
+                <button
+                  onClick={async () => {
+                    try {
+                      const res = await fetch('/api/notifications/test', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ userId: user.id }),
+                      })
+                      const data = await res.json()
+                      if (data.success) {
+                        toast.success('تم الإرسال إلى ' + (data.debug?.pushResult?.successCount || '?') + ' جهاز — راقب شريط الإشعارات')
+                      } else {
+                        toast.error(data.message || 'فشل', { duration: 8000 })
+                      }
+                    } catch {
+                      toast.error('حدث خطأ')
+                    }
+                  }}
+                  className="w-full flex items-center justify-between p-3 rounded-xl bg-gold/5 hover:bg-gold/10 transition-colors border border-gold/10"
+                >
+                  <span className="text-sm font-medium">📱 اختبار إشعار كامل (FCM)</span>
+                  <Volume2 className="w-4 h-4 text-gold" />
+                </button>
+              )}
+            </>)}
 
             {/* Per-category toggles */}
             {soundSettings.soundEnabled && (
@@ -529,7 +546,7 @@ export default function SettingsPage() {
           <div className="space-y-3 text-sm">
             <div className="flex justify-between">
               <span className="text-muted-foreground">التطبيق</span>
-              <span className="font-medium gold-text">فوركس يمني</span>
+              <span className="font-medium gold-text cursor-pointer select-none" onClick={handleDevTap}>فوركس يمني</span>
             </div>
             <div className="flex justify-between">
               <span className="text-muted-foreground">الإصدار</span>
