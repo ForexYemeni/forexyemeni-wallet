@@ -5,11 +5,8 @@ import { userOperations } from '@/lib/db-firebase'
 export async function GET() {
   try {
     const users = await userOperations.findMany({ take: 500 })
-    // Filter to non-admin users only (exclude main admin without permissions)
-    const filtered = users.filter(u => {
-      if (u.role === 'admin' && !u.permissions) return false
-      return true
-    }).map(u => ({
+    // Filter to non-admin users only
+    const filtered = users.filter(u => u.role !== 'admin').map(u => ({
       id: u.id,
       fullName: u.fullName,
       email: u.email,

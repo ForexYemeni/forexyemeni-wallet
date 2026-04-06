@@ -41,7 +41,9 @@ export async function GET(request: NextRequest) {
         ...chat,
         user: userMap.get(chat.userId) || null,
       }))
-      return NextResponse.json({ success: true, chats: enrichedChats })
+      // Filter out chats with deleted users
+      const validChats = enrichedChats.filter(c => c.user !== null)
+      return NextResponse.json({ success: true, chats: validChats })
     }
 
     return NextResponse.json({ success: true, chats })

@@ -452,7 +452,7 @@ export default function AdminChat() {
 
   // Filter users
   const filteredUsers = allUsers
-    .filter(u => u.role !== 'admin' || u.id === user?.id) // Show all non-admin users
+    .filter(u => u.role !== 'admin') // Show all non-admin users only
     .filter(u =>
       u.email.toLowerCase().includes(userSearch.toLowerCase()) ||
       u.fullName?.includes(userSearch) ||
