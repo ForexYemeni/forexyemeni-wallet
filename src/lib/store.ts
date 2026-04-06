@@ -1,24 +1,5 @@
 import { create } from 'zustand'
-import { persist } from 'zustand/middleware'
-
-// Safety: clear corrupted localStorage data on import
-if (typeof window !== 'undefined') {
-  try {
-    const stored = localStorage.getItem('forexyameni-auth')
-    if (stored) {
-      const parsed = JSON.parse(stored)
-      const state = parsed?.state || parsed
-      // Remove navigationHistory from stored data if it exists (old/corrupt data)
-      if (state && state.navigationHistory !== undefined) {
-        delete state.navigationHistory
-        localStorage.setItem('forexyameni-auth', JSON.stringify(parsed))
-      }
-    }
-  } catch {
-    // Corrupted data - clear it
-    try { localStorage.removeItem('forexyameni-auth') } catch {}
-  }
-}
+import { persist, createJSONStorage } from 'zustand/middleware'
 
 export interface User {
   id: string
@@ -64,7 +45,7 @@ interface AuthState {
 
 export const useAuthStore = create<AuthState>()(
   persist(
-    (set) => ({
+    (set, get) => ({
       user: null,
       token: null,
       currentScreen: 'login',
@@ -77,39 +58,36 @@ export const useAuthStore = create<AuthState>()(
           localStorage.setItem('forexyameni-session-start', Date.now().toString())
         }
         return set({
-        user,
-        token,
-        isAuthenticated: true,
-        currentScreen: mustChangePassword
-          ? 'force-change-password'
-          : !user.hasPin
-            ? 'set-pin'
-            : (user.role === 'admin' || (user.permissions && Object.values(user.permissions).some(v => v)))
-              ? 'admin'
-              : user.merchantId
-                ? 'p2p'
-                : 'dashboard',
-        // Clear stale withdrawal confirmation from previous sessions
-        pendingWithdrawalConfirmation: user?.pendingConfirmation || null,
-        // Reset navigation history on login
-        navigationHistory: [],
-      })
+          user,
+          token,
+          isAuthenticated: true,
+          currentScreen: mustChangePassword
+            ? 'force-change-password'
+            : !user.hasPin
+              ? 'set-pin'
+              : (user.role === 'admin' || (user.permissions && Object.values(user.permissions).some(v => v)))
+                ? 'admin'
+                : user.merchantId
+                  ? 'p2p'
+                  : 'dashboard',
+          pendingWithdrawalConfirmation: user?.pendingConfirmation || null,
+          navigationHistory: [],
+        })
       },
       logout: () => set({ user: null, token: null, isAuthenticated: false, currentScreen: 'login', pendingRegistration: null, pendingWithdrawalConfirmation: null, navigationHistory: [] }),
       clearForLock: () => set({ user: null, token: null, isAuthenticated: false, currentScreen: 'device-locked', pendingRegistration: null, pendingWithdrawalConfirmation: null, navigationHistory: [] }),
       setScreen: (screen) => set((state) => {
-        // Don't push duplicate consecutive screens
         const prev = state.currentScreen
         if (screen === prev) return { currentScreen: screen }
-        const history = state.navigationHistory || []
+        const history = Array.isArray(state.navigationHistory) ? state.navigationHistory : []
         return {
           currentScreen: screen,
           navigationHistory: [...history, prev],
         }
       }),
       goBack: () => {
-        const state = useAuthStore.getState()
-        const history = state.navigationHistory || []
+        const state = get()
+        const history = Array.isArray(state.navigationHistory) ? state.navigationHistory : []
         if (history.length === 0) return null
         const prev = history[history.length - 1]
         set({
@@ -125,6 +103,35 @@ export const useAuthStore = create<AuthState>()(
     }),
     {
       name: 'forexyameni-auth',
+      version: 2,
+      storage: createJSONStorage(() => {
+        if (typeof window === 'undefined') return undefined as any
+        return {
+          getItem: (name) => {
+            try {
+              const value = localStorage.getItem(name)
+              if (!value) return null
+              const parsed = JSON.parse(value)
+              // Remove navigationHistory if it was accidentally stored (corrupted data)
+              if (parsed?.state?.navigationHistory !== undefined) {
+                delete parsed.state.navigationHistory
+                try { localStorage.setItem(name, JSON.stringify(parsed)) } catch {}
+              }
+              return value
+            } catch {
+              // Corrupted data - remove it
+              try { localStorage.removeItem(name) } catch {}
+              return null
+            }
+          },
+          setItem: (name, value) => {
+            try { localStorage.setItem(name, value) } catch {}
+          },
+          removeItem: (name) => {
+            try { localStorage.removeItem(name) } catch {}
+          },
+        }
+      }),
       partialize: (state) => ({
         user: state.user,
         token: state.token,
@@ -132,18 +139,24 @@ export const useAuthStore = create<AuthState>()(
         currentScreen: state.currentScreen,
         pendingWithdrawalConfirmation: state.pendingWithdrawalConfirmation,
       }),
-      merge: (persisted, current) => {
-        try {
-          const p = persisted as Record<string, unknown> | null
+      // Version migration: bump version to clear old corrupted data
+      migrate: (persisted, version) => {
+        if (version < 2) {
+          // Clear old data that might have navigationHistory
           return {
-            ...current,
-            ...(p || {}),
-            // Always reset navigationHistory - never persist it
-            navigationHistory: [],
-          } as AuthState
-        } catch {
-          // If merge fails, return defaults
-          return { ...current, navigationHistory: [] } as AuthState
+            user: (persisted as any)?.user || null,
+            token: (persisted as any)?.token || null,
+            isAuthenticated: !!(persisted as any)?.isAuthenticated,
+            currentScreen: (persisted as any)?.currentScreen || 'login',
+            pendingWithdrawalConfirmation: (persisted as any)?.pendingWithdrawalConfirmation || null,
+          }
+        }
+        return persisted as AuthState
+      },
+      // Always ensure navigationHistory exists after hydration
+      onRehydrateStorage: () => (state) => {
+        if (state && !Array.isArray(state.navigationHistory)) {
+          useAuthStore.setState({ navigationHistory: [] })
         }
       },
     }
