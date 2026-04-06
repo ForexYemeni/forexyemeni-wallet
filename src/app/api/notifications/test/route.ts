@@ -69,7 +69,7 @@ export async function POST(request: NextRequest) {
       'info'
     )
 
-    debug.pushResult = pushResult
+    debug.pushResult = { successCount: pushResult.count, failureCount: tokensSnapshot.size - pushResult.count, sent: pushResult.sent }
 
     if (pushResult.sent) {
       return NextResponse.json({
