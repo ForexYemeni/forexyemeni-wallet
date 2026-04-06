@@ -199,6 +199,8 @@ export default function ChatPage() {
   const inputRef = useRef<HTMLInputElement>(null)
   const pollingRef = useRef<NodeJS.Timeout | null>(null)
 
+  // Filter only open chats for user
+  const openChats = chats.filter(c => c.status !== 'closed')
   // Get selected chat data
   const selectedChat = chats.find(c => c.id === selectedChatId) || null
 
@@ -246,13 +248,21 @@ export default function ChatPage() {
     fetchChats()
   }, [fetchChats])
 
-  // Select first chat if none selected (but NOT on initial load if coming from back)
+  // Select first open chat if none selected
+  // Also clear selection if selected chat was deleted or closed
   useEffect(() => {
-    if (chats.length > 0 && !selectedChatId) {
-      const openChat = chats.find(c => c.status === 'open')
-      setSelectedChatId(openChat?.id || chats[0]?.id || null)
+    if (selectedChatId && !chats.find(c => c.id === selectedChatId)) {
+      // Chat was deleted
+      setSelectedChatId(null)
+      setMessages([])
+    } else if (selectedChatId && !openChats.find(c => c.id === selectedChatId)) {
+      // Chat was closed by admin
+      setSelectedChatId(null)
+      setMessages([])
+    } else if (openChats.length > 0 && !selectedChatId) {
+      setSelectedChatId(openChats[0]?.id || null)
     }
-  }, [chats.length])
+  }, [openChats.length, chats, selectedChatId])
 
   // Handle device back button — go back to chat list instead of same chat
   useEffect(() => {
@@ -489,10 +499,10 @@ export default function ChatPage() {
               selectedChatId ? 'hidden md:block' : 'block'
             }`}>
               <div className="p-3 border-b border-gold/10">
-                <p className="text-xs text-muted-foreground font-medium px-2">المحادثات ({chats.length})</p>
+                <p className="text-xs text-muted-foreground font-medium px-2">المحادثات ({openChats.length})</p>
               </div>
               <div className="overflow-y-auto max-h-[200px] md:max-h-[65vh]">
-                {chats.map(chat => (
+                {openChats.map(chat => (
                   <ChatListItem
                     key={chat.id}
                     chat={chat}
