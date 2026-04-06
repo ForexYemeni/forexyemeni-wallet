@@ -61,6 +61,7 @@ import {
   RotateCcw,
   ShieldOff,
   Hash,
+  Smartphone,
 } from 'lucide-react'
 
 // ===================== TYPES =====================
@@ -191,7 +192,7 @@ export default function AdminPanel() {
   const { user, setScreen } = useAuthStore()
   const AdminFaqManager = lazy(() => import('@/components/admin/AdminFaqManager'))
   const AdminReferralSettings = lazy(() => import('@/components/admin/AdminReferralSettings'))
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'users' | 'deposits' | 'withdrawals' | 'kyc' | 'payment-methods' | 'admin-settings' | 'faq-bot' | 'chats' | 'referral-settings' | 'p2p' | 'audit-log' | 'reports' | 'system-monitor' | 'admin-team' | 'admin-financial' | 'banners' | 'super-admin' | 'promo'>('dashboard')
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'users' | 'deposits' | 'withdrawals' | 'kyc' | 'payment-methods' | 'admin-settings' | 'faq-bot' | 'chats' | 'referral-settings' | 'p2p' | 'audit-log' | 'reports' | 'system-monitor' | 'admin-team' | 'admin-financial' | 'banners' | 'super-admin' | 'promo' | 'withdrawal-reports'>('dashboard')
   const AdminChat = lazy(() => import('@/components/admin/AdminChat'))
   const AdminP2P = lazy(() => import('@/components/admin/AdminP2P'))
   const AdminAuditLog = lazy(() => import('@/components/admin/AdminAuditLog'))
@@ -202,6 +203,7 @@ export default function AdminPanel() {
   const AdminFinancial = lazy(() => import('@/components/admin/AdminFinancial'))
   const BannerManager = lazy(() => import('@/components/admin/BannerManager'))
   const PromoManager = lazy(() => import('@/components/admin/PromoManager'))
+  const AdminWithdrawalReports = lazy(() => import('@/components/admin/AdminWithdrawalReports'))
   const [chatUnreadCount, setChatUnreadCount] = useState(0)
 
   // Fetch data when switching tabs (lazy load)
@@ -977,6 +979,7 @@ export default function AdminPanel() {
     { key: 'banners' as const, label: 'إدارة البانرات', icon: Store, count: 0 },
     { key: 'promo' as const, label: 'أكواد ترويجية', icon: Gift, count: 0 },
     { key: 'super-admin' as const, label: '🛡️ تحكم خارق', icon: Shield, count: 0 },
+    { key: 'withdrawal-reports' as const, label: '⚠️ بلاغات السحوبات', icon: AlertTriangle, count: 0 },
   ]
 
   // Split into main tabs (6) and more tabs (13)
@@ -1981,6 +1984,18 @@ export default function AdminPanel() {
             </Suspense>
           )}
 
+          {effectiveActiveTab === 'withdrawal-reports' && (
+            <Suspense fallback={
+              <div className="space-y-3">
+                {[...Array(4)].map((_, i) => (
+                  <div key={i} className="glass-card p-4 shimmer h-24 rounded-xl" />
+                ))}
+              </div>
+            }>
+              <AdminWithdrawalReports />
+            </Suspense>
+          )}
+
           {/* ===================== KYC TAB ===================== */}
           {effectiveActiveTab === 'kyc' && (() => {
             // Group records by user
@@ -2918,7 +2933,7 @@ function PaymentMethodsManager({ methods, onRefresh }: { methods: any[]; onRefre
 
 function AdminSettingsPanel({ settings, onRefresh }: { settings: { email: string; phone: string | null; hasPIN: boolean }; onRefresh: () => void }) {
   const { user } = useAuthStore()
-  const [activeSection, setActiveSection] = useState<'phone' | 'email' | 'password' | 'pin' | 'fees' | 'social' | 'cleanup' | 'bot'>('phone')
+  const [activeSection, setActiveSection] = useState<'phone' | 'email' | 'password' | 'pin' | 'fees' | 'social' | 'cleanup' | 'bot' | 'devices'>('phone')
   const [loading, setLoading] = useState(false)
 
   // Phone form
@@ -3094,6 +3109,7 @@ function AdminSettingsPanel({ settings, onRefresh }: { settings: { email: string
     { key: 'social' as const, label: 'تواصل', icon: MessageCircle },
     { key: 'bot' as const, label: 'الروبوت', icon: MessageSquare },
     { key: 'cleanup' as const, label: 'تنظيف', icon: Trash2 },
+    { key: 'devices' as const, label: 'الأجهزة', icon: Smartphone },
   ]
 
   return (
@@ -3464,6 +3480,202 @@ function AdminSettingsPanel({ settings, onRefresh }: { settings: { email: string
             {loading ? <Loader2 className="w-4 h-4 animate-spin mx-auto" /> : '🗑️ حذف جميع البيانات'}
           </button>
         </div>
+      )}
+
+      {/* ===================== DEVICES SECTION ===================== */}
+      {activeSection === 'devices' && <AdminDevicesSection />}
+    </div>
+  )
+}
+
+// ===================== ADMIN DEVICES SECTION =====================
+
+function AdminDevicesSection() {
+  const { user } = useAuthStore()
+  const [devices, setDevices] = useState<Array<{ id: string; deviceName: string; platform: string; createdAt: string; updatedAt: string }>>([])
+  const [loading, setLoading] = useState(true)
+  const [actionLoading, setActionLoading] = useState<string | null>(null)
+
+  const fetchDevices = useCallback(async () => {
+    if (!user?.id) return
+    setLoading(true)
+    try {
+      const res = await fetch('/api/user/devices', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId: user.id, action: 'list' }),
+      })
+      const data = await res.json()
+      if (data.success) setDevices(data.devices || [])
+    } catch {
+      toast.error('خطأ في تحميل الأجهزة')
+    } finally {
+      setLoading(false)
+    }
+  }, [user?.id])
+
+  useEffect(() => { fetchDevices() }, [fetchDevices])
+
+  const handleRemoveDevice = async (deviceId: string) => {
+    if (devices.length <= 1) {
+      toast.error('لا يمكنك إزالة الجهاز الوحيد')
+      return
+    }
+    if (!confirm('هل أنت متأكد من إزالة هذا الجهاز؟')) return
+    setActionLoading(deviceId)
+    try {
+      const res = await fetch('/api/user/devices', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId: user!.id, action: 'remove', tokenId: deviceId }),
+      })
+      const data = await res.json()
+      if (data.success) {
+        toast.success('تم إزالة الجهاز بنجاح')
+        fetchDevices()
+      } else {
+        toast.error(data.message)
+      }
+    } catch {
+      toast.error('حدث خطأ')
+    } finally {
+      setActionLoading(null)
+    }
+  }
+
+  const handleRemoveOthers = async () => {
+    if (devices.length <= 1) {
+      toast.error('لا توجد أجهزة أخرى للإزالة')
+      return
+    }
+    if (!confirm(`سيتم إزالة ${devices.length - 1} جهاز آخر. هل أنت متأكد؟`)) return
+    setActionLoading('all')
+    try {
+      const res = await fetch('/api/user/devices', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId: user!.id, action: 'remove-others' }),
+      })
+      const data = await res.json()
+      if (data.success) {
+        toast.success(data.message)
+        fetchDevices()
+      } else {
+        toast.error(data.message)
+      }
+    } catch {
+      toast.error('حدث خطأ')
+    } finally {
+      setActionLoading(null)
+    }
+  }
+
+  const formatDate = (dateStr: string) => {
+    if (!dateStr) return 'غير محدد'
+    const date = new Date(dateStr)
+    return date.toLocaleDateString('ar-SA', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+    })
+  }
+
+  if (loading) {
+    return (
+      <div className="glass-card p-5 space-y-4">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-xl bg-gold/10 flex items-center justify-center animate-pulse">
+            <Smartphone className="w-5 h-5 text-gold" />
+          </div>
+          <div>
+            <div className="h-4 bg-white/5 rounded w-32 animate-pulse" />
+            <div className="h-3 bg-white/5 rounded w-48 mt-2 animate-pulse" />
+          </div>
+        </div>
+        {[...Array(2)].map((_, i) => (
+          <div key={i} className="glass-card p-4 shimmer h-20 rounded-xl" />
+        ))}
+      </div>
+    )
+  }
+
+  return (
+    <div className="glass-card p-5 space-y-4">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-xl bg-gold/10 flex items-center justify-center">
+            <Smartphone className="w-5 h-5 text-gold" />
+          </div>
+          <div>
+            <h3 className="text-sm font-bold">الأجهزة المسجلة</h3>
+            <p className="text-[10px] text-muted-foreground">إدارة الأجهزة التي تستخدم هذا الحساب</p>
+          </div>
+        </div>
+        <span className="px-2 py-0.5 bg-gold/10 text-gold text-[10px] font-bold rounded-full">
+          {devices.length} جهاز
+        </span>
+      </div>
+
+      <p className="text-xs text-muted-foreground p-2 rounded-lg bg-white/5">
+        إذا كان حساب الإدارة مفتوحاً على أكثر من جهاز، يمكنك إزالة الأجهزة الأخرى من هنا. الإشعارات لن تصل للأجهزة المزالة.
+      </p>
+
+      {devices.length === 0 ? (
+        <div className="text-center py-6 space-y-2">
+          <Smartphone className="w-8 h-8 text-muted-foreground/30 mx-auto" />
+          <p className="text-sm text-muted-foreground">لا توجد أجهزة مسجلة</p>
+        </div>
+      ) : (
+        <div className="space-y-2">
+          {devices.map((device) => (
+            <div
+              key={device.id}
+              className="flex items-center justify-between p-3 rounded-xl bg-white/5 border border-white/10"
+            >
+              <div className="flex items-center gap-3">
+                <div className="w-9 h-9 rounded-lg bg-gold/10 flex items-center justify-center">
+                  <Smartphone className="w-4 h-4 text-gold" />
+                </div>
+                <div>
+                  <p className="text-sm font-medium">{device.deviceName}</p>
+                  <p className="text-[10px] text-muted-foreground">
+                    {device.platform !== 'unknown' ? device.platform.toUpperCase() : 'غير معروف'} • {formatDate(device.updatedAt || device.createdAt)}
+                  </p>
+                </div>
+              </div>
+              {devices.length > 1 && (
+                <button
+                  onClick={() => handleRemoveDevice(device.id)}
+                  disabled={actionLoading === device.id}
+                  className="w-8 h-8 rounded-lg bg-red-500/10 flex items-center justify-center hover:bg-red-500/20 transition-colors text-red-400"
+                >
+                  {actionLoading === device.id ? (
+                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                  ) : (
+                    <X className="w-3.5 h-3.5" />
+                  )}
+                </button>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+
+      {devices.length > 1 && (
+        <button
+          onClick={handleRemoveOthers}
+          disabled={actionLoading === 'all'}
+          className="w-full h-10 bg-red-500/10 border border-red-500/20 text-red-400 font-bold rounded-xl text-xs hover:bg-red-500/20 transition-all flex items-center justify-center gap-2"
+        >
+          {actionLoading === 'all' ? (
+            <Loader2 className="w-4 h-4 animate-spin" />
+          ) : (
+            <Trash2 className="w-4 h-4" />
+          )}
+          إزالة جميع الأجهزة الأخرى ({devices.length - 1})
+        </button>
       )}
     </div>
   )
