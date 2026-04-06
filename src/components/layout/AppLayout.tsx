@@ -4,6 +4,7 @@ import { useState, useEffect, useRef, useCallback } from 'react'
 import { useAuthStore } from '@/lib/store'
 import { useRealtimeNotifications, useUnreadCount } from '@/hooks/useRealtimeNotifications'
 import { setupFCMAutoRegister } from '@/lib/fcm-push'
+import { navPush, navBack, navClear } from '@/lib/nav-history'
 import BottomNav from './BottomNav'
 import Sidebar from './Sidebar'
 import SocialFloatingButton from './SocialFloatingButton'
@@ -42,6 +43,22 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     setupFCMAutoRegister()
   }, [])
 
+  // Track navigation history automatically
+  const prevScreenRef = useRef(currentScreen)
+  useEffect(() => {
+    if (currentScreen !== prevScreenRef.current) {
+      navPush(prevScreenRef.current)
+      prevScreenRef.current = currentScreen
+    }
+  }, [currentScreen])
+
+  // Clear history on logout
+  const handleLogout = () => {
+    setLogoutDialogOpen(false)
+    navClear()
+    logout()
+  }
+
   // Android hardware back button handler
   useEffect(() => {
     const isNativeApp = typeof window !== 'undefined' && (() => {
@@ -66,8 +83,11 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
           if (backEvent.defaultPrevented) return
 
           // 2. Try going back in history
-          const prevScreen = useAuthStore.getState().goBack()
-          if (prevScreen) return
+          const prevScreen = navBack()
+          if (prevScreen) {
+            setScreen(prevScreen)
+            return
+          }
 
           // 3. No history → show exit confirmation
           setExitDialogOpen(true)
@@ -130,11 +150,6 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     window.addEventListener('notificationTap', handleNotificationTap)
     return () => window.removeEventListener('notificationTap', handleNotificationTap)
   }, [])
-
-  const handleLogout = () => {
-    setLogoutDialogOpen(false)
-    logout()
-  }
 
   // Pull-to-refresh handlers (uses window scroll since <main> is not the scroll container)
   const onTouchStart = useCallback((e: React.TouchEvent) => {
