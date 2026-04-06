@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getDb, generateId, nowTimestamp } from '@/lib/firebase'
+import { notificationOperations } from '@/lib/db-firebase'
+import { sendPushNotification } from '@/lib/push-notification'
 import bcrypt from 'bcryptjs'
 
 export async function POST(request: NextRequest) {
@@ -181,17 +183,20 @@ export async function POST(request: NextRequest) {
     // Commit batch
     await batch.commit()
 
-    // Create notification for receiver
-    const notifId = generateId()
-    await db.collection('notifications').doc(notifId).set({
-      id: notifId,
-      userId: receiverId,
-      title: 'تحويل وارد',
-      message: `لقد استلمت ${transferAmount.toFixed(2)} USDT من ${senderData.fullName || senderData.email}`,
-      type: 'transfer',
-      read: false,
-      createdAt: now,
-    })
+    const senderLabel = senderData.fullName || senderData.email
+    const receiverLabel = receiverData.fullName || receiverData.email
+
+    // Notify receiver about incoming transfer
+    const recvTitle = '💰 تحويل وارد'
+    const recvMessage = `لقد استلمت ${transferAmount.toFixed(2)} USDT من ${senderLabel}`
+    await notificationOperations.create({ userId: receiverId, title: recvTitle, message: recvMessage, type: 'success', read: false })
+    sendPushNotification(receiverId, recvTitle, recvMessage, 'success').catch(() => {})
+
+    // Notify sender about sent transfer
+    const sendTitle = '💰 تحويل صادر'
+    const sendMessage = `تم تحويل ${transferAmount.toFixed(2)} USDT إلى ${receiverLabel}`
+    await notificationOperations.create({ userId: senderId, title: sendTitle, message: sendMessage, type: 'transfer', read: false })
+    sendPushNotification(senderId, sendTitle, sendMessage, 'info').catch(() => {})
 
     // Send email notifications (awaited but won't fail the transfer)
     try {
