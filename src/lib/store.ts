@@ -1,6 +1,25 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 
+// Safety: clear corrupted localStorage data on import
+if (typeof window !== 'undefined') {
+  try {
+    const stored = localStorage.getItem('forexyameni-auth')
+    if (stored) {
+      const parsed = JSON.parse(stored)
+      const state = parsed?.state || parsed
+      // Remove navigationHistory from stored data if it exists (old/corrupt data)
+      if (state && state.navigationHistory !== undefined) {
+        delete state.navigationHistory
+        localStorage.setItem('forexyameni-auth', JSON.stringify(parsed))
+      }
+    }
+  } catch {
+    // Corrupted data - clear it
+    try { localStorage.removeItem('forexyameni-auth') } catch {}
+  }
+}
+
 export interface User {
   id: string
   email: string
@@ -72,6 +91,8 @@ export const useAuthStore = create<AuthState>()(
                 : 'dashboard',
         // Clear stale withdrawal confirmation from previous sessions
         pendingWithdrawalConfirmation: user?.pendingConfirmation || null,
+        // Reset navigation history on login
+        navigationHistory: [],
       })
       },
       logout: () => set({ user: null, token: null, isAuthenticated: false, currentScreen: 'login', pendingRegistration: null, pendingWithdrawalConfirmation: null, navigationHistory: [] }),
@@ -103,21 +124,28 @@ export const useAuthStore = create<AuthState>()(
       setPendingWithdrawalConfirmation: (id) => set({ pendingWithdrawalConfirmation: id }),
     }),
     {
-      name: 'forexyemeni-auth',
+      name: 'forexyameni-auth',
       partialize: (state) => ({
         user: state.user,
         token: state.token,
         isAuthenticated: state.isAuthenticated,
         currentScreen: state.currentScreen,
         pendingWithdrawalConfirmation: state.pendingWithdrawalConfirmation,
-        // Don't persist navigationHistory - reset on each app launch
       }),
-      merge: (persisted, current) => ({
-        ...current,
-        ...(persisted as Partial<AuthState>),
-        // Always ensure navigationHistory has a valid value
-        navigationHistory: [],
-      }),
+      merge: (persisted, current) => {
+        try {
+          const p = persisted as Record<string, unknown> | null
+          return {
+            ...current,
+            ...(p || {}),
+            // Always reset navigationHistory - never persist it
+            navigationHistory: [],
+          } as AuthState
+        } catch {
+          // If merge fails, return defaults
+          return { ...current, navigationHistory: [] } as AuthState
+        }
+      },
     }
   )
 )
