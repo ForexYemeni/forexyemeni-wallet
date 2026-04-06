@@ -233,6 +233,8 @@ export default function AdminPanel() {
   const [kycRejectDialog, setKycRejectDialog] = useState<{ recordId: string; userId: string } | null>(null)
   const [kycRejectReason, setKycRejectReason] = useState('')
   const [kycRejectLoading, setKycRejectLoading] = useState(false)
+  // KYC detail modal
+  const [kycDetailUser, setKycDetailUser] = useState<string | null>(null)
   // Device management dialog state
   const [deviceDialogUser, setDeviceDialogUser] = useState<AdminUser | null>(null)
   const [deviceList, setDeviceList] = useState<any[]>([])
@@ -1987,39 +1989,100 @@ export default function AdminPanel() {
               grouped.get(uid)!.records.push(k)
             }
             const entries = Array.from(grouped.entries())
+            const detailUser = kycDetailUser ? entries.find(([uid]) => uid === kycDetailUser) : null
 
             return (
-              <div className="space-y-4 max-h-[600px] overflow-y-auto pr-1">
-                {entries.length === 0 ? (
-                  <div className="glass-card p-8 text-center text-muted-foreground text-sm">لا توجد طلبات تحقق</div>
-                ) : (
-                  entries.map(([uid, { user: userInfo, records }]) => {
-                    const idPhoto = records.find(r => r.type === 'id_photo')
-                    const selfie = records.find(r => r.type === 'selfie')
-                    const hasPending = records.some(r => r.status === 'pending')
-                    const allApproved = records.every(r => r.status === 'approved')
-                    const allRejected = records.every(r => r.status === 'rejected')
-                    const anyNotes = records.find(r => r.notes)
-                    const pendingRecords = records.filter(r => r.status === 'pending')
+              <>
+                {/* User List */}
+                <div className="space-y-2 max-h-[600px] overflow-y-auto pr-1">
+                  {entries.length === 0 ? (
+                    <div className="glass-card p-8 text-center text-muted-foreground text-sm">لا توجد طلبات تحقق</div>
+                  ) : (
+                    entries.map(([uid, { user: userInfo, records }]) => {
+                      const hasPending = records.some(r => r.status === 'pending')
+                      const allApproved = records.every(r => r.status === 'approved')
+                      const allRejected = records.every(r => r.status === 'rejected')
+                      const idPhoto = records.find(r => r.type === 'id_photo')
+                      const selfie = records.find(r => r.type === 'selfie')
 
-                    return (
-                      <div key={uid} className="glass-card rounded-2xl overflow-hidden border border-white/10">
-                        {/* User Header */}
-                        <div className="flex items-center justify-between p-4 border-b border-white/5 bg-white/[0.02]">
-                          <div className="flex items-center gap-3">
-                            <div className={`w-10 h-10 rounded-xl flex items-center justify-center text-sm font-bold ${
+                      return (
+                        <button
+                          key={uid}
+                          onClick={() => setKycDetailUser(uid)}
+                          className="w-full glass-card rounded-xl p-3 flex items-center gap-3 hover:border-gold/20 transition-all text-right group"
+                        >
+                          {/* Avatar */}
+                          <div className={`w-11 h-11 rounded-xl flex items-center justify-center text-sm font-bold flex-shrink-0 ${
+                            allApproved ? 'bg-green-500/10 text-green-400' :
+                            allRejected ? 'bg-red-500/10 text-red-400' :
+                            hasPending ? 'bg-amber-500/10 text-amber-400' :
+                            'bg-white/5 text-muted-foreground'
+                          }`}>
+                            {(userInfo?.fullName || userInfo?.email || '?').charAt(0).toUpperCase()}
+                          </div>
+
+                          {/* Info */}
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-medium truncate">{userInfo?.fullName || userInfo?.email || 'مستخدم غير معروف'}</p>
+                            <div className="flex items-center gap-2 mt-0.5">
+                              {userInfo?.phone && <p className="text-[10px] text-muted-foreground">{userInfo.phone}</p>}
+                              <span className="text-[10px] text-muted-foreground">{records.length} مستند</span>
+                              {idPhoto && <span className="text-[10px] text-muted-foreground">| 🪪 هوية: {idPhoto.status === 'approved' ? '✓' : idPhoto.status === 'rejected' ? '✗' : '⏳'}</span>}
+                              {selfie && <span className="text-[10px] text-muted-foreground">| 🧑 صورة: {selfie.status === 'approved' ? '✓' : selfie.status === 'rejected' ? '✗' : '⏳'}</span>}
+                            </div>
+                          </div>
+
+                          {/* Status + Arrow */}
+                          <div className="flex items-center gap-2 flex-shrink-0">
+                            <span className={`text-[10px] px-2.5 py-1 rounded-full font-bold ${
                               allApproved ? 'bg-green-500/10 text-green-400' :
                               allRejected ? 'bg-red-500/10 text-red-400' :
-                              'bg-amber-500/10 text-amber-400'
+                              hasPending ? 'bg-amber-500/10 text-amber-400' :
+                              'bg-white/5 text-muted-foreground'
+                            }`}>
+                              {allApproved ? 'مقبول' : allRejected ? 'مرفوض' : hasPending ? 'بانتظار المراجعة' : 'مختلط'}
+                            </span>
+                            <ChevronDown className="w-4 h-4 text-muted-foreground group-hover:text-gold transition-colors rotate-[-90deg]" />
+                          </div>
+                        </button>
+                      )
+                    })
+                  )}
+                </div>
+
+                {/* ===================== KYC DETAIL MODAL ===================== */}
+                {detailUser && (() => {
+                  const [uid, { user: userInfo, records }] = detailUser
+                  const idPhoto = records.find(r => r.type === 'id_photo')
+                  const selfie = records.find(r => r.type === 'selfie')
+                  const hasPending = records.some(r => r.status === 'pending')
+                  const allApproved = records.every(r => r.status === 'approved')
+                  const allRejected = records.every(r => r.status === 'rejected')
+                  const anyNotes = records.find(r => r.notes)
+                  const pendingRecords = records.filter(r => r.status === 'pending')
+
+                  return (
+                    <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-3" onClick={() => setKycDetailUser(null)}>
+                      <div
+                        className="bg-background/95 backdrop-blur-xl w-full max-w-lg rounded-3xl overflow-hidden shadow-2xl border border-white/10 max-h-[90vh] overflow-y-auto"
+                        style={{ animation: 'scaleIn 0.3s cubic-bezier(0.34, 1.56, 0.64, 1)' }}
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        {/* Modal Header */}
+                        <div className="sticky top-0 bg-background/95 backdrop-blur-xl z-10 p-4 border-b border-white/5 flex items-center justify-between">
+                          <div className="flex items-center gap-3">
+                            <div className={`w-12 h-12 rounded-2xl flex items-center justify-center text-base font-bold ${
+                              allApproved ? 'bg-green-500/10 text-green-400' :
+                              allRejected ? 'bg-red-500/10 text-red-400' :
+                              hasPending ? 'bg-amber-500/10 text-amber-400' :
+                              'bg-white/5 text-muted-foreground'
                             }`}>
                               {(userInfo?.fullName || userInfo?.email || '?').charAt(0).toUpperCase()}
                             </div>
                             <div>
-                              <p className="text-sm font-bold">{userInfo?.fullName || userInfo?.email || 'مستخدم غير معروف'}</p>
-                              <div className="flex items-center gap-2 mt-0.5">
-                                {userInfo?.phone && <p className="text-[10px] text-muted-foreground">{userInfo.phone}</p>}
-                                {userInfo?.email && <p className="text-[10px] text-muted-foreground">{userInfo.email}</p>}
-                              </div>
+                              <h3 className="text-base font-bold">{userInfo?.fullName || 'مستخدم غير معروف'}</h3>
+                              <p className="text-[10px] text-muted-foreground mt-0.5">{userInfo?.email}</p>
+                              {userInfo?.phone && <p className="text-[10px] text-muted-foreground">{userInfo?.phone}</p>}
                             </div>
                           </div>
                           <div className="flex items-center gap-2">
@@ -2031,95 +2094,114 @@ export default function AdminPanel() {
                             }`}>
                               {allApproved ? '✓ مقبول' : allRejected ? '✗ مرفوض' : hasPending ? '⏳ بانتظار المراجعة' : 'مختلط'}
                             </span>
-                            <span className="text-[10px] text-muted-foreground bg-white/5 px-2 py-1 rounded-full">{records.length} مستند</span>
+                            <button onClick={() => setKycDetailUser(null)} className="w-8 h-8 rounded-full bg-white/5 hover:bg-white/10 flex items-center justify-center transition-colors">
+                              <X className="w-4 h-4 text-muted-foreground" />
+                            </button>
                           </div>
                         </div>
 
-                        {/* Images Grid */}
-                        <div className="p-4 space-y-3">
+                        {/* Modal Body */}
+                        <div className="p-4 space-y-4">
+                          {/* Photos Grid - Large */}
                           <div className="grid grid-cols-2 gap-3">
                             {/* ID Photo */}
-                            <div className="space-y-1.5">
-                              <div className="flex items-center gap-1.5">
-                                <CreditCard className="w-3 h-3 text-muted-foreground" />
-                                <span className="text-[10px] font-medium text-muted-foreground">صورة الهوية</span>
+                            <div className="space-y-2">
+                              <div className="flex items-center justify-between">
+                                <div className="flex items-center gap-1.5">
+                                  <CreditCard className="w-3.5 h-3.5 text-muted-foreground" />
+                                  <span className="text-xs font-medium">صورة الهوية</span>
+                                </div>
                                 {idPhoto && (
-                                  <span className={`text-[9px] px-1.5 py-0.5 rounded-full ${
+                                  <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold ${
                                     idPhoto.status === 'approved' ? 'bg-green-500/10 text-green-400' :
                                     idPhoto.status === 'rejected' ? 'bg-red-500/10 text-red-400' :
                                     'bg-amber-500/10 text-amber-400'
                                   }`}>
-                                    {idPhoto.status === 'approved' ? 'مقبول' : idPhoto.status === 'rejected' ? 'مرفوض' : 'معلق'}
+                                    {idPhoto.status === 'approved' ? '✓ مقبول' : idPhoto.status === 'rejected' ? '✗ مرفوض' : '⏳ معلق'}
                                   </span>
                                 )}
                               </div>
                               {idPhoto ? (
-                                <div className="rounded-xl overflow-hidden border border-white/10 bg-white/5 relative group cursor-pointer" onClick={() => window.open(idPhoto.fileUrl, '_blank')}>
+                                <div className="rounded-2xl overflow-hidden border border-white/10 bg-white/5 relative group cursor-pointer aspect-[3/4]" onClick={() => window.open(idPhoto.fileUrl, '_blank')}>
                                   <img
                                     src={idPhoto.fileUrl || ''}
                                     alt="صورة الهوية"
-                                    className="w-full h-32 object-cover group-hover:scale-105 transition-transform duration-300"
+                                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                                     onError={(e) => {
                                       (e.target as HTMLImageElement).style.display = 'none'
                                       ;(e.target as HTMLImageElement).nextElementSibling?.classList.remove('hidden')
                                     }}
                                   />
                                   <div className="absolute inset-0 flex items-center justify-center bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity">
-                                    <Eye className="w-5 h-5 text-white" />
+                                    <div className="text-center">
+                                      <Eye className="w-6 h-6 text-white mx-auto mb-1" />
+                                      <p className="text-[10px] text-white">عرض بالحجم الكامل</p>
+                                    </div>
                                   </div>
                                   <div className="absolute inset-0 flex items-center justify-center bg-white/5 hidden">
                                     <div className="text-center">
-                                      <ImageOff className="w-6 h-6 text-muted-foreground/30 mx-auto mb-1" />
-                                      <p className="text-[10px] text-muted-foreground">فشل التحميل</p>
+                                      <ImageOff className="w-8 h-8 text-muted-foreground/30 mx-auto mb-1" />
+                                      <p className="text-xs text-muted-foreground">فشل التحميل</p>
                                     </div>
                                   </div>
                                 </div>
                               ) : (
-                                <div className="h-32 rounded-xl border border-dashed border-white/10 flex items-center justify-center">
-                                  <p className="text-[10px] text-muted-foreground">غير مرفق</p>
+                                <div className="aspect-[3/4] rounded-2xl border-2 border-dashed border-white/10 flex items-center justify-center">
+                                  <div className="text-center">
+                                    <ImageOff className="w-8 h-8 text-muted-foreground/20 mx-auto mb-1" />
+                                    <p className="text-xs text-muted-foreground/50">غير مرفق</p>
+                                  </div>
                                 </div>
                               )}
                             </div>
 
                             {/* Selfie */}
-                            <div className="space-y-1.5">
-                              <div className="flex items-center gap-1.5">
-                                <UserCheck className="w-3 h-3 text-muted-foreground" />
-                                <span className="text-[10px] font-medium text-muted-foreground">صورة شخصية</span>
+                            <div className="space-y-2">
+                              <div className="flex items-center justify-between">
+                                <div className="flex items-center gap-1.5">
+                                  <UserCheck className="w-3.5 h-3.5 text-muted-foreground" />
+                                  <span className="text-xs font-medium">صورة شخصية</span>
+                                </div>
                                 {selfie && (
-                                  <span className={`text-[9px] px-1.5 py-0.5 rounded-full ${
+                                  <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold ${
                                     selfie.status === 'approved' ? 'bg-green-500/10 text-green-400' :
                                     selfie.status === 'rejected' ? 'bg-red-500/10 text-red-400' :
                                     'bg-amber-500/10 text-amber-400'
                                   }`}>
-                                    {selfie.status === 'approved' ? 'مقبول' : selfie.status === 'rejected' ? 'مرفوض' : 'معلق'}
+                                    {selfie.status === 'approved' ? '✓ مقبول' : selfie.status === 'rejected' ? '✗ مرفوض' : '⏳ معلق'}
                                   </span>
                                 )}
                               </div>
                               {selfie ? (
-                                <div className="rounded-xl overflow-hidden border border-white/10 bg-white/5 relative group cursor-pointer" onClick={() => window.open(selfie.fileUrl, '_blank')}>
+                                <div className="rounded-2xl overflow-hidden border border-white/10 bg-white/5 relative group cursor-pointer aspect-[3/4]" onClick={() => window.open(selfie.fileUrl, '_blank')}>
                                   <img
                                     src={selfie.fileUrl || ''}
                                     alt="صورة شخصية"
-                                    className="w-full h-32 object-cover group-hover:scale-105 transition-transform duration-300"
+                                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                                     onError={(e) => {
                                       (e.target as HTMLImageElement).style.display = 'none'
                                       ;(e.target as HTMLImageElement).nextElementSibling?.classList.remove('hidden')
                                     }}
                                   />
                                   <div className="absolute inset-0 flex items-center justify-center bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity">
-                                    <Eye className="w-5 h-5 text-white" />
+                                    <div className="text-center">
+                                      <Eye className="w-6 h-6 text-white mx-auto mb-1" />
+                                      <p className="text-[10px] text-white">عرض بالحجم الكامل</p>
+                                    </div>
                                   </div>
                                   <div className="absolute inset-0 flex items-center justify-center bg-white/5 hidden">
                                     <div className="text-center">
-                                      <ImageOff className="w-6 h-6 text-muted-foreground/30 mx-auto mb-1" />
-                                      <p className="text-[10px] text-muted-foreground">فشل التحميل</p>
+                                      <ImageOff className="w-8 h-8 text-muted-foreground/30 mx-auto mb-1" />
+                                      <p className="text-xs text-muted-foreground">فشل التحميل</p>
                                     </div>
                                   </div>
                                 </div>
                               ) : (
-                                <div className="h-32 rounded-xl border border-dashed border-white/10 flex items-center justify-center">
-                                  <p className="text-[10px] text-muted-foreground">غير مرفق</p>
+                                <div className="aspect-[3/4] rounded-2xl border-2 border-dashed border-white/10 flex items-center justify-center">
+                                  <div className="text-center">
+                                    <ImageOff className="w-8 h-8 text-muted-foreground/20 mx-auto mb-1" />
+                                    <p className="text-xs text-muted-foreground/50">غير مرفق</p>
+                                  </div>
                                 </div>
                               )}
                             </div>
@@ -2127,11 +2209,11 @@ export default function AdminPanel() {
 
                           {/* Reject Notes */}
                           {anyNotes && (
-                            <div className="p-2.5 rounded-xl bg-yellow-500/5 border border-yellow-500/10">
-                              <p className="text-[10px] text-yellow-400 font-medium">⚠️ ملاحظات الرفض:</p>
+                            <div className="p-3 rounded-2xl bg-yellow-500/5 border border-yellow-500/10">
+                              <p className="text-xs text-yellow-400 font-bold mb-1">⚠️ ملاحظات الرفض:</p>
                               {records.filter(r => r.notes).map(r => (
-                                <p key={r.id} className="text-[10px] text-muted-foreground mt-1">
-                                  {r.type === 'id_photo' ? 'الهوية' : 'الصورة الشخصية'}: {r.notes}
+                                <p key={r.id} className="text-xs text-muted-foreground mt-1">
+                                  {r.type === 'id_photo' ? '🪪 الهوية' : '🧑 الصورة الشخصية'}: {r.notes}
                                 </p>
                               ))}
                             </div>
@@ -2139,51 +2221,55 @@ export default function AdminPanel() {
 
                           {/* Action Buttons */}
                           {hasPending && pendingRecords.length > 0 && (
-                            <div className="flex gap-2 pt-1">
-                              <button
-                                onClick={() => pendingRecords.forEach(r => handleUpdateKYC(r.id, 'approved', r.userId!))}
-                                className="flex-1 flex items-center justify-center gap-1.5 text-xs py-2.5 rounded-xl bg-green-500/10 text-green-400 hover:bg-green-500/20 transition-all border border-green-500/10 font-medium"
-                              >
-                                <Check className="w-3.5 h-3.5" /> قبول الكل
-                              </button>
-                              <button
-                                onClick={() => { setKycRejectDialog({ recordId: pendingRecords[0].id, userId: pendingRecords[0].userId! }); setKycRejectReason('') }}
-                                className="flex-1 flex items-center justify-center gap-1.5 text-xs py-2.5 rounded-xl bg-red-500/10 text-red-400 hover:bg-red-500/20 transition-all border border-red-500/10 font-medium"
-                              >
-                                <X className="w-3.5 h-3.5" /> رفض
-                              </button>
-                            </div>
-                          )}
-
-                          {/* Individual pending record buttons */}
-                          {hasPending && pendingRecords.length > 1 && (
-                            <div className="grid grid-cols-2 gap-2 pt-1">
-                              {pendingRecords.map(r => (
-                                <div key={r.id} className="flex gap-1.5">
-                                  <button
-                                    onClick={() => handleUpdateKYC(r.id, 'approved', r.userId!)}
-                                    className="flex-1 flex items-center justify-center gap-1 text-[10px] py-1.5 rounded-lg bg-green-500/5 text-green-400/70 hover:bg-green-500/15 transition-colors"
-                                    title={`قبول ${r.type === 'id_photo' ? 'الهوية' : 'الصورة الشخصية'}`}
-                                  >
-                                    <Check className="w-2.5 h-2.5" /> {r.type === 'id_photo' ? 'الهوية' : 'الصورة'}
-                                  </button>
-                                  <button
-                                    onClick={() => { setKycRejectDialog({ recordId: r.id, userId: r.userId! }); setKycRejectReason('') }}
-                                    className="flex-1 flex items-center justify-center gap-1 text-[10px] py-1.5 rounded-lg bg-red-500/5 text-red-400/70 hover:bg-red-500/15 transition-colors"
-                                    title={`رفض ${r.type === 'id_photo' ? 'الهوية' : 'الصورة الشخصية'}`}
-                                  >
-                                    <X className="w-2.5 h-2.5" /> {r.type === 'id_photo' ? 'الهوية' : 'الصورة'}
-                                  </button>
+                            <div className="space-y-2 pt-1">
+                              <div className="flex gap-2">
+                                <button
+                                  onClick={() => {
+                                    pendingRecords.forEach(r => handleUpdateKYC(r.id, 'approved', r.userId!))
+                                    if (pendingRecords.every(r => records.length === pendingRecords.length)) setKycDetailUser(null)
+                                  }}
+                                  className="flex-1 flex items-center justify-center gap-2 text-sm py-3 rounded-xl bg-green-500/10 text-green-400 hover:bg-green-500/20 transition-all border border-green-500/15 font-bold"
+                                >
+                                  <Check className="w-4 h-4" /> قبول الكل
+                                </button>
+                                <button
+                                  onClick={() => { setKycRejectDialog({ recordId: pendingRecords[0].id, userId: pendingRecords[0].userId! }); setKycRejectReason('') }}
+                                  className="flex-1 flex items-center justify-center gap-2 text-sm py-3 rounded-xl bg-red-500/10 text-red-400 hover:bg-red-500/20 transition-all border border-red-500/15 font-bold"
+                                >
+                                  <X className="w-4 h-4" /> رفض
+                                </button>
+                              </div>
+                              {pendingRecords.length > 1 && (
+                                <div className="grid grid-cols-2 gap-2">
+                                  {pendingRecords.map(r => (
+                                    <div key={r.id} className="flex gap-1.5">
+                                      <button
+                                        onClick={() => {
+                                          handleUpdateKYC(r.id, 'approved', r.userId!)
+                                          if (records.filter(x => x.status === 'pending').length <= 1) setKycDetailUser(null)
+                                        }}
+                                        className="flex-1 flex items-center justify-center gap-1 text-[11px] py-2 rounded-xl bg-green-500/5 text-green-400/80 hover:bg-green-500/15 transition-colors border border-green-500/10"
+                                      >
+                                        <Check className="w-3 h-3" /> {r.type === 'id_photo' ? 'قبول الهوية' : 'قبول الصورة'}
+                                      </button>
+                                      <button
+                                        onClick={() => { setKycRejectDialog({ recordId: r.id, userId: r.userId! }); setKycRejectReason('') }}
+                                        className="flex-1 flex items-center justify-center gap-1 text-[11px] py-2 rounded-xl bg-red-500/5 text-red-400/80 hover:bg-red-500/15 transition-colors border border-red-500/10"
+                                      >
+                                        <X className="w-3 h-3" /> {r.type === 'id_photo' ? 'رفض الهوية' : 'رفض الصورة'}
+                                      </button>
+                                    </div>
+                                  ))}
                                 </div>
-                              ))}
+                              )}
                             </div>
                           )}
                         </div>
                       </div>
-                    )
-                  })
-                )}
-              </div>
+                    </div>
+                  )
+                })()}
+              </>
             )
           })()}
         </div>
