@@ -1978,64 +1978,214 @@ export default function AdminPanel() {
           )}
 
           {/* ===================== KYC TAB ===================== */}
-          {effectiveActiveTab === 'kyc' && (
-            <div className="space-y-2 max-h-[500px] overflow-y-auto">
-              {kycRecords.length === 0 ? (
-                <div className="glass-card p-8 text-center text-muted-foreground text-sm">لا توجد طلبات تحقق</div>
-              ) : (
-                kycRecords.map((k) => (
-                  <div key={k.id} className="glass-card p-4 rounded-xl space-y-2">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <p className="text-sm font-medium">{k.user?.fullName || k.user?.email || 'مستخدم غير معروف'}</p>
-                        <p className="text-xs text-muted-foreground">
-                          {k.type === 'id_photo' ? 'صورة الهوية' : 'صورة شخصية'}
-                          {k.user?.phone ? ` | ${k.user.phone}` : ''}
-                        </p>
-                      </div>
-                      <span className={`text-xs px-2 py-0.5 rounded-md status-${k.status}`}>
-                        {k.status === 'pending' ? 'معلق' : k.status === 'approved' ? 'مقبول' : 'مرفوض'}
-                      </span>
-                    </div>
-                    {/* FIX 3: Image with error handler */}
-                    <div className="rounded-xl overflow-hidden border border-white/10 bg-white/5 relative">
-                      <img
-                        src={k.fileUrl || ''}
-                        alt={k.type}
-                        className="w-full h-40 object-cover"
-                        onError={(e) => {
-                          (e.target as HTMLImageElement).style.display = 'none'
-                          ;(e.target as HTMLImageElement).nextElementSibling?.classList.remove('hidden')
-                        }}
-                      />
-                      <div className="absolute inset-0 flex items-center justify-center bg-white/5 hidden">
-                        <div className="text-center">
-                          <ImageOff className="w-8 h-8 text-muted-foreground/30 mx-auto mb-1" />
-                          <p className="text-xs text-muted-foreground">فشل تحميل الصورة</p>
+          {effectiveActiveTab === 'kyc' && (() => {
+            // Group records by user
+            const grouped = new Map<string, { user: KYCRecordItem['user']; records: KYCRecordItem[] }>()
+            for (const k of kycRecords) {
+              const uid = k.userId || 'unknown'
+              if (!grouped.has(uid)) grouped.set(uid, { user: k.user, records: [] })
+              grouped.get(uid)!.records.push(k)
+            }
+            const entries = Array.from(grouped.entries())
+
+            return (
+              <div className="space-y-4 max-h-[600px] overflow-y-auto pr-1">
+                {entries.length === 0 ? (
+                  <div className="glass-card p-8 text-center text-muted-foreground text-sm">لا توجد طلبات تحقق</div>
+                ) : (
+                  entries.map(([uid, { user: userInfo, records }]) => {
+                    const idPhoto = records.find(r => r.type === 'id_photo')
+                    const selfie = records.find(r => r.type === 'selfie')
+                    const hasPending = records.some(r => r.status === 'pending')
+                    const allApproved = records.every(r => r.status === 'approved')
+                    const allRejected = records.every(r => r.status === 'rejected')
+                    const anyNotes = records.find(r => r.notes)
+                    const pendingRecords = records.filter(r => r.status === 'pending')
+
+                    return (
+                      <div key={uid} className="glass-card rounded-2xl overflow-hidden border border-white/10">
+                        {/* User Header */}
+                        <div className="flex items-center justify-between p-4 border-b border-white/5 bg-white/[0.02]">
+                          <div className="flex items-center gap-3">
+                            <div className={`w-10 h-10 rounded-xl flex items-center justify-center text-sm font-bold ${
+                              allApproved ? 'bg-green-500/10 text-green-400' :
+                              allRejected ? 'bg-red-500/10 text-red-400' :
+                              'bg-amber-500/10 text-amber-400'
+                            }`}>
+                              {(userInfo?.fullName || userInfo?.email || '?').charAt(0).toUpperCase()}
+                            </div>
+                            <div>
+                              <p className="text-sm font-bold">{userInfo?.fullName || userInfo?.email || 'مستخدم غير معروف'}</p>
+                              <div className="flex items-center gap-2 mt-0.5">
+                                {userInfo?.phone && <p className="text-[10px] text-muted-foreground">{userInfo.phone}</p>}
+                                {userInfo?.email && <p className="text-[10px] text-muted-foreground">{userInfo.email}</p>}
+                              </div>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <span className={`text-[10px] px-2.5 py-1 rounded-full font-bold ${
+                              allApproved ? 'bg-green-500/10 text-green-400 border border-green-500/20' :
+                              allRejected ? 'bg-red-500/10 text-red-400 border border-red-500/20' :
+                              hasPending ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20' :
+                              'bg-white/5 text-muted-foreground border border-white/10'
+                            }`}>
+                              {allApproved ? '✓ مقبول' : allRejected ? '✗ مرفوض' : hasPending ? '⏳ بانتظار المراجعة' : 'مختلط'}
+                            </span>
+                            <span className="text-[10px] text-muted-foreground bg-white/5 px-2 py-1 rounded-full">{records.length} مستند</span>
+                          </div>
+                        </div>
+
+                        {/* Images Grid */}
+                        <div className="p-4 space-y-3">
+                          <div className="grid grid-cols-2 gap-3">
+                            {/* ID Photo */}
+                            <div className="space-y-1.5">
+                              <div className="flex items-center gap-1.5">
+                                <CreditCard className="w-3 h-3 text-muted-foreground" />
+                                <span className="text-[10px] font-medium text-muted-foreground">صورة الهوية</span>
+                                {idPhoto && (
+                                  <span className={`text-[9px] px-1.5 py-0.5 rounded-full ${
+                                    idPhoto.status === 'approved' ? 'bg-green-500/10 text-green-400' :
+                                    idPhoto.status === 'rejected' ? 'bg-red-500/10 text-red-400' :
+                                    'bg-amber-500/10 text-amber-400'
+                                  }`}>
+                                    {idPhoto.status === 'approved' ? 'مقبول' : idPhoto.status === 'rejected' ? 'مرفوض' : 'معلق'}
+                                  </span>
+                                )}
+                              </div>
+                              {idPhoto ? (
+                                <div className="rounded-xl overflow-hidden border border-white/10 bg-white/5 relative group cursor-pointer" onClick={() => window.open(idPhoto.fileUrl, '_blank')}>
+                                  <img
+                                    src={idPhoto.fileUrl || ''}
+                                    alt="صورة الهوية"
+                                    className="w-full h-32 object-cover group-hover:scale-105 transition-transform duration-300"
+                                    onError={(e) => {
+                                      (e.target as HTMLImageElement).style.display = 'none'
+                                      ;(e.target as HTMLImageElement).nextElementSibling?.classList.remove('hidden')
+                                    }}
+                                  />
+                                  <div className="absolute inset-0 flex items-center justify-center bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity">
+                                    <Eye className="w-5 h-5 text-white" />
+                                  </div>
+                                  <div className="absolute inset-0 flex items-center justify-center bg-white/5 hidden">
+                                    <div className="text-center">
+                                      <ImageOff className="w-6 h-6 text-muted-foreground/30 mx-auto mb-1" />
+                                      <p className="text-[10px] text-muted-foreground">فشل التحميل</p>
+                                    </div>
+                                  </div>
+                                </div>
+                              ) : (
+                                <div className="h-32 rounded-xl border border-dashed border-white/10 flex items-center justify-center">
+                                  <p className="text-[10px] text-muted-foreground">غير مرفق</p>
+                                </div>
+                              )}
+                            </div>
+
+                            {/* Selfie */}
+                            <div className="space-y-1.5">
+                              <div className="flex items-center gap-1.5">
+                                <UserCheck className="w-3 h-3 text-muted-foreground" />
+                                <span className="text-[10px] font-medium text-muted-foreground">صورة شخصية</span>
+                                {selfie && (
+                                  <span className={`text-[9px] px-1.5 py-0.5 rounded-full ${
+                                    selfie.status === 'approved' ? 'bg-green-500/10 text-green-400' :
+                                    selfie.status === 'rejected' ? 'bg-red-500/10 text-red-400' :
+                                    'bg-amber-500/10 text-amber-400'
+                                  }`}>
+                                    {selfie.status === 'approved' ? 'مقبول' : selfie.status === 'rejected' ? 'مرفوض' : 'معلق'}
+                                  </span>
+                                )}
+                              </div>
+                              {selfie ? (
+                                <div className="rounded-xl overflow-hidden border border-white/10 bg-white/5 relative group cursor-pointer" onClick={() => window.open(selfie.fileUrl, '_blank')}>
+                                  <img
+                                    src={selfie.fileUrl || ''}
+                                    alt="صورة شخصية"
+                                    className="w-full h-32 object-cover group-hover:scale-105 transition-transform duration-300"
+                                    onError={(e) => {
+                                      (e.target as HTMLImageElement).style.display = 'none'
+                                      ;(e.target as HTMLImageElement).nextElementSibling?.classList.remove('hidden')
+                                    }}
+                                  />
+                                  <div className="absolute inset-0 flex items-center justify-center bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity">
+                                    <Eye className="w-5 h-5 text-white" />
+                                  </div>
+                                  <div className="absolute inset-0 flex items-center justify-center bg-white/5 hidden">
+                                    <div className="text-center">
+                                      <ImageOff className="w-6 h-6 text-muted-foreground/30 mx-auto mb-1" />
+                                      <p className="text-[10px] text-muted-foreground">فشل التحميل</p>
+                                    </div>
+                                  </div>
+                                </div>
+                              ) : (
+                                <div className="h-32 rounded-xl border border-dashed border-white/10 flex items-center justify-center">
+                                  <p className="text-[10px] text-muted-foreground">غير مرفق</p>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+
+                          {/* Reject Notes */}
+                          {anyNotes && (
+                            <div className="p-2.5 rounded-xl bg-yellow-500/5 border border-yellow-500/10">
+                              <p className="text-[10px] text-yellow-400 font-medium">⚠️ ملاحظات الرفض:</p>
+                              {records.filter(r => r.notes).map(r => (
+                                <p key={r.id} className="text-[10px] text-muted-foreground mt-1">
+                                  {r.type === 'id_photo' ? 'الهوية' : 'الصورة الشخصية'}: {r.notes}
+                                </p>
+                              ))}
+                            </div>
+                          )}
+
+                          {/* Action Buttons */}
+                          {hasPending && pendingRecords.length > 0 && (
+                            <div className="flex gap-2 pt-1">
+                              <button
+                                onClick={() => pendingRecords.forEach(r => handleUpdateKYC(r.id, 'approved', r.userId!))}
+                                className="flex-1 flex items-center justify-center gap-1.5 text-xs py-2.5 rounded-xl bg-green-500/10 text-green-400 hover:bg-green-500/20 transition-all border border-green-500/10 font-medium"
+                              >
+                                <Check className="w-3.5 h-3.5" /> قبول الكل
+                              </button>
+                              <button
+                                onClick={() => { setKycRejectDialog({ recordId: pendingRecords[0].id, userId: pendingRecords[0].userId! }); setKycRejectReason('') }}
+                                className="flex-1 flex items-center justify-center gap-1.5 text-xs py-2.5 rounded-xl bg-red-500/10 text-red-400 hover:bg-red-500/20 transition-all border border-red-500/10 font-medium"
+                              >
+                                <X className="w-3.5 h-3.5" /> رفض
+                              </button>
+                            </div>
+                          )}
+
+                          {/* Individual pending record buttons */}
+                          {hasPending && pendingRecords.length > 1 && (
+                            <div className="grid grid-cols-2 gap-2 pt-1">
+                              {pendingRecords.map(r => (
+                                <div key={r.id} className="flex gap-1.5">
+                                  <button
+                                    onClick={() => handleUpdateKYC(r.id, 'approved', r.userId!)}
+                                    className="flex-1 flex items-center justify-center gap-1 text-[10px] py-1.5 rounded-lg bg-green-500/5 text-green-400/70 hover:bg-green-500/15 transition-colors"
+                                    title={`قبول ${r.type === 'id_photo' ? 'الهوية' : 'الصورة الشخصية'}`}
+                                  >
+                                    <Check className="w-2.5 h-2.5" /> {r.type === 'id_photo' ? 'الهوية' : 'الصورة'}
+                                  </button>
+                                  <button
+                                    onClick={() => { setKycRejectDialog({ recordId: r.id, userId: r.userId! }); setKycRejectReason('') }}
+                                    className="flex-1 flex items-center justify-center gap-1 text-[10px] py-1.5 rounded-lg bg-red-500/5 text-red-400/70 hover:bg-red-500/15 transition-colors"
+                                    title={`رفض ${r.type === 'id_photo' ? 'الهوية' : 'الصورة الشخصية'}`}
+                                  >
+                                    <X className="w-2.5 h-2.5" /> {r.type === 'id_photo' ? 'الهوية' : 'الصورة'}
+                                  </button>
+                                </div>
+                              ))}
+                            </div>
+                          )}
                         </div>
                       </div>
-                    </div>
-                    {/* Notes */}
-                    {k.notes && (
-                      <div className="p-2 rounded-lg bg-yellow-500/5 border border-yellow-500/10 text-xs text-yellow-400">
-                        سبب الرفض: {k.notes}
-                      </div>
-                    )}
-                    {k.status === 'pending' && k.userId && (
-                      <div className="flex gap-2">
-                        <button onClick={() => handleUpdateKYC(k.id, 'approved', k.userId)} className="flex-1 flex items-center justify-center gap-1 text-xs py-2 rounded-lg bg-green-500/10 text-green-400 hover:bg-green-500/20 transition-colors">
-                          <Check className="w-3 h-3" /> قبول
-                        </button>
-                        <button onClick={() => { setKycRejectDialog({ recordId: k.id, userId: k.userId }); setKycRejectReason('') }} className="flex-1 flex items-center justify-center gap-1 text-xs py-2 rounded-lg bg-red-500/10 text-red-400 hover:bg-red-500/20 transition-colors">
-                          <X className="w-3 h-3" /> رفض
-                        </button>
-                      </div>
-                    )}
-                  </div>
-                ))
-              )}
-            </div>
-          )}
+                    )
+                  })
+                )}
+              </div>
+            )
+          })()}
         </div>
       )}
 
