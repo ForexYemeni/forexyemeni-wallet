@@ -31,11 +31,9 @@ interface AuthState {
   isAuthenticated: boolean
   pendingRegistration: { email: string; fullName: string; password: string } | null
   pendingWithdrawalConfirmation: string | null
-  navigationHistory: string[]
   setAuth: (user: User, token: string, mustChangePassword?: boolean) => void
   logout: () => void
   setScreen: (screen: string) => void
-  goBack: () => string | null
   updateBalance: (balance: number) => void
   updateUser: (updates: Partial<User>) => void
   setPendingRegistration: (data: { email: string; fullName: string; password: string } | null) => void
@@ -45,14 +43,13 @@ interface AuthState {
 
 export const useAuthStore = create<AuthState>()(
   persist(
-    (set, get) => ({
+    (set) => ({
       user: null,
       token: null,
       currentScreen: 'login',
       isAuthenticated: false,
       pendingRegistration: null,
       pendingWithdrawalConfirmation: null,
-      navigationHistory: [],
       setAuth: (user, token, mustChangePassword = false) => {
         if (typeof window !== 'undefined') {
           localStorage.setItem('forexyameni-session-start', Date.now().toString())
@@ -76,33 +73,14 @@ export const useAuthStore = create<AuthState>()(
       },
       logout: () => set({ user: null, token: null, isAuthenticated: false, currentScreen: 'login', pendingRegistration: null, pendingWithdrawalConfirmation: null }),
       clearForLock: () => set({ user: null, token: null, isAuthenticated: false, currentScreen: 'device-locked', pendingRegistration: null, pendingWithdrawalConfirmation: null }),
-      setScreen: (screen) => set((state) => {
-        const prev = state.currentScreen
-        if (screen === prev) return { currentScreen: screen }
-        const history = state.navigationHistory || []
-        return {
-          currentScreen: screen,
-          navigationHistory: [...history, prev],
-        }
-      }),
-      goBack: () => {
-        const state = get()
-        const history = state.navigationHistory || []
-        if (history.length === 0) return null
-        const prev = history[history.length - 1]
-        set({
-          currentScreen: prev,
-          navigationHistory: history.slice(0, -1),
-        })
-        return prev
-      },
+      setScreen: (screen) => set({ currentScreen: screen }),
       updateBalance: (balance) => set((state) => ({ user: state.user ? { ...state.user, balance } : null })),
       updateUser: (updates) => set((state) => ({ user: state.user ? { ...state.user, ...updates } : null })),
       setPendingRegistration: (data) => set({ pendingRegistration: data }),
       setPendingWithdrawalConfirmation: (id) => set({ pendingWithdrawalConfirmation: id }),
     }),
     {
-      name: 'forexyameni-auth',
+      name: 'forexyemeni-auth',
       partialize: (state) => ({
         user: state.user,
         token: state.token,

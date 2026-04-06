@@ -22,9 +22,7 @@ import {
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   const { user, setScreen, logout } = useAuthStore()
-  const currentScreen = useAuthStore(s => s.currentScreen)
   const [logoutDialogOpen, setLogoutDialogOpen] = useState(false)
-  const [exitDialogOpen, setExitDialogOpen] = useState(false)
 
   // Pull-to-refresh
   const [refreshing, setRefreshing] = useState(false)
@@ -43,52 +41,6 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     setupFCMAutoRegister()
   }, [])
-
-  // Android hardware back button handler
-  useEffect(() => {
-    // Check if running inside native Capacitor app
-    const isNativeApp = typeof window !== 'undefined' && (() => {
-      try {
-        const w = window as any
-        if (w.Capacitor?.isNativePlatform?.()) return true
-        if (w.Capacitor?.getPlatform?.() === 'android') return true
-        if (w.Capacitor?.Plugins) return true
-        return false
-      } catch { return false }
-    })()
-    if (!isNativeApp) return
-
-    const goBack = useAuthStore.getState().goBack
-
-    const handleBackButton = () => {
-      // 1. Dispatch custom event for child components (Admin, P2P, Settings) to handle internal navigation
-      const backEvent = new CustomEvent('app:backbutton', { cancelable: true })
-      window.dispatchEvent(backEvent)
-
-      // If a child component handled it (called preventDefault), stop here
-      if (backEvent.defaultPrevented) return
-
-      // 2. Try to go back in navigation history
-      const prevScreen = goBack()
-      if (prevScreen) return
-
-      // 3. No history left → show exit confirmation
-      setExitDialogOpen(true)
-    }
-
-    // Listen for Android back button via Capacitor
-    let listenerHandle: any = null
-    const setupBackButton = async () => {
-      try {
-        const { App } = await import('@capacitor/app')
-        listenerHandle = await App.addListener('backButton', handleBackButton)
-      } catch {
-        // Capacitor not available (web browser)
-      }
-    }
-    setupBackButton()
-    return () => { listenerHandle?.remove?.() }
-  }, [currentScreen])
 
   // Session timeout check (7 days)
   useEffect(() => {
@@ -286,42 +238,6 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
       {/* Social Floating Button */}
       <SocialFloatingButton />
-
-      {/* Exit Confirmation Dialog */}
-      <AlertDialog open={exitDialogOpen} onOpenChange={setExitDialogOpen}>
-        <AlertDialogContent className="glass-card bg-background/95 backdrop-blur-xl border-gold/20 text-right" dir="rtl">
-          <AlertDialogHeader>
-            <AlertDialogTitle className="text-lg font-bold gold-text flex items-center gap-2">
-              <LogOut className="w-5 h-5" />
-              الخروج من التطبيق
-            </AlertDialogTitle>
-            <AlertDialogDescription className="text-muted-foreground text-sm leading-relaxed">
-              هل تريد الخروج من التطبيق؟
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter className="flex gap-3 sm:gap-0">
-            <AlertDialogAction
-              onClick={() => {
-                setExitDialogOpen(false)
-                // Exit the app
-                try {
-                  import('@capacitor/app').then(({ App }) => App.exitApp())
-                } catch {
-                  window.close()
-                }
-              }}
-              className="flex-1 h-11 gold-gradient text-gray-900 font-bold rounded-xl hover:opacity-90 transition-all"
-            >
-              نعم، خروج
-            </AlertDialogAction>
-            <AlertDialogCancel
-              className="flex-1 h-11 bg-white/10 hover:bg-white/20 text-foreground font-medium rounded-xl transition-all"
-            >
-              إلغاء
-            </AlertDialogCancel>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
     </div>
   )
 }

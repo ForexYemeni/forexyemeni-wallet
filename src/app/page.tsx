@@ -508,35 +508,6 @@ export default function Home() {
     )
   }
 
-  // Android back button handler for unauthenticated (login) screens - exit app directly
-  useEffect(() => {
-    if (isAuthenticated) return // AppLayout handles it when authenticated
-
-    const isNativeApp = typeof window !== 'undefined' && (() => {
-      try {
-        const w = window as any
-        if (w.Capacitor?.isNativePlatform?.()) return true
-        if (w.Capacitor?.getPlatform?.() === 'android') return true
-        if (w.Capacitor?.Plugins) return true
-        return false
-      } catch { return false }
-    })()
-    if (!isNativeApp) return
-
-    let listenerHandle: any = null
-    const setupBackButton = async () => {
-      try {
-        const { App } = await import('@capacitor/app')
-        listenerHandle = await App.addListener('backButton', () => {
-          // On auth screens (login, register, forgot-password) → exit app
-          App.exitApp()
-        })
-      } catch { /* not in native app */ }
-    }
-    setupBackButton()
-    return () => { listenerHandle?.remove?.() }
-  }, [isAuthenticated])
-
   // Authentication Screens
   if (!isAuthenticated) {
     return (

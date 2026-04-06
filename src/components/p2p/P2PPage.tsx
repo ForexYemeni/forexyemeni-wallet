@@ -65,38 +65,6 @@ export default function P2PPage() {
     }
   }, [isMerchant, subScreen])
 
-  // Android back button handler for internal P2P navigation
-  useEffect(() => {
-    const handleBackButton = (e: Event) => {
-      // Priority 1: Close trade creation dialog
-      if (creatingTrade) {
-        setCreatingTrade(null)
-        e.preventDefault()
-        return
-      }
-
-      // Priority 2: Go back from trade detail to trades list
-      if (subScreen === 'trade-detail') {
-        setSubScreen('my-trades')
-        setSelectedTradeId(null)
-        e.preventDefault()
-        return
-      }
-
-      // Priority 3: Go back from sub-tabs to default tab
-      if (subScreen !== 'overview' && subScreen !== 'market') {
-        setSubScreen(isMerchant ? 'overview' : 'market')
-        e.preventDefault()
-        return
-      }
-
-      // Don't prevent default - let AppLayout handle it (goBack or exit)
-    }
-
-    window.addEventListener('app:backbutton', handleBackButton)
-    return () => window.removeEventListener('app:backbutton', handleBackButton)
-  }, [creatingTrade, subScreen, isMerchant])
-
   const handleBuy = (listingId: string) => {
     setCreatingTrade({ listingId, type: 'buy' })
   }
