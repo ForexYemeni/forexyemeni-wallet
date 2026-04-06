@@ -7,6 +7,7 @@ import { setupFCMAutoRegister } from '@/lib/fcm-push'
 import BottomNav from './BottomNav'
 import Sidebar from './Sidebar'
 import SocialFloatingButton from './SocialFloatingButton'
+import AnnouncementBanner from './AnnouncementBanner'
 import { Bell, LogOut, Loader2 } from 'lucide-react'
 import {
   AlertDialog,
@@ -231,6 +232,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
         {/* Page Content */}
         <div className="px-4 md:px-6 py-4 max-w-2xl mx-auto overflow-x-hidden">
+          <AnnouncementBanner />
           {children}
         </div>
       </main>

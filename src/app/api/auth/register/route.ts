@@ -8,6 +8,31 @@ export async function POST(request: NextRequest) {
   try {
     const { email, password, fullName } = await request.json()
 
+    // === SYSTEM SETTINGS CHECK (Registration Toggle + Maintenance) ===
+    try {
+      const db = getDb()
+      const maintenanceDoc = await db.collection('systemSettings').doc('maintenance').get()
+      if (maintenanceDoc.exists) {
+        const settings = maintenanceDoc.data()!
+        // Block registration if maintenance mode is active
+        if (settings.maintenance === true) {
+          return NextResponse.json(
+            { success: false, message: settings.maintenanceMessage || 'المنصة تحت الصيانة حالياً. يرجى المحاولة لاحقاً' },
+            { status: 503 }
+          )
+        }
+        // Block registration if registration is closed
+        if (settings.registrationOpen === false) {
+          return NextResponse.json(
+            { success: false, message: 'التسجيل مغلق حالياً. يرجى المحاولة لاحقاً' },
+            { status: 403 }
+          )
+        }
+      }
+    } catch {
+      // If settings can't be read, allow registration (fail-open)
+    }
+
     if (!email || !password) {
       return NextResponse.json(
         { success: false, message: 'البريد الإلكتروني وكلمة المرور مطلوبان' },

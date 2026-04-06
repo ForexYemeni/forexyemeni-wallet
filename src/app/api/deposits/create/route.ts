@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { userOperations, depositOperations, notificationOperations } from '@/lib/db-firebase'
+import { userOperations, depositOperations, transactionOperations, notificationOperations } from '@/lib/db-firebase'
 import { sendPushNotification } from '@/lib/push-notification'
 import { getDb } from '@/lib/firebase'
-import { sendAdminNewDepositEmail } from '@/lib/email'
+import { sendAdminNewDepositEmail, sendUserDepositConfirmedEmail, sendMerchantDepositConfirmedEmail } from '@/lib/email'
 
 // GET - Check if user has a pending deposit
 export async function GET(request: NextRequest) {
@@ -107,6 +107,86 @@ export async function POST(request: NextRequest) {
       screenshot: screenshot || null,
       status: 'pending',
     })
+
+    // ===== AUTO-APPROVE CHECK =====
+    const maintenanceDoc = await db.collection('systemSettings').doc('maintenance').get()
+    const autoApproveDeposit = maintenanceDoc.exists ? (maintenanceDoc.data().autoApproveDeposit === true) : false
+
+    if (autoApproveDeposit) {
+      // Auto-confirm the deposit immediately
+      await depositOperations.update(deposit.id, { status: 'confirmed' })
+
+      // Credit user balance
+      const creditAmount = netAmount
+      const balanceBefore = user.balance
+      const balanceAfter = balanceBefore + creditAmount
+      await userOperations.updateBalance(userId, balanceAfter)
+
+      // Create transaction record
+      await transactionOperations.create({
+        userId,
+        type: 'deposit',
+        amount: creditAmount,
+        balanceBefore,
+        balanceAfter,
+        description: `إيداع USDT (تلقائي)${fee > 0 ? ` (الرسوم: ${fee.toFixed(2)} USDT → حساب الإدارة)` : ''} - ${txId || deposit.id.substring(0, 8)}`,
+        referenceId: deposit.id,
+      })
+
+      // Notify user
+      const title = 'تم تأكيد الإيداع'
+      const feeInfo = fee > 0 ? ` (${fee.toFixed(2)} USDT رسوم)` : ''
+      const message = `تم تأكيد إيداعك بقيمة ${creditAmount.toFixed(2)} USDT${feeInfo} تلقائياً`
+      await notificationOperations.create({ userId, title, message, type: 'success', read: false })
+      sendPushNotification(userId, title, message, 'success').catch(() => {})
+
+      // Send email
+      if (user.role === 'merchant') {
+        await sendMerchantDepositConfirmedEmail(user.email, user.fullName || user.email, amount, creditAmount, deposit.id).catch(() => {})
+      } else {
+        await sendUserDepositConfirmedEmail(user.email, user.fullName || user.email, amount, fee, creditAmount, deposit.id).catch(() => {})
+      }
+
+      // Credit fee to admin
+      if (fee > 0) {
+        try {
+          const adminDocs = await db.collection('users').where('role', '==', 'admin').limit(1).get()
+          if (!adminDocs.empty) {
+            const adminDoc = adminDocs.docs[0]
+            const admin = { id: adminDoc.id, ...adminDoc.data() } as any
+            const adminBalanceBefore = admin.balance
+            const adminBalanceAfter = adminBalanceBefore + fee
+            await userOperations.updateBalance(admin.id, adminBalanceAfter)
+            await transactionOperations.create({
+              userId: admin.id,
+              type: 'fee_income',
+              amount: fee,
+              balanceBefore: adminBalanceBefore,
+              balanceAfter: adminBalanceAfter,
+              description: `رسوم إيداع تلقائي من ${user.fullName || user.email} - إيداع #${deposit.id.substring(0, 8)}`,
+              referenceId: deposit.id,
+            })
+          }
+        } catch {}
+      }
+
+      // Process referral commissions
+      try {
+        await fetch(`${process.env.NEXT_PUBLIC_BASE_URL || ''}/api/referral`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: 'process_commissions', depositId: deposit.id }),
+        })
+      } catch {}
+
+      return NextResponse.json({
+        success: true,
+        message: 'تم تأكيد الإيداع تلقائياً',
+        deposit: { ...deposit, status: 'confirmed' },
+      })
+    }
+
+    // ===== NORMAL FLOW (not auto-approved) =====
 
     // Notify admin(s) about new deposit request
     try {

@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { userOperations, withdrawalOperations, notificationOperations } from '@/lib/db-firebase'
+import { userOperations, withdrawalOperations, transactionOperations, notificationOperations } from '@/lib/db-firebase'
 import { getDb, nowTimestamp } from '@/lib/firebase'
 import { sendPushNotification } from '@/lib/push-notification'
-import { sendAdminNewWithdrawalEmail } from '@/lib/email'
+import { sendAdminNewWithdrawalEmail, sendUserWithdrawalProcessingEmail, sendMerchantWithdrawalProcessingEmail } from '@/lib/email'
 import bcrypt from 'bcryptjs'
 
 // GET - Check if user has a pending withdrawal
@@ -137,6 +137,75 @@ export async function POST(request: NextRequest) {
       paymentMethodId: paymentMethodId || null,
       status: 'pending',
     })
+
+    // ===== AUTO-APPROVE WITHDRAWAL CHECK =====
+    const maintenanceDoc = await db.collection('systemSettings').doc('maintenance').get()
+    const autoApproveWithdrawal = maintenanceDoc.exists ? (maintenanceDoc.data().autoApproveWithdrawal === true) : false
+
+    if (autoApproveWithdrawal) {
+      // Auto-approve: pending → approved → processing (complete)
+      await withdrawalOperations.update(withdrawal.id, { status: 'approved' })
+      await withdrawalOperations.update(withdrawal.id, { status: 'processing' })
+
+      // Send notification to user
+      const title = 'تم السحب'
+      const message = `تم سحب ${netAmount.toFixed(2)} USDT بنجاح (تلقائي).`
+      await notificationOperations.create({ userId, title, message, type: 'success', read: false })
+      sendPushNotification(userId, title, message, 'success').catch(() => {})
+
+      // Unfreeze balance
+      const newFrozen = user.frozenBalance - amount
+      await userOperations.updateFrozenBalance(userId, Math.max(0, newFrozen))
+
+      // Create transaction record
+      await transactionOperations.create({
+        userId,
+        type: 'withdrawal',
+        amount: -(amount),
+        balanceBefore: user.balance,
+        balanceAfter: user.balance,
+        description: `سحب USDT تلقائي إلى ${toAddress.substring(0, 10)}... (الرسوم: ${fee.toFixed(2)} USDT, الصافي: ${netAmount.toFixed(2)})`,
+        referenceId: withdrawal.id,
+      })
+
+      // Send email
+      if (user.role === 'merchant') {
+        await sendMerchantWithdrawalProcessingEmail(user.email, user.fullName || user.email, netAmount, toAddress, withdrawal.id).catch(() => {})
+      } else {
+        await sendUserWithdrawalProcessingEmail(user.email, user.fullName || user.email, amount, netAmount, toAddress, withdrawal.id).catch(() => {})
+      }
+
+      // Credit fee to admin
+      if (fee > 0) {
+        try {
+          const adminDocs = await db.collection('users').where('role', '==', 'admin').limit(1).get()
+          if (!adminDocs.empty) {
+            const adminDoc = adminDocs.docs[0]
+            const admin = { id: adminDoc.id, ...adminDoc.data() } as any
+            const adminBalanceBefore = admin.balance
+            const adminBalanceAfter = adminBalanceBefore + fee
+            await userOperations.updateBalance(admin.id, adminBalanceAfter)
+            await transactionOperations.create({
+              userId: admin.id,
+              type: 'fee_income',
+              amount: fee,
+              balanceBefore: adminBalanceBefore,
+              balanceAfter: adminBalanceAfter,
+              description: `رسوم سحب تلقائي من ${user.fullName || user.email} - سحب #${withdrawal.id.substring(0, 8)}`,
+              referenceId: withdrawal.id,
+            })
+          }
+        } catch {}
+      }
+
+      return NextResponse.json({
+        success: true,
+        message: 'تم تأكيد السحب تلقائياً',
+        withdrawal: { ...withdrawal, status: 'processing' },
+      })
+    }
+
+    // ===== NORMAL FLOW (not auto-approved) =====
 
     // Notify admin(s) about new withdrawal request
     try {

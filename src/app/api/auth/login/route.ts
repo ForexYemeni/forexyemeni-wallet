@@ -33,6 +33,30 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    // === MAINTENANCE MODE CHECK ===
+    try {
+      const db = getDb()
+      const maintenanceDoc = await db.collection('systemSettings').doc('maintenance').get()
+      if (maintenanceDoc.exists) {
+        const settings = maintenanceDoc.data()!
+        if (settings.maintenance === true) {
+          // Allow admins and users with permissions to bypass maintenance
+          const userPerms = typeof user.permissions === 'string'
+            ? (() => { try { return JSON.parse(user.permissions) } catch { return null } })()
+            : (typeof user.permissions === 'object' ? user.permissions : null)
+          const hasPermissions = userPerms && Object.values(userPerms as Record<string, any>).some((v: any) => v === true)
+          if (user.role !== 'admin' && !hasPermissions) {
+            return NextResponse.json(
+              { success: false, message: settings.maintenanceMessage || 'المنصة تحت الصيانة حالياً. يرجى المحاولة لاحقاً' },
+              { status: 503 }
+            )
+          }
+        }
+      }
+    } catch {
+      // If settings can't be read, allow login (fail-open)
+    }
+
     // Enrich merchantId from merchant application / old merchant system if missing
     if (!user.merchantId && user.role !== 'admin') {
       const applications = await merchantApplicationOperations.findByUser(user.id)
