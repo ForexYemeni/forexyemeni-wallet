@@ -340,41 +340,47 @@ export default function Home() {
   }, [mounted, isAuthenticated, user?.id, logout, currentScreen])
 
   // Fetch withdrawal data when confirmation is pending
+  // Uses user-facing endpoint — never clears pendingConfirmation on fetch failure
+  // to prevent flickering loop with auto-polling
   useEffect(() => {
-    if (isAuthenticated && user?.pendingConfirmation) {
+    if (!isAuthenticated || !user?.pendingConfirmation) return
+
+    let cancelled = false
+    const fetchWithdrawal = async () => {
       setLoadingWithdrawal(true)
-      fetch(`/api/admin/withdrawals?id=${user.pendingConfirmation}`)
-        .then(res => {
-          if (!res.ok) throw new Error('API error')
-          return res.json()
+      try {
+        const res = await fetch('/api/withdrawals/[id]', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ userId: user!.id, withdrawalId: user!.pendingConfirmation }),
         })
-        .then(data => {
-          if (data.success && data.withdrawals?.length > 0) {
-            const w = data.withdrawals[0]
-            setPendingWithdrawal({
-              amount: w.amount || 0,
-              fee: w.fee || 0,
-              netAmount: w.netAmount || (w.amount || 0) - (w.fee || 0),
-              method: w.method || '',
-              screenshot: w.screenshot || null,
-              status: w.status || '',
-              walletAddress: w.walletAddress,
-              walletName: w.walletName,
-            })
-          } else {
-            // Invalid or expired confirmation — clear it
-            setPendingWithdrawalConfirmation(null)
-            updateUser({ pendingConfirmation: null } as any)
-          }
-        })
-        .catch(() => {
-          // Failed to fetch confirmation data — clear stale state
-          setPendingWithdrawalConfirmation(null)
-          updateUser({ pendingConfirmation: null } as any)
-        })
-        .finally(() => setLoadingWithdrawal(false))
+        const data = await res.json()
+        if (cancelled) return
+
+        if (data.success && data.withdrawal) {
+          const w = data.withdrawal
+          setPendingWithdrawal({
+            amount: w.amount || 0,
+            fee: w.fee || 0,
+            netAmount: w.netAmount || (w.amount || 0) - (w.fee || 0),
+            method: w.method || '',
+            screenshot: w.screenshot || null,
+            status: w.status || '',
+            walletAddress: w.walletAddress,
+            walletName: w.walletName,
+          })
+        }
+        // If fetch fails, do NOT clear pendingConfirmation — just keep showing loading
+        // The user can still confirm with password even without seeing the details
+      } catch {
+        // Silent — don't clear pendingConfirmation to prevent flickering
+      } finally {
+        if (!cancelled) setLoadingWithdrawal(false)
+      }
     }
-  }, [isAuthenticated, user?.pendingConfirmation])
+    fetchWithdrawal()
+    return () => { cancelled = true }
+  }, [isAuthenticated, user?.id, user?.pendingConfirmation])
 
   // Show loading until client hydration is complete
   if (!mounted) {
