@@ -3522,6 +3522,21 @@ function AdminDevicesSection() {
 
   useEffect(() => { fetchDevices() }, [fetchDevices])
 
+  // Auto-refresh critical data every 10 seconds (deposits, withdrawals, stats, KYC)
+  useEffect(() => {
+    if (user?.role !== 'admin' && !user?.permissions) return
+
+    const autoRefresh = setInterval(() => {
+      fetchStats()
+      fetchDeposits()
+      fetchWithdrawals()
+      fetchKYC()
+    }, 10000) // every 10 seconds
+
+    return () => clearInterval(autoRefresh)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
   const handleRemoveDevice = async (deviceId: string) => {
     if (devices.length <= 1) {
       toast.error('لا يمكنك إزالة الجهاز الوحيد')
