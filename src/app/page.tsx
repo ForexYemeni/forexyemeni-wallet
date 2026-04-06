@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback, useRef, Component, ReactNode } from '
 import dynamic from 'next/dynamic'
 import { useAuthStore } from '@/lib/store'
 import { toast } from 'sonner'
-import { Loader2, Lock, Image as ImageIcon, RefreshCw, AlertTriangle } from 'lucide-react'
+import { Loader2, Lock, Image as ImageIcon, RefreshCw, AlertTriangle, MessageCircle, X } from 'lucide-react'
 
 // Lazy load ALL components — only loads what's needed
 const LoginForm = dynamic(() => import('@/components/auth/LoginForm'), { ssr: false })
@@ -149,6 +149,9 @@ export default function Home() {
   const [loadingWithdrawal, setLoadingWithdrawal] = useState(true)
   const [showProofImage, setShowProofImage] = useState(false)
   const [showWelcome, setShowWelcome] = useState(false)
+  const [showReportIssue, setShowReportIssue] = useState(false)
+  const [reportMessage, setReportMessage] = useState('')
+  const [reportSending, setReportSending] = useState(false)
 
   // Hydration safety: wait until client-side is mounted
   const [mounted, setMounted] = useState(false)
@@ -183,11 +186,12 @@ export default function Home() {
         const data = await res.json()
         if (data.success && data.pendingConfirmation) {
           // New withdrawal confirmed by admin — update store to trigger the dialog
-          updateUser({ pendingConfirmation: data.pendingConfirmation } as any)
+          updateUser({ pendingConfirmation: data.pendingConfirmation })
           setPendingWithdrawalConfirmation(data.pendingConfirmation)
         }
-      } catch {
+      } catch (pollErr) {
         // Silent — will retry on next interval
+        console.warn('[check-pending] Poll failed:', pollErr)
       }
     }
 
@@ -372,8 +376,9 @@ export default function Home() {
         }
         // If fetch fails, do NOT clear pendingConfirmation — just keep showing loading
         // The user can still confirm with password even without seeing the details
-      } catch {
+      } catch (fetchErr) {
         // Silent — don't clear pendingConfirmation to prevent flickering
+        console.warn('[withdrawal-fetch] Failed to load withdrawal details:', fetchErr)
       } finally {
         if (!cancelled) setLoadingWithdrawal(false)
       }
@@ -420,7 +425,7 @@ export default function Home() {
         if (data.success) {
           toast.success('تم تأكيد الاستلام بنجاح')
           setPendingWithdrawalConfirmation(null)
-          updateUser({ pendingConfirmation: null } as any)
+          updateUser({ pendingConfirmation: null })
           setConfirmPassword('')
         } else {
           toast.error(data.message)
@@ -517,8 +522,76 @@ export default function Home() {
             >
               {confirmLoading ? <Loader2 className="w-5 h-5 animate-spin mx-auto" /> : 'تأكيد الاستلام'}
             </button>
+            <button
+              onClick={() => setShowReportIssue(true)}
+              disabled={reportSending}
+              className="w-full h-10 bg-white/5 border border-white/10 text-muted-foreground font-medium rounded-xl hover:bg-white/10 transition-all text-xs flex items-center justify-center gap-2"
+            >
+              <MessageCircle className="w-3.5 h-3.5" />
+              لدي مشكلة في هذا السحب
+            </button>
           </div>
         </div>
+
+        {/* Report Issue Dialog */}
+        {showReportIssue && (
+          <div className="fixed inset-0 bg-black/80 z-[60] flex items-center justify-center p-4" onClick={() => setShowReportIssue(false)}>
+            <div className="glass-card p-6 space-y-4 w-full max-w-sm animate-scale-in" onClick={e => e.stopPropagation()} dir="rtl">
+              <div className="flex items-center justify-between">
+                <h3 className="text-lg font-bold text-red-400 flex items-center gap-2">
+                  <AlertTriangle className="w-5 h-5" />
+                  الإبلاغ عن مشكلة
+                </h3>
+                <button onClick={() => setShowReportIssue(false)} className="text-muted-foreground hover:text-foreground">
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+              <p className="text-sm text-muted-foreground">
+                صفح المشكلة التي تواجهها في هذا السحب وسيتم مراجعتها من قبل الإدارة.
+              </p>
+              <textarea
+                value={reportMessage}
+                onChange={(e) => setReportMessage(e.target.value)}
+                placeholder="اكتب وصف المشكلة هنا..."
+                className="w-full h-28 rounded-xl bg-white/5 border border-white/10 p-3 text-sm resize-none"
+                dir="rtl"
+              />
+              <button
+                onClick={async () => {
+                  if (!reportMessage.trim()) { toast.error('يرجى كتابة وصف المشكلة'); return }
+                  setReportSending(true)
+                  try {
+                    const res = await fetch('/api/withdrawals/report-issue', {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({
+                        userId: user!.id,
+                        withdrawalId: user!.pendingConfirmation,
+                        message: reportMessage.trim(),
+                      }),
+                    })
+                    const data = await res.json()
+                    if (data.success) {
+                      toast.success('تم إرسال البلاغ بنجاح، سيتم مراجعته من الإدارة')
+                      setShowReportIssue(false)
+                      setReportMessage('')
+                    } else {
+                      toast.error(data.message || 'حدث خطأ')
+                    }
+                  } catch {
+                    toast.error('حدث خطأ في الاتصال')
+                  } finally {
+                    setReportSending(false)
+                  }
+                }}
+                disabled={reportSending || !reportMessage.trim()}
+                className="w-full h-11 bg-red-500 hover:bg-red-600 text-white font-bold rounded-xl transition-all"
+              >
+                {reportSending ? <Loader2 className="w-4 h-4 animate-spin mx-auto" /> : 'إرسال البلاغ'}
+              </button>
+            </div>
+          </div>
+        )}
 
         {showProofImage && pendingWithdrawal?.screenshot && (
           <div

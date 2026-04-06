@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { userOperations } from '@/lib/db-firebase'
+import { userOperations, withdrawalOperations } from '@/lib/db-firebase'
+import { sendPushNotification } from '@/lib/push-notification'
 import bcrypt from 'bcryptjs'
 
 export async function POST(request: NextRequest) {
@@ -26,12 +27,42 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ success: false, message: 'لا يوجد طلب تأكيد معلق' }, { status: 400 })
     }
 
-    // Clear pendingConfirmation
+    // Clear pendingConfirmation on user
     await userOperations.update({ id: userId }, { pendingConfirmation: null })
+
+    // Update withdrawal status to 'completed'
+    try {
+      await withdrawalOperations.update(withdrawalId, { status: 'completed' })
+    } catch (updateErr) {
+      console.error('[confirm-receipt] Failed to update withdrawal status:', updateErr)
+      // Don't fail the whole request — user already confirmed
+    }
+
+    // Send push notification to all admin users
+    try {
+      const db = (await import('@/lib/firebase')).getDb()
+      const adminDocs = await db.collection('users').where('role', '==', 'admin').limit(10).get()
+      for (const adminDoc of adminDocs.docs) {
+        const adminId = adminDoc.id
+        const withdrawal = await withdrawalOperations.findUnique(withdrawalId)
+        const amount = withdrawal?.amount || 0
+        await sendPushNotification(
+          adminId,
+          'تأكيد استلام سحب',
+          `المستخدم ${user.fullName || user.email} أكد استلام سحب بقيمة ${amount.toFixed(2)} USDT`,
+          'success',
+          { withdrawalId, userId }
+        )
+      }
+    } catch (notifyErr) {
+      console.error('[confirm-receipt] Failed to send admin notification:', notifyErr)
+      // Don't fail the whole request
+    }
 
     return NextResponse.json({ success: true, message: 'تم تأكيد الاستلام بنجاح' })
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : 'حدث خطأ'
+    console.error('[confirm-receipt] Error:', error)
     return NextResponse.json({ success: false, message }, { status: 500 })
   }
 }
