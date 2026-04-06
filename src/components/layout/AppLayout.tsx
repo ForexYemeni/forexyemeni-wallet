@@ -77,15 +77,17 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     }
 
     // Listen for Android back button via Capacitor
+    let listenerHandle: any = null
     const setupBackButton = async () => {
       try {
         const { App } = await import('@capacitor/app')
-        App.addListener('backButton', handleBackButton)
+        listenerHandle = await App.addListener('backButton', handleBackButton)
       } catch {
         // Capacitor not available (web browser)
       }
     }
     setupBackButton()
+    return () => { listenerHandle?.remove?.() }
   }, [currentScreen])
 
   // Session timeout check (7 days)
