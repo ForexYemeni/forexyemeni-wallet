@@ -85,6 +85,12 @@ export async function POST(request: NextRequest) {
       const netAmount = withdrawal.netAmount ?? (withdrawal.amount - withdrawal.fee)
       const withdrawalFee = withdrawal.fee ?? 0
 
+      // 1. Send notification FIRST - ensure user gets notified regardless of other operations
+      const title = 'تم السحب'
+      const message = `تم سحب ${netAmount.toFixed(2)} USDT بنجاح. يرجى تأكيد الاستلام.`
+      await notificationOperations.create({ userId: withdrawal.userId, title, message, type: 'success', read: false })
+      sendPushNotification(withdrawal.userId, title, message, 'success').catch(() => {})
+
       const user = await userOperations.findUnique({ id: withdrawal.userId })
       if (user) {
         // Unfreeze only the amount (not amount + fee, since fee is deducted from amount)
@@ -112,7 +118,11 @@ export async function POST(request: NextRequest) {
         const sendWProcessing = user.role === 'merchant'
           ? sendMerchantWithdrawalProcessingEmail
           : sendUserWithdrawalProcessingEmail
-        await sendWProcessing(user.email, user.fullName || user.email, netAmount, withdrawal.toAddress, withdrawal.id).catch(() => {})
+        if (user.role === 'merchant') {
+          await sendMerchantWithdrawalProcessingEmail(user.email, user.fullName || user.email, netAmount, withdrawal.toAddress, withdrawal.id).catch(() => {})
+        } else {
+          await sendUserWithdrawalProcessingEmail(user.email, user.fullName || user.email, withdrawal.amount, netAmount, withdrawal.toAddress, withdrawal.id).catch(() => {})
+        }
       }
 
       // Credit fee to admin's account
@@ -146,11 +156,6 @@ export async function POST(request: NextRequest) {
         } catch (adminErr) {
         }
       }
-
-      const title = 'تم السحب'
-      const message = `تم سحب ${netAmount.toFixed(2)} USDT بنجاح. يرجى تأكيد الاستلام.`
-      await notificationOperations.create({ userId: withdrawal.userId, title, message, type: 'success', read: false })
-      sendPushNotification(withdrawal.userId, title, message, 'success').catch(() => {})
     }
 
     if (status === 'rejected') {
