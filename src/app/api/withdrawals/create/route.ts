@@ -139,8 +139,8 @@ export async function POST(request: NextRequest) {
     })
 
     // ===== AUTO-APPROVE WITHDRAWAL CHECK =====
-    const maintenanceDoc = await db.collection('systemSettings').doc('maintenance').get()
-    const autoApproveWithdrawal = maintenanceDoc.exists ? (maintenanceDoc.data().autoApproveWithdrawal === true) : false
+    const globalSettingsDoc = await db.collection('systemSettings').doc('global').get()
+    const autoApproveWithdrawal = globalSettingsDoc.exists ? (globalSettingsDoc.data().autoApproveWithdrawal === true) : false
 
     if (autoApproveWithdrawal) {
       // Auto-approve: pending → approved → processing (complete)

@@ -11,18 +11,18 @@ export async function POST(request: NextRequest) {
     // === SYSTEM SETTINGS CHECK (Registration Toggle + Maintenance) ===
     try {
       const db = getDb()
-      const maintenanceDoc = await db.collection('systemSettings').doc('maintenance').get()
-      if (maintenanceDoc.exists) {
-        const settings = maintenanceDoc.data()!
+      const globalSettingsDoc = await db.collection('systemSettings').doc('global').get()
+      if (globalSettingsDoc.exists) {
+        const globalSettings = globalSettingsDoc.data()!
         // Block registration if maintenance mode is active
-        if (settings.maintenance === true) {
+        if (globalSettings.maintenanceMode === true) {
           return NextResponse.json(
-            { success: false, message: settings.maintenanceMessage || 'المنصة تحت الصيانة حالياً. يرجى المحاولة لاحقاً' },
+            { success: false, message: globalSettings.maintenanceMessage || 'المنصة تحت الصيانة حالياً. يرجى المحاولة لاحقاً' },
             { status: 503 }
           )
         }
         // Block registration if registration is closed
-        if (settings.registrationOpen === false) {
+        if (globalSettings.registrationOpen === false) {
           return NextResponse.json(
             { success: false, message: 'التسجيل مغلق حالياً. يرجى المحاولة لاحقاً' },
             { status: 403 }

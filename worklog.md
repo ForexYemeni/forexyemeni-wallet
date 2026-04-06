@@ -53,3 +53,33 @@ Stage Summary:
 - Created: src/components/layout/AnnouncementBanner.tsx
 - Modified: src/components/settings/Settings.tsx - Added support info section in About tab
 - Modified: src/components/layout/AppLayout.tsx - Added AnnouncementBanner import and render
+
+---
+Task ID: 1-2
+Agent: Main
+Task: Fix login showing wrong password for all users + forgot password RESOURCE_EXHAUSTED error
+
+Work Log:
+- Investigated login route code thoroughly - found the maintenance mode check was reading from wrong Firestore document
+- The admin panel writes maintenance settings to `systemSettings/global` with field `maintenanceMode`
+- But login/register routes were reading from `systemSettings/maintenance` with field `maintenance`
+- This mismatch meant the toggle had zero effect on actual blocking
+- Added email trimming (trim + lowercase) to avoid whitespace issues
+- Added guard for missing/corrupted passwordHash field with console.error logging
+- Wrapped bcrypt.compare in try-catch for safer error handling
+- Added graceful handling for Firebase RESOURCE_EXHAUSTED errors in both login and forgot-password
+- Fixed forgot-password route to also handle quota errors gracefully
+- Updated all 6 files that referenced the wrong maintenance document:
+  - src/app/api/auth/login/route.ts
+  - src/app/api/auth/register/route.ts
+  - src/app/api/deposits/create/route.ts
+  - src/app/api/withdrawals/create/route.ts
+  - src/app/api/announcements/route.ts
+  - src/app/api/support-info/route.ts
+
+Stage Summary:
+- Fixed maintenance mode document mismatch across all routes (all now read from systemSettings/global)
+- Added email trimming in login and forgot-password routes
+- Added passwordHash validation and bcrypt error handling in login route
+- Added RESOURCE_EXHAUSTED graceful error handling in login and forgot-password routes
+- All 6 routes now consistently reference systemSettings/global document

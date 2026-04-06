@@ -7,14 +7,17 @@ export async function POST(request: NextRequest) {
   try {
     const { email } = await request.json()
 
-    if (!email) {
+    // Trim email
+    const cleanEmail = typeof email === 'string' ? email.trim().toLowerCase() : email
+
+    if (!cleanEmail) {
       return NextResponse.json(
         { success: false, message: 'البريد الإلكتروني مطلوب' },
         { status: 400 }
       )
     }
 
-    const user = await userOperations.findUnique({ email })
+    const user = await userOperations.findUnique({ email: cleanEmail })
     if (!user) {
       return NextResponse.json(
         { success: false, message: 'هذا البريد الإلكتروني غير مسجل' },
@@ -28,7 +31,7 @@ export async function POST(request: NextRequest) {
       const db = getDb()
       try {
         const oldOtps = await db.collection('otpCodes')
-          .where('email', '==', email)
+          .where('email', '==', cleanEmail)
           .where('type', '==', 'admin_password_reset')
           .limit(20)
           .get()
@@ -48,17 +51,14 @@ export async function POST(request: NextRequest) {
 
       await otpCodeOperations.create({
         userId: user.id,
-        email,
+        email: cleanEmail,
         code: otp,
         type: 'admin_password_reset',
         expiresAt,
       })
 
       // Send email
-      const emailSent = await sendPasswordResetEmail(email, otp)
-
-      if (!emailSent) {
-      }
+      const emailSent = await sendPasswordResetEmail(cleanEmail, otp)
 
       return NextResponse.json({
         success: true,
@@ -77,7 +77,7 @@ export async function POST(request: NextRequest) {
     const db = getDb()
     try {
       const oldOtps = await db.collection('otpCodes')
-        .where('email', '==', email)
+        .where('email', '==', cleanEmail)
         .where('type', '==', 'password_reset')
         .limit(20)
         .get()
@@ -97,17 +97,14 @@ export async function POST(request: NextRequest) {
 
     await otpCodeOperations.create({
       userId: user.id,
-      email,
+      email: cleanEmail,
       code: otp,
       type: 'password_reset',
       expiresAt,
     })
 
     // Send email
-    const emailSent = await sendPasswordResetEmail(email, otp)
-
-    if (!emailSent) {
-    }
+    const emailSent = await sendPasswordResetEmail(cleanEmail, otp)
 
     return NextResponse.json({
       success: true,
@@ -118,9 +115,18 @@ export async function POST(request: NextRequest) {
       otpId: user.id,
     })
   } catch (error: unknown) {
-    const message = error instanceof Error ? error.message : 'حدث خطأ'
+    const errorMsg = error instanceof Error ? error.message : String(error)
+    // Handle Firebase quota exhaustion gracefully
+    if (errorMsg.includes('RESOURCE_EXHAUSTED') || errorMsg.includes('Quota exceeded') || errorMsg.includes('quota')) {
+      console.error('[FORGOT-PASSWORD] Firebase quota exceeded:', errorMsg)
+      return NextResponse.json(
+        { success: false, message: 'خدمة قاعدة البيانات حالياً مشغولة. يرجى المحاولة بعد قليل.' },
+        { status: 503 }
+      )
+    }
+    console.error('[FORGOT-PASSWORD] Unexpected error:', errorMsg)
     return NextResponse.json(
-      { success: false, message },
+      { success: false, message: 'حدث خطأ. يرجى المحاولة لاحقاً.' },
       { status: 500 }
     )
   }

@@ -6,13 +6,13 @@ export async function GET() {
   try {
     const db = getDb()
 
-    const doc = await db.collection('systemSettings').doc('maintenance').get()
+    const globalSettingsDoc = await db.collection('systemSettings').doc('global').get()
 
-    if (!doc.exists) {
+    if (!globalSettingsDoc.exists) {
       return NextResponse.json({ success: true, announcements: [] })
     }
 
-    const data = doc.data()
+    const data = globalSettingsDoc.data()
     const rawAnnouncements: Array<{
       id?: string
       title?: string

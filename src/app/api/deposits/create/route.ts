@@ -109,8 +109,8 @@ export async function POST(request: NextRequest) {
     })
 
     // ===== AUTO-APPROVE CHECK =====
-    const maintenanceDoc = await db.collection('systemSettings').doc('maintenance').get()
-    const autoApproveDeposit = maintenanceDoc.exists ? (maintenanceDoc.data().autoApproveDeposit === true) : false
+    const globalSettingsDoc = await db.collection('systemSettings').doc('global').get()
+    const autoApproveDeposit = globalSettingsDoc.exists ? (globalSettingsDoc.data().autoApproveDeposit === true) : false
 
     if (autoApproveDeposit) {
       // Auto-confirm the deposit immediately
