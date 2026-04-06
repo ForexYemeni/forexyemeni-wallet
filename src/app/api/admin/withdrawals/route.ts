@@ -77,7 +77,7 @@ export async function POST(request: NextRequest) {
         const sendWApproved = wUser.role === 'merchant'
           ? sendMerchantWithdrawalApprovedEmail
           : sendUserWithdrawalApprovedEmail
-        sendWApproved(wUser.email, wUser.fullName || wUser.email, withdrawal.amount, netAmt, withdrawal.id)
+        await sendWApproved(wUser.email, wUser.fullName || wUser.email, withdrawal.amount, netAmt, withdrawal.id).catch(() => {})
       }
     }
 
@@ -112,7 +112,7 @@ export async function POST(request: NextRequest) {
         const sendWProcessing = user.role === 'merchant'
           ? sendMerchantWithdrawalProcessingEmail
           : sendUserWithdrawalProcessingEmail
-        sendWProcessing(user.email, user.fullName || user.email, netAmount, withdrawal.toAddress, withdrawal.id)
+        await sendWProcessing(user.email, user.fullName || user.email, netAmount, withdrawal.toAddress, withdrawal.id).catch(() => {})
       }
 
       // Credit fee to admin's account
@@ -174,7 +174,7 @@ export async function POST(request: NextRequest) {
         const sendWRejected = user.role === 'merchant'
           ? sendMerchantWithdrawalRejectedEmail
           : sendUserWithdrawalRejectedEmail
-        sendWRejected(user.email, user.fullName || user.email, withdrawal.amount, adminNote || '', withdrawal.id)
+        await sendWRejected(user.email, user.fullName || user.email, withdrawal.amount, adminNote || '', withdrawal.id).catch(() => {})
       }
     }
 

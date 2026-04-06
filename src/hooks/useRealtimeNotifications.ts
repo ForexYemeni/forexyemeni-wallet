@@ -52,31 +52,25 @@ export function useRealtimeNotifications() {
       // Get the latest notification
       const latest = newOnes[0]
 
-      // v3.6.2 FIX: In native app (APK), FCM handles sound + notification display.
-      // Skip sound/banner here to avoid DUPLICATE notifications.
-      // Polling still updates the notification list (badge count).
-      const isNative = typeof window !== 'undefined' && !!(window as any).Capacitor?.isNativePlatform?.()
+      // Always play sound and show notification for ALL platforms (native + web)
+      // FCM may not be working or tokens may not exist, so we need this as fallback
+      try {
+        await initAudioOnInteraction()
+      } catch {}
 
-      if (!isNative) {
-        // Web only: play sound and show browser notification
-        try {
-          await initAudioOnInteraction()
-        } catch {}
-
-        try {
-          if (latest.type === 'success') {
-            await playSuccessSound(latest.type)
-          } else if (latest.type === 'warning' || latest.type === 'error') {
-            await playAlertSound(latest.type)
-          } else {
-            await playNotificationSound(latest.type)
-          }
-        } catch {
-          // Sound failed silently
+      try {
+        if (latest.type === 'success') {
+          await playSuccessSound(latest.type)
+        } else if (latest.type === 'warning' || latest.type === 'error') {
+          await playAlertSound(latest.type)
+        } else {
+          await playNotificationSound(latest.type)
         }
-
-        await showBrowserNotification(latest.title, latest.message)
+      } catch {
+        // Sound failed silently
       }
+
+      await showBrowserNotification(latest.title, latest.message)
 
       // Update last checked timestamp
       lastCheckedRef.current = newOnes[0].createdAt
