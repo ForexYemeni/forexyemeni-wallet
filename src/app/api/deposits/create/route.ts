@@ -37,8 +37,21 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Fetch deposit fee from settings
+    // Check for existing pending deposit
     const db = getDb()
+    const pendingDeposits = await db.collection('deposits')
+      .where('userId', '==', userId)
+      .where('status', 'in', ['pending', 'reviewing'])
+      .limit(1)
+      .get()
+    if (!pendingDeposits.empty) {
+      return NextResponse.json(
+        { success: false, message: 'لديك طلب إيداع معلق بالفعل، يرجى الانتظار حتى يتم معالجته قبل تقديم طلب جديد' },
+        { status: 400 }
+      )
+    }
+
+    // Fetch deposit fee from settings
     const settingsDoc = await db.collection('systemSettings').doc('fees').get()
     const depositFeePercentage = settingsDoc.exists ? (settingsDoc.data().depositFee || 0) : 0
 

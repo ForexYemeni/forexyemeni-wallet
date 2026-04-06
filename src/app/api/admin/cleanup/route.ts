@@ -249,7 +249,7 @@ export async function POST(request: NextRequest) {
       const adminSnapshot = await db.collection('users').where('role', '==', 'admin').limit(20).get()
       const batch = db.batch()
       for (const doc of adminSnapshot.docs) {
-        batch.update(doc.ref, { balance: 0, frozenBalance: 0 })
+        batch.update(doc.ref, { balance: 0, frozenBalance: 0, accountNumber: 1000 })
       }
       if (adminSnapshot.size > 0) {
         await batch.commit()
@@ -257,6 +257,14 @@ export async function POST(request: NextRequest) {
       }
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : String(e)
+    }
+
+    // 12. Reset account number counter to start from 1001
+    try {
+      await db.collection('counters').doc('accountNumber').set({ value: 1000 })
+      results.accountCounterReset = true
+    } catch (e: unknown) {
+      results.accountCounterReset = false
     }
 
     return NextResponse.json({

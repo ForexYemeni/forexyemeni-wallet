@@ -39,6 +39,20 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    // Check for existing pending withdrawal
+    const db = getDb()
+    const pendingWithdrawals = await db.collection('withdrawals')
+      .where('userId', '==', userId)
+      .where('status', 'in', ['pending', 'processing'])
+      .limit(1)
+      .get()
+    if (!pendingWithdrawals.empty) {
+      return NextResponse.json(
+        { success: false, message: 'لديك طلب سحب معلق بالفعل، يرجى الانتظار حتى يتم معالجته قبل تقديم طلب جديد' },
+        { status: 400 }
+      )
+    }
+
     if (!pin) {
       return NextResponse.json(
         { success: false, message: 'رمز PIN مطلوب لإجراء السحب', needsPin: true },
@@ -55,7 +69,6 @@ export async function POST(request: NextRequest) {
     }
 
     // Fetch fee from settings
-    const db = getDb()
     const settingsDoc = await db.collection('systemSettings').doc('fees').get()
     const feePercentage = settingsDoc.exists ? (settingsDoc.data().withdrawalFee || 0.1) : 0.1
 
