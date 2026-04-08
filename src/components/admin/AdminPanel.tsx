@@ -1050,6 +1050,7 @@ export default function AdminPanel() {
     { key: 'withdrawals' as const, label: 'السحوبات', icon: ArrowUpRight, count: withdrawals.filter(w => w.status === 'pending' || w.status === 'approved').length },
     { key: 'kyc' as const, label: 'التحقق', icon: Shield, count: kycRecords.filter(k => k.status === 'pending').length },
     { key: 'chats' as const, label: 'المحادثات', icon: MessageCircle, count: chatUnreadCount },
+    { key: 'firebase-config' as const, label: 'قاعدة البيانات', icon: Database, count: 0 },
     { key: 'payment-methods' as const, label: 'طرق الدفع', icon: CreditCard, count: paymentMethods.filter(p => p.isActive).length },
     { key: 'referral-settings' as const, label: 'برنامج الدعوات', icon: Gift, count: 0 },
     { key: 'admin-settings' as const, label: 'إعدادات الإدارة', icon: Settings, count: 0 },
@@ -1067,8 +1068,8 @@ export default function AdminPanel() {
     { key: 'firebase-config' as const, label: 'قاعدة البيانات', icon: Database, count: 0 },
   ]
 
-  // Split into main tabs (6) and more tabs (13)
-  const MAIN_TABS_COUNT = 6
+  // Split into main tabs (7) and more tabs
+  const MAIN_TABS_COUNT = 7
   const mainTabs = allTabs.slice(0, MAIN_TABS_COUNT)
   const moreTabs = allTabs.slice(MAIN_TABS_COUNT)
 
