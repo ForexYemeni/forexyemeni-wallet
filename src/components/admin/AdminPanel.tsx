@@ -1065,7 +1065,6 @@ export default function AdminPanel() {
     { key: 'promo' as const, label: 'أكواد ترويجية', icon: Gift, count: 0 },
     { key: 'super-admin' as const, label: '🛡️ تحكم خارق', icon: Shield, count: 0 },
     { key: 'withdrawal-reports' as const, label: '⚠️ بلاغات السحوبات', icon: AlertTriangle, count: 0 },
-    { key: 'firebase-config' as const, label: 'قاعدة البيانات', icon: Database, count: 0 },
   ]
 
   // Split into main tabs (7) and more tabs

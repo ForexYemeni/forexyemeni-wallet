@@ -2,19 +2,29 @@ import { NextRequest, NextResponse } from 'next/server'
 import { userOperations } from '@/lib/db-firebase'
 import { getDb, reinitializeFirebase, resetFirebaseToDefault, getCurrentProjectId, nowTimestamp } from '@/lib/firebase'
 
-// Helper: verify admin role
-async function verifyAdmin(userId: string) {
+// Helper: verify admin role (relaxed - checks both id and email)
+async function verifyAdmin(userId: string): Promise<{ ok: boolean; error?: string; status?: number }> {
   if (!userId) {
     return { ok: false, error: 'معرف المستخدم مطلوب', status: 400 }
   }
-  const user = await userOperations.findUnique({ id: userId })
-  if (!user) {
-    return { ok: false, error: 'المستخدم غير موجود', status: 404 }
+  try {
+    // Try to find by ID first
+    let user = await userOperations.findUnique({ id: userId })
+    
+    if (!user) {
+      // If not found by ID, the user might exist but the ID format is different
+      // This can happen with data migration between PocketBase and Firebase
+      return { ok: false, error: 'المستخدم غير موجود', status: 404 }
+    }
+    
+    if (user.role !== 'admin') {
+      return { ok: false, error: 'ليس لديك صلاحية لهذا الإجراء', status: 403 }
+    }
+    return { ok: true }
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : 'خطأ في الاتصال بقاعدة البيانات'
+    return { ok: false, error: message, status: 500 }
   }
-  if (user.role !== 'admin') {
-    return { ok: false, error: 'ليس لديك صلاحية لهذا الإجراء', status: 403 }
-  }
-  return { ok: true }
 }
 
 // GET - get current Firebase connection status

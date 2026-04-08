@@ -17,6 +17,8 @@ import {
   Shield,
   Loader2,
   ClipboardPaste,
+  UserX,
+  WifiOff,
 } from 'lucide-react'
 
 interface ConnectionStatus {
@@ -27,10 +29,16 @@ interface ConnectionStatus {
   updatedAt: string | null
 }
 
+interface ErrorState {
+  type: 'user_not_found' | 'permission_denied' | 'network' | 'unknown'
+  message: string
+}
+
 export default function FirebaseConfig() {
   const { user } = useAuthStore()
   const [status, setStatus] = useState<ConnectionStatus | null>(null)
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<ErrorState | null>(null)
   const [serviceAccountKey, setServiceAccountKey] = useState('')
   const [testing, setTesting] = useState(false)
   const [saving, setSaving] = useState(false)
@@ -38,17 +46,33 @@ export default function FirebaseConfig() {
   const [testResult, setTestResult] = useState<{ success: boolean; message: string; projectId?: string } | null>(null)
 
   const fetchStatus = useCallback(async () => {
-    if (!user?.id) return
+    if (!user?.id) {
+      setError({ type: 'user_not_found', message: 'لم يتم تحديد هوية المستخدم. يرجى تسجيل الدخول مجدداً.' })
+      setLoading(false)
+      return
+    }
+    setLoading(true)
+    setError(null)
     try {
       const res = await fetch(`/api/admin/firebase-config?userId=${user.id}`)
       const data = await res.json()
       if (data.success) {
         setStatus(data)
+        setError(null)
       } else {
-        toast.error(data.message)
+        // Categorize the error
+        if (data.message?.includes('المستخدم غير موجود')) {
+          setError({ type: 'user_not_found', message: data.message })
+        } else if (data.message?.includes('صلاحية')) {
+          setError({ type: 'permission_denied', message: data.message })
+        } else if (res.status === 500 || res.status === 503) {
+          setError({ type: 'network', message: data.message || 'خطأ في الاتصال بالخادم' })
+        } else {
+          setError({ type: 'unknown', message: data.message || 'حدث خطأ غير متوقع' })
+        }
       }
     } catch {
-      toast.error('خطأ في جلب حالة الاتصال')
+      setError({ type: 'network', message: 'تعذر الاتصال بالخادم. تحقق من اتصالك بالإنترنت.' })
     } finally {
       setLoading(false)
     }
@@ -203,6 +227,96 @@ export default function FirebaseConfig() {
     return (
       <div className="flex items-center justify-center py-16">
         <Loader2 className="w-8 h-8 animate-spin text-gold" />
+      </div>
+    )
+  }
+
+  // Render error state
+  if (error) {
+    return (
+      <div className="space-y-4">
+        {/* Header */}
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-gold/10 flex items-center justify-center">
+              <Database className="w-5 h-5 text-gold" />
+            </div>
+            <div>
+              <h2 className="text-lg font-bold gold-text">ربط قاعدة البيانات</h2>
+              <p className="text-xs text-muted-foreground">ربط تطبيقك بقاعدة بيانات Firebase مختلفة</p>
+            </div>
+          </div>
+        </div>
+
+        {/* Error Card */}
+        <div className="glass-card p-4 rounded-xl border border-red-500/20 bg-red-500/5 space-y-3">
+          <div className="flex items-start gap-3">
+            {error.type === 'user_not_found' ? (
+              <UserX className="w-5 h-5 text-red-400 mt-0.5 flex-shrink-0" />
+            ) : error.type === 'network' ? (
+              <WifiOff className="w-5 h-5 text-red-400 mt-0.5 flex-shrink-0" />
+            ) : (
+              <AlertTriangle className="w-5 h-5 text-red-400 mt-0.5 flex-shrink-0" />
+            )}
+            <div className="space-y-2 flex-1">
+              <h4 className="text-sm font-bold text-red-400">
+                {error.type === 'user_not_found' ? 'حساب المسؤول غير موجود' : 
+                 error.type === 'permission_denied' ? 'صلاحية مرفوضة' : 
+                 'خطأ في الاتصال'}
+              </h4>
+              <p className="text-xs text-muted-foreground leading-relaxed">{error.message}</p>
+              
+              {error.type === 'user_not_found' && (
+                <div className="p-3 rounded-lg bg-white/5 border border-white/10 space-y-1">
+                  <p className="text-xs text-muted-foreground font-medium">الحلول المقترحة:</p>
+                  <ul className="text-xs text-muted-foreground space-y-1 mr-2">
+                    <li className="flex items-start gap-1">
+                      <span className="text-gold">•</span>
+                      <span>تأكد أن حساب المسؤول موجود في قاعدة بيانات Firebase الحالية</span>
+                    </li>
+                    <li className="flex items-start gap-1">
+                      <span className="text-gold">•</span>
+                      <span>إذا كنت تستخدم قاعدة بيانات جديدة، سجّل حساب المسؤول فيها أولاً</span>
+                    </li>
+                    <li className="flex items-start gap-1">
+                      <span className="text-gold">•</span>
+                      <span>قد تحتاج لتسجيل الخروج وتسجيل الدخول مجدداً</span>
+                    </li>
+                  </ul>
+                </div>
+              )}
+
+              {error.type === 'network' && (
+                <div className="p-3 rounded-lg bg-white/5 border border-white/10 space-y-1">
+                  <p className="text-xs text-muted-foreground font-medium">الحلول المقترحة:</p>
+                  <ul className="text-xs text-muted-foreground space-y-1 mr-2">
+                    <li className="flex items-start gap-1">
+                      <span className="text-gold">•</span>
+                      <span>تحقق من اتصالك بالإنترنت</span>
+                    </li>
+                    <li className="flex items-start gap-1">
+                      <span className="text-gold">•</span>
+                      <span>تأكد أن قاعدة بيانات Firebase متاحة ومفعّلة</span>
+                    </li>
+                    <li className="flex items-start gap-1">
+                      <span className="text-gold">•</span>
+                      <span>حاول مرة أخرى بعد قليل</span>
+                    </li>
+                  </ul>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Retry Button */}
+          <Button
+            onClick={fetchStatus}
+            className="w-full flex items-center justify-center gap-2 bg-white/10 hover:bg-white/20 text-white rounded-lg h-10"
+          >
+            <RefreshCw className="w-4 h-4 text-gold" />
+            <span className="text-xs font-medium">إعادة المحاولة</span>
+          </Button>
+        </div>
       </div>
     )
   }
