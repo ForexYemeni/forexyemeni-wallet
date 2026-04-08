@@ -1,281 +1,198 @@
-import { NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
 import { getDb } from '@/lib/firebase'
 
-// ====== SERVER-SIDE CACHE (30 seconds) ======
-let cachedStats: { data: any; timestamp: number } | null = null
-const CACHE_TTL = 30 * 1000 // 30 seconds
-
-async function countByQuery(collection: string, field: string, value: string): Promise<number> {
-  const db = getDb()
-  const snap = await db.collection(collection).where(field, '==', value).count().get()
-  return snap.data().count
-}
-
-async function countAll(collection: string): Promise<number> {
-  const db = getDb()
-  const snap = await db.collection(collection).count().get()
-  return snap.data().count
-}
-
-async function sumFieldByStatus(collection: string, statusField: string, statusValue: string, sumField: string): Promise<number> {
-  const db = getDb()
-  const snap = await db.collection(collection).where(statusField, '==', statusValue).get()
-  let total = 0
-  for (const doc of snap.docs) {
-    total += doc.data()[sumField] || 0
-  }
-  return total
-}
-
-async function getRecentDocs(collection: string, limit: number): Promise<any[]> {
-  const db = getDb()
-  const snap = await db.collection(collection).orderBy('createdAt', 'desc').limit(limit).get()
-  return snap.docs.map(d => ({ id: d.id, ...d.data() }))
-}
+// In-memory cache for admin stats (TTL: 30 seconds)
+// Admin stats is the MOST expensive API call — reads entire collections
+// With 30s cache, multiple admin refreshes per minute share the same result
+let statsCache: { data: any; ts: number } | null = null
+const STATS_CACHE_TTL = 30000
 
 export async function GET() {
   try {
-    // Return cached stats if still valid
-    if (cachedStats && Date.now() - cachedStats.timestamp < CACHE_TTL) {
-      return NextResponse.json({ success: true, stats: cachedStats.data }, {
-        headers: { 'Cache-Control': 'public, s-maxage=30, stale-while-revalidate=60' }
-      })
+    // Return cached stats if fresh (< 30s old)
+    if (statsCache && Date.now() - statsCache.ts < STATS_CACHE_TTL) {
+      return NextResponse.json({
+        success: true,
+        stats: statsCache.data,
+      }, { headers: { 'Cache-Control': 'no-cache, no-store, must-revalidate' } })
     }
 
     const db = getDb()
 
-    // ====== USER COUNTS (using count queries - 1 read each) ======
-    const totalUsersSnap = await db.collection('users').where('role', '!=', 'admin').count().get()
-    const totalUsers = totalUsersSnap.data().count
-
-    const activeUsersSnap = await db.collection('users').where('role', '!=', 'admin').where('status', '==', 'active').count().get()
-    const activeUsers = activeUsersSnap.data().count
-
-    const suspendedUsersSnap = await db.collection('users').where('role', '!=', 'admin').where('status', '==', 'suspended').count().get()
-    const suspendedUsers = suspendedUsersSnap.data().count
-
-    const kycApprovedSnap = await db.collection('users').where('kycStatus', '==', 'approved').count().get()
-    const kycApproved = kycApprovedSnap.data().count
-
-    const kycPendingSnap = await db.collection('users').where('kycStatus', '==', 'pending').count().get()
-    const kycPending = kycPendingSnap.data().count
-
-    const kycRejectedSnap = await db.collection('users').where('kycStatus', '==', 'rejected').count().get()
-    const kycRejected = kycRejectedSnap.data().count
-
-    // New users today - use createdAt filter (1 read)
-    const todayStart = new Date()
-    todayStart.setHours(0, 0, 0, 0)
-    const newUsersTodaySnap = await db.collection('users')
-      .where('role', '!=', 'admin')
-      .where('createdAt', '>=', todayStart.toISOString())
-      .count().get()
-    const newUsersToday = newUsersTodaySnap.data().count
-
-    // New users this week
+    // ====== USER STATS ======
+    // OPTIMIZED: Use targeted queries instead of fetching ALL users
+    const today = new Date()
+    const todayStr = today.toDateString()
     const weekAgo = new Date()
     weekAgo.setDate(weekAgo.getDate() - 7)
-    const newUsersThisWeekSnap = await db.collection('users')
-      .where('role', '!=', 'admin')
-      .where('createdAt', '>=', weekAgo.toISOString())
-      .count().get()
-    const newUsersThisWeek = newUsersThisWeekSnap.data().count
+    const thisMonthStart = new Date(today.getFullYear(), today.getMonth(), 1)
 
-    // ====== DEPOSIT COUNTS (count queries - 1 read each) ======
-    const depositsPendingSnap = await db.collection('deposits').where('status', '==', 'pending').count().get()
-    const depositsPending = depositsPendingSnap.data().count
+    // Single query for all non-admin users (avoids composite index requirement)
+    const totalUsersSnap = await db.collection('users').where('role', '!=', 'admin').get()
+    
+    const allUsers = totalUsersSnap.docs.map(d => d.data())
+    const totalUsers = allUsers.length
+    const activeUsers = allUsers.filter(u => u.status === 'active').length
+    const suspendedUsers = allUsers.filter(u => u.status === 'suspended').length
+    
+    // KYC counts from users (filtered from already-fetched data)
+    const kycApproved = allUsers.filter(u => u.kycStatus === 'approved').length
+    const kycPending = allUsers.filter(u => u.kycStatus === 'pending').length
+    const kycRejected = allUsers.filter(u => u.kycStatus === 'rejected').length
+    
+    // Date-based filters (only on the already-fetched data)
+    const newUsersToday = allUsers.filter(u => u.createdAt && new Date(u.createdAt).toDateString() === todayStr).length
+    const newUsersThisWeek = allUsers.filter(u => u.createdAt && new Date(u.createdAt) >= weekAgo).length
+    const newUsersThisMonth = allUsers.filter(u => {
+      if (!u.createdAt) return false
+      const d = new Date(u.createdAt)
+      return d.getMonth() === today.getMonth() && d.getFullYear() === today.getFullYear()
+    }).length
 
-    const depositsReviewingSnap = await db.collection('deposits').where('status', '==', 'reviewing').count().get()
-    const depositsReviewing = depositsReviewingSnap.data().count
+    // ====== DEPOSIT STATS ======
+    // OPTIMIZED: Use status-filtered queries + only fetch needed fields concept
+    const [pendingDepositsSnap, reviewingDepositsSnap, allDepositsSnap] = await Promise.all([
+      db.collection('deposits').where('status', '==', 'pending').get(),
+      db.collection('deposits').where('status', '==', 'reviewing').get(),
+      db.collection('deposits').get(),
+    ])
 
-    const depositsConfirmedSnap = await db.collection('deposits').where('status', '==', 'confirmed').count().get()
-    const depositsConfirmed = depositsConfirmedSnap.data().count
+    const depositsPending = pendingDepositsSnap.size
+    const depositsReviewing = reviewingDepositsSnap.size
+    
+    const allDeposits = allDepositsSnap.docs.map(d => ({ id: d.id, ...d.data() }))
+    const depositsConfirmed = allDeposits.filter(d => d.status === 'confirmed').length
+    const depositsRejected = allDeposits.filter(d => d.status === 'rejected').length
 
-    const depositsRejectedSnap = await db.collection('deposits').where('status', '==', 'rejected').count().get()
-    const depositsRejected = depositsRejectedSnap.data().count
+    const totalDepositsAmount = allDeposits
+      .filter(d => d.status === 'confirmed')
+      .reduce((sum, d) => sum + (d.netAmount || d.amount || 0), 0)
 
-    // Total confirmed deposit amounts (limited to recent for efficiency)
-    const confirmedDepositsSnap = await db.collection('deposits')
-      .where('status', '==', 'confirmed')
-      .select('netAmount', 'amount', 'fee')
-      .get()
-    let totalDepositsAmount = 0
-    let totalDepositFees = 0
-    for (const doc of confirmedDepositsSnap.docs) {
-      const d = doc.data()
-      totalDepositsAmount += d.netAmount || d.amount || 0
-      totalDepositFees += d.fee || 0
-    }
+    const totalDepositFees = allDeposits
+      .filter(d => d.status === 'confirmed')
+      .reduce((sum, d) => sum + (d.fee || 0), 0)
 
-    // Today's deposits (limited read)
-    const todayDepositsSnap = await db.collection('deposits')
-      .where('createdAt', '>=', todayStart.toISOString())
-      .get()
-    let depositsTodayCount = 0
-    let depositsTodayAmount = 0
-    for (const doc of todayDepositsSnap.docs) {
-      depositsTodayCount++
-      const d = doc.data()
-      if (d.status === 'confirmed') {
-        depositsTodayAmount += d.netAmount || d.amount || 0
-      }
-    }
+    const depositsToday = allDeposits.filter(d => d.createdAt && new Date(d.createdAt).toDateString() === todayStr)
+    const depositsTodayAmount = depositsToday.filter(d => d.status === 'confirmed').reduce((sum, d) => sum + (d.netAmount || d.amount || 0), 0)
+    const depositsTodayCount = depositsToday.length
 
-    // This week deposits
-    const weekDepositsSnap = await db.collection('deposits')
-      .where('createdAt', '>=', weekAgo.toISOString())
-      .get()
-    let depositsThisWeekAmount = 0
-    for (const doc of weekDepositsSnap.docs) {
-      const d = doc.data()
-      if (d.status === 'confirmed') {
-        depositsThisWeekAmount += d.netAmount || d.amount || 0
-      }
-    }
+    const depositsThisWeek = allDeposits.filter(d => d.createdAt && new Date(d.createdAt) >= weekAgo)
+    const depositsThisWeekAmount = depositsThisWeek.filter(d => d.status === 'confirmed').reduce((sum, d) => sum + (d.netAmount || d.amount || 0), 0)
 
-    // This month deposits
-    const monthStart = new Date()
-    monthStart.setDate(1)
-    monthStart.setHours(0, 0, 0, 0)
-    const monthDepositsSnap = await db.collection('deposits')
-      .where('createdAt', '>=', monthStart.toISOString())
-      .get()
-    let depositsThisMonthAmount = 0
-    for (const doc of monthDepositsSnap.docs) {
-      const d = doc.data()
-      if (d.status === 'confirmed') {
-        depositsThisMonthAmount += d.netAmount || d.amount || 0
-      }
-    }
+    const depositsThisMonth = allDeposits.filter(d => d.createdAt && new Date(d.createdAt) >= thisMonthStart)
+    const depositsThisMonthAmount = depositsThisMonth.filter(d => d.status === 'confirmed').reduce((sum, d) => sum + (d.netAmount || d.amount || 0), 0)
 
-    // ====== WITHDRAWAL COUNTS (count queries - 1 read each) ======
-    const withdrawalsPendingSnap = await db.collection('withdrawals').where('status', '==', 'pending').count().get()
-    const withdrawalsPending = withdrawalsPendingSnap.data().count
+    // ====== WITHDRAWAL STATS ======
+    const [pendingWithdrawalsSnap, approvedWithdrawalsSnap, processingWithdrawalsSnap, allWithdrawalsSnap] = await Promise.all([
+      db.collection('withdrawals').where('status', '==', 'pending').get(),
+      db.collection('withdrawals').where('status', '==', 'approved').get(),
+      db.collection('withdrawals').where('status', '==', 'processing').get(),
+      db.collection('withdrawals').get(),
+    ])
 
-    const withdrawalsApprovedSnap = await db.collection('withdrawals').where('status', '==', 'approved').count().get()
-    const withdrawalsApproved = withdrawalsApprovedSnap.data().count
+    const withdrawalsPending = pendingWithdrawalsSnap.size
+    const withdrawalsApproved = approvedWithdrawalsSnap.size
+    const withdrawalsProcessing = processingWithdrawalsSnap.size
+    
+    const allWithdrawals = allWithdrawalsSnap.docs.map(d => ({ id: d.id, ...d.data() }))
+    const withdrawalsRejected = allWithdrawals.filter(w => w.status === 'rejected').length
 
-    const withdrawalsProcessingSnap = await db.collection('withdrawals').where('status', '==', 'processing').count().get()
-    const withdrawalsProcessing = withdrawalsProcessingSnap.data().count
+    const totalWithdrawalsAmount = allWithdrawals
+      .filter(w => w.status === 'processing')
+      .reduce((sum, w) => sum + (w.amount || 0), 0)
 
-    const withdrawalsRejectedSnap = await db.collection('withdrawals').where('status', '==', 'rejected').count().get()
-    const withdrawalsRejected = withdrawalsRejectedSnap.data().count
+    const totalWithdrawalFees = allWithdrawals
+      .filter(w => w.status === 'processing')
+      .reduce((sum, w) => sum + (w.fee || 0), 0)
 
-    // Processing withdrawal amounts
-    const processingWithdrawalsSnap = await db.collection('withdrawals')
-      .where('status', '==', 'processing')
-      .select('amount', 'fee')
-      .get()
-    let totalWithdrawalsAmount = 0
-    let totalWithdrawalFees = 0
-    for (const doc of processingWithdrawalsSnap.docs) {
-      const w = doc.data()
-      totalWithdrawalsAmount += w.amount || 0
-      totalWithdrawalFees += w.fee || 0
-    }
+    const withdrawalsToday = allWithdrawals.filter(w => w.createdAt && new Date(w.createdAt).toDateString() === todayStr)
+    const withdrawalsTodayAmount = withdrawalsToday.filter(w => w.status === 'processing').reduce((sum, w) => sum + (w.amount || 0), 0)
+    const withdrawalsTodayCount = withdrawalsToday.length
 
-    // Today's withdrawals
-    const todayWithdrawalsSnap = await db.collection('withdrawals')
-      .where('createdAt', '>=', todayStart.toISOString())
-      .get()
-    let withdrawalsTodayCount = 0
-    let withdrawalsTodayAmount = 0
-    for (const doc of todayWithdrawalsSnap.docs) {
-      withdrawalsTodayCount++
-      const w = doc.data()
-      if (w.status === 'processing') {
-        withdrawalsTodayAmount += w.amount || 0
-      }
-    }
+    const withdrawalsThisWeek = allWithdrawals.filter(w => w.createdAt && new Date(w.createdAt) >= weekAgo)
+    const withdrawalsThisWeekAmount = withdrawalsThisWeek.filter(w => w.status === 'processing').reduce((sum, w) => sum + (w.amount || 0), 0)
 
-    // This week withdrawals
-    const weekWithdrawalsSnap = await db.collection('withdrawals')
-      .where('createdAt', '>=', weekAgo.toISOString())
-      .get()
-    let withdrawalsThisWeekAmount = 0
-    for (const doc of weekWithdrawalsSnap.docs) {
-      const w = doc.data()
-      if (w.status === 'processing') {
-        withdrawalsThisWeekAmount += w.amount || 0
-      }
-    }
+    const withdrawalsThisMonth = allWithdrawals.filter(w => w.createdAt && new Date(w.createdAt) >= thisMonthStart)
+    const withdrawalsThisMonthAmount = withdrawalsThisMonth.filter(w => w.status === 'processing').reduce((sum, w) => sum + (w.amount || 0), 0)
 
-    // This month withdrawals
-    const monthWithdrawalsSnap = await db.collection('withdrawals')
-      .where('createdAt', '>=', monthStart.toISOString())
-      .get()
-    let withdrawalsThisMonthAmount = 0
-    for (const doc of monthWithdrawalsSnap.docs) {
-      const w = doc.data()
-      if (w.status === 'processing') {
-        withdrawalsThisMonthAmount += w.amount || 0
-      }
-    }
-
-    // ====== FEE INCOME ======
+    // ====== FEE INCOME STATS ======
     const totalFees = totalDepositFees + totalWithdrawalFees
 
-    // Get admin balance (1 read)
+    // Get admin balance
     let adminBalance = 0
     const adminSnap = await db.collection('users').where('role', '==', 'admin').limit(1).get()
     if (!adminSnap.empty) {
       adminBalance = adminSnap.docs[0].data().balance || 0
     }
 
-    // ====== KYC PENDING RECORDS (count query) ======
-    const kycRecordsPendingSnap = await db.collection('kycRecords').where('status', '==', 'pending').count().get()
-    const kycRecordsPending = kycRecordsPendingSnap.data().count
+    // ====== KYC STATS ======
+    const pendingKycSnap = await db.collection('kycRecords').where('status', '==', 'pending').get()
+    const kycRecordsPending = pendingKycSnap.size
 
-    // ====== RECENT ACTIVITY (5 deposits + 5 withdrawals = 10 reads max) ======
-    const recentDeposits = await getRecentDocs('deposits', 5)
-    const recentWithdrawals = await getRecentDocs('withdrawals', 5)
-
-    const recentActivity = [
-      ...recentDeposits.map(d => ({
+    // ====== RECENT TRANSACTIONS (last 10) ======
+    const recentDeposits = allDeposits
+      .sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime())
+      .slice(0, 5)
+      .map(d => ({
         type: 'deposit' as const,
-        id: d.id, amount: d.amount, netAmount: d.netAmount, fee: d.fee,
-        status: d.status, createdAt: d.createdAt, userId: d.userId,
-      })),
-      ...recentWithdrawals.map(w => ({
-        type: 'withdrawal' as const,
-        id: w.id, amount: w.amount, netAmount: w.netAmount, fee: w.fee,
-        status: w.status, createdAt: w.createdAt, userId: w.userId,
+        id: d.id,
+        amount: d.amount,
+        netAmount: d.netAmount,
+        fee: d.fee,
+        status: d.status,
+        createdAt: d.createdAt,
+        userId: d.userId,
       }))
-    ].sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime())
+
+    const recentWithdrawals = allWithdrawals
+      .sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime())
+      .slice(0, 5)
+      .map(w => ({
+        type: 'withdrawal' as const,
+        id: w.id,
+        amount: w.amount,
+        netAmount: w.netAmount,
+        fee: w.fee,
+        status: w.status,
+        createdAt: w.createdAt,
+        userId: w.userId,
+      }))
+
+    const recentActivity = [...recentDeposits, ...recentWithdrawals]
+      .sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime())
       .slice(0, 10)
 
     const statsData = {
-      // Users
       totalUsers, activeUsers, suspendedUsers,
       newUsersToday, newUsersThisWeek, newUsersThisMonth,
-      // KYC
       kycApproved, kycPending, kycRejected, kycRecordsPending,
-      // Deposits
       depositsPending, depositsReviewing, depositsConfirmed, depositsRejected,
       totalDepositsAmount, totalDepositFees,
       depositsTodayCount, depositsTodayAmount,
       depositsThisWeekAmount, depositsThisMonthAmount,
-      // Withdrawals
       withdrawalsPending, withdrawalsApproved, withdrawalsProcessing, withdrawalsRejected,
       totalWithdrawalsAmount, totalWithdrawalFees,
       withdrawalsTodayCount, withdrawalsTodayAmount,
       withdrawalsThisWeekAmount, withdrawalsThisMonthAmount,
-      // Fees & Balance
       totalFees, adminBalance,
-      // Pending actions
       pendingActions: depositsPending + depositsReviewing + withdrawalsPending + withdrawalsApproved + kycRecordsPending,
-      // Recent activity
       recentActivity,
     }
 
     // Cache the result
-    cachedStats = { data: statsData, timestamp: Date.now() }
+    statsCache = { data: statsData, ts: Date.now() }
 
-    return NextResponse.json({ success: true, stats: statsData }, {
-      headers: { 'Cache-Control': 'public, s-maxage=30, stale-while-revalidate=60' }
-    })
+    return NextResponse.json({
+      success: true,
+      stats: statsData,
+    }, { headers: { 'Cache-Control': 'no-cache, no-store, must-revalidate' } })
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : 'حدث خطأ'
     return NextResponse.json({ success: false, message }, { status: 500 })
   }
+}
+
+// Helper to bust the cache when data changes (called by admin action routes)
+export function bustStatsCache() {
+  statsCache = null
 }

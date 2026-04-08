@@ -8,31 +8,6 @@ export async function POST(request: NextRequest) {
   try {
     const { email, password, fullName } = await request.json()
 
-    // === SYSTEM SETTINGS CHECK (Registration Toggle + Maintenance) ===
-    try {
-      const db = getDb()
-      const globalSettingsDoc = await db.collection('systemSettings').doc('global').get()
-      if (globalSettingsDoc.exists) {
-        const globalSettings = globalSettingsDoc.data()!
-        // Block registration if maintenance mode is active
-        if (globalSettings.maintenanceMode === true) {
-          return NextResponse.json(
-            { success: false, message: globalSettings.maintenanceMessage || 'المنصة تحت الصيانة حالياً. يرجى المحاولة لاحقاً' },
-            { status: 503 }
-          )
-        }
-        // Block registration if registration is closed
-        if (globalSettings.registrationOpen === false) {
-          return NextResponse.json(
-            { success: false, message: 'التسجيل مغلق حالياً. يرجى المحاولة لاحقاً' },
-            { status: 403 }
-          )
-        }
-      }
-    } catch {
-      // If settings can't be read, allow registration (fail-open)
-    }
-
     if (!email || !password) {
       return NextResponse.json(
         { success: false, message: 'البريد الإلكتروني وكلمة المرور مطلوبان' },
@@ -55,7 +30,18 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    const existingUser = await userOperations.findUnique({ email })
+    // Step 1: Check if user exists
+    let existingUser = null
+    try {
+      existingUser = await userOperations.findUnique({ email })
+    } catch (err: any) {
+      console.error('[REGISTER] Step 1 (findUnique) failed:', err.code || err.message)
+      return NextResponse.json(
+        { success: false, message: 'خطأ في الاتصال بقاعدة البيانات. يرجى المحاولة لاحقاً.', step: 'findUser', detail: err.code || err.message },
+        { status: 503 }
+      )
+    }
+
     if (existingUser) {
       return NextResponse.json(
         { success: false, message: 'هذا البريد الإلكتروني مسجل بالفعل' },
@@ -64,65 +50,75 @@ export async function POST(request: NextRequest) {
     }
 
     const passwordHash = await bcrypt.hash(password, 12)
-    const accountNumber = await generateAccountNumber()
 
-    const user = await userOperations.create({
-      email,
-      passwordHash,
-      fullName: fullName || null,
-      phone: null,
-      country: null,
-      role: 'user',
-      status: 'active',
-      emailVerified: false,
-      phoneVerified: false,
-      kycStatus: 'none',
-      kycIdPhoto: null,
-      kycSelfie: null,
-      kycNotes: null,
-      balance: 0,
-      frozenBalance: 0,
-      mustChangePassword: false,
-      referredBy: null,
-      merchantId: null,
-      affiliateCode: generateAffiliateCode(),
-      accountNumber,
-    })
-
-    // Delete any old OTPs for this email to avoid confusion
-    const db = getDb()
+    // Step 2: Generate account number
+    let accountNumber: number
     try {
-      const oldOtps = await db.collection('otpCodes')
-        .where('email', '==', email)
-        .where('type', '==', 'email_verify')
-        .limit(20)
-        .get()
-      const batch = db.batch()
-      for (const doc of oldOtps.docs) {
-        batch.delete(doc.ref)
-      }
-      if (oldOtps.docs.length > 0) {
-        await batch.commit()
-      }
-    } catch {
-      // Continue even if delete fails
+      accountNumber = await generateAccountNumber()
+    } catch (err: any) {
+      console.error('[REGISTER] Step 2 (accountNumber) failed:', err.code || err.message)
+      return NextResponse.json(
+        { success: false, message: 'خطأ في إنشاء رقم الحساب. يرجى المحاولة لاحقاً.', step: 'accountNumber', detail: err.code || err.message },
+        { status: 503 }
+      )
     }
 
+    // Step 3: Create user
+    let user
+    try {
+      user = await userOperations.create({
+        email,
+        passwordHash,
+        fullName: fullName || null,
+        phone: null,
+        country: null,
+        role: 'user',
+        status: 'active',
+        emailVerified: false,
+        phoneVerified: false,
+        kycStatus: 'none',
+        kycIdPhoto: null,
+        kycSelfie: null,
+        kycNotes: null,
+        balance: 0,
+        frozenBalance: 0,
+        mustChangePassword: false,
+        referredBy: null,
+        merchantId: null,
+        affiliateCode: generateAffiliateCode(),
+        accountNumber,
+      })
+    } catch (err: any) {
+      console.error('[REGISTER] Step 3 (create) failed:', err.code || err.message)
+      return NextResponse.json(
+        { success: false, message: 'خطأ في إنشاء الحساب. يرجى المحاولة لاحقاً.', step: 'createUser', detail: err.code || err.message },
+        { status: 503 }
+      )
+    }
+
+    // Step 4: Create OTP (skip old OTP deletion to reduce Firebase calls)
     const otp = Math.floor(100000 + Math.random() * 900000).toString()
     const expiresAt = new Date(Date.now() + 10 * 60 * 1000).toISOString()
 
-    await otpCodeOperations.create({
-      userId: user.id,
-      email,
-      code: otp,
-      type: 'email_verify',
-      expiresAt,
-    })
+    try {
+      await otpCodeOperations.create({
+        userId: user.id,
+        email,
+        code: otp,
+        type: 'email_verify',
+        expiresAt,
+      })
+    } catch (err: any) {
+      console.error('[REGISTER] Step 4 (otp) failed:', err.code || err.message)
+      // Non-critical: continue without OTP
+    }
 
-    // Send email
-    const emailSent = await sendVerificationEmail(email, otp)
-
-    if (!emailSent) {
+    // Step 5: Send email (non-critical)
+    let emailSent = false
+    try {
+      emailSent = await sendVerificationEmail(email, otp)
+    } catch {
+      // Continue even if email fails
     }
 
     return NextResponse.json({
@@ -133,6 +129,7 @@ export async function POST(request: NextRequest) {
       otpId: user.id,
     })
   } catch (error: unknown) {
+    console.error('[REGISTER] Unexpected error:', error)
     const message = error instanceof Error ? error.message : 'حدث خطأ في التسجيل'
     return NextResponse.json(
       { success: false, message },

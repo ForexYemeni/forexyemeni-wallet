@@ -75,3 +75,4 @@ Thumbs.db
 # IDE
 .vscode/
 .idea/
+service-account-fix.json

@@ -60,7 +60,7 @@ export async function POST(request: NextRequest) {
 
       // Send email to user
       if (user) {
-        await sendUserDepositReviewingEmail(user.email, user.fullName || user.email, deposit.amount, deposit.id).catch(() => {})
+        sendUserDepositReviewingEmail(user.email, user.fullName || user.email, deposit.amount, deposit.id)
       }
     }
 
@@ -93,9 +93,9 @@ export async function POST(request: NextRequest) {
 
         // Send email to user/merchant
         if (user.role === 'merchant') {
-          await sendMerchantDepositConfirmedEmail(user.email, user.fullName || user.email, deposit.amount, creditAmount, deposit.id).catch(() => {})
+          sendMerchantDepositConfirmedEmail(user.email, user.fullName || user.email, deposit.amount, creditAmount, deposit.id)
         } else {
-          await sendUserDepositConfirmedEmail(user.email, user.fullName || user.email, deposit.amount, depositFee, creditAmount, deposit.id).catch(() => {})
+          sendUserDepositConfirmedEmail(user.email, user.fullName || user.email, deposit.amount, depositFee, creditAmount, deposit.id)
         }
 
         // Credit fee to admin's account
@@ -155,9 +155,9 @@ export async function POST(request: NextRequest) {
       // Send email to user/merchant
       if (user) {
         if (user.role === 'merchant') {
-          await sendMerchantDepositRejectedEmail(user.email, user.fullName || user.email, deposit.amount, adminNote || '', deposit.id).catch(() => {})
+          sendMerchantDepositRejectedEmail(user.email, user.fullName || user.email, deposit.amount, adminNote || '', deposit.id)
         } else {
-          await sendUserDepositRejectedEmail(user.email, user.fullName || user.email, deposit.amount, adminNote || '', deposit.id).catch(() => {})
+          sendUserDepositRejectedEmail(user.email, user.fullName || user.email, deposit.amount, adminNote || '', deposit.id)
         }
       }
     }

@@ -1,85 +1,69 @@
 ---
-Task ID: 1
+Task ID: 3b
 Agent: Main
-Task: Fix admin panel pending operations box to show breakdown of all pending types (deposits + withdrawals + KYC)
+Task: Fix FCM push notifications + update google-services.json for com.forexyemeni.wallet1 + ErrorBoundary logging
 
 Work Log:
-- Analyzed AdminPanel.tsx to find the pending actions banner (lines 1249-1262)
-- Found that the banner previously showed only a single total count and navigated only to 'deposits' tab
-- Enhanced the banner to show a breakdown with three separate clickable buttons:
-  - Green button for pending deposits (depositsPending + depositsReviewing)
-  - Red button for pending withdrawals (withdrawalsPending + withdrawalsApproved)
-  - Blue button for pending KYC (kycRecordsPending)
-- Each button navigates to its respective tab
-- Verified that deposit confirm dialog (Issue B) was already implemented with amount, fees, and PIN
-- Verified that withdrawal receiving data (Issue C) was already formatted with structured display
-- Built project successfully
+- User uploaded new google-services.json with both com.forexyemeni.wallet and com.forexyemeni.wallet1 package names
+- Updated android/app/google-services.json to include both package entries
+- Updated android/app/build.gradle: applicationId changed to "com.forexyemeni.wallet1" (kept namespace as com.forexyemeni.wallet to avoid breaking Java package references)
+- Fixed push-notification.ts: Added comprehensive console.error logging throughout the FCM sending pipeline
+- Fixed /api/fcm/send/route.ts: Updated to use BOTH notification+data fields instead of data-only
+- Fixed ErrorBoundary in page.tsx: Added componentDidCatch logging
+- Build successful, pushed to GitHub (commit 91135c4)
 
 Stage Summary:
-- Admin pending actions banner now shows breakdown of all pending types
-- The three issues from user's request: Issue A fixed (pending breakdown), Issue B already implemented, Issue C already implemented
-- Build successful
+- FCM: Added comprehensive error logging to diagnose notification failures on Vercel
+- google-services.json: Now includes com.forexyemeni.wallet1
+- /api/fcm/send: Now uses same notification+data strategy as push-notification.ts
+- Admin devices: Previous fix confirmed, crash should be resolved once deployed
 
 ---
-Task ID: 1
-Agent: general-purpose
-Task: Implement maintenance mode blocking and registration toggle
-
-Work Log:
-- Read login API to understand current flow
-- Added maintenance mode check before allowing login (admins and users with permissions bypass)
-- Read registration API to understand current flow
-- Added registration open/close check and maintenance mode check at start of registration
-
-Stage Summary:
-- Modified: src/app/api/auth/login/route.ts - Added maintenance mode blocking (lines 36-58)
-- Modified: src/app/api/auth/register/route.ts - Added registration toggle and maintenance blocking (lines 11-34)
-
----
-Task ID: 4-5
-Agent: general-purpose
-Task: Display announcements and support info to users
-
-Work Log:
-- Created public API for announcements (/api/announcements) - fetches maintenance doc, filters active+non-expired
-- Created public API for support info (/api/support-info) - fetches email, phone, telegram, whatsapp from maintenance doc
-- Created AnnouncementBanner component with auto-scroll every 5s, dismiss per announcement, type-based coloring
-- Added support info section to user Settings (About tab) with clickable contact links (mailto:, tel:, external links)
-- Integrated AnnouncementBanner into AppLayout above main page content
-
-Stage Summary:
-- Created: src/app/api/announcements/route.ts
-- Created: src/app/api/support-info/route.ts
-- Created: src/components/layout/AnnouncementBanner.tsx
-- Modified: src/components/settings/Settings.tsx - Added support info section in About tab
-- Modified: src/components/layout/AppLayout.tsx - Added AnnouncementBanner import and render
-
----
-Task ID: 1-2
+Task ID: 4
 Agent: Main
-Task: Fix login showing wrong password for all users + forgot password RESOURCE_EXHAUSTED error
+Task: Build Android APK with updated google-services.json and com.forexyemeni.wallet1 package name
 
 Work Log:
-- Investigated login route code thoroughly - found the maintenance mode check was reading from wrong Firestore document
-- The admin panel writes maintenance settings to `systemSettings/global` with field `maintenanceMode`
-- But login/register routes were reading from `systemSettings/maintenance` with field `maintenance`
-- This mismatch meant the toggle had zero effect on actual blocking
-- Added email trimming (trim + lowercase) to avoid whitespace issues
-- Added guard for missing/corrupted passwordHash field with console.error logging
-- Wrapped bcrypt.compare in try-catch for safer error handling
-- Added graceful handling for Firebase RESOURCE_EXHAUSTED errors in both login and forgot-password
-- Fixed forgot-password route to also handle quota errors gracefully
-- Updated all 6 files that referenced the wrong maintenance document:
-  - src/app/api/auth/login/route.ts
-  - src/app/api/auth/register/route.ts
-  - src/app/api/deposits/create/route.ts
-  - src/app/api/withdrawals/create/route.ts
-  - src/app/api/announcements/route.ts
-  - src/app/api/support-info/route.ts
+- Installed Android SDK command-line tools (cmdline-tools-linux-11076708_latest.zip) to /home/z/android-sdk
+- Accepted Android SDK licenses
+- Installed platform-tools, platforms;android-36, build-tools;36.0.0
+- Downloaded JDK 21 (only JRE was installed, needed javac for compilation) to /home/z/jdk-21.0.10
+- Updated capacitor.config.ts: appId changed from 'com.forexyemeni.wallet' to 'com.forexyemeni.wallet1'
+- Created minimal out/ directory for Capacitor sync
+- Ran npx cap sync android — synced plugins successfully (5 Capacitor plugins)
+- Built APK: ./gradlew assembleDebug — BUILD SUCCESSFUL in 56s (246 tasks)
+- APK saved to /home/z/my-project/download/forexyemeni-wallet1-v3.6.0-debug.apk (5.6MB)
 
 Stage Summary:
-- Fixed maintenance mode document mismatch across all routes (all now read from systemSettings/global)
-- Added email trimming in login and forgot-password routes
-- Added passwordHash validation and bcrypt error handling in login route
-- Added RESOURCE_EXHAUSTED graceful error handling in login and forgot-password routes
-- All 6 routes now consistently reference systemSettings/global document
+- APK built successfully with new package name com.forexyemeni.wallet1
+- google-services.json includes both com.forexyemeni.wallet and com.forexyemeni.wallet1
+- APK includes updated FCM configuration matching Firebase project forexyemeni-wallet-ed009
+- File: /home/z/my-project/download/forexyemeni-wallet1-v3.6.0-debug.apk (5.6MB)
+
+---
+Task ID: 5
+Agent: Main
+Task: Build ForexYemeni Wallet APK using webtoapp-builder template
+
+Work Log:
+- Cloned GitHub repo https://github.com/Ayoubvvch/webtoapp-builder.git
+- Analyzed repo structure: Android WebView-based template for converting web apps to APK
+- Customized template for ForexYemeni Wallet:
+  - Changed URL from local files to https://forexyemeni-wallet.vercel.app
+  - Changed app name to "فوركس يمني"
+  - Changed package to com.forexyemeni.wallet
+  - Added dark/gold theme matching the web app
+  - Added fullscreen immersive mode, portrait-only orientation
+  - Added error pages for no internet / loading errors (in Arabic)
+  - Added network security config for HTTPS domains
+  - Added GitHub Actions workflow for future cloud builds
+- Fixed compilation errors: replaced non-existent APIs (setRenderScalesContentAsText, NET_CAPABILITY_NET_CAPABLE)
+- Used Gradle 8.14.3 with AGP 8.7.3 (leverage cached dependencies)
+- BUILD SUCCESSFUL in 19s
+
+Stage Summary:
+- APK built: ForexYemeni-Wallet-WebView-v1.0.0.apk (5.6MB)
+- File: /home/z/my-project/download/ForexYemeni-Wallet-WebView-v1.0.0.apk
+- This is a lightweight WebView wrapper that loads the Vercel URL
+- Does NOT include FCM/push notifications (unlike Capacitor version)
+- Suitable for users who want a simple APK without Firebase dependencies

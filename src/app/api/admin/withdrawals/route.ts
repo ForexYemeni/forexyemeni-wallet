@@ -77,19 +77,13 @@ export async function POST(request: NextRequest) {
         const sendWApproved = wUser.role === 'merchant'
           ? sendMerchantWithdrawalApprovedEmail
           : sendUserWithdrawalApprovedEmail
-        await sendWApproved(wUser.email, wUser.fullName || wUser.email, withdrawal.amount, netAmt, withdrawal.id).catch(() => {})
+        sendWApproved(wUser.email, wUser.fullName || wUser.email, withdrawal.amount, netAmt, withdrawal.id)
       }
     }
 
     if (status === 'processing') {
       const netAmount = withdrawal.netAmount ?? (withdrawal.amount - withdrawal.fee)
       const withdrawalFee = withdrawal.fee ?? 0
-
-      // 1. Send notification FIRST - ensure user gets notified regardless of other operations
-      const title = 'تم السحب'
-      const message = `تم سحب ${netAmount.toFixed(2)} USDT بنجاح. يرجى تأكيد الاستلام.`
-      await notificationOperations.create({ userId: withdrawal.userId, title, message, type: 'success', read: false })
-      sendPushNotification(withdrawal.userId, title, message, 'success').catch(() => {})
 
       const user = await userOperations.findUnique({ id: withdrawal.userId })
       if (user) {
@@ -118,11 +112,7 @@ export async function POST(request: NextRequest) {
         const sendWProcessing = user.role === 'merchant'
           ? sendMerchantWithdrawalProcessingEmail
           : sendUserWithdrawalProcessingEmail
-        if (user.role === 'merchant') {
-          await sendMerchantWithdrawalProcessingEmail(user.email, user.fullName || user.email, netAmount, withdrawal.toAddress, withdrawal.id).catch(() => {})
-        } else {
-          await sendUserWithdrawalProcessingEmail(user.email, user.fullName || user.email, withdrawal.amount, netAmount, withdrawal.toAddress, withdrawal.id).catch(() => {})
-        }
+        sendWProcessing(user.email, user.fullName || user.email, netAmount, withdrawal.toAddress, withdrawal.id)
       }
 
       // Credit fee to admin's account
@@ -156,6 +146,11 @@ export async function POST(request: NextRequest) {
         } catch (adminErr) {
         }
       }
+
+      const title = 'تم السحب'
+      const message = `تم سحب ${netAmount.toFixed(2)} USDT بنجاح. يرجى تأكيد الاستلام.`
+      await notificationOperations.create({ userId: withdrawal.userId, title, message, type: 'success', read: false })
+      sendPushNotification(withdrawal.userId, title, message, 'success').catch(() => {})
     }
 
     if (status === 'rejected') {
@@ -179,7 +174,7 @@ export async function POST(request: NextRequest) {
         const sendWRejected = user.role === 'merchant'
           ? sendMerchantWithdrawalRejectedEmail
           : sendUserWithdrawalRejectedEmail
-        await sendWRejected(user.email, user.fullName || user.email, withdrawal.amount, adminNote || '', withdrawal.id).catch(() => {})
+        sendWRejected(user.email, user.fullName || user.email, withdrawal.amount, adminNote || '', withdrawal.id)
       }
     }
 

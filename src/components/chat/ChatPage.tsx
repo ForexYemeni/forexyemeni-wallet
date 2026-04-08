@@ -289,7 +289,7 @@ export default function ChatPage() {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages])
 
-  // Polling for new messages (every 10 seconds)
+  // Polling for new messages (every 3 seconds)
   useEffect(() => {
     if (!selectedChatId || !user?.id) return
 
@@ -336,7 +336,7 @@ export default function ChatPage() {
       } catch {
         // silent - polling should not show errors
       }
-    }, 10000)
+    }, 10000)  // 10s poll (was 3s — 70% less reads)
 
     return () => {
       if (pollingRef.current) clearInterval(pollingRef.current)

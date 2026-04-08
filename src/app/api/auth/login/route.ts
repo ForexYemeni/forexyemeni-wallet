@@ -8,58 +8,30 @@ export async function POST(request: NextRequest) {
   try {
     const { email, password, pin, deviceFingerprint, deviceName } = await request.json()
 
-    // Trim email to avoid whitespace issues (NO lowercase - Firestore emails are case-sensitive)
-    const cleanEmail = typeof email === 'string' ? email.trim() : email
-
     // Rate limiting
     const ip = request.headers.get('x-forwarded-for') || request.headers.get('x-real-ip') || 'unknown'
     const { rateLimit } = await import('@/lib/rate-limit')
-    const rl = rateLimit.checkLoginRateLimit(ip, cleanEmail)
+    const rl = rateLimit.checkLoginRateLimit(ip, email)
     if (rl.blocked) {
       return NextResponse.json({ success: false, message: `محاولات كثيرة. حاول بعد ${Math.ceil(rl.retryAfter / 60)} دقيقة.` }, { status: 429 })
     }
 
-    if (!cleanEmail || (!password && !pin)) {
+    if (!email || (!password && !pin)) {
       return NextResponse.json(
         { success: false, message: 'البريد الإلكتروني وكلمة المرور أو رمز PIN مطلوبان' },
         { status: 400 }
       )
     }
 
-    const user = await userOperations.findUnique({ email: cleanEmail })
+    const user = await userOperations.findUnique({ email })
     if (!user) {
-      rateLimit.recordFailedAttempt(ip, cleanEmail)
-      const rlAfter = rateLimit.checkLoginRateLimit(ip, cleanEmail)
+      rateLimit.recordFailedAttempt(ip, email)
+      const rlAfter = rateLimit.checkLoginRateLimit(ip, email)
       return NextResponse.json(
         { success: false, message: 'البريد الإلكتروني أو كلمة المرور غير صحيحة', remaining: rlAfter.remaining },
         { status: 401 }
       )
     }
-
-    // === MAINTENANCE MODE CHECK (disabled until verified - was blocking all logins) ===
-    // TODO: Re-enable after confirming maintenanceMode is false in systemSettings/global
-    /*
-    try {
-      const db = getDb()
-      const globalSettingsDoc = await db.collection('systemSettings').doc('global').get()
-      if (globalSettingsDoc.exists) {
-        const globalSettings = globalSettingsDoc.data()!
-        if (globalSettings.maintenanceMode === true) {
-          const userPerms = typeof user.permissions === 'string'
-            ? (() => { try { return JSON.parse(user.permissions) } catch { return null } })()
-            : (typeof user.permissions === 'object' ? user.permissions : null)
-          const hasPermissions = userPerms && Object.values(userPerms as Record<string, any>).some((v: any) => v === true)
-          if (user.role !== 'admin' && !hasPermissions) {
-            return NextResponse.json(
-              { success: false, message: globalSettings.maintenanceMessage || 'المنصة تحت الصيانة حالياً. يرجى المحاولة لاحقاً' },
-              { status: 503 }
-            )
-          }
-        }
-      }
-    } catch {
-    }
-    */
 
     // Enrich merchantId from merchant application / old merchant system if missing
     if (!user.merchantId && user.role !== 'admin') {
@@ -99,8 +71,8 @@ export async function POST(request: NextRequest) {
 
       const isPinValid = await bcrypt.compare(pin, user.tempPinHash)
       if (!isPinValid) {
-        rateLimit.recordFailedAttempt(ip, cleanEmail)
-        const rlAfter = rateLimit.checkLoginRateLimit(ip, cleanEmail)
+        rateLimit.recordFailedAttempt(ip, email)
+        const rlAfter = rateLimit.checkLoginRateLimit(ip, email)
         return NextResponse.json(
           { success: false, message: 'رمز PIN غير صحيح', remaining: rlAfter.remaining },
           { status: 401 }
@@ -109,7 +81,7 @@ export async function POST(request: NextRequest) {
 
       // Clear temp PIN after successful use
       await userOperations.update({ id: user.id }, { tempPinHash: null as any, tempPinExpiresAt: null as any, mustChangePassword: true })
-      rateLimit.clearLoginAttempts(ip, cleanEmail)
+      rateLimit.clearLoginAttempts(ip, email)
 
       // Bypass password check, proceed with login but force password change
       const parsePermissions = (perm: any) => {
@@ -147,26 +119,10 @@ export async function POST(request: NextRequest) {
     }
 
     // === NORMAL PASSWORD LOGIN ===
-    // Guard against missing or corrupted passwordHash
-    if (!user.passwordHash || typeof user.passwordHash !== 'string') {
-      console.error(`[LOGIN] Missing/corrupted passwordHash for user ${user.id} (${user.email})`)
-      rateLimit.recordFailedAttempt(ip, cleanEmail)
-      const rlAfter = rateLimit.checkLoginRateLimit(ip, cleanEmail)
-      return NextResponse.json(
-        { success: false, message: 'كلمة المرور غير صحيحة', remaining: rlAfter.remaining },
-        { status: 401 }
-      )
-    }
-
-    let isValid = false
-    try {
-      isValid = await bcrypt.compare(password, user.passwordHash)
-    } catch (compareErr) {
-      console.error(`[LOGIN] bcrypt.compare error for user ${user.id}:`, compareErr)
-    }
+    const isValid = await bcrypt.compare(password, user.passwordHash)
     if (!isValid) {
-      rateLimit.recordFailedAttempt(ip, cleanEmail)
-      const rlAfter = rateLimit.checkLoginRateLimit(ip, cleanEmail)
+      rateLimit.recordFailedAttempt(ip, email)
+      const rlAfter = rateLimit.checkLoginRateLimit(ip, email)
       return NextResponse.json(
         { success: false, message: 'كلمة المرور غير صحيحة', remaining: rlAfter.remaining },
         { status: 401 }
@@ -333,7 +289,7 @@ export async function POST(request: NextRequest) {
       await send2FACodeEmail(user.email, twoFactorCode)
 
       // Return with requires2FA flag - do NOT give full access yet
-      rateLimit.clearLoginAttempts(ip, cleanEmail)
+      rateLimit.clearLoginAttempts(ip, email)
       return NextResponse.json({
         success: true,
         requires2FA: true,
@@ -344,7 +300,7 @@ export async function POST(request: NextRequest) {
     }
 
     const token = crypto.randomUUID()
-    rateLimit.clearLoginAttempts(ip, cleanEmail)
+    rateLimit.clearLoginAttempts(ip, email)
     await otpCodeOperations.create({
       userId: user.id,
       email: user.email,
@@ -360,18 +316,9 @@ export async function POST(request: NextRequest) {
       user: getUserResponse(user),
     })
   } catch (error: unknown) {
-    // Handle Firebase quota exhaustion gracefully
-    const errorMsg = error instanceof Error ? error.message : String(error)
-    if (errorMsg.includes('RESOURCE_EXHAUSTED') || errorMsg.includes('Quota exceeded') || errorMsg.includes('quota')) {
-      console.error('[LOGIN] Firebase quota exceeded:', errorMsg)
-      return NextResponse.json(
-        { success: false, message: 'خدمة قاعدة البيانات حالياً مشغولة. يرجى المحاولة بعد قليل.' },
-        { status: 503 }
-      )
-    }
-    console.error('[LOGIN] Unexpected error:', errorMsg)
+    const message = error instanceof Error ? error.message : 'حدث خطأ في تسجيل الدخول'
     return NextResponse.json(
-      { success: false, message: 'حدث خطأ في تسجيل الدخول. يرجى المحاولة لاحقاً.' },
+      { success: false, message },
       { status: 500 }
     )
   }

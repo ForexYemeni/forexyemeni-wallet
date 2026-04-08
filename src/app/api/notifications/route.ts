@@ -1,6 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { notificationOperations } from '@/lib/db-firebase'
 import { sendPushNotification } from '@/lib/push-notification'
+import { getDb } from '@/lib/firebase'
+
+// Simple in-memory cache for unread counts (TTL: 15s)
+// This prevents Firestore reads on every 30s poll
+const unreadCountCache = new Map<string, { count: number; ts: number }>()
+const CACHE_TTL = 15000
 
 export async function GET(request: NextRequest) {
   try {
@@ -8,6 +14,7 @@ export async function GET(request: NextRequest) {
     const userId = searchParams.get('userId')
     const after = searchParams.get('after')
     const countOnly = searchParams.get('countOnly')
+    const includeUnread = searchParams.get('includeUnread')
 
     if (!userId) {
       return NextResponse.json(
@@ -17,17 +24,38 @@ export async function GET(request: NextRequest) {
     }
 
     // Return unread count only (lightweight, for badge polling)
+    // OPTIMIZED: Uses cached value when available (< 15s old)
     if (countOnly === 'true') {
+      const cached = unreadCountCache.get(userId)
+      if (cached && Date.now() - cached.ts < CACHE_TTL) {
+        return NextResponse.json({ success: true, unreadCount: cached.count })
+      }
+
       const unreadCount = await notificationOperations.countUnread(userId)
-      return NextResponse.json({ success: true, unreadCount }, { headers: { 'Cache-Control': 'no-cache, no-store, must-revalidate' } })
+      unreadCountCache.set(userId, { count: unreadCount, ts: Date.now() })
+      return NextResponse.json({ success: true, unreadCount })
     }
 
     // Return notifications, optionally filtered by timestamp
+    // OPTIMIZED: Also includes unread count in same response (one API call instead of two)
     const notifications = await notificationOperations.findMany(userId, after || undefined)
+
+    // Get unread count (from cache or fresh)
+    let unreadCount = 0
+    if (includeUnread === 'true') {
+      const cached = unreadCountCache.get(userId)
+      if (cached && Date.now() - cached.ts < CACHE_TTL) {
+        unreadCount = cached.count
+      } else {
+        unreadCount = await notificationOperations.countUnread(userId)
+        unreadCountCache.set(userId, { count: unreadCount, ts: Date.now() })
+      }
+    }
 
     return NextResponse.json({
       success: true,
       notifications,
+      ...(includeUnread === 'true' ? { unreadCount } : {}),
     }, { headers: { 'Cache-Control': 'no-cache, no-store, must-revalidate' } })
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : 'حدث خطأ'
@@ -44,7 +72,7 @@ export async function POST(request: NextRequest) {
 
     if (!userId || !title || !message) {
       return NextResponse.json(
-        { success: false, message: 'جميع الحقول مطلوبة' },
+        { success: false, message: 'جميع الحقول مطلوب' },
         { status: 400 }
       )
     }
@@ -55,6 +83,9 @@ export async function POST(request: NextRequest) {
       message,
       type,
     })
+
+    // Invalidate unread count cache for this user
+    unreadCountCache.delete(userId)
 
     // Also send push notification (FCM) if user has registered tokens
     sendPushNotification(userId, title, message, type).catch(() => {})
@@ -84,6 +115,9 @@ export async function PUT(request: NextRequest) {
     }
 
     await notificationOperations.markAllRead(userId)
+
+    // Invalidate unread count cache
+    unreadCountCache.delete(userId)
 
     return NextResponse.json({ success: true })
   } catch (error: unknown) {

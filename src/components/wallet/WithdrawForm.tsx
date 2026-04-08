@@ -45,12 +45,6 @@ const getMethodTitle = (m: any) => {
   if (m.category === 'crypto') {
     return m.network ? `عملات رقمية - ${m.network}` : 'عملات رقمية'
   }
-  if (m.type === 'bank_deposit' && m.accountName) {
-    return m.accountName
-  }
-  if (m.type === 'atm_transfer' && m.recipientName) {
-    return `${m.recipientName} - صراف`
-  }
   return TYPE_LABELS[m.type] || m.type
 }
 
@@ -425,7 +419,7 @@ export default function WithdrawForm() {
                     </div>
                     <div className="flex-1">
                       <p className="text-sm font-medium">{getMethodTitle(m)}</p>
-                      <p className="text-[10px] text-muted-foreground">{TYPE_LABELS[m.type] || m.type}{m.network && m.category === 'crypto' ? ` - ${m.network}` : ''}</p>
+                      <p className="text-[10px] text-muted-foreground">{CATEGORY_LABELS[m.category] || m.category}</p>
                     </div>
                     <ChevronLeft className="w-5 h-5 text-muted-foreground" />
                   </button>

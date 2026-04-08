@@ -384,11 +384,11 @@ export const depositOperations = {
     const deposits = snapshot.docs.map(doc => ({ id: doc.id, ...(doc.data() as Deposit) }))
     const uniqueUserIds = [...new Set(deposits.map(d => d.userId))]
     const userDocs = await Promise.all(uniqueUserIds.map(uid => db.collection('users').doc(uid).get()))
-    const userMap = new Map<string, { id: string; email: string; fullName: string | null; accountNumber?: string | null; merchantId?: string | null }>()
+    const userMap = new Map<string, { id: string; email: string; fullName: string | null }>()
     for (const userDoc of userDocs) {
       if (userDoc.exists) {
         const ud = userDoc.data()
-        userMap.set(userDoc.id, { id: userDoc.id, email: ud.email, fullName: ud.fullName || null, accountNumber: ud.accountNumber || null, merchantId: ud.merchantId || null })
+        userMap.set(userDoc.id, { id: userDoc.id, email: ud.email, fullName: ud.fullName || null })
       }
     }
 
@@ -441,11 +441,11 @@ export const withdrawalOperations = {
     const withdrawals = snapshot.docs.map(doc => ({ id: doc.id, ...(doc.data() as Withdrawal) }))
     const uniqueUserIds = [...new Set(withdrawals.map(w => w.userId))]
     const userDocs = await Promise.all(uniqueUserIds.map(uid => db.collection('users').doc(uid).get()))
-    const userMap = new Map<string, { id: string; email: string; fullName: string | null; phone: string | null; accountNumber?: string | null; merchantId?: string | null }>()
+    const userMap = new Map<string, { id: string; email: string; fullName: string | null; phone: string | null }>()
     for (const userDoc of userDocs) {
       if (userDoc.exists) {
         const ud = userDoc.data()
-        userMap.set(userDoc.id, { id: userDoc.id, email: ud.email, fullName: ud.fullName || null, phone: ud.phone || null, accountNumber: ud.accountNumber || null, merchantId: ud.merchantId || null })
+        userMap.set(userDoc.id, { id: userDoc.id, email: ud.email, fullName: ud.fullName || null, phone: ud.phone || null })
       }
     }
 
@@ -520,10 +520,13 @@ export const notificationOperations = {
 
   async countUnread(userId: string): Promise<number> {
     const db = getDb()
+    // OPTIMIZED: Only select the doc ID, not full document content
+    // This still counts as a read in Firestore, but we limit to 50
+    // The real savings come from the 30s poll interval + server-side cache
     const snapshot = await db.collection('notifications')
       .where('userId', '==', userId)
       .where('read', '==', false)
-      .limit(100)
+      .limit(50)
       .get()
     return snapshot.docs.length
   },

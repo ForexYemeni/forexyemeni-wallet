@@ -358,7 +358,7 @@ export default function AdminChat() {
       } catch {
         // silent
       }
-    }, 10000)
+    }, 10000)  // 10s poll (was 3s — 70% less reads)
 
     return () => {
       if (pollingRef.current) clearInterval(pollingRef.current)

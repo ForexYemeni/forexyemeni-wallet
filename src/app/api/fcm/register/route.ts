@@ -13,6 +13,8 @@ export async function POST(request: NextRequest) {
 
     const db = getDb()
 
+    console.log(`[FCM/register] Registering token for user ${userId}, device=${deviceName || 'unknown'}`)
+
     // Check if token already exists for this user
     const existingTokens = await db.collection('fcmTokens')
       .where('userId', '==', userId)
@@ -36,7 +38,10 @@ export async function POST(request: NextRequest) {
         for (const doc of toDelete) {
           batch.delete(doc.ref)
         }
-        if (toDelete.length > 0) await batch.commit()
+        if (toDelete.length > 0) {
+          await batch.commit()
+          console.log(`[FCM/register] Cleaned up ${toDelete.length} old token(s) for user ${userId}`)
+        }
       }
 
       // Add new token
@@ -48,16 +53,20 @@ export async function POST(request: NextRequest) {
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
       })
+
+      console.log(`[FCM/register] New token saved for user ${userId} (total: ${oldTokens.size + 1})`)
     } else {
       // Update existing token timestamp
       await existingTokens.docs[0].ref.update({
         updatedAt: new Date().toISOString(),
         deviceName: deviceName || 'Android',
       })
+      console.log(`[FCM/register] Existing token updated for user ${userId}`)
     }
 
     return NextResponse.json({ success: true, message: 'تم تسجيل الجهاز بنجاح' })
   } catch (error: unknown) {
+    console.error('[FCM/register] Error:', error)
     const message = error instanceof Error ? error.message : 'حدث خطأ'
     return NextResponse.json({ success: false, message }, { status: 500 })
   }
@@ -72,6 +81,8 @@ export async function DELETE(request: NextRequest) {
       return NextResponse.json({ success: false, message: 'البيانات مطلوبة' }, { status: 400 })
     }
 
+    console.log(`[FCM/register] Removing token for user ${userId}`)
+
     const db = getDb()
     const tokens = await db.collection('fcmTokens')
       .where('userId', '==', userId)
@@ -82,10 +93,14 @@ export async function DELETE(request: NextRequest) {
     for (const doc of tokens.docs) {
       batch.delete(doc.ref)
     }
-    if (tokens.size > 0) await batch.commit()
+    if (tokens.size > 0) {
+      await batch.commit()
+      console.log(`[FCM/register] Removed ${tokens.size} token(s) for user ${userId}`)
+    }
 
     return NextResponse.json({ success: true })
-  } catch {
+  } catch (error: unknown) {
+    console.error('[FCM/register] Delete error:', error)
     return NextResponse.json({ success: true })
   }
 }

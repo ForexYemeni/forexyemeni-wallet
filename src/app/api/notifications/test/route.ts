@@ -77,6 +77,12 @@ export async function POST(request: NextRequest) {
         message: `تم الإرسال إلى ${pushResult.count} جهاز — راقب شريط الإشعارات خلال 5 ثواني`,
         debug,
       })
+    } else if (tokensSnapshot.size > 0) {
+      return NextResponse.json({
+        success: false,
+        message: `فشل إرسال FCM — الرمز القديم غير صالح. أعد تسجيل الدخول من التطبيق لتسجيل رمز جديد.`,
+        debug,
+      })
     } else {
       return NextResponse.json({
         success: false,

@@ -35,37 +35,47 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(true)
   const [copiedAccount, setCopiedAccount] = useState(false)
 
+  // Combined data fetch — single API call for both transactions + user data
   useEffect(() => {
     if (user?.id) {
-      fetchTransactions()
+      fetchDashboardData()
     }
   }, [user?.id])
 
-  // Refresh data when screen becomes active (e.g. returning from another tab)
+  // Refresh when returning to dashboard (e.g. from another tab)
   useEffect(() => {
-    if (user?.id) {
-      fetchTransactions()
+    if (user?.id && user?.currentScreen === 'dashboard') {
+      fetchDashboardData()
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user?.currentScreen])
 
-  const fetchTransactions = async () => {
+  // OPTIMIZED: Single function replaces duplicate fetchTransactions + fetchLatestUserData
+  // Both were calling the same /api/transactions endpoint — now only 1 API call
+  const fetchDashboardData = async () => {
     if (!user?.id) return
     try {
       const res = await fetch(`/api/transactions?userId=${user.id}`)
       const data = await res.json()
       if (data.success) {
-        setTransactions(data.transactions.slice(0, 5))
-        // Update local balance from server
+        setTransactions((data.transactions || []).slice(0, 5))
+        // Update user data from server
+        const updates: Record<string, unknown> = {}
+        let needsUpdate = false
         if (data.balance !== null && data.balance !== undefined && data.balance !== user?.balance) {
-          updateBalance(data.balance)
-        }
-        // Also update accountNumber from server if available
-        if (data.accountNumber && data.accountNumber !== user?.accountNumber) {
-          useAuthStore.getState().updateUser({ accountNumber: data.accountNumber } as any)
+          updates.balance = data.balance
+          needsUpdate = true
         }
         if (data.frozenBalance !== null && data.frozenBalance !== undefined && data.frozenBalance !== user?.frozenBalance) {
-          useAuthStore.getState().updateUser({ frozenBalance: data.frozenBalance } as any)
+          updates.frozenBalance = data.frozenBalance
+          needsUpdate = true
+        }
+        if (data.accountNumber && data.accountNumber !== user?.accountNumber) {
+          updates.accountNumber = data.accountNumber
+          needsUpdate = true
+        }
+        if (needsUpdate) {
+          useAuthStore.getState().updateUser(updates as any)
         }
       }
     } catch {
@@ -74,7 +84,6 @@ export default function Dashboard() {
       setLoading(false)
     }
   }
-
 
   const formatDate = (dateStr: string) => {
     const date = new Date(dateStr)

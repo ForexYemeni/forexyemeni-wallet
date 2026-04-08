@@ -57,6 +57,8 @@ class AdminErrorBoundary extends Component<
   }
 
   componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
+    console.error('[AdminErrorBoundary] Caught error:', error.message)
+    console.error('[AdminErrorBoundary] Component stack:', errorInfo.componentStack)
   }
 
   handleRetry = () => {
@@ -72,7 +74,7 @@ class AdminErrorBoundary extends Component<
           </div>
           <div className="text-center space-y-2">
             <p className="text-sm text-red-400 font-medium">حدث خطأ في لوحة الإدارة</p>
-            <p className="text-xs text-muted-foreground max-w-xs">{this.state.error?.message || ''}</p>
+            <p className="text-xs text-muted-foreground max-w-xs break-all" dir="ltr">{this.state.error?.message || ''}</p>
           </div>
           <button
             onClick={this.handleRetry}

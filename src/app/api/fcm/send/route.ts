@@ -4,10 +4,6 @@ import { getMessaging } from 'firebase-admin/messaging'
 
 // POST /api/fcm/send - Send FCM push notification to a user
 // Body: { userId, title, message, type?, data? }
-//
-// IMPORTANT: Sends DATA-ONLY messages (no "notification" field).
-// This ensures our custom MyFirebaseMessagingService.onMessageReceived()
-// is ALWAYS called, where we play sound + show notification manually.
 export async function POST(request: NextRequest) {
   try {
     const { userId, title, message, type = 'info', data = {} } = await request.json()
@@ -38,17 +34,24 @@ export async function POST(request: NextRequest) {
     try {
       const { app } = initializeFirebase()
       messaging = getMessaging(app)
-    } catch {
-      // Firebase Admin Messaging might not be configured
+    } catch (err) {
+      console.error('[FCM/send] Firebase Admin Messaging init failed:', err)
       return NextResponse.json({ success: true, sent: false, message: 'FCM not configured' })
     }
 
-    // Send DATA-ONLY multicast message — NO "notification" field!
+    // Send with BOTH notification AND data fields (matching push-notification.ts strategy)
+    // This ensures notifications show in background with sound + custom channel
     const multicastMessage = {
-      // ❌ NO "notification" field — ensures onMessageReceived() is always called
       android: {
         priority: 'high' as const,
         ttl: 86400,
+        notification: {
+          channelId: 'fx_v8',
+          sound: 'default',
+          title,
+          body: message,
+          clickAction: 'OPEN_NOTIFICATIONS',
+        },
         data: {
           type: type || 'info',
           userId,
@@ -57,27 +60,43 @@ export async function POST(request: NextRequest) {
           ...data,
         },
       },
-      // Top-level data payload
+      notification: {
+        title,
+        body: message,
+      },
       data: {
         type: type || 'info',
         userId,
         title,
         body: message,
+        click_action: 'OPEN_NOTIFICATIONS',
         ...data,
       },
       tokens,
     }
 
+    console.log(`[FCM/send] Sending to ${tokens.length} token(s) for user ${userId}`)
+
     const response = await messaging.sendEachForMulticast(multicastMessage)
+
+    console.log(`[FCM/send] Response: ${response.successCount} success, ${response.failureCount} failure`)
 
     // Clean up invalid tokens
     if (response.failureCount > 0) {
       const batch = db.batch()
       response.responses.forEach((resp, idx) => {
-        if (!resp.success && (resp.error?.code === 'messaging/invalid-registration-token' ||
-            resp.error?.code === 'messaging/registration-token-not-registered')) {
-          const docToDelete = tokensSnapshot.docs[idx]
-          if (docToDelete) batch.delete(docToDelete.ref)
+        if (!resp.success) {
+          const errCode = resp.error?.info?.code || resp.error?.code || ''
+          console.error(`[FCM/send] Token ${idx} failed: ${errCode} - ${resp.error?.message}`)
+          if ([
+            'messaging/invalid-registration-token',
+            'messaging/registration-token-not-registered',
+            'messaging/mismatched-credential',
+            'UNREGISTERED',
+          ].includes(errCode)) {
+            const docToDelete = tokensSnapshot.docs[idx]
+            if (docToDelete) batch.delete(docToDelete.ref)
+          }
         }
       })
       await batch.commit()
@@ -90,6 +109,7 @@ export async function POST(request: NextRequest) {
       failureCount: response.failureCount,
     })
   } catch (error: unknown) {
+    console.error('[FCM/send] Error:', error)
     const message = error instanceof Error ? error.message : 'حدث خطأ'
     return NextResponse.json({ success: false, message }, { status: 500 })
   }

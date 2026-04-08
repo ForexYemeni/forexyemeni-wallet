@@ -29,7 +29,7 @@ export async function sendPushNotification(
   body: string,
   type: string = 'info',
   data?: Record<string, string>
-): Promise<{ sent: boolean; count: number }> {
+): Promise<{ sent: boolean; count: number; error?: string }> {
   try {
     const db = getDb()
 
@@ -39,12 +39,14 @@ export async function sendPushNotification(
       .get()
 
     if (tokensSnapshot.empty) {
-      return { sent: false, count: 0 }
+      console.log(`[FCM] No tokens found for user ${userId}`)
+      return { sent: false, count: 0, error: 'No FCM tokens registered' }
     }
 
     const tokens = tokensSnapshot.docs.map(doc => doc.data().token).filter(Boolean)
     if (tokens.length === 0) {
-      return { sent: false, count: 0 }
+      console.log(`[FCM] All tokens empty for user ${userId}`)
+      return { sent: false, count: 0, error: 'All FCM tokens are empty' }
     }
 
     // Get Firebase Messaging instance
@@ -52,9 +54,9 @@ export async function sendPushNotification(
     try {
       const { app } = initializeFirebase()
       messaging = getMessaging(app)
-    } catch {
-      // Firebase Admin Messaging not available
-      return { sent: false, count: 0 }
+    } catch (err) {
+      console.error('[FCM] Failed to initialize Firebase Messaging:', err)
+      return { sent: false, count: 0, error: 'Firebase Messaging init failed' }
     }
 
     // Build message with BOTH notification AND data fields.
@@ -105,17 +107,39 @@ export async function sendPushNotification(
       tokens,
     }
 
+    console.log(`[FCM] Sending to ${tokens.length} token(s) for user ${userId}, type=${type}`)
+
     const response = await messaging.sendEachForMulticast(message)
 
-    // Clean up invalid tokens
+    console.log(`[FCM] Response: ${response.successCount} success, ${response.failureCount} failure out of ${tokens.length}`)
+
+    // Log individual failures for debugging
     if (response.failureCount > 0) {
+      response.responses.forEach((resp, idx) => {
+        if (!resp.success) {
+          const errCode = resp.error?.info?.code || resp.error?.code || 'unknown'
+          const errMsg = resp.error?.message || 'no message'
+          console.error(`[FCM] Token ${idx} failed: ${errCode} - ${errMsg}`)
+        }
+      })
+
+      // Clean up invalid tokens (including mismatched-credential)
       const batch = db.batch()
       response.responses.forEach((resp, idx) => {
         if (!resp.success) {
           const errCode = resp.error?.info?.code || ''
-          if (['messaging/invalid-registration-token', 'messaging/registration-token-not-registered', 'UNREGISTERED'].includes(errCode)) {
+          // Delete tokens that are invalid, unregistered, or from a different Firebase project
+          if ([
+            'messaging/invalid-registration-token',
+            'messaging/registration-token-not-registered',
+            'messaging/mismatched-credential',
+            'UNREGISTERED',
+          ].includes(errCode)) {
             const docToDelete = tokensSnapshot.docs[idx]
-            if (docToDelete) batch.delete(docToDelete.ref)
+            if (docToDelete) {
+              batch.delete(docToDelete.ref)
+              console.log(`[FCM] Cleaned up invalid token for user ${userId}: ${errCode}`)
+            }
           }
         }
       })
@@ -124,6 +148,7 @@ export async function sendPushNotification(
 
     return { sent: response.successCount > 0, count: response.successCount }
   } catch (error) {
-    return { sent: false, count: 0 }
+    console.error('[FCM] sendPushNotification error:', error)
+    return { sent: false, count: 0, error: error instanceof Error ? error.message : 'Unknown error' }
   }
 }
