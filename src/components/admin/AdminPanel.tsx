@@ -62,6 +62,7 @@ import {
   ShieldOff,
   Hash,
   Smartphone,
+  Database,
 } from 'lucide-react'
 
 // ===================== TYPES =====================
@@ -197,7 +198,7 @@ export default function AdminPanel() {
   const { user, setScreen } = useAuthStore()
   const AdminFaqManager = lazy(() => import('@/components/admin/AdminFaqManager'))
   const AdminReferralSettings = lazy(() => import('@/components/admin/AdminReferralSettings'))
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'users' | 'deposits' | 'withdrawals' | 'kyc' | 'payment-methods' | 'admin-settings' | 'faq-bot' | 'chats' | 'referral-settings' | 'p2p' | 'audit-log' | 'reports' | 'system-monitor' | 'admin-team' | 'admin-financial' | 'banners' | 'super-admin' | 'promo' | 'withdrawal-reports'>('dashboard')
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'users' | 'deposits' | 'withdrawals' | 'kyc' | 'payment-methods' | 'admin-settings' | 'faq-bot' | 'chats' | 'referral-settings' | 'p2p' | 'audit-log' | 'reports' | 'system-monitor' | 'admin-team' | 'admin-financial' | 'banners' | 'super-admin' | 'promo' | 'withdrawal-reports' | 'firebase-config'>('dashboard')
   const AdminChat = lazy(() => import('@/components/admin/AdminChat'))
   const AdminP2P = lazy(() => import('@/components/admin/AdminP2P'))
   const AdminAuditLog = lazy(() => import('@/components/admin/AdminAuditLog'))
@@ -209,6 +210,7 @@ export default function AdminPanel() {
   const BannerManager = lazy(() => import('@/components/admin/BannerManager'))
   const PromoManager = lazy(() => import('@/components/admin/PromoManager'))
   const AdminWithdrawalReports = lazy(() => import('@/components/admin/AdminWithdrawalReports'))
+  const FirebaseConfig = lazy(() => import('@/components/admin/FirebaseConfig'))
   const [chatUnreadCount, setChatUnreadCount] = useState(0)
 
   // Fetch data when switching tabs (lazy load)
@@ -1062,6 +1064,7 @@ export default function AdminPanel() {
     { key: 'promo' as const, label: 'أكواد ترويجية', icon: Gift, count: 0 },
     { key: 'super-admin' as const, label: '🛡️ تحكم خارق', icon: Shield, count: 0 },
     { key: 'withdrawal-reports' as const, label: '⚠️ بلاغات السحوبات', icon: AlertTriangle, count: 0 },
+    { key: 'firebase-config' as const, label: 'قاعدة البيانات', icon: Database, count: 0 },
   ]
 
   // Split into main tabs (6) and more tabs (13)
@@ -2190,6 +2193,12 @@ export default function AdminPanel() {
               </div>
             }>
               <AdminWithdrawalReports />
+            </Suspense>
+          )}
+
+          {effectiveActiveTab === 'firebase-config' && (
+            <Suspense fallback={<div className="glass-card p-8 text-center"><Loader2 className="w-6 h-6 animate-spin mx-auto text-gold" /></div>}>
+              <FirebaseConfig />
             </Suspense>
           )}
 

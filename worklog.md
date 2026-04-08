@@ -1,69 +1,48 @@
----
-Task ID: 3b
-Agent: Main
-Task: Fix FCM push notifications + update google-services.json for com.forexyemeni.wallet1 + ErrorBoundary logging
+# سجل العمل - ميزة "ربط قاعدة البيانات"
 
-Work Log:
-- User uploaded new google-services.json with both com.forexyemeni.wallet and com.forexyemeni.wallet1 package names
-- Updated android/app/google-services.json to include both package entries
-- Updated android/app/build.gradle: applicationId changed to "com.forexyemeni.wallet1" (kept namespace as com.forexyemeni.wallet to avoid breaking Java package references)
-- Fixed push-notification.ts: Added comprehensive console.error logging throughout the FCM sending pipeline
-- Fixed /api/fcm/send/route.ts: Updated to use BOTH notification+data fields instead of data-only
-- Fixed ErrorBoundary in page.tsx: Added componentDidCatch logging
-- Build successful, pushed to GitHub (commit 91135c4)
+## التاريخ: 2025
 
-Stage Summary:
-- FCM: Added comprehensive error logging to diagnose notification failures on Vercel
-- google-services.json: Now includes com.forexyemeni.wallet1
-- /api/fcm/send: Now uses same notification+data strategy as push-notification.ts
-- Admin devices: Previous fix confirmed, crash should be resolved once deployed
+## المهام المنجزة
 
----
-Task ID: 4
-Agent: Main
-Task: Build Android APK with updated google-services.json and com.forexyemeni.wallet1 package name
+### 1. تعديل `src/lib/firebase.ts`
+- إضافة دالة `reinitializeFirebase()` لتهيئة Firebase بمفتاح service account جديد
+- إضافة دالة `resetFirebaseToDefault()` للرجوع للمفتاح الافتراضي
+- إضافة دالة `getCurrentProjectId()` للحصول على معرف المشروع الحالي
+- استيراد `deleteApp` من `firebase-admin/app` لحذف التطبيق الحالي قبل إعادة التهيئة
 
-Work Log:
-- Installed Android SDK command-line tools (cmdline-tools-linux-11076708_latest.zip) to /home/z/android-sdk
-- Accepted Android SDK licenses
-- Installed platform-tools, platforms;android-36, build-tools;36.0.0
-- Downloaded JDK 21 (only JRE was installed, needed javac for compilation) to /home/z/jdk-21.0.10
-- Updated capacitor.config.ts: appId changed from 'com.forexyemeni.wallet' to 'com.forexyemeni.wallet1'
-- Created minimal out/ directory for Capacitor sync
-- Ran npx cap sync android — synced plugins successfully (5 Capacitor plugins)
-- Built APK: ./gradlew assembleDebug — BUILD SUCCESSFUL in 56s (246 tasks)
-- APK saved to /home/z/my-project/download/forexyemeni-wallet1-v3.6.0-debug.apk (5.6MB)
+### 2. إنشاء API Route `/src/app/api/admin/firebase-config/route.ts`
+- **GET**: يعيد حالة الاتصال الحالية (projectId, connected, isCustom, customProjectId, updatedAt)
+- **POST - action: "test"**: يختبر الاتصال بقاعدة Firebase باستخدام مفتاح مؤقت
+- **POST - action: "save"**: يحفظ المفتاح المشفر (base64) في `systemSettings/customFirebase` ويعيد تهيئة Firebase
+- **POST - action: "revert"**: يحذف الإعدادات المخصصة ويرجع للمفتاح الافتراضي
+- التحقق من صلاحية الأدمن في كل الطلبات
 
-Stage Summary:
-- APK built successfully with new package name com.forexyemeni.wallet1
-- google-services.json includes both com.forexyemeni.wallet and com.forexyemeni.wallet1
-- APK includes updated FCM configuration matching Firebase project forexyemeni-wallet-ed009
-- File: /home/z/my-project/download/forexyemeni-wallet1-v3.6.0-debug.apk (5.6MB)
+### 3. إنشاء مكون `/src/components/admin/FirebaseConfig.tsx`
+- بطاقة حالة الاتصال الحالية (projectId, حالة الاتصال, نوع الاتصال)
+- حقل إدخال Service Account Key (textarea) مع دعم RTL
+- زر "لصق من الحافظة" لنسخ المفتاح
+- زر "اختبار الاتصال" - يرسل JSON للـ API ويعرض النتيجة
+- زر "حفظ وتفعيل" - يحفظ المفتاح ويعيد تهيئة Firebase
+- زر "الرجوع للافتراضي" - يظهر فقط عند استخدام مفتاح مخصص
+- تحذير أمني حول حماية المفتاح
+- قسم "كيف تحصل على المفتاح؟" مع خطوات مفصلة
+- استخدام `glass-card`, `text-gold`, ألوان ذهبية, اتجاه RTL
 
----
-Task ID: 5
-Agent: Main
-Task: Build ForexYemeni Wallet APK using webtoapp-builder template
+### 4. تعديل `src/components/admin/AdminPanel.tsx`
+- إضافة أيقونة `Database` من lucide-react
+- إضافة `FirebaseConfig` كـ lazy import
+- إضافة تبويب جديد `firebase-config` في قائمة `allTabs` (بعد "بلاغات السحوبات")
+- إضافة عرض المكون مع Suspense fallback
+- تحديث نوع `activeTab` state ليشمل `'firebase-config'`
 
-Work Log:
-- Cloned GitHub repo https://github.com/Ayoubvvch/webtoapp-builder.git
-- Analyzed repo structure: Android WebView-based template for converting web apps to APK
-- Customized template for ForexYemeni Wallet:
-  - Changed URL from local files to https://forexyemeni-wallet.vercel.app
-  - Changed app name to "فوركس يمني"
-  - Changed package to com.forexyemeni.wallet
-  - Added dark/gold theme matching the web app
-  - Added fullscreen immersive mode, portrait-only orientation
-  - Added error pages for no internet / loading errors (in Arabic)
-  - Added network security config for HTTPS domains
-  - Added GitHub Actions workflow for future cloud builds
-- Fixed compilation errors: replaced non-existent APIs (setRenderScalesContentAsText, NET_CAPABILITY_NET_CAPABLE)
-- Used Gradle 8.14.3 with AGP 8.7.3 (leverage cached dependencies)
-- BUILD SUCCESSFUL in 19s
+## الملفات المعدلة/المُنشأة
+1. ✅ `src/lib/firebase.ts` - معدّل
+2. ✅ `src/app/api/admin/firebase-config/route.ts` - جديد
+3. ✅ `src/components/admin/FirebaseConfig.tsx` - جديد
+4. ✅ `src/components/admin/AdminPanel.tsx` - معدّل
 
-Stage Summary:
-- APK built: ForexYemeni-Wallet-WebView-v1.0.0.apk (5.6MB)
-- File: /home/z/my-project/download/ForexYemeni-Wallet-WebView-v1.0.0.apk
-- This is a lightweight WebView wrapper that loads the Vercel URL
-- Does NOT include FCM/push notifications (unlike Capacitor version)
-- Suitable for users who want a simple APK without Firebase dependencies
+## ملاحظات
+- لا أخطاء TypeScript في الملفات الجديدة
+- جميع النصوص باللغة العربية
+- لا env variables جديدة
+- المفتاح الافتراضي في `firebase-key.ts` لم يتغير

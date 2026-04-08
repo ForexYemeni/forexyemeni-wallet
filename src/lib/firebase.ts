@@ -1,4 +1,4 @@
-import { initializeApp, cert, App, getApps } from 'firebase-admin/app'
+import { initializeApp, cert, deleteApp, App, getApps } from 'firebase-admin/app'
 import { getFirestore, Firestore } from 'firebase-admin/firestore'
 import { _fbk } from './firebase-key'
 
@@ -17,6 +17,41 @@ export function initializeFirebase() {
   }
   if (!db) db = getFirestore(app)
   return { app, db }
+}
+
+// Reinitialize Firebase with a custom service account key
+export function reinitializeFirebase(serviceAccountKeyJson: string): { app: App; db: Firestore } {
+  if (app) {
+    try { deleteApp(app) } catch { /* ignore */ }
+  }
+  app = undefined as any
+  db = undefined as any
+
+  const serviceAccount = JSON.parse(serviceAccountKeyJson)
+  app = initializeApp({
+    credential: cert(serviceAccount),
+    databaseURL: `https://${serviceAccount.project_id}.firebaseio.com`
+  })
+  db = getFirestore(app)
+  return { app, db }
+}
+
+// Reset Firebase to the default embedded key
+export function resetFirebaseToDefault(): { app: App; db: Firestore } {
+  if (app) {
+    try { deleteApp(app) } catch { /* ignore */ }
+  }
+  app = undefined as any
+  db = undefined as any
+  return initializeFirebase()
+}
+
+// Get the current project ID
+export function getCurrentProjectId(): string | null {
+  if (!app) return null
+  try {
+    return app.options.projectId || null
+  } catch { return null }
 }
 
 export function getDb(): Firestore {
