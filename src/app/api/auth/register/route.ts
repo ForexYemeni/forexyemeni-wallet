@@ -1,11 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { userOperations, otpCodeOperations } from '@/lib/db-firebase'
 import { sendVerificationEmail } from '@/lib/email'
-import { getDb, generateAffiliateCode, generateAccountNumber } from '@/lib/firebase'
+import { getDb, generateAffiliateCode, generateAccountNumber, checkAndApplyCustomFirebase } from '@/lib/firebase'
 import bcrypt from 'bcryptjs'
 
 export async function POST(request: NextRequest) {
   try {
+    // Ensure custom Firebase is loaded before any DB operations
+    await checkAndApplyCustomFirebase()
+
     const { email, password, fullName } = await request.json()
 
     if (!email || !password) {

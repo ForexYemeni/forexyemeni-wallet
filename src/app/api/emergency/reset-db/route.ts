@@ -1,10 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { deleteCustomConfigFromDefaultDb, resetFirebaseToDefault, getDefaultDb } from '@/lib/firebase'
 
 const EMERGENCY_SECRET = 'forexyemeni-emergency-reset'
 
 /**
- * Emergency endpoint — NO authentication required.
+ * Emergency endpoint — NO authentication required, NO ensureDb() dependency.
+ * Completely self-contained — uses only getDefaultDb() and direct firebase-admin imports.
+ * 
  * Resets the app to the default Firebase database.
  * 
  * Use this when:
@@ -22,18 +23,34 @@ const EMERGENCY_SECRET = 'forexyemeni-emergency-reset'
  */
 async function performReset(): Promise<NextResponse> {
   try {
-    // Step 1: Delete custom config from default DB
-    await deleteCustomConfigFromDefaultDb()
+    // Import ONLY what we need — avoid importing anything that triggers ensureDb()
+    const { _fbk } = await import('@/lib/firebase-key')
 
-    // Step 2: Reset Firebase to default
-    resetFirebaseToDefault()
+    // Step 1: Connect directly to DEFAULT DB (never touches global state)
+    const raw = Buffer.from(_fbk, 'base64').toString()
+    const serviceAccount = JSON.parse(raw)
+    const { initializeApp: initApp, cert: firebaseCert, deleteApp: delApp } = await import('firebase-admin/app')
+    const { getFirestore: getFs } = await import('firebase-admin/firestore')
+    
+    const tempApp = initApp({
+      credential: firebaseCert(serviceAccount),
+    }, `emergency-reset-${Date.now()}`)
+    const defaultDb = getFs(tempApp)
+
+    // Step 2: Delete custom config from default DB
+    try {
+      await defaultDb.collection('systemSettings').doc('customFirebase').delete()
+    } catch {}
 
     // Step 3: Verify default DB is working
-    const defaultDb = await getDefaultDb()
-    await defaultDb.collection('systemSettings').doc('testConnection').get()
-    try { await (defaultDb as any).app?.delete?.() } catch {}
+    const testDoc = await defaultDb.collection('systemSettings').doc('testConnection').get()
+    
+    // Clean up temp app
+    try { await delApp(tempApp) } catch {}
 
-    const { getCurrentProjectId } = await import('@/lib/firebase')
+    // Step 4: Now reset the global Firebase (force reset regardless of current state)
+    const { resetFirebaseToDefault, getCurrentProjectId } = await import('@/lib/firebase')
+    resetFirebaseToDefault()
     const projectId = getCurrentProjectId()
 
     return NextResponse.json({
@@ -76,10 +93,14 @@ export async function GET(request: NextRequest) {
     return await performReset()
   }
 
-  // Otherwise, just show status
+  // Otherwise, just show status page (completely self-contained, no ensureDb dependency)
   try {
-    const { getCurrentProjectId } = await import('@/lib/firebase')
-    const projectId = getCurrentProjectId()
+    let projectId = 'غير معروف'
+    try {
+      const { getCurrentProjectId } = await import('@/lib/firebase')
+      const id = getCurrentProjectId()
+      if (id) projectId = id
+    } catch {}
 
     return new NextResponse(`<!DOCTYPE html>
 <html dir="rtl" lang="ar">
@@ -105,7 +126,7 @@ p{font-size:13px;color:#999;margin-bottom:20px;line-height:1.6}
 <p>إذا كنت عالق ولا تستطيع تسجيل الدخول بسبب قاعدة بيانات متوقفة</p>
 <div class="status">
 <span>القاعدة الحالية</span><br>
-<b>${projectId || 'غير معروف'}</b>
+<b>${projectId}</b>
 </div>
 <a class="btn" href="?secret=forexyemeni-emergency-reset">🔄 إعادة للقاعدة الافتراضية</a>
 <div class="warn">
