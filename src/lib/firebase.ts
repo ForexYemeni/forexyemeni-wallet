@@ -21,7 +21,23 @@ export function initializeFirebase() {
 }
 
 /**
- * Check if a custom Firebase config is saved and reinitialize with it.
+ * Get a temporary Firestore connection to the DEFAULT database.
+ * Always creates a fresh connection using the embedded key, regardless of current state.
+ */
+export async function getDefaultDb(): Promise<Firestore> {
+  const raw = Buffer.from(_fbk, 'base64').toString()
+  const serviceAccount = JSON.parse(raw)
+  const { initializeApp: initApp, cert: firebaseCert, deleteApp: delApp } = await import('firebase-admin/app')
+  const { getFirestore: getFs } = await import('firebase-admin/firestore')
+  const tempApp = initApp({
+    credential: firebaseCert(serviceAccount),
+  }, `default-temp-${Date.now()}`)
+  const defaultDb = getFs(tempApp)
+  return defaultDb
+}
+
+/**
+ * Check if a custom Firebase config is saved in the DEFAULT database and reinitialize with it.
  * Called once on first API request after server startup.
  */
 export async function checkAndApplyCustomFirebase(): Promise<boolean> {
@@ -29,20 +45,33 @@ export async function checkAndApplyCustomFirebase(): Promise<boolean> {
   checkedCustomFirebase = true
 
   try {
-    // First init with default key to read the config
-    const { db: defaultDb } = initializeFirebase()
+    // Always use a temporary connection to the DEFAULT database to read config
+    const defaultDb = await getDefaultDb()
     
     const customDoc = await defaultDb.collection('systemSettings').doc('customFirebase').get()
-    if (!customDoc.exists) return false
+    if (!customDoc.exists) {
+      // Clean up temp app
+      try { await (defaultDb as any).app?.delete?.() } catch {}
+      return false
+    }
 
     const data = customDoc.data()
-    if (!data?.encodedKey) return false
+    if (!data?.encodedKey) {
+      try { await (defaultDb as any).app?.delete?.() } catch {}
+      return false
+    }
 
     const serviceAccountKeyJson = Buffer.from(data.encodedKey, 'base64').toString()
     
     // Validate JSON
     const serviceAccount = JSON.parse(serviceAccountKeyJson)
-    if (!serviceAccount.project_id || !serviceAccount.private_key) return false
+    if (!serviceAccount.project_id || !serviceAccount.private_key) {
+      try { await (defaultDb as any).app?.delete?.() } catch {}
+      return false
+    }
+
+    // Clean up temp app
+    try { await (defaultDb as any).app?.delete?.() } catch {}
 
     // Reinitialize with custom key
     reinitializeFirebase(serviceAccountKeyJson)
@@ -51,6 +80,37 @@ export async function checkAndApplyCustomFirebase(): Promise<boolean> {
   } catch (error) {
     console.error('[Firebase] Failed to check/apply custom config:', error)
     return false
+  }
+}
+
+/**
+ * Save custom Firebase config to the DEFAULT database.
+ * Always uses a fresh connection to ensure config is saved in the right place.
+ */
+export async function saveCustomConfigToDefaultDb(encodedKey: string, projectId: string): Promise<void> {
+  const defaultDb = await getDefaultDb()
+  try {
+    await defaultDb.collection('systemSettings').doc('customFirebase').set({
+      encodedKey,
+      projectId,
+      updatedAt: nowTimestamp(),
+    }, { merge: true })
+  } finally {
+    // Clean up temp app
+    try { await (defaultDb as any).app?.delete?.() } catch {}
+  }
+}
+
+/**
+ * Delete custom Firebase config from the DEFAULT database.
+ * Always uses a fresh connection to ensure config is deleted from the right place.
+ */
+export async function deleteCustomConfigFromDefaultDb(): Promise<void> {
+  const defaultDb = await getDefaultDb()
+  try {
+    await defaultDb.collection('systemSettings').doc('customFirebase').delete()
+  } finally {
+    try { await (defaultDb as any).app?.delete?.() } catch {}
   }
 }
 
@@ -87,6 +147,8 @@ export function resetFirebaseToDefault(): { app: App; db: Firestore } {
   }
   app = undefined as any
   db = undefined as any
+  // Reset the check flag so it re-checks on next startup
+  checkedCustomFirebase = false
   return initializeFirebase()
 }
 

@@ -1,10 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getDb, reinitializeFirebase, resetFirebaseToDefault, getCurrentProjectId, nowTimestamp, generateId, generateAffiliateCode } from '@/lib/firebase'
+import { getDb, reinitializeFirebase, resetFirebaseToDefault, getCurrentProjectId, nowTimestamp, generateId, generateAffiliateCode, saveCustomConfigToDefaultDb, deleteCustomConfigFromDefaultDb, checkAndApplyCustomFirebase } from '@/lib/firebase'
 import bcrypt from 'bcryptjs'
 
 // GET - get current Firebase connection status (NO admin verification needed)
 export async function GET() {
   try {
+    await checkAndApplyCustomFirebase()
     const db = getDb()
     const projectId = getCurrentProjectId()
     let connected = false
@@ -349,12 +350,8 @@ export async function POST(request: NextRequest) {
       const projectId = serviceAccount.project_id as string
       const encodedKey = Buffer.from(serviceAccountKey).toString('base64')
 
-      const db = getDb()
-      await db.collection('systemSettings').doc('customFirebase').set({
-        encodedKey,
-        projectId,
-        updatedAt: nowTimestamp(),
-      }, { merge: true })
+      // ALWAYS save config in the DEFAULT database (not the current one)
+      await saveCustomConfigToDefaultDb(encodedKey, projectId)
 
       try {
         reinitializeFirebase(serviceAccountKey)
@@ -379,11 +376,11 @@ export async function POST(request: NextRequest) {
     // === REVERT ACTION ===
     if (action === 'revert') {
       try {
-        const db = getDb()
-        await db.collection('systemSettings').doc('customFirebase').delete()
+        // Delete config from DEFAULT database
+        await deleteCustomConfigFromDefaultDb()
         resetFirebaseToDefault()
         const defaultDb = getDb()
-        await defaultDb.collection('systemSettings').doc('customFirebase').get()
+        await defaultDb.collection('systemSettings').doc('testConnection').get()
         const defaultProjectId = getCurrentProjectId()
 
         return NextResponse.json({
