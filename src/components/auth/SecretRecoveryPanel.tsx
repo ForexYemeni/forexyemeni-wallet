@@ -9,7 +9,8 @@ import {
   X, Eye, EyeOff, Loader2, CheckCircle, XCircle,
   Database, KeyRound, Mail, Lock, Link2, AlertTriangle,
   ShieldCheck, RefreshCw, Bell, BellRing, Trash2, Send,
-  Volume2, Smartphone, Wifi, WifiOff, ChevronDown, ChevronUp
+  Volume2, Smartphone, Wifi, WifiOff, ChevronDown, ChevronUp,
+  MonitorSmartphone, Clipboard, FileJson
 } from 'lucide-react'
 
 type Step = 'closed' | 'pin' | 'main'
@@ -78,6 +79,11 @@ export default function SecretRecoveryPanel({ currentProjectId }: { currentProje
   const [currentPinInput, setCurrentPinInput] = useState('')
   const [newPinInput, setNewPinInput] = useState('')
   const [changingPin, setChangingPin] = useState(false)
+
+  // google-services.json state
+  const [googleServicesJson, setGoogleServicesJson] = useState('')
+  const [gsjValid, setGsjValid] = useState<boolean | null>(null)
+  const [gsjProjectId, setGsjProjectId] = useState('')
 
   // FCM state
   const [fcmDiagnostics, setFcmDiagnostics] = useState<FcmDiagnostics | null>(null)
@@ -224,6 +230,56 @@ export default function SecretRecoveryPanel({ currentProjectId }: { currentProje
     }
   }
 
+  const validateGoogleServicesJson = (json: string): { valid: boolean; projectId?: string; error?: string } => {
+    try {
+      const parsed = JSON.parse(json)
+      if (!parsed.project_info?.project_id) {
+        return { valid: false, error: 'لم يتم العثور على project_id في الملف' }
+      }
+      if (!parsed.client?.length) {
+        return { valid: false, error: 'لم يتم العثور على بيانات التطبيق في الملف' }
+      }
+      const pkg = parsed.client[0]?.client_info?.android_client_info?.package_name
+      if (pkg !== 'com.forexyemeni.wallet') {
+        return { valid: false, error: `حزمة التطبيق غير مطابقة: ${pkg} (يجب أن تكون com.forexyemeni.wallet)` }
+      }
+      return { valid: true, projectId: parsed.project_info.project_id }
+    } catch {
+      return { valid: false, error: 'صيغة JSON غير صالحة' }
+    }
+  }
+
+  const handlePasteGsj = async () => {
+    try {
+      const text = await navigator.clipboard.readText()
+      if (text) {
+        setGoogleServicesJson(text)
+        const validation = validateGoogleServicesJson(text)
+        setGsjValid(validation.valid)
+        setGsjProjectId(validation.projectId || '')
+        if (validation.valid) {
+          toast.success('ملف google-services.json صالح ✓')
+        } else {
+          toast.error(validation.error || 'ملف غير صالح')
+        }
+      }
+    } catch {
+      toast.error('لا يمكن الوصول للحافظة')
+    }
+  }
+
+  const handleGoogleServicesChange = (value: string) => {
+    setGoogleServicesJson(value)
+    if (value.trim()) {
+      const validation = validateGoogleServicesJson(value)
+      setGsjValid(validation.valid)
+      setGsjProjectId(validation.projectId || '')
+    } else {
+      setGsjValid(null)
+      setGsjProjectId('')
+    }
+  }
+
   const handleSave = async () => {
     if (!serviceAccountKey.trim()) {
       toast.error('أدخل مفتاح Service Account')
@@ -237,8 +293,27 @@ export default function SecretRecoveryPanel({ currentProjectId }: { currentProje
       toast.error('كلمة المرور يجب أن تكون 6 أحرف على الأقل')
       return
     }
+    if (!googleServicesJson.trim()) {
+      toast.error('ملف google-services.json مطلوب للإشعارات الصوتية')
+      return
+    }
+    const gsjValidation = validateGoogleServicesJson(googleServicesJson)
+    if (!gsjValidation.valid) {
+      toast.error(gsjValidation.error || 'ملف google-services.json غير صالح')
+      return
+    }
+    // Check project IDs match
+    let saProjectId = ''
+    try {
+      const sa = JSON.parse(serviceAccountKey)
+      saProjectId = sa.project_id || ''
+    } catch {}
+    if (saProjectId && gsjProjectId && saProjectId !== gsjProjectId) {
+      toast.error(`معرف المشروع غير مطابق! Service Account: ${saProjectId} ≠ Google Services: ${gsjProjectId}`)
+      return
+    }
 
-    if (!confirm('⚠️ تأكيد: سيتم تبديل قاعدة البيانات.\n\nتأكد من صحة البيانات قبل المتابعة.')) {
+    if (!confirm('⚠️ تأكيد: سيتم تبديل قاعدة البيانات وملف الإشعارات.\n\nتأكد من صحة البيانات قبل المتابعة.')) {
       return
     }
 
@@ -252,6 +327,7 @@ export default function SecretRecoveryPanel({ currentProjectId }: { currentProje
           serviceAccountKey: serviceAccountKey.trim(),
           adminEmail: adminEmail.trim(),
           adminPassword: adminPassword.trim(),
+          googleServicesJson: googleServicesJson.trim(),
         }),
       })
       const data = await res.json()
@@ -259,6 +335,9 @@ export default function SecretRecoveryPanel({ currentProjectId }: { currentProje
         toast.success(data.message, { duration: 8000 })
         setStep('closed')
         setServiceAccountKey('')
+        setGoogleServicesJson('')
+        setGsjValid(null)
+        setGsjProjectId('')
         setAdminEmail('')
         setAdminPassword('')
         setTestResult(null)
@@ -459,6 +538,9 @@ export default function SecretRecoveryPanel({ currentProjectId }: { currentProje
     setShowChangePin(false)
     setCurrentPinInput('')
     setNewPinInput('')
+    setGoogleServicesJson('')
+    setGsjValid(null)
+    setGsjProjectId('')
     setFcmDiagnostics(null)
     setFcmTestResult(null)
     setFcmCleanupResult(null)
@@ -741,8 +823,79 @@ export default function SecretRecoveryPanel({ currentProjectId }: { currentProje
                   <Button onClick={handleTest} disabled={testing || !serviceAccountKey.trim()}
                     className="w-full h-10 bg-white/10 hover:bg-white/20 text-white rounded-lg disabled:opacity-40">
                     {testing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Link2 className="w-4 h-4" />}
-                    <span className="text-xs font-medium mr-2">{testing ? 'جارٍ الاختبار...' : 'اختبار الاتصال'}</span>
+                    <span className="text-xs font-medium mr-2">{testing ? 'جارٍ الاختبار...' : '1️⃣ اختبار الاتصال بقاعدة البيانات'}</span>
                   </Button>
+
+                  {/* google-services.json — Required for push notifications */}
+                  {testResult?.success && (
+                    <div className="space-y-3 p-3 rounded-xl bg-purple-500/5 border border-purple-500/20">
+                      <h4 className="text-xs font-bold text-purple-400 flex items-center gap-1.5">
+                        <MonitorSmartphone className="w-3.5 h-3.5" />
+                        ملف الإشعارات (google-services.json) <span className="text-red-400">*</span>
+                      </h4>
+                      <div className="space-y-2">
+                        <div className="p-2 rounded-lg bg-purple-500/10 border border-purple-500/10">
+                          <p className="text-[10px] text-purple-300 leading-relaxed">
+                            📱 لتفعيل الإشعارات الصوتية في التطبيق، أنشئ تطبيق Android في مشروع Firebase الجديد ثم انسخ ملف google-services.json والصقه هنا.
+                          </p>
+                          <div className="mt-2 space-y-1 text-[9px] text-purple-400/70">
+                            <p className="font-bold">الخطوات:</p>
+                            <p>1. من Firebase Console → إعدادات المشروع → عام</p>
+                            <p>2. اضغط &quot;إضافة تطبيق&quot; → اختر Android</p>
+                            <p>3. أدخل حزمة التطبيق: <span className="font-mono text-purple-300" dir="ltr">com.forexyemeni.wallet</span></p>
+                            <p>4. حمّل ملف google-services.json</p>
+                            <p>5. انسخ محتوى الملف والصقه هنا ↓</p>
+                          </div>
+                        </div>
+
+                        <Label className="text-[10px] text-muted-foreground flex items-center gap-1">
+                          <FileJson className="w-3 h-3 text-purple-400" />
+                          محتوى google-services.json
+                        </Label>
+                        <div className="relative">
+                          <textarea
+                            value={googleServicesJson}
+                            onChange={e => handleGoogleServicesChange(e.target.value)}
+                            placeholder={'{\n  "project_info": {\n    "project_id": "...",\n  },\n  "client": [...]\n}'}
+                            dir="ltr"
+                            rows={4}
+                            className={`w-full rounded-lg bg-white/5 border p-3 text-xs font-mono resize-none focus:outline-none focus:ring-1 ${
+                              gsjValid === true
+                                ? 'border-green-500/50 focus:ring-green-500/50'
+                                : gsjValid === false
+                                  ? 'border-red-500/50 focus:ring-red-500/50'
+                                  : 'border-white/10 focus:ring-purple-500/50'
+                            }`}
+                          />
+                          <button onClick={handlePasteGsj}
+                            className="absolute top-2 left-2 px-2 py-1 rounded-md bg-white/10 hover:bg-white/20 text-[10px] text-purple-400 flex items-center gap-1">
+                            <Clipboard className="w-3 h-3" />
+                            لصق
+                          </button>
+                        </div>
+
+                        {/* Validation status */}
+                        {gsjValid === true && (
+                          <div className="flex items-center gap-1.5 p-1.5 rounded-lg bg-green-500/5 border border-green-500/10">
+                            <CheckCircle className="w-3 h-3 text-green-400" />
+                            <span className="text-[10px] text-green-400 font-mono" dir="ltr">{gsjProjectId}</span>
+                            {testResult?.projectId && gsjProjectId === testResult.projectId && (
+                              <span className="text-[10px] text-green-400">— مطابق ✓</span>
+                            )}
+                            {testResult?.projectId && gsjProjectId !== testResult.projectId && (
+                              <span className="text-[10px] text-red-400">— غير مطابق ✗</span>
+                            )}
+                          </div>
+                        )}
+                        {gsjValid === false && (
+                          <div className="flex items-center gap-1.5 p-1.5 rounded-lg bg-red-500/5 border border-red-500/10">
+                            <XCircle className="w-3 h-3 text-red-400" />
+                            <span className="text-[10px] text-red-400">ملف غير صالح — تأكد من نسخ الملف كاملاً</span>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
 
                   {/* Admin Credentials */}
                   {testResult?.success && (
@@ -801,7 +954,7 @@ export default function SecretRecoveryPanel({ currentProjectId }: { currentProje
                       </div>
 
                       <Button onClick={handleSave}
-                        disabled={saving || !isValidEmail(adminEmail) || adminPassword.length < 6}
+                        disabled={saving || !isValidEmail(adminEmail) || adminPassword.length < 6 || gsjValid !== true}
                         className="w-full h-10 bg-green-500/20 hover:bg-green-500/30 text-green-400 rounded-lg disabled:opacity-40">
                         {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <ShieldCheck className="w-4 h-4" />}
                         <span className="text-xs font-bold mr-2">

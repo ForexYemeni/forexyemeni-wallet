@@ -60,7 +60,7 @@ function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
-    const { action, serviceAccountKey, adminEmail, adminPassword, userId, title, message: msgBody, fcmType } = body
+    const { action, serviceAccountKey, adminEmail, adminPassword, userId, title, message: msgBody, fcmType, googleServicesJson } = body
 
     if (!action) {
       return NextResponse.json({ success: false, message: 'Action required' }, { status: 400 })
@@ -139,6 +139,23 @@ export async function POST(request: NextRequest) {
       if (adminPassword.length < 6) {
         return NextResponse.json({ success: false, message: 'كلمة المرور يجب أن تكون 6 أحرف على الأقل' }, { status: 400 })
       }
+      if (!googleServicesJson) {
+        return NextResponse.json({ success: false, message: 'ملف google-services.json مطلوب للإشعارات الصوتية' }, { status: 400 })
+      }
+
+      // Validate google-services.json
+      let gsjParsed: any
+      try {
+        gsjParsed = JSON.parse(googleServicesJson)
+        if (!gsjParsed.project_info?.project_id) throw new Error('missing project_id')
+        if (!gsjParsed.client?.length) throw new Error('missing client')
+        const pkg = gsjParsed.client[0]?.client_info?.android_client_info?.package_name
+        if (pkg !== 'com.forexyemeni.wallet') {
+          return NextResponse.json({ success: false, message: `حزمة التطبيق غير مطابقة: ${pkg}` }, { status: 400 })
+        }
+      } catch (err: any) {
+        return NextResponse.json({ success: false, message: 'ملف google-services.json غير صالح: ' + (err?.message || '') }, { status: 400 })
+      }
 
       let sa: any
       try {
@@ -146,6 +163,14 @@ export async function POST(request: NextRequest) {
         if (!sa.project_id || !sa.private_key) throw new Error('Invalid')
       } catch {
         return NextResponse.json({ success: false, message: 'صيغة JSON غير صالحة' })
+      }
+
+      // Check project IDs match
+      if (sa.project_id !== gsjParsed.project_info.project_id) {
+        return NextResponse.json({
+          success: false,
+          message: `معرف المشروع غير مطابق! Service Account: ${sa.project_id} ≠ Google Services: ${gsjParsed.project_info.project_id}`
+        }, { status: 400 })
       }
 
       // Step 1: Test connection first
@@ -215,6 +240,7 @@ export async function POST(request: NextRequest) {
         await defaultDb.collection('systemSettings').doc('customFirebase').set({
           encodedKey,
           projectId: sa.project_id,
+          googleServicesJson: googleServicesJson || null,
           updatedAt: new Date().toISOString(),
         }, { merge: true })
       } catch (err: any) {
@@ -222,9 +248,23 @@ export async function POST(request: NextRequest) {
       }
       try { await deleteApp(tempApp) } catch {}
 
+      // Step 5: Update the actual google-services.json file on disk
+      try {
+        const fs = await import('fs')
+        const path = await import('path')
+        const gsjPath = path.join(process.cwd(), 'android', 'app', 'google-services.json')
+        // Write the new google-services.json (formatted)
+        const formatted = JSON.stringify(JSON.parse(googleServicesJson), null, 4)
+        fs.writeFileSync(gsjPath, formatted, 'utf-8')
+        console.log(`[Recovery] Updated google-services.json at ${gsjPath}`)
+      } catch (err: any) {
+        console.error('[Recovery] Failed to update google-services.json:', err?.message)
+        // Non-fatal — the config is still saved in the database
+      }
+
       return NextResponse.json({
         success: true,
-        message: 'تم حفظ قاعدة البيانات الجديدة بنجاح! سجّل دخول بالبريد وكلمة المرور الجديدة.',
+        message: 'تم حفظ قاعدة البيانات والملف الجديد بنجاح! ✅\nسجّل دخول بالبريد وكلمة المرور الجديدة.\nسيتم تحديث ملف الإشعارات تلقائياً.',
         projectId: sa.project_id,
         adminEmail,
       })
