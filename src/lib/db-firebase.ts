@@ -1,4 +1,4 @@
-import { getDb, generateId, generateAffiliateCode, nowTimestamp, fromFirestoreTimestamp } from './firebase'
+import { ensureDb, generateId, generateAffiliateCode, nowTimestamp, fromFirestoreTimestamp } from './firebase'
 import type { Query, DocumentData, Filter } from 'firebase-admin/firestore'
 
 // ===================== TYPES =====================
@@ -167,7 +167,7 @@ export interface UserPaymentMethod {
 
 export const userOperations = {
   async findUnique(where: { email?: string; id?: string }): Promise<User | null> {
-    const db = getDb()
+    const db = await ensureDb()
     if (where.email) {
       const snapshot = await db.collection('users').where('email', '==', where.email).limit(1).get()
       if (snapshot.empty) return null
@@ -183,7 +183,7 @@ export const userOperations = {
   },
 
   async findMany(options?: { orderBy?: string; take?: number; select?: string[] }): Promise<User[]> {
-    const db = getDb()
+    const db = await ensureDb()
     let query: Query<DocumentData> = db.collection('users')
     
     if (options?.take) {
@@ -198,7 +198,7 @@ export const userOperations = {
   },
 
   async create(data: Omit<User, 'id' | 'createdAt' | 'updatedAt'>): Promise<User> {
-    const db = getDb()
+    const db = await ensureDb()
     const id = generateId()
     const now = nowTimestamp()
     const user: User = {
@@ -213,7 +213,7 @@ export const userOperations = {
   },
 
   async update(where: { id: string }, data: Partial<User>): Promise<User> {
-    const db = getDb()
+    const db = await ensureDb()
     const now = nowTimestamp()
     const updateData = { ...data, updatedAt: now }
     await db.collection('users').doc(where.id).update(updateData)
@@ -222,7 +222,7 @@ export const userOperations = {
   },
 
   async incrementBalance(userId: string, amount: number): Promise<void> {
-    const db = getDb()
+    const db = await ensureDb()
     const userRef = db.collection('users').doc(userId)
     const doc = await userRef.get()
     if (!doc.exists) return
@@ -234,7 +234,7 @@ export const userOperations = {
   },
 
   async updateBalance(userId: string, newBalance: number): Promise<void> {
-    const db = getDb()
+    const db = await ensureDb()
     await db.collection('users').doc(userId).update({
       balance: newBalance,
       updatedAt: nowTimestamp(),
@@ -242,7 +242,7 @@ export const userOperations = {
   },
 
   async updateFrozenBalance(userId: string, newFrozenBalance: number): Promise<void> {
-    const db = getDb()
+    const db = await ensureDb()
     await db.collection('users').doc(userId).update({
       frozenBalance: newFrozenBalance,
       updatedAt: nowTimestamp(),
@@ -254,7 +254,7 @@ export const userOperations = {
 
 export const otpCodeOperations = {
   async create(data: Omit<OtpCode, 'id' | 'createdAt'>): Promise<OtpCode> {
-    const db = getDb()
+    const db = await ensureDb()
     const id = generateId()
     const otp: OtpCode = { ...data, id, createdAt: nowTimestamp(), verified: false }
     await db.collection('otpCodes').doc(id).set(otp)
@@ -270,7 +270,7 @@ export const otpCodeOperations = {
     }
     orderBy?: string
   }): Promise<OtpCode | null> {
-    const db = getDb()
+    const db = await ensureDb()
 
     let query: Query<DocumentData> = db.collection('otpCodes')
 
@@ -299,7 +299,7 @@ export const otpCodeOperations = {
   },
 
   async update(id: string, data: Partial<OtpCode>): Promise<void> {
-    const db = getDb()
+    const db = await ensureDb()
     await db.collection('otpCodes').doc(id).update(data)
   },
 }
@@ -308,7 +308,7 @@ export const otpCodeOperations = {
 
 export const kycRecordOperations = {
   async create(data: Omit<KYCRecord, 'id' | 'createdAt'>): Promise<KYCRecord> {
-    const db = getDb()
+    const db = await ensureDb()
     const id = generateId()
     const record: KYCRecord = { ...data, id, createdAt: nowTimestamp() }
     await db.collection('kycRecords').doc(id).set(record)
@@ -316,7 +316,7 @@ export const kycRecordOperations = {
   },
 
   async findMany(): Promise<(KYCRecord & { user?: { id: string; email: string; fullName: string | null; phone: string | null } })[]> {
-    const db = getDb()
+    const db = await ensureDb()
     const snapshot = await db.collection('kycRecords').limit(100).get()
     
     if (snapshot.empty) return []
@@ -339,14 +339,14 @@ export const kycRecordOperations = {
   },
 
   async update(id: string, data: Partial<KYCRecord>): Promise<KYCRecord> {
-    const db = getDb()
+    const db = await ensureDb()
     await db.collection('kycRecords').doc(id).update(data)
     const doc = await db.collection('kycRecords').doc(id).get()
     return { id: doc.id, ...doc.data() } as KYCRecord
   },
 
   async countPending(userId: string): Promise<number> {
-    const db = getDb()
+    const db = await ensureDb()
     const snapshot = await db.collection('kycRecords')
       .where('userId', '==', userId)
       .where('status', '==', 'pending')
@@ -359,7 +359,7 @@ export const kycRecordOperations = {
 
 export const depositOperations = {
   async create(data: Omit<Deposit, 'id' | 'createdAt' | 'updatedAt'>): Promise<Deposit> {
-    const db = getDb()
+    const db = await ensureDb()
     const id = generateId()
     const now = nowTimestamp()
     const deposit: Deposit = { ...data, id, createdAt: now, updatedAt: now }
@@ -368,7 +368,7 @@ export const depositOperations = {
   },
 
   async findMany(options?: { status?: string }): Promise<(Deposit & { user?: { id: string; email: string; fullName: string | null } })[]> {
-    const db = getDb()
+    const db = await ensureDb()
     let query: Query<DocumentData> = db.collection('deposits')
     
     if (options?.status && options.status !== 'all') {
@@ -398,14 +398,14 @@ export const depositOperations = {
   },
 
   async findUnique(id: string): Promise<(Deposit & { id: string }) | null> {
-    const db = getDb()
+    const db = await ensureDb()
     const doc = await db.collection('deposits').doc(id).get()
     if (!doc.exists) return null
     return { id: doc.id, ...doc.data() } as Deposit
   },
 
   async update(id: string, data: Partial<Deposit>): Promise<Deposit> {
-    const db = getDb()
+    const db = await ensureDb()
     await db.collection('deposits').doc(id).update({ ...data, updatedAt: nowTimestamp() })
     const doc = await db.collection('deposits').doc(id).get()
     return { id: doc.id, ...doc.data() } as Deposit
@@ -416,7 +416,7 @@ export const depositOperations = {
 
 export const withdrawalOperations = {
   async create(data: Omit<Withdrawal, 'id' | 'createdAt' | 'updatedAt'>): Promise<Withdrawal> {
-    const db = getDb()
+    const db = await ensureDb()
     const id = generateId()
     const now = nowTimestamp()
     const withdrawal: Withdrawal = { ...data, id, createdAt: now, updatedAt: now }
@@ -425,7 +425,7 @@ export const withdrawalOperations = {
   },
 
   async findMany(options?: { status?: string }): Promise<(Withdrawal & { user?: { id: string; email: string; fullName: string | null; phone: string | null } })[]> {
-    const db = getDb()
+    const db = await ensureDb()
     let query: Query<DocumentData> = db.collection('withdrawals')
     
     if (options?.status && options.status !== 'all') {
@@ -455,14 +455,14 @@ export const withdrawalOperations = {
   },
 
   async findUnique(id: string): Promise<(Withdrawal & { id: string }) | null> {
-    const db = getDb()
+    const db = await ensureDb()
     const doc = await db.collection('withdrawals').doc(id).get()
     if (!doc.exists) return null
     return { id: doc.id, ...doc.data() } as Withdrawal
   },
 
   async update(id: string, data: Partial<Withdrawal>): Promise<Withdrawal> {
-    const db = getDb()
+    const db = await ensureDb()
     await db.collection('withdrawals').doc(id).update({ ...data, updatedAt: nowTimestamp() })
     const doc = await db.collection('withdrawals').doc(id).get()
     return { id: doc.id, ...doc.data() } as Withdrawal
@@ -473,7 +473,7 @@ export const withdrawalOperations = {
 
 export const transactionOperations = {
   async create(data: Omit<Transaction, 'id' | 'createdAt'>): Promise<Transaction> {
-    const db = getDb()
+    const db = await ensureDb()
     const id = generateId()
     const transaction: Transaction = { ...data, id, createdAt: nowTimestamp() }
     await db.collection('transactions').doc(id).set(transaction)
@@ -481,7 +481,7 @@ export const transactionOperations = {
   },
 
   async findMany(userId: string): Promise<Transaction[]> {
-    const db = getDb()
+    const db = await ensureDb()
     const snapshot = await db.collection('transactions')
       .where('userId', '==', userId)
       .limit(100)
@@ -497,7 +497,7 @@ export const transactionOperations = {
 
 export const notificationOperations = {
   async create(data: Omit<Notification, 'id' | 'createdAt'>): Promise<Notification> {
-    const db = getDb()
+    const db = await ensureDb()
     const id = generateId()
     const notification: Notification = { ...data, id, createdAt: nowTimestamp() }
     await db.collection('notifications').doc(id).set(notification)
@@ -505,7 +505,7 @@ export const notificationOperations = {
   },
 
   async findMany(userId: string, after?: string): Promise<Notification[]> {
-    const db = getDb()
+    const db = await ensureDb()
     let query: Query<DocumentData, Filter> = db.collection('notifications')
       .where('userId', '==', userId)
     if (after) {
@@ -519,7 +519,7 @@ export const notificationOperations = {
   },
 
   async countUnread(userId: string): Promise<number> {
-    const db = getDb()
+    const db = await ensureDb()
     // OPTIMIZED: Only select the doc ID, not full document content
     // This still counts as a read in Firestore, but we limit to 50
     // The real savings come from the 30s poll interval + server-side cache
@@ -532,7 +532,7 @@ export const notificationOperations = {
   },
 
   async markAllRead(userId: string): Promise<void> {
-    const db = getDb()
+    const db = await ensureDb()
     const snapshot = await db.collection('notifications')
       .where('userId', '==', userId)
       .where('read', '==', false)
@@ -550,7 +550,7 @@ export const notificationOperations = {
 
 export const paymentMethodOperations = {
   async create(data: Omit<PaymentMethod, 'id' | 'createdAt' | 'updatedAt'>): Promise<PaymentMethod> {
-    const db = getDb()
+    const db = await ensureDb()
     const id = generateId()
     const now = nowTimestamp()
     const method: PaymentMethod = { ...data, id, createdAt: now, updatedAt: now }
@@ -559,7 +559,7 @@ export const paymentMethodOperations = {
   },
 
   async findMany(): Promise<PaymentMethod[]> {
-    const db = getDb()
+    const db = await ensureDb()
     const snapshot = await db.collection('paymentMethods').limit(50).get()
     const results = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() } as PaymentMethod))
     results.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
@@ -567,7 +567,7 @@ export const paymentMethodOperations = {
   },
 
   async findActive(purpose?: string): Promise<PaymentMethod[]> {
-    const db = getDb()
+    const db = await ensureDb()
     const snapshot = await db.collection('paymentMethods')
       .where('isActive', '==', true)
       .limit(50)
@@ -582,12 +582,12 @@ export const paymentMethodOperations = {
   },
 
   async update(id: string, data: Partial<PaymentMethod>): Promise<void> {
-    const db = getDb()
+    const db = await ensureDb()
     await db.collection('paymentMethods').doc(id).update({ ...data, updatedAt: nowTimestamp() })
   },
 
   async delete(id: string): Promise<void> {
-    const db = getDb()
+    const db = await ensureDb()
     await db.collection('paymentMethods').doc(id).delete()
   },
 }
@@ -608,7 +608,7 @@ export interface FaqItem {
 
 export const faqBotOperations = {
   async create(data: Omit<FaqItem, 'id' | 'createdAt' | 'updatedAt'>): Promise<FaqItem> {
-    const db = getDb()
+    const db = await ensureDb()
     const id = generateId()
     const now = nowTimestamp()
     const faq: FaqItem = { ...data, id, createdAt: now, updatedAt: now }
@@ -617,7 +617,7 @@ export const faqBotOperations = {
   },
 
   async findMany(options?: { activeOnly?: boolean }): Promise<FaqItem[]> {
-    const db = getDb()
+    const db = await ensureDb()
     let query: Query<DocumentData> = db.collection('faqBot')
     if (options?.activeOnly) {
       query = query.where('isActive', '==', true)
@@ -630,19 +630,19 @@ export const faqBotOperations = {
   },
 
   async update(id: string, data: Partial<FaqItem>): Promise<FaqItem> {
-    const db = getDb()
+    const db = await ensureDb()
     await db.collection('faqBot').doc(id).update({ ...data, updatedAt: nowTimestamp() })
     const doc = await db.collection('faqBot').doc(id).get()
     return { id: doc.id, ...doc.data() } as FaqItem
   },
 
   async delete(id: string): Promise<void> {
-    const db = getDb()
+    const db = await ensureDb()
     await db.collection('faqBot').doc(id).delete()
   },
 
   async getBotSettings(): Promise<{ isEnabled: boolean; greeting: string }> {
-    const db = getDb()
+    const db = await ensureDb()
     const doc = await db.collection('systemSettings').doc('botSettings').get()
     if (!doc.exists) {
       return { isEnabled: true, greeting: 'مرحباً! كيف يمكنني مساعدتك اليوم؟ اطرح سؤالك وسأحاول الإجابة.' }
@@ -655,7 +655,7 @@ export const faqBotOperations = {
   },
 
   async updateBotSettings(data: { isEnabled: boolean; greeting: string }): Promise<void> {
-    const db = getDb()
+    const db = await ensureDb()
     await db.collection('systemSettings').doc('botSettings').set({
       ...data,
       updatedAt: nowTimestamp(),
@@ -667,7 +667,7 @@ export const faqBotOperations = {
 
 export const userPaymentMethodOperations = {
   async create(data: Omit<UserPaymentMethod, 'id' | 'createdAt' | 'updatedAt'>): Promise<UserPaymentMethod> {
-    const db = getDb()
+    const db = await ensureDb()
     const id = generateId()
     const now = nowTimestamp()
     const method: UserPaymentMethod = { ...data, id, createdAt: now, updatedAt: now }
@@ -676,7 +676,7 @@ export const userPaymentMethodOperations = {
   },
 
   async findByUserId(userId: string): Promise<UserPaymentMethod[]> {
-    const db = getDb()
+    const db = await ensureDb()
     const snapshot = await db.collection('userPaymentMethods')
       .where('userId', '==', userId)
       .limit(50)
@@ -687,12 +687,12 @@ export const userPaymentMethodOperations = {
   },
 
   async update(id: string, data: Partial<UserPaymentMethod>): Promise<void> {
-    const db = getDb()
+    const db = await ensureDb()
     await db.collection('userPaymentMethods').doc(id).update({ ...data, updatedAt: nowTimestamp() })
   },
 
   async delete(id: string): Promise<void> {
-    const db = getDb()
+    const db = await ensureDb()
     await db.collection('userPaymentMethods').doc(id).delete()
   },
 }
@@ -736,7 +736,7 @@ export interface ReferralSettings {
 
 export const referralOperations = {
   async create(data: Omit<Referral, 'id' | 'createdAt' | 'totalEarnings'>): Promise<Referral> {
-    const db = getDb()
+    const db = await ensureDb()
     const id = generateId()
     const referral: Referral = { ...data, id, totalEarnings: 0, createdAt: nowTimestamp() }
     await db.collection('referrals').doc(id).set(referral)
@@ -744,7 +744,7 @@ export const referralOperations = {
   },
 
   async findByReferrer(referrerId: string): Promise<Referral[]> {
-    const db = getDb()
+    const db = await ensureDb()
     const snapshot = await db.collection('referrals')
       .where('referrerId', '==', referrerId)
       .limit(200)
@@ -755,7 +755,7 @@ export const referralOperations = {
   },
 
   async findByReferred(referredId: string): Promise<Referral[]> {
-    const db = getDb()
+    const db = await ensureDb()
     const snapshot = await db.collection('referrals')
       .where('referredId', '==', referredId)
       .limit(10)
@@ -765,7 +765,7 @@ export const referralOperations = {
   },
 
   async updateEarnings(id: string, additionalEarnings: number): Promise<void> {
-    const db = getDb()
+    const db = await ensureDb()
     const doc = await db.collection('referrals').doc(id).get()
     if (!doc.exists) return
     const current = (doc.data()?.totalEarnings || 0)
@@ -773,7 +773,7 @@ export const referralOperations = {
   },
 
   async createCommission(data: Omit<ReferralCommission, 'id' | 'createdAt'>): Promise<ReferralCommission> {
-    const db = getDb()
+    const db = await ensureDb()
     const id = generateId()
     const commission: ReferralCommission = { ...data, id, createdAt: nowTimestamp() }
     await db.collection('referralCommissions').doc(id).set(commission)
@@ -781,7 +781,7 @@ export const referralOperations = {
   },
 
   async findByReferrerCommissions(referrerId: string): Promise<ReferralCommission[]> {
-    const db = getDb()
+    const db = await ensureDb()
     const snapshot = await db.collection('referralCommissions')
       .where('referrerId', '==', referrerId)
       .limit(200)
@@ -792,7 +792,7 @@ export const referralOperations = {
   },
 
   async findAllCommissions(): Promise<ReferralCommission[]> {
-    const db = getDb()
+    const db = await ensureDb()
     const snapshot = await db.collection('referralCommissions').limit(500).get()
     const results = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() } as ReferralCommission))
     results.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
@@ -800,7 +800,7 @@ export const referralOperations = {
   },
 
   async countAllReferrals(): Promise<number> {
-    const db = getDb()
+    const db = await ensureDb()
     const snapshot = await db.collection('referrals').limit(500).get()
     return snapshot.size
   },
@@ -810,7 +810,7 @@ export const referralOperations = {
 
 export const systemSettingsOperations = {
   async getReferralSettings(): Promise<ReferralSettings> {
-    const db = getDb()
+    const db = await ensureDb()
     const doc = await db.collection('systemSettings').doc('referralSettings').get()
     if (!doc.exists) {
       const defaults: ReferralSettings = {
@@ -827,7 +827,7 @@ export const systemSettingsOperations = {
   },
 
   async updateReferralSettings(data: Partial<ReferralSettings>): Promise<ReferralSettings> {
-    const db = getDb()
+    const db = await ensureDb()
     const current = await systemSettingsOperations.getReferralSettings()
     const updated = { ...current, ...data }
     await db.collection('systemSettings').doc('referralSettings').set(updated)
@@ -835,7 +835,7 @@ export const systemSettingsOperations = {
   },
 
   async findByAffiliateCode(code: string): Promise<User | null> {
-    const db = getDb()
+    const db = await ensureDb()
     const snapshot = await db.collection('users')
       .where('affiliateCode', '==', code)
       .limit(1)
@@ -878,7 +878,7 @@ export interface ChatMessage {
 export const chatOperations = {
   // Create a new chat
   async createChat(userId: string, adminId: string, firstMessage: string, senderType: string = 'user'): Promise<Chat> {
-    const db = getDb()
+    const db = await ensureDb()
     const id = generateId()
     const now = nowTimestamp()
     const isFromAdmin = senderType === 'admin'
@@ -915,7 +915,7 @@ export const chatOperations = {
 
   // List chats for a user or admin
   async findChats(options: { userId: string; role: string }): Promise<Chat[]> {
-    const db = getDb()
+    const db = await ensureDb()
     let snapshot: FirebaseFirestore.QuerySnapshot
     if (options.role === 'admin') {
       snapshot = await db.collection('chats').where('adminId', '==', options.userId).limit(100).get()
@@ -929,7 +929,7 @@ export const chatOperations = {
 
   // Get chat by id
   async findChat(chatId: string): Promise<Chat | null> {
-    const db = getDb()
+    const db = await ensureDb()
     const doc = await db.collection('chats').doc(chatId).get()
     if (!doc.exists) return null
     return { id: doc.id, ...doc.data() } as Chat
@@ -937,7 +937,7 @@ export const chatOperations = {
 
   // Send a message
   async sendMessage(chatId: string, senderId: string, senderType: string, message: string, type: string = 'text', imageUrl?: string | null): Promise<ChatMessage> {
-    const db = getDb()
+    const db = await ensureDb()
     const now = nowTimestamp()
     const id = generateId()
     const msg: ChatMessage = {
@@ -975,7 +975,7 @@ export const chatOperations = {
 
   // Get messages for a chat (paginated)
   async findMessages(chatId: string, limit: number = 50, before?: string): Promise<ChatMessage[]> {
-    const db = getDb()
+    const db = await ensureDb()
     let query: Query<DocumentData> = db.collection('chatMessages').where('chatId', '==', chatId)
     if (before) {
       const beforeDoc = await db.collection('chatMessages').doc(before).get()
@@ -993,7 +993,7 @@ export const chatOperations = {
 
   // Get latest messages for polling (messages after a given timestamp)
   async findMessagesAfter(chatId: string, after: string): Promise<ChatMessage[]> {
-    const db = getDb()
+    const db = await ensureDb()
     const snapshot = await db.collection('chatMessages')
       .where('chatId', '==', chatId)
       .where('createdAt', '>', after)
@@ -1006,7 +1006,7 @@ export const chatOperations = {
 
   // Mark messages as read
   async markRead(chatId: string, readerType: string): Promise<void> {
-    const db = getDb()
+    const db = await ensureDb()
     // Mark unread messages as read
     const snapshot = await db.collection('chatMessages')
       .where('chatId', '==', chatId)
@@ -1037,7 +1037,7 @@ export const chatOperations = {
 
   // Close a chat (admin only)
   async closeChat(chatId: string): Promise<void> {
-    const db = getDb()
+    const db = await ensureDb()
     await db.collection('chats').doc(chatId).update({
       status: 'closed',
       updatedAt: nowTimestamp(),
@@ -1046,7 +1046,7 @@ export const chatOperations = {
 
   // Delete a chat and all its messages
   async deleteChat(chatId: string): Promise<void> {
-    const db = getDb()
+    const db = await ensureDb()
     // Delete all messages in this chat
     const messagesSnapshot = await db.collection('chatMessages').where('chatId', '==', chatId).limit(500).get()
     if (!messagesSnapshot.empty) {
@@ -1062,7 +1062,7 @@ export const chatOperations = {
 
   // Count total unread for admin
   async countAdminUnread(adminId: string): Promise<number> {
-    const db = getDb()
+    const db = await ensureDb()
     const snapshot = await db.collection('chats')
       .where('adminId', '==', adminId)
       .where('adminUnreadCount', '>', 0)
@@ -1077,7 +1077,7 @@ export const chatOperations = {
 
   // Count total unread for user
   async countUserUnread(userId: string): Promise<number> {
-    const db = getDb()
+    const db = await ensureDb()
     const snapshot = await db.collection('chats')
       .where('userId', '==', userId)
       .where('userUnreadCount', '>', 0)
@@ -1152,7 +1152,7 @@ export interface P2PTrade {
 
 export const merchantOperations = {
   async create(data: Omit<Merchant, 'id' | 'submittedAt' | 'status'>): Promise<Merchant> {
-    const db = getDb()
+    const db = await ensureDb()
     const id = generateId()
     const merchant: Merchant = { ...data, id, status: 'pending', submittedAt: nowTimestamp() }
     await db.collection('merchants').doc(id).set(merchant)
@@ -1160,7 +1160,7 @@ export const merchantOperations = {
   },
 
   async findPending(): Promise<Merchant[]> {
-    const db = getDb()
+    const db = await ensureDb()
     const snapshot = await db.collection('merchants').where('status', '==', 'pending').limit(100).get()
     const results = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Merchant))
     results.sort((a, b) => new Date(b.submittedAt).getTime() - new Date(a.submittedAt).getTime())
@@ -1168,7 +1168,7 @@ export const merchantOperations = {
   },
 
   async findAll(): Promise<Merchant[]> {
-    const db = getDb()
+    const db = await ensureDb()
     const snapshot = await db.collection('merchants').limit(200).get()
     const results = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Merchant))
     results.sort((a, b) => new Date(b.submittedAt).getTime() - new Date(a.submittedAt).getTime())
@@ -1176,13 +1176,13 @@ export const merchantOperations = {
   },
 
   async findByUser(userId: string): Promise<Merchant[]> {
-    const db = getDb()
+    const db = await ensureDb()
     const snapshot = await db.collection('merchants').where('userId', '==', userId).limit(10).get()
     return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Merchant))
   },
 
   async findApprovedByUser(userId: string): Promise<Merchant | null> {
-    const db = getDb()
+    const db = await ensureDb()
     const snapshot = await db.collection('merchants')
       .where('userId', '==', userId)
       .where('status', '==', 'approved')
@@ -1193,7 +1193,7 @@ export const merchantOperations = {
   },
 
   async updateStatus(id: string, status: 'approved' | 'rejected', reviewNote?: string, reviewedBy?: string): Promise<void> {
-    const db = getDb()
+    const db = await ensureDb()
     await db.collection('merchants').doc(id).update({
       status,
       reviewNote: reviewNote || null,
@@ -1203,7 +1203,7 @@ export const merchantOperations = {
   },
 
   async findUnique(id: string): Promise<Merchant | null> {
-    const db = getDb()
+    const db = await ensureDb()
     const doc = await db.collection('merchants').doc(id).get()
     if (!doc.exists) return null
     return { id: doc.id, ...doc.data() } as Merchant
@@ -1214,7 +1214,7 @@ export const merchantOperations = {
 
 export const p2pListingOperations = {
   async create(data: Omit<P2PListing, 'id' | 'createdAt' | 'updatedAt' | 'totalTrades' | 'successRate'>): Promise<P2PListing> {
-    const db = getDb()
+    const db = await ensureDb()
     const id = generateId()
     const now = nowTimestamp()
     const listing: P2PListing = { ...data, id, totalTrades: 0, successRate: 100, createdAt: now, updatedAt: now }
@@ -1223,7 +1223,7 @@ export const p2pListingOperations = {
   },
 
   async findActive(filters?: { type?: string; network?: string; paymentMethod?: string }): Promise<P2PListing[]> {
-    const db = getDb()
+    const db = await ensureDb()
     let query: Query<DocumentData> = db.collection('p2pListings').where('status', '==', 'active').limit(100)
     const snapshot = await query.get()
     let results = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as P2PListing))
@@ -1235,7 +1235,7 @@ export const p2pListingOperations = {
   },
 
   async findByMerchant(merchantId: string): Promise<P2PListing[]> {
-    const db = getDb()
+    const db = await ensureDb()
     const snapshot = await db.collection('p2pListings').where('merchantId', '==', merchantId).limit(50).get()
     const results = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as P2PListing))
     results.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
@@ -1243,36 +1243,36 @@ export const p2pListingOperations = {
   },
 
   async findUnique(id: string): Promise<P2PListing | null> {
-    const db = getDb()
+    const db = await ensureDb()
     const doc = await db.collection('p2pListings').doc(id).get()
     if (!doc.exists) return null
     return { id: doc.id, ...doc.data() } as P2PListing
   },
 
   async update(id: string, data: Partial<P2PListing>): Promise<P2PListing> {
-    const db = getDb()
+    const db = await ensureDb()
     await db.collection('p2pListings').doc(id).update({ ...data, updatedAt: nowTimestamp() })
     const doc = await db.collection('p2pListings').doc(id).get()
     return { id: doc.id, ...doc.data() } as P2PListing
   },
 
   async pause(id: string): Promise<void> {
-    const db = getDb()
+    const db = await ensureDb()
     await db.collection('p2pListings').doc(id).update({ status: 'paused', updatedAt: nowTimestamp() })
   },
 
   async activate(id: string): Promise<void> {
-    const db = getDb()
+    const db = await ensureDb()
     await db.collection('p2pListings').doc(id).update({ status: 'active', updatedAt: nowTimestamp() })
   },
 
   async delete(id: string): Promise<void> {
-    const db = getDb()
+    const db = await ensureDb()
     await db.collection('p2pListings').doc(id).delete()
   },
 
   async incrementTrades(listingId: string, success: boolean): Promise<void> {
-    const db = getDb()
+    const db = await ensureDb()
     const doc = await db.collection('p2pListings').doc(listingId).get()
     if (!doc.exists) return
     const data = doc.data() as P2PListing
@@ -1287,7 +1287,7 @@ export const p2pListingOperations = {
 
 export const p2pTradeOperations = {
   async create(data: Omit<P2PTrade, 'id' | 'createdAt' | 'updatedAt'>): Promise<P2PTrade> {
-    const db = getDb()
+    const db = await ensureDb()
     const id = generateId()
     const now = nowTimestamp()
     const trade: P2PTrade = { ...data, id, createdAt: now, updatedAt: now }
@@ -1296,7 +1296,7 @@ export const p2pTradeOperations = {
   },
 
   async findActive(): Promise<P2PTrade[]> {
-    const db = getDb()
+    const db = await ensureDb()
     const snapshot = await db.collection('p2pTrades')
       .where('status', 'in', ['pending', 'escrowed', 'paid'])
       .limit(200).get()
@@ -1304,7 +1304,7 @@ export const p2pTradeOperations = {
   },
 
   async findByUser(userId: string): Promise<P2PTrade[]> {
-    const db = getDb()
+    const db = await ensureDb()
     const snapshot = await db.collection('p2pTrades')
       .where('buyerId', '==', userId)
       .limit(100).get()
@@ -1319,14 +1319,14 @@ export const p2pTradeOperations = {
   },
 
   async findUnique(id: string): Promise<P2PTrade | null> {
-    const db = getDb()
+    const db = await ensureDb()
     const doc = await db.collection('p2pTrades').doc(id).get()
     if (!doc.exists) return null
     return { id: doc.id, ...doc.data() } as P2PTrade
   },
 
   async updateStatus(id: string, status: P2PTrade['status'], extra?: Partial<P2PTrade>): Promise<P2PTrade> {
-    const db = getDb()
+    const db = await ensureDb()
     const updateData: any = { status, updatedAt: nowTimestamp() }
     if (status === 'released' || status === 'cancelled' || status === 'expired') {
       updateData.completedAt = nowTimestamp()
@@ -1338,7 +1338,7 @@ export const p2pTradeOperations = {
   },
 
   async addDispute(id: string, reason: string): Promise<void> {
-    const db = getDb()
+    const db = await ensureDb()
     await db.collection('p2pTrades').doc(id).update({
       status: 'disputed',
       disputeReason: reason,
@@ -1347,7 +1347,7 @@ export const p2pTradeOperations = {
   },
 
   async resolveDispute(id: string, resolvedBy: string, note: string): Promise<void> {
-    const db = getDb()
+    const db = await ensureDb()
     await db.collection('p2pTrades').doc(id).update({
       disputeResolvedBy: resolvedBy,
       disputeNote: note,
@@ -1356,7 +1356,7 @@ export const p2pTradeOperations = {
   },
 
   async findAllDisputed(): Promise<P2PTrade[]> {
-    const db = getDb()
+    const db = await ensureDb()
     const snapshot = await db.collection('p2pTrades').where('status', '==', 'disputed').limit(100).get()
     const results = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as P2PTrade))
     results.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
@@ -1364,7 +1364,7 @@ export const p2pTradeOperations = {
   },
 
   async findAll(): Promise<P2PTrade[]> {
-    const db = getDb()
+    const db = await ensureDb()
     const snapshot = await db.collection('p2pTrades').limit(200).get()
     const results = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as P2PTrade))
     results.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
@@ -1441,7 +1441,7 @@ export interface P2PDispute {
 
 export const merchantApplicationOperations = {
   async create(data: Omit<MerchantApplication, 'id' | 'appliedAt' | 'status'>): Promise<MerchantApplication> {
-    const db = getDb()
+    const db = await ensureDb()
     const id = generateId()
     const application: MerchantApplication = {
       ...data,
@@ -1454,7 +1454,7 @@ export const merchantApplicationOperations = {
   },
 
   async findMany(options?: { status?: string }): Promise<MerchantApplication[]> {
-    const db = getDb()
+    const db = await ensureDb()
     let query: Query<DocumentData> = db.collection('merchantApplications')
 
     if (options?.status && options.status !== 'all') {
@@ -1468,7 +1468,7 @@ export const merchantApplicationOperations = {
   },
 
   async findByUser(userId: string): Promise<MerchantApplication[]> {
-    const db = getDb()
+    const db = await ensureDb()
     const snapshot = await db.collection('merchantApplications')
       .where('userId', '==', userId)
       .limit(10)
@@ -1479,21 +1479,21 @@ export const merchantApplicationOperations = {
   },
 
   async findById(id: string): Promise<MerchantApplication | null> {
-    const db = getDb()
+    const db = await ensureDb()
     const doc = await db.collection('merchantApplications').doc(id).get()
     if (!doc.exists) return null
     return { id: doc.id, ...doc.data() } as MerchantApplication
   },
 
   async update(id: string, data: Partial<MerchantApplication>): Promise<MerchantApplication> {
-    const db = getDb()
+    const db = await ensureDb()
     await db.collection('merchantApplications').doc(id).update(data)
     const doc = await db.collection('merchantApplications').doc(id).get()
     return { id: doc.id, ...doc.data() } as MerchantApplication
   },
 
   async approve(id: string, reviewedBy: string): Promise<MerchantApplication> {
-    const db = getDb()
+    const db = await ensureDb()
     await db.collection('merchantApplications').doc(id).update({
       status: 'approved',
       reviewedBy,
@@ -1505,7 +1505,7 @@ export const merchantApplicationOperations = {
   },
 
   async reject(id: string, reviewedBy: string, rejectionReason: string): Promise<MerchantApplication> {
-    const db = getDb()
+    const db = await ensureDb()
     await db.collection('merchantApplications').doc(id).update({
       status: 'rejected',
       reviewedBy,
@@ -1521,7 +1521,7 @@ export const merchantApplicationOperations = {
 
 export const p2pOrderOperations = {
   async create(data: Omit<P2POrder, 'id' | 'createdAt' | 'updatedAt'>): Promise<P2POrder> {
-    const db = getDb()
+    const db = await ensureDb()
     const id = generateId()
     const now = nowTimestamp()
     const order: P2POrder = { ...data, id, createdAt: now, updatedAt: now }
@@ -1530,7 +1530,7 @@ export const p2pOrderOperations = {
   },
 
   async findOpen(filters?: { type?: string; network?: string }): Promise<P2POrder[]> {
-    const db = getDb()
+    const db = await ensureDb()
     let query: Query<DocumentData> = db.collection('p2pOrders')
       .where('status', '==', 'open')
       .limit(100)
@@ -1555,14 +1555,14 @@ export const p2pOrderOperations = {
   },
 
   async findById(id: string): Promise<P2POrder | null> {
-    const db = getDb()
+    const db = await ensureDb()
     const doc = await db.collection('p2pOrders').doc(id).get()
     if (!doc.exists) return null
     return { id: doc.id, ...doc.data() } as P2POrder
   },
 
   async findMerchantOrders(merchantId: string): Promise<P2POrder[]> {
-    const db = getDb()
+    const db = await ensureDb()
     const snapshot = await db.collection('p2pOrders')
       .where('merchantId', '==', merchantId)
       .limit(100)
@@ -1573,7 +1573,7 @@ export const p2pOrderOperations = {
   },
 
   async findBuyerOrders(buyerId: string): Promise<P2POrder[]> {
-    const db = getDb()
+    const db = await ensureDb()
     const snapshot = await db.collection('p2pOrders')
       .where('buyerId', '==', buyerId)
       .limit(100)
@@ -1584,7 +1584,7 @@ export const p2pOrderOperations = {
   },
 
   async updateStatus(id: string, status: P2POrder['status'], extra?: Partial<P2POrder>): Promise<P2POrder> {
-    const db = getDb()
+    const db = await ensureDb()
     const updateData: Partial<P2POrder> = { status, updatedAt: nowTimestamp() }
     if (extra) Object.assign(updateData, extra)
     await db.collection('p2pOrders').doc(id).update(updateData)
@@ -1593,7 +1593,7 @@ export const p2pOrderOperations = {
   },
 
   async findDisputedOrders(): Promise<P2POrder[]> {
-    const db = getDb()
+    const db = await ensureDb()
     const snapshot = await db.collection('p2pOrders')
       .where('status', '==', 'disputed')
       .limit(100)
@@ -1604,7 +1604,7 @@ export const p2pOrderOperations = {
   },
 
   async findMany(options?: { status?: string }): Promise<P2POrder[]> {
-    const db = getDb()
+    const db = await ensureDb()
     let query: Query<DocumentData> = db.collection('p2pOrders')
 
     if (options?.status && options.status !== 'all') {
@@ -1623,7 +1623,7 @@ export const p2pOrderOperations = {
 
 export const p2pDisputeOperations = {
   async create(data: Omit<P2PDispute, 'id' | 'createdAt' | 'status'>): Promise<P2PDispute> {
-    const db = getDb()
+    const db = await ensureDb()
     const id = generateId()
     const dispute: P2PDispute = {
       ...data,
@@ -1636,7 +1636,7 @@ export const p2pDisputeOperations = {
   },
 
   async findByOrder(orderId: string): Promise<P2PDispute[]> {
-    const db = getDb()
+    const db = await ensureDb()
     const snapshot = await db.collection('p2pDisputes')
       .where('orderId', '==', orderId)
       .limit(20)
@@ -1647,14 +1647,14 @@ export const p2pDisputeOperations = {
   },
 
   async update(id: string, data: Partial<P2PDispute>): Promise<P2PDispute> {
-    const db = getDb()
+    const db = await ensureDb()
     await db.collection('p2pDisputes').doc(id).update(data)
     const doc = await db.collection('p2pDisputes').doc(id).get()
     return { id: doc.id, ...doc.data() } as P2PDispute
   },
 
   async findOpen(): Promise<P2PDispute[]> {
-    const db = getDb()
+    const db = await ensureDb()
     const snapshot = await db.collection('p2pDisputes')
       .where('status', '==', 'open')
       .limit(100)

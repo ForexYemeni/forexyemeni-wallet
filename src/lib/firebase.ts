@@ -188,6 +188,16 @@ export function getDb(): Firestore {
   return initializeFirebase().db
 }
 
+/**
+ * Async version of getDb that ensures custom Firebase is checked.
+ * Use this in API routes instead of getDb() for guaranteed correct database.
+ * The check only runs once per server lifecycle, so performance impact is minimal.
+ */
+export async function ensureDb(): Promise<Firestore> {
+  await checkAndApplyCustomFirebase()
+  return getDb()
+}
+
 export function generateId(): string {
   const c = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789'
   let r = ''
