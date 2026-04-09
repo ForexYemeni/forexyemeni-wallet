@@ -18,14 +18,15 @@ import {
   Shield,
   Loader2,
   ClipboardPaste,
-  UserX,
   WifiOff,
   Play,
   KeyRound,
   UserPlus,
-  ArrowLeftRight,
   Eye,
   EyeOff,
+  Mail,
+  Lock,
+  Info,
 } from 'lucide-react'
 
 interface ConnectionStatus {
@@ -55,7 +56,7 @@ interface SetupResult {
 }
 
 interface ErrorState {
-  type: 'user_not_found' | 'permission_denied' | 'network' | 'unknown'
+  type: 'network' | 'unknown'
   message: string
 }
 
@@ -74,8 +75,16 @@ export default function FirebaseConfig() {
   const [testResult, setTestResult] = useState<TestResult | null>(null)
   const [setupResult, setSetupResult] = useState<SetupResult | null>(null)
   const [setupStep, setSetupStep] = useState<SetupStep>('idle')
+  const [adminEmail, setAdminEmail] = useState('')
   const [adminPassword, setAdminPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
+
+  // Pre-fill email from current user
+  useEffect(() => {
+    if (user?.email && !adminEmail) {
+      setAdminEmail(user.email)
+    }
+  }, [user?.email, adminEmail])
 
   const fetchStatus = useCallback(async () => {
     setLoading(true)
@@ -99,6 +108,8 @@ export default function FirebaseConfig() {
   useEffect(() => {
     fetchStatus()
   }, [fetchStatus])
+
+  const isValidEmail = (email: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)
 
   const handlePasteFromClipboard = async () => {
     try {
@@ -137,7 +148,7 @@ export default function FirebaseConfig() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           action: 'test',
-          adminEmail: user?.email,
+          adminEmail: adminEmail.trim(),
           serviceAccountKey: serviceAccountKey.trim(),
         }),
       })
@@ -166,12 +177,19 @@ export default function FirebaseConfig() {
   }
 
   const handleSetup = async () => {
-    if (!serviceAccountKey.trim()) {
-      toast.error('يرجى إدخال مفتاح Service Account')
+    // Validate email
+    const email = adminEmail.trim()
+    if (!email || !isValidEmail(email)) {
+      toast.error('يرجى إدخال بريد إلكتروني صحيح')
       return
     }
+    // Validate password
     if (!adminPassword.trim() || adminPassword.length < 6) {
       toast.error('كلمة المرور يجب أن تكون 6 أحرف على الأقل')
+      return
+    }
+    if (!serviceAccountKey.trim()) {
+      toast.error('يرجى إدخال مفتاح Service Account')
       return
     }
 
@@ -184,10 +202,8 @@ export default function FirebaseConfig() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           action: 'setup',
-          adminEmail: user?.email,
-          adminName: user?.fullName,
-          adminPhone: user?.phone,
-          adminCountry: user?.country,
+          adminEmail: email,
+          adminName: user?.fullName || 'مدير النظام',
           serviceAccountKey: serviceAccountKey.trim(),
           adminPassword: adminPassword.trim(),
         }),
@@ -224,7 +240,8 @@ export default function FirebaseConfig() {
       return
     }
 
-    if (!confirm(`هل أنت متأكد من تفعيل قاعدة البيانات الجديدة؟\n\nسيتم التحول لقاعدة البيانات: ${testResult?.projectId || setupResult?.projectId}\n\n⚠️ يجب تسجيل الخروج ثم تسجيل الدخول بكلمة المرور الجديدة.`)) {
+    const creds = setupResult || { projectId: testResult?.projectId }
+    if (!confirm(`هل أنت متأكد من تفعيل قاعدة البيانات الجديدة؟\n\nالمشروع: ${creds.projectId}\nالبريد: ${adminEmail}\n\n⚠️ بعد التفعيل سجّل خروج ثم سجّل دخول بالبيانات الجديدة.`)) {
       return
     }
 
@@ -241,7 +258,7 @@ export default function FirebaseConfig() {
       const data = await res.json()
       if (data.success) {
         toast.success(data.message)
-        toast.info('تم التفعيل! يرجى تسجيل الخروج ثم تسجيل الدخول بكلمة المرور الجديدة.', { duration: 8000 })
+        toast.info('تم التفعيل! سجّل خروج ثم سجّل دخول بالبيانات الجديدة.', { duration: 8000 })
         setTestResult(null)
         setSetupResult(null)
         setSetupStep('idle')
@@ -304,7 +321,6 @@ export default function FirebaseConfig() {
     )
   }
 
-  // Error state - only for network/server errors (not user-not-found since GET doesn't verify)
   if (error) {
     return (
       <div className="space-y-4">
@@ -322,15 +338,7 @@ export default function FirebaseConfig() {
             <WifiOff className="w-5 h-5 text-red-400 mt-0.5 flex-shrink-0" />
             <div className="space-y-2 flex-1">
               <h4 className="text-sm font-bold text-red-400">خطأ في الاتصال</h4>
-              <p className="text-xs text-muted-foreground leading-relaxed">{error.message}</p>
-              <div className="p-3 rounded-lg bg-white/5 border border-white/10">
-                <p className="text-xs text-muted-foreground font-medium mb-1">الحلول:</p>
-                <ul className="text-xs text-muted-foreground space-y-1 mr-2">
-                  <li>• تأكد من اتصالك بالإنترنت</li>
-                  <li>• حاول مرة أخرى بعد قليل</li>
-                  <li>• تأكد أن حسابك له صلاحية المسؤول</li>
-                </ul>
-              </div>
+              <p className="text-xs text-muted-foreground">{error.message}</p>
             </div>
           </div>
           <Button onClick={fetchStatus} className="w-full flex items-center justify-center gap-2 bg-white/10 hover:bg-white/20 text-white rounded-lg h-10">
@@ -342,16 +350,15 @@ export default function FirebaseConfig() {
     )
   }
 
-  // Steps indicator
+  // Steps
   const steps = [
-    { key: 'tested', label: 'اختبار الاتصال', icon: Link2 },
-    { key: 'done', label: 'إعداد القاعدة', icon: UserPlus },
-    { key: 'save', label: 'تفعيل', icon: Play },
+    { label: 'اختبار الاتصال', icon: Link2 },
+    { label: 'بيانات المسؤول', icon: UserPlus },
+    { label: 'تفعيل', icon: Play },
   ]
-
   const currentStepIndex = setupStep === 'idle' ? -1 :
     setupStep === 'testing' ? 0 :
-    setupStep === 'tested' ? 0 :
+    setupStep === 'tested' ? 1 :
     setupStep === 'setup' ? 1 :
     setupStep === 'done' ? 2 : -1
 
@@ -368,13 +375,13 @@ export default function FirebaseConfig() {
             <p className="text-xs text-muted-foreground">أضف أي قاعدة Firebase وسيتم إعدادها تلقائياً</p>
           </div>
         </div>
-        <button onClick={fetchStatus} className="w-9 h-9 rounded-lg bg-white/10 flex items-center justify-center hover:bg-white/20 transition-colors" title="تحديث الحالة">
+        <button onClick={fetchStatus} className="w-9 h-9 rounded-lg bg-white/10 flex items-center justify-center hover:bg-white/20 transition-colors" title="تحديث">
           <RefreshCw className="w-4 h-4 text-gold" />
         </button>
       </div>
 
       {/* Steps Progress */}
-      {(setupStep !== 'idle') && (
+      {setupStep !== 'idle' && (
         <div className="glass-card p-4 rounded-xl">
           <div className="flex items-center justify-between">
             {steps.map((step, idx) => {
@@ -382,7 +389,7 @@ export default function FirebaseConfig() {
               const isCompleted = idx < currentStepIndex || setupStep === 'done'
               const isCurrent = idx === currentStepIndex && setupStep !== 'done'
               return (
-                <div key={step.key} className="flex items-center gap-2">
+                <div key={step.label} className="flex items-center gap-2">
                   <div className={`flex items-center gap-2 px-3 py-2 rounded-lg transition-colors ${
                     isCompleted ? 'bg-green-500/10 border border-green-500/20' :
                     isCurrent ? 'bg-gold/10 border border-gold/20' :
@@ -405,7 +412,7 @@ export default function FirebaseConfig() {
         </div>
       )}
 
-      {/* Connection Status */}
+      {/* Current Connection Status */}
       <div className="glass-card p-4 rounded-xl space-y-3">
         <h3 className="text-sm font-bold flex items-center gap-2">
           <Link2 className="w-4 h-4 text-gold" />
@@ -438,38 +445,52 @@ export default function FirebaseConfig() {
                 {status.isCustom ? 'مخصص' : 'افتراضي'}
               </span>
             </div>
-            {status.isCustom && status.customProjectId && (
-              <div className="flex items-center justify-between p-3 rounded-lg bg-amber-500/5 border border-amber-500/10">
-                <span className="text-xs text-muted-foreground">مشروع مخصص</span>
-                <span className="text-xs font-mono text-amber-400" dir="ltr">{status.customProjectId}</span>
-              </div>
-            )}
           </div>
         )}
       </div>
 
-      {/* STEP 1: Paste Key + Test Connection */}
+      {/* STEP 1: Admin Credentials + Service Account Key + Test */}
       <div className="glass-card p-4 rounded-xl space-y-3">
         <h3 className="text-sm font-bold flex items-center gap-2">
           <KeyRound className="w-4 h-4 text-gold" />
-          الخطوة 1: اختبار الاتصال
+          الخطوة 1: مفتاح الاتصال + بيانات المسؤول
         </h3>
         <p className="text-xs text-muted-foreground">
-          الصق مفتاح Service Account JSON من Firebase Console
+          أدخل بيانات المسؤول ومفتاح Firebase لاختبار الاتصال
         </p>
 
+        {/* Admin Email */}
         <div className="space-y-2">
-          <Label className="text-xs text-muted-foreground">مفتاح Service Account (JSON)</Label>
+          <Label className="text-xs text-muted-foreground flex items-center gap-1">
+            <Mail className="w-3 h-3 text-gold" />
+            بريد المسؤول (للقاعدة الجديدة) <span className="text-red-400">*</span>
+          </Label>
+          <Input
+            type="email"
+            value={adminEmail}
+            onChange={(e) => { setAdminEmail(e.target.value); handleReset() }}
+            placeholder="admin@example.com"
+            dir="ltr"
+            className="rounded-lg bg-white/5 border border-white/10 h-10 text-sm"
+          />
+          {!isValidEmail(adminEmail.trim()) && adminEmail.length > 0 && (
+            <p className="text-[10px] text-red-400">بريد إلكتروني غير صحيح</p>
+          )}
+        </div>
+
+        {/* Service Account Key */}
+        <div className="space-y-2">
+          <Label className="text-xs text-muted-foreground flex items-center gap-1">
+            <KeyRound className="w-3 h-3 text-gold" />
+            مفتاح Service Account (JSON) <span className="text-red-400">*</span>
+          </Label>
           <div className="relative">
             <textarea
               value={serviceAccountKey}
-              onChange={(e) => {
-                setServiceAccountKey(e.target.value)
-                handleReset()
-              }}
+              onChange={(e) => { setServiceAccountKey(e.target.value); handleReset() }}
               placeholder='{"type": "service_account", "project_id": "...", ...}'
               dir="ltr"
-              rows={6}
+              rows={5}
               disabled={setupStep === 'done'}
               className="w-full rounded-lg bg-white/5 border border-white/10 p-3 text-xs font-mono resize-y focus:outline-none focus:ring-1 focus:ring-gold/50 focus:border-gold/50 placeholder:text-muted-foreground/50 disabled:opacity-50"
             />
@@ -494,16 +515,14 @@ export default function FirebaseConfig() {
               {testResult.success ? <CheckCircle className="w-4 h-4 text-green-400 flex-shrink-0" /> : <XCircle className="w-4 h-4 text-red-400 flex-shrink-0" />}
               <div>
                 <p className={`text-xs font-bold ${testResult.success ? 'text-green-400' : 'text-red-400'}`}>
-                  {testResult.success ? 'اتصال ناجح' : 'فشل الاتصال'}
+                  {testResult.success ? 'اتصال ناجح ✓' : 'فشل الاتصال ✗'}
                 </p>
                 <p className="text-xs text-muted-foreground mt-0.5">{testResult.message}</p>
-                {testResult.success && testResult.projectId && (
-                  <div className="mt-2 space-y-1">
-                    <p className="text-xs font-mono text-green-400/70" dir="ltr">المشروع: {testResult.projectId}</p>
-                    <div className="flex items-center gap-3 text-xs text-muted-foreground">
-                      <span>المستخدمون: {testResult.totalUsers || 0}</span>
-                      <span>{testResult.adminExists ? '✅ حساب المسؤول موجود' : '❌ حساب المسؤول غير موجود'}</span>
-                    </div>
+                {testResult.success && (
+                  <div className="mt-2 flex items-center gap-4 text-xs">
+                    <span className="font-mono text-green-400/70" dir="ltr">{testResult.projectId}</span>
+                    <span className="text-muted-foreground">{testResult.totalUsers || 0} مستخدم</span>
+                    <span>{testResult.adminExists ? '✅ مسؤول موجود' : '🆕 قاعدة فارغة'}</span>
                   </div>
                 )}
               </div>
@@ -512,122 +531,138 @@ export default function FirebaseConfig() {
         )}
 
         {/* Test Button */}
-        <Button onClick={handleTest} disabled={testing || !serviceAccountKey.trim() || setupStep === 'done'}
+        <Button onClick={handleTest}
+          disabled={testing || !serviceAccountKey.trim() || !isValidEmail(adminEmail.trim()) || setupStep === 'done'}
           className="w-full flex items-center justify-center gap-2 bg-white/10 hover:bg-white/20 text-white rounded-lg h-10 disabled:opacity-40">
           {testing ? <Loader2 className="w-4 h-4 animate-spin text-gold" /> : <Link2 className="w-4 h-4 text-gold" />}
           <span className="text-xs font-medium">{testing ? 'جارٍ الاختبار...' : 'اختبار الاتصال'}</span>
         </Button>
       </div>
 
-      {/* STEP 2: Setup - Create Admin Account */}
+      {/* STEP 2: Setup Password */}
       {setupStep === 'tested' && testResult?.success && (
         <div className="glass-card p-4 rounded-xl space-y-3 border border-gold/20">
           <h3 className="text-sm font-bold flex items-center gap-2">
             <UserPlus className="w-4 h-4 text-gold" />
-            الخطوة 2: إعداد القاعدة الجديدة
+            الخطوة 2: إعداد كلمة المرور
           </h3>
-          <p className="text-xs text-muted-foreground">
-            {testResult.adminExists
-              ? 'حساب المسؤول موجود مسبقاً. يمكنك تحديث كلمة المرور أو تخطي هذه الخطوة.'
-              : 'سيتم إنشاء حساب المسؤول وجميع الإعدادات الأساسية في القاعدة الجديدة.'}
-          </p>
 
+          {/* Info: what will happen */}
           <div className="p-3 rounded-lg bg-gold/5 border border-gold/10 space-y-2">
             <div className="flex items-center gap-2">
-              <UserPlus className="w-4 h-4 text-gold" />
-              <span className="text-xs font-bold text-gold">ما سيتم إنشاؤه:</span>
+              <Info className="w-4 h-4 text-gold" />
+              <span className="text-xs font-bold text-gold">سيتم إنشاء:</span>
             </div>
             <ul className="text-xs text-muted-foreground space-y-1 mr-6">
-              <li>✅ حساب مسؤول بالبريد: <span className="text-gold" dir="ltr">{user?.email}</span></li>
-              <li>✅ إعدادات النظام (الرسوم، العمولات، البوت)</li>
-              <li>✅ عداد الحسابات</li>
-              <li>✅ روابط التواصل الاجتماعي</li>
+              <li>👤 حساب مسؤول بالبريد: <span className="text-gold font-medium" dir="ltr">{adminEmail}</span></li>
+              <li>🔑 بالكلمة التي تحددها أدناه</li>
+              <li>⚙️ إعدادات النظام (الرسوم، العمولات، البوت)</li>
+              <li>🔢 عداد الحسابات</li>
+              <li>🔗 روابط التواصل الاجتماعي</li>
             </ul>
+          </div>
+
+          {/* Admin email display */}
+          <div className="flex items-center justify-between p-3 rounded-lg bg-white/5">
+            <div className="flex items-center gap-2">
+              <Mail className="w-4 h-4 text-gold" />
+              <span className="text-xs text-muted-foreground">بريد المسؤول</span>
+            </div>
+            <span className="text-xs font-medium text-gold" dir="ltr">{adminEmail}</span>
           </div>
 
           {/* Password Input */}
           <div className="space-y-2">
-            <Label className="text-xs text-muted-foreground">كلمة المرور للمسؤول في القاعدة الجديدة</Label>
+            <Label className="text-xs text-muted-foreground flex items-center gap-1">
+              <Lock className="w-3 h-3 text-gold" />
+              كلمة المرور <span className="text-red-400">*</span>
+            </Label>
             <div className="relative">
               <Input
                 type={showPassword ? 'text' : 'password'}
                 value={adminPassword}
                 onChange={(e) => setAdminPassword(e.target.value)}
-                placeholder="أدخل كلمة مرور قوية (6 أحرف على الأقل)"
-                className="pr-10 rounded-lg bg-white/5 border border-white/10 h-10 text-sm"
+                placeholder="أدخل كلمة مرور (6 أحرف على الأقل)"
+                className="pl-10 pr-10 rounded-lg bg-white/5 border border-white/10 h-10 text-sm"
               />
               <button type="button" onClick={() => setShowPassword(!showPassword)}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-gold transition-colors">
+                className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-gold transition-colors">
                 {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
               </button>
+              <Lock className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground/40" />
             </div>
-            {!adminPassword && (
-              <p className="text-[10px] text-muted-foreground">افتراضي: Admin@123</p>
+            {adminPassword.length > 0 && adminPassword.length < 6 && (
+              <p className="text-[10px] text-red-400">كلمة المرور قصيرة جداً (6 أحرف على الأقل)</p>
+            )}
+            {adminPassword.length >= 6 && (
+              <p className="text-[10px] text-green-400">✓ قوة كلمة المرور مقبولة</p>
             )}
           </div>
 
           {/* Setup Button */}
-          <Button onClick={handleSetup} disabled={settingUp || adminPassword.length > 0 && adminPassword.length < 6}
+          <Button onClick={handleSetup}
+            disabled={settingUp || adminPassword.length < 6}
             className="w-full flex items-center justify-center gap-2 bg-gold/20 hover:bg-gold/30 text-gold rounded-lg h-10 disabled:opacity-40">
             {settingUp ? <Loader2 className="w-4 h-4 animate-spin" /> : <UserPlus className="w-4 h-4" />}
             <span className="text-xs font-medium">
-              {settingUp ? 'جارٍ الإعداد...' :
-               testResult.adminExists ? 'تحديث كلمة المرور وإعداد القاعدة' : 'إنشاء المسؤول وإعداد القاعدة'}
+              {settingUp ? 'جارٍ إنشاء المسؤول والإعدادات...' :
+               testResult.adminExists ? 'تحديث كلمة المرور في القاعدة' : 'إنشاء المسؤول وإعداد القاعدة'}
             </span>
           </Button>
         </div>
       )}
 
-      {/* Setup Result */}
+      {/* Setup Result - SUCCESS */}
       {setupResult && setupStep === 'done' && (
         <div className="glass-card p-4 rounded-xl space-y-3 border border-green-500/20 bg-green-500/5">
           <div className="flex items-center gap-2">
             <CheckCircle className="w-5 h-5 text-green-400" />
             <h3 className="text-sm font-bold text-green-400">تم الإعداد بنجاح!</h3>
           </div>
-          <div className="space-y-2">
-            <div className="flex items-center justify-between p-3 rounded-lg bg-white/5">
-              <span className="text-xs text-muted-foreground">المشروع</span>
-              <span className="text-xs font-mono text-green-400" dir="ltr">{setupResult.projectId}</span>
-            </div>
-            <div className="flex items-center justify-between p-3 rounded-lg bg-white/5">
-              <span className="text-xs text-muted-foreground">البريد</span>
-              <span className="text-xs text-green-400" dir="ltr">{setupResult.adminEmail}</span>
-            </div>
-            <div className="flex items-center justify-between p-3 rounded-lg bg-white/5">
-              <span className="text-xs text-muted-foreground">كلمة المرور</span>
-              <span className="text-xs font-mono text-green-400" dir="ltr">{setupResult.adminPassword}</span>
+
+          {/* Credentials Card */}
+          <div className="p-4 rounded-lg bg-white/5 border border-white/10 space-y-3">
+            <p className="text-xs font-bold text-white/80 mb-2">🔑 بيانات تسجيل الدخول الجديدة:</p>
+            <div className="space-y-2">
+              <div className="flex items-center justify-between p-2.5 rounded-lg bg-green-500/5 border border-green-500/10">
+                <span className="text-xs text-muted-foreground flex items-center gap-1"><Mail className="w-3 h-3" /> البريد</span>
+                <span className="text-sm font-bold text-green-400" dir="ltr">{setupResult.adminEmail}</span>
+              </div>
+              <div className="flex items-center justify-between p-2.5 rounded-lg bg-green-500/5 border border-green-500/10">
+                <span className="text-xs text-muted-foreground flex items-center gap-1"><Lock className="w-3 h-3" /> كلمة المرور</span>
+                <span className="text-sm font-mono font-bold text-green-400" dir="ltr">{setupResult.adminPassword}</span>
+              </div>
             </div>
             {setupResult.adminCreated && (
-              <p className="text-xs text-green-400">✅ تم إنشاء حساب المسؤول وجميع الإعدادات</p>
+              <p className="text-xs text-green-400 mt-2">✅ تم إنشاء حساب المسؤول وجميع الإعدادات الأساسية</p>
             )}
             {setupResult.adminUpdated && (
-              <p className="text-xs text-amber-400">⚠️ تم تحديث حساب المسؤول الموجود مسبقاً</p>
+              <p className="text-xs text-amber-400 mt-2">⚠️ تم تحديث كلمة المرور لحساب مسؤول موجود مسبقاً</p>
             )}
           </div>
 
-          {/* Save & Activate Button */}
+          {/* Warning + Activate */}
           <div className="space-y-2">
             <div className="p-3 rounded-lg bg-amber-500/5 border border-amber-500/10">
               <div className="flex items-start gap-2">
                 <AlertTriangle className="w-4 h-4 text-amber-400 mt-0.5 flex-shrink-0" />
                 <div className="text-xs text-muted-foreground leading-relaxed">
                   <p className="font-bold text-amber-400 mb-1">⚠️ مهم جداً</p>
-                  <p>بعد التفعيل يجب تسجيل <strong className="text-white">الخروج</strong> ثم تسجيل الدخول بكلمة المرور الجديدة: <span className="font-mono text-gold" dir="ltr">{setupResult.adminPassword}</span></p>
+                  <p>بعد التفعيل سجّل <strong className="text-white">خروج</strong> ثم سجّل <strong className="text-white">دخول</strong> بالبيانات أعلاه</p>
                 </div>
               </div>
             </div>
             <Button onClick={handleSave} disabled={saving}
               className="w-full flex items-center justify-center gap-2 bg-green-500/20 hover:bg-green-500/30 text-green-400 rounded-lg h-10">
               {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Play className="w-4 h-4" />}
-              <span className="text-xs font-medium">{saving ? 'جارٍ التفعيل...' : 'حفظ وتفعيل القاعدة الجديدة'}</span>
+              <span className="text-xs font-medium">{saving ? 'جارٍ التفعيل...' : '✅ حفظ وتفعيل القاعدة الجديدة'}</span>
             </Button>
           </div>
         </div>
       )}
 
-      {/* Revert Button */}
-      {status?.isCustom && (
+      {/* Revert */}
+      {status?.isCustom && setupStep !== 'done' && (
         <div className="glass-card p-4 rounded-xl">
           <Button onClick={handleRevert} disabled={reverting}
             className="w-full flex items-center justify-center gap-2 border border-red-500/20 hover:bg-red-500/10 text-red-400 rounded-lg h-10">
@@ -644,7 +679,7 @@ export default function FirebaseConfig() {
           <div className="space-y-1">
             <h4 className="text-sm font-bold text-amber-400">تحذير أمني</h4>
             <p className="text-xs text-muted-foreground leading-relaxed">
-              مفتاح Service Account حساس جداً. سيتم تخزينه مشفراً. لا تشاركه مع أي شخص.
+              مفتاح Service Account حساس جداً ويمنح وصول كامل لقاعدة البيانات. لا تشاركه مع أي شخص.
             </p>
           </div>
         </div>
