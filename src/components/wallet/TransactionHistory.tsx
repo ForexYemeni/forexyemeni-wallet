@@ -2,12 +2,15 @@
 
 import { useState, useEffect } from 'react'
 import { useAuthStore } from '@/lib/store'
+import { useOfflineStore } from '@/lib/offline-store'
+import { useOfflineMode } from '@/hooks/useOfflineMode'
 import {
   ArrowDownLeft,
   ArrowUpRight,
   TrendingUp,
   Clock,
   Filter,
+  WifiOff,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import dynamic from 'next/dynamic'
@@ -27,22 +30,63 @@ interface Transaction {
 
 export default function TransactionHistory() {
   const { user } = useAuthStore()
+  const { cachedTransactions, setCachedTransactions, setCachedUser, setLastSyncTime } = useOfflineStore()
+  const { isOffline } = useOfflineMode()
   const [transactions, setTransactions] = useState<Transaction[]>([])
   const [loading, setLoading] = useState(true)
   const [filter, setFilter] = useState<string>('all')
+  const [usingOffline, setUsingOffline] = useState(false)
 
   useEffect(() => {
     if (user?.id) fetchTransactions()
   }, [user?.id])
 
+  // Load offline cache when going offline
+  useEffect(() => {
+    if (isOffline && cachedTransactions.length > 0) {
+      setTransactions(cachedTransactions as Transaction[])
+      setUsingOffline(true)
+      setLoading(false)
+    }
+  }, [isOffline, cachedTransactions])
+
   const fetchTransactions = async () => {
     if (!user?.id) return
+
+    // If offline, use cached data
+    if (!navigator.onLine) {
+      if (cachedTransactions.length > 0) {
+        setTransactions(cachedTransactions as Transaction[])
+        setUsingOffline(true)
+      }
+      setLoading(false)
+      return
+    }
+
     try {
       const res = await fetch(`/api/transactions?userId=${user.id}`)
       const data = await res.json()
-      if (data.success) setTransactions(data.transactions)
+      if (data.success) {
+        setTransactions(data.transactions)
+        setUsingOffline(false)
+        // Save to offline cache
+        setCachedTransactions(data.transactions || [])
+        setCachedUser({
+          balance: user?.balance ?? 0,
+          frozenBalance: user?.frozenBalance ?? 0,
+          accountNumber: user?.accountNumber ?? null,
+          fullName: user?.fullName ?? null,
+          email: user?.email ?? '',
+          kycStatus: user?.kycStatus ?? 'none',
+        })
+        setLastSyncTime()
+      }
     } catch {
-      // silently fail
+      // Network error — try cached data
+      if (cachedTransactions.length > 0) {
+        setTransactions(cachedTransactions as Transaction[])
+        setUsingOffline(true)
+      }
     } finally {
       setLoading(false)
     }
@@ -90,6 +134,14 @@ export default function TransactionHistory() {
 
   return (
     <div className="space-y-6 animate-fade-in">
+      {/* Offline Mode Indicator */}
+      {usingOffline && (
+        <div className="flex items-center gap-2 p-3 rounded-xl bg-amber-500/10 border border-amber-500/20 text-xs text-amber-400">
+          <WifiOff className="w-4 h-4 flex-shrink-0" />
+          <span>أنت غير متصل — يتم عرض البيانات المخزنة مؤقتاً</span>
+        </div>
+      )}
+
       <div className="flex items-center gap-3">
         <div className="w-10 h-10 rounded-xl bg-gold/10 flex items-center justify-center">
           <Clock className="w-5 h-5 text-gold" />

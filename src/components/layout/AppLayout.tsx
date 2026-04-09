@@ -7,6 +7,7 @@ import { setupFCMAutoRegister } from '@/lib/fcm-push'
 import BottomNav from './BottomNav'
 import Sidebar from './Sidebar'
 import SocialFloatingButton from './SocialFloatingButton'
+import OfflineBanner from '@/components/OfflineBanner'
 import { Bell, LogOut, Loader2 } from 'lucide-react'
 import {
   AlertDialog,
@@ -143,6 +144,9 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="min-h-screen bg-background">
+      {/* Offline Banner */}
+      <OfflineBanner />
+
       {/* Desktop Sidebar */}
       <Sidebar />
 

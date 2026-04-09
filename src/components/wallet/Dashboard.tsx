@@ -2,6 +2,8 @@
 
 import { useState, useEffect } from 'react'
 import { useAuthStore } from '@/lib/store'
+import { useOfflineStore } from '@/lib/offline-store'
+import { useOfflineMode } from '@/hooks/useOfflineMode'
 import { convertUSDTtoYER, formatYER } from '@/lib/currency'
 import { toast } from 'sonner'
 import BannerSlider from '@/components/BannerSlider'
@@ -16,6 +18,7 @@ import {
   Send,
   Copy,
   Check as CheckIcon,
+  WifiOff,
 } from 'lucide-react'
 import dynamic from 'next/dynamic'
 
@@ -31,9 +34,12 @@ interface Transaction {
 
 export default function Dashboard() {
   const { user, setScreen, updateBalance } = useAuthStore()
+  const { cachedTransactions, setCachedTransactions, setCachedUser, setLastSyncTime } = useOfflineStore()
+  const { isOffline } = useOfflineMode()
   const [transactions, setTransactions] = useState<Transaction[]>([])
   const [loading, setLoading] = useState(true)
   const [copiedAccount, setCopiedAccount] = useState(false)
+  const [usingOffline, setUsingOffline] = useState(false)
 
   // Combined data fetch — single API call for both transactions + user data
   useEffect(() => {
@@ -50,15 +56,50 @@ export default function Dashboard() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user?.currentScreen])
 
+  // Load offline cache when going offline
+  useEffect(() => {
+    if (isOffline && cachedTransactions.length > 0) {
+      setTransactions(cachedTransactions.slice(0, 5))
+      setUsingOffline(true)
+      setLoading(false)
+    }
+  }, [isOffline, cachedTransactions])
+
   // OPTIMIZED: Single function replaces duplicate fetchTransactions + fetchLatestUserData
   // Both were calling the same /api/transactions endpoint — now only 1 API call
   const fetchDashboardData = async () => {
     if (!user?.id) return
+
+    // If offline, use cached data
+    if (!navigator.onLine) {
+      if (cachedTransactions.length > 0) {
+        setTransactions(cachedTransactions.slice(0, 5))
+        setUsingOffline(true)
+      }
+      setLoading(false)
+      return
+    }
+
     try {
       const res = await fetch(`/api/transactions?userId=${user.id}`)
       const data = await res.json()
       if (data.success) {
-        setTransactions((data.transactions || []).slice(0, 5))
+        const txs = (data.transactions || []).slice(0, 5)
+        setTransactions(txs)
+        setUsingOffline(false)
+
+        // Save to offline cache
+        setCachedTransactions(data.transactions || [])
+        setCachedUser({
+          balance: data.balance ?? user?.balance ?? 0,
+          frozenBalance: data.frozenBalance ?? user?.frozenBalance ?? 0,
+          accountNumber: data.accountNumber ?? user?.accountNumber ?? null,
+          fullName: user?.fullName ?? null,
+          email: user?.email ?? '',
+          kycStatus: user?.kycStatus ?? 'none',
+        })
+        setLastSyncTime()
+
         // Update user data from server
         const updates: Record<string, unknown> = {}
         let needsUpdate = false
@@ -79,7 +120,11 @@ export default function Dashboard() {
         }
       }
     } catch {
-      // silently fail
+      // Network error — try to use cached data
+      if (cachedTransactions.length > 0) {
+        setTransactions(cachedTransactions.slice(0, 5))
+        setUsingOffline(true)
+      }
     } finally {
       setLoading(false)
     }
@@ -116,6 +161,14 @@ export default function Dashboard() {
 
   return (
     <div className="space-y-6 animate-fade-in">
+      {/* Offline Mode Indicator */}
+      {usingOffline && (
+        <div className="flex items-center gap-2 p-3 rounded-xl bg-amber-500/10 border border-amber-500/20 text-xs text-amber-400">
+          <WifiOff className="w-4 h-4 flex-shrink-0" />
+          <span>أنت غير متصل — يتم عرض البيانات المخزنة مؤقتاً</span>
+        </div>
+      )}
+
       {/* Banner Slider */}
       <BannerSlider />
 
