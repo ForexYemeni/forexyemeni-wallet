@@ -2,10 +2,13 @@ import { NextRequest, NextResponse } from 'next/server'
 import { userOperations, otpCodeOperations, merchantApplicationOperations, merchantOperations } from '@/lib/db-firebase'
 import bcrypt from 'bcryptjs'
 import crypto from 'crypto'
-import { getDb, generateAccountNumber } from '@/lib/firebase'
+import { getDb, generateAccountNumber, checkAndApplyCustomFirebase } from '@/lib/firebase'
 
 export async function POST(request: NextRequest) {
   try {
+    // Ensure custom Firebase is loaded before any DB operations
+    await checkAndApplyCustomFirebase()
+
     const { email, password, pin, deviceFingerprint, deviceName } = await request.json()
 
     // Rate limiting

@@ -4,6 +4,7 @@ import { _fbk } from './firebase-key'
 
 let app: App
 let db: Firestore
+let checkedCustomFirebase = false
 
 export function initializeFirebase() {
   if (!app) {
@@ -17,6 +18,49 @@ export function initializeFirebase() {
   }
   if (!db) db = getFirestore(app)
   return { app, db }
+}
+
+/**
+ * Check if a custom Firebase config is saved and reinitialize with it.
+ * Called once on first API request after server startup.
+ */
+export async function checkAndApplyCustomFirebase(): Promise<boolean> {
+  if (checkedCustomFirebase) return false
+  checkedCustomFirebase = true
+
+  try {
+    // First init with default key to read the config
+    const { db: defaultDb } = initializeFirebase()
+    
+    const customDoc = await defaultDb.collection('systemSettings').doc('customFirebase').get()
+    if (!customDoc.exists) return false
+
+    const data = customDoc.data()
+    if (!data?.encodedKey) return false
+
+    const serviceAccountKeyJson = Buffer.from(data.encodedKey, 'base64').toString()
+    
+    // Validate JSON
+    const serviceAccount = JSON.parse(serviceAccountKeyJson)
+    if (!serviceAccount.project_id || !serviceAccount.private_key) return false
+
+    // Reinitialize with custom key
+    reinitializeFirebase(serviceAccountKeyJson)
+    console.log(`[Firebase] Auto-switched to custom project: ${serviceAccount.project_id}`)
+    return true
+  } catch (error) {
+    console.error('[Firebase] Failed to check/apply custom config:', error)
+    return false
+  }
+}
+
+/**
+ * Ensure custom Firebase is loaded before returning DB.
+ * Call this at the start of API routes that need the correct database.
+ */
+export async function getDbWithCustomCheck(): Promise<Firestore> {
+  await checkAndApplyCustomFirebase()
+  return getDb()
 }
 
 // Reinitialize Firebase with a custom service account key
