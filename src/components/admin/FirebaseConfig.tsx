@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { useAuthStore } from '@/lib/store'
+import { forceReregisterFCM } from '@/lib/fcm-push'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
@@ -258,6 +259,11 @@ export default function FirebaseConfig() {
       const data = await res.json()
       if (data.success) {
         toast.success(data.message)
+        // Re-register FCM for the new database
+        try {
+          const fcmResult = await forceReregisterFCM()
+          console.log('[FirebaseConfig] FCM re-registration:', fcmResult)
+        } catch {}
         toast.info('تم التفعيل! سجّل خروج ثم سجّل دخول بالبيانات الجديدة.', { duration: 8000 })
         setTestResult(null)
         setSetupResult(null)

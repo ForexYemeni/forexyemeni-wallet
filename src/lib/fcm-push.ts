@@ -175,6 +175,24 @@ async function sendTokenToServer(userId: string, token: string): Promise<boolean
   }
 }
 
+/**
+ * Reset FCM registration flag so it re-registers on next attempt.
+ * Called after database switch or user change.
+ */
+export function resetFCMRegistration(): void {
+  fcmRegistered = false
+  currentFcmToken = null
+  console.log('[FCM] Registration reset — will re-register on next attempt')
+}
+
+/**
+ * Force re-register FCM token (e.g. after database switch).
+ */
+export async function forceReregisterFCM(): Promise<string> {
+  resetFCMRegistration()
+  return registerFCMPushNotifications()
+}
+
 export async function unregisterFCM(): Promise<void> {
   if (!currentFcmToken) return
   try {
@@ -212,6 +230,12 @@ export function setupFCMAutoRegister(): void {
   // Watch for login
   useAuthStore.subscribe((state, prevState) => {
     if (state.isAuthenticated && !prevState.isAuthenticated && state.user?.id) {
+      resetFCMRegistration() // Always re-register on new login
+      setTimeout(doRegister, 2000)
+    }
+    // Re-register if user ID changes (different account = possibly different DB)
+    if (state.isAuthenticated && prevState.isAuthenticated && state.user?.id && prevState.user?.id && state.user.id !== prevState.user.id) {
+      resetFCMRegistration()
       setTimeout(doRegister, 2000)
     }
     if (!state.isAuthenticated && prevState.isAuthenticated) {
