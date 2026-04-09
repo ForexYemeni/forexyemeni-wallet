@@ -39,9 +39,12 @@ export async function getDefaultDb(): Promise<Firestore> {
 /**
  * Check if a custom Firebase config is saved in the DEFAULT database and reinitialize with it.
  * Called once on first API request after server startup.
+ * 
+ * IMPORTANT: If the custom database is unreachable, it automatically falls back to default
+ * and deletes the stale config, so the app never gets stuck.
  */
-export async function checkAndApplyCustomFirebase(): Promise<boolean> {
-  if (checkedCustomFirebase) return false
+export async function checkAndApplyCustomFirebase(): Promise<{ active: boolean; fallback: boolean; projectId?: string }> {
+  if (checkedCustomFirebase) return { active: false, fallback: false }
   checkedCustomFirebase = true
 
   try {
@@ -50,15 +53,14 @@ export async function checkAndApplyCustomFirebase(): Promise<boolean> {
     
     const customDoc = await defaultDb.collection('systemSettings').doc('customFirebase').get()
     if (!customDoc.exists) {
-      // Clean up temp app
       try { await (defaultDb as any).app?.delete?.() } catch {}
-      return false
+      return { active: false, fallback: false }
     }
 
     const data = customDoc.data()
     if (!data?.encodedKey) {
       try { await (defaultDb as any).app?.delete?.() } catch {}
-      return false
+      return { active: false, fallback: false }
     }
 
     const serviceAccountKeyJson = Buffer.from(data.encodedKey, 'base64').toString()
@@ -66,20 +68,43 @@ export async function checkAndApplyCustomFirebase(): Promise<boolean> {
     // Validate JSON
     const serviceAccount = JSON.parse(serviceAccountKeyJson)
     if (!serviceAccount.project_id || !serviceAccount.private_key) {
+      // Invalid config — delete it
+      console.warn('[Firebase] Invalid custom config found, deleting...')
+      try { await defaultDb.collection('systemSettings').doc('customFirebase').delete() } catch {}
       try { await (defaultDb as any).app?.delete?.() } catch {}
-      return false
+      return { active: false, fallback: true }
     }
 
-    // Clean up temp app
+    // Clean up temp app before switching
     try { await (defaultDb as any).app?.delete?.() } catch {}
 
-    // Reinitialize with custom key
+    // Try to reinitialize with custom key
     reinitializeFirebase(serviceAccountKeyJson)
-    console.log(`[Firebase] Auto-switched to custom project: ${serviceAccount.project_id}`)
-    return true
+    
+    // TEST: verify the custom database is actually reachable
+    const testDb = getDb()
+    try {
+      await testDb.collection('systemSettings').doc('testConnection').get()
+      console.log(`[Firebase] Auto-switched to custom project: ${serviceAccount.project_id}`)
+      return { active: true, fallback: false, projectId: serviceAccount.project_id }
+    } catch (testError) {
+      console.error(`[Firebase] Custom database UNREACHABLE (${serviceAccount.project_id}), falling back to default!`)
+      
+      // Custom DB is dead — revert to default and delete stale config
+      resetFirebaseToDefault()
+      
+      // Delete the stale config from default DB
+      try {
+        const cleanupDb = await getDefaultDb()
+        try { await cleanupDb.collection('systemSettings').doc('customFirebase').delete() } catch {}
+        try { await (cleanupDb as any).app?.delete?.() } catch {}
+      } catch {}
+      
+      return { active: false, fallback: true }
+    }
   } catch (error) {
     console.error('[Firebase] Failed to check/apply custom config:', error)
-    return false
+    return { active: false, fallback: false }
   }
 }
 
@@ -96,7 +121,6 @@ export async function saveCustomConfigToDefaultDb(encodedKey: string, projectId:
       updatedAt: nowTimestamp(),
     }, { merge: true })
   } finally {
-    // Clean up temp app
     try { await (defaultDb as any).app?.delete?.() } catch {}
   }
 }
