@@ -689,16 +689,34 @@ export default function FirebaseConfig() {
       <div className="glass-card p-4 rounded-xl space-y-3">
         <h3 className="text-sm font-bold flex items-center gap-2">
           <Copy className="w-4 h-4 text-muted-foreground" />
-          كيف تحصل على المفتاح؟
+          خطوات إعداد مشروع Firebase جديد
         </h3>
-        <ol className="text-xs text-muted-foreground leading-relaxed list-decimal list-inside space-y-1 mr-2">
-          <li>افتح <a href="https://console.firebase.google.com" target="_blank" className="text-gold underline" rel="noreferrer">Firebase Console</a></li>
-          <li>اختر المشروع (أو أنشئ مشروع جديد)</li>
-          <li>اذهب إلى ⚙️ Project Settings → Service Accounts</li>
-          <li>اضغط &quot;Generate new private key&quot;</li>
+        <div className="p-3 rounded-lg bg-amber-500/5 border border-amber-500/10">
+          <div className="flex items-start gap-2">
+            <AlertTriangle className="w-4 h-4 text-amber-400 mt-0.5 flex-shrink-0" />
+            <p className="text-xs text-amber-400 font-medium">⚠️ مهم: يجب إكمال جميع الخطوات بالترتيب</p>
+          </div>
+        </div>
+        <ol className="text-xs text-muted-foreground leading-relaxed list-decimal list-inside space-y-2 mr-2">
+          <li>افتح <a href="https://console.firebase.google.com" target="_blank" className="text-gold underline" rel="noreferrer">Firebase Console</a> وأنشئ مشروع جديد</li>
+          <li className="text-amber-400 font-medium">📁 أنشئ قاعدة Firestore Database:</li>
+          <ul className="text-xs text-muted-foreground space-y-0.5 mr-4 list-disc list-inside">
+            <li>اذهب إلى <strong className="text-white">Firestore Database</strong> من القائمة الجانبية</li>
+            <li>اضغط <strong className="text-white">Create database</strong></li>
+            <li>اختر <strong className="text-white">Start in production mode</strong></li>
+            <li>اختر <strong className="text-white">أقرب منطقة</strong> لك ثم اضغط <strong className="text-white">Enable</strong></li>
+          </ul>
+          <li>اذهب إلى ⚙️ <strong className="text-white">Project Settings</strong> → <strong className="text-white">Service Accounts</strong></li>
+          <li>اضغط <strong className="text-white">Generate new private key</strong></li>
           <li>انسخ محتوى ملف JSON بالكامل</li>
           <li>الصقه هنا واتبع الخطوات</li>
         </ol>
+        <div className="p-3 rounded-lg bg-gold/5 border border-gold/10">
+          <div className="flex items-center gap-2">
+            <Info className="w-4 h-4 text-gold" />
+            <span className="text-xs text-gold">💡 لا تحتاج لتفعيل Authentication — التطبيق يستخدم نظام مصادقة خاص</span>
+          </div>
+        </div>
       </div>
     </div>
   )

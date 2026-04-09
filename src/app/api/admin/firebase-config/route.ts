@@ -79,7 +79,6 @@ export async function POST(request: NextRequest) {
 
         const testApp = initApp({
           credential: firebaseCert(serviceAccount as any),
-          databaseURL: `https://${serviceAccount.project_id}.firebaseio.com`
         }, `test-connection-${Date.now()}`)
 
         testProjectId = serviceAccount.project_id as string
@@ -120,6 +119,30 @@ export async function POST(request: NextRequest) {
         })
       } catch (testError: unknown) {
         const errMsg = testError instanceof Error ? testError.message : 'فشل الاتصال'
+        const errStr = errMsg.toLowerCase()
+
+        // Detect common issues with new Firebase projects
+        if (errStr.includes('not found') || errStr.includes('not configured') || errStr.includes('firestore')) {
+          return NextResponse.json({
+            success: false,
+            message: 'قاعدة Firestore غير موجودة! يجب إنشاؤها أولاً من Firebase Console → Firestore Database → Create database',
+            projectId: testProjectId,
+          }, { status: 400 })
+        }
+        if (errStr.includes('permission') || errStr.includes('access') || errStr.includes('denied')) {
+          return NextResponse.json({
+            success: false,
+            message: 'صلاحيات غير كافية! تأكد من أن مفتاح Service Account يحتوي على صلاحيات Firestore (roles/firestore.admin)',
+            projectId: testProjectId,
+          }, { status: 400 })
+        }
+        if (errStr.includes('network') || errStr.includes('timeout') || errStr.includes('unavailable')) {
+          return NextResponse.json({
+            success: false,
+            message: 'تعذر الوصول لقاعدة البيانات. تأكد من أن Firestore Database مُفعّلة في المشروع وأن الإنترنت يعمل.',
+            projectId: testProjectId,
+          }, { status: 400 })
+        }
         return NextResponse.json({
           success: false,
           message: `فشل الاتصال: ${errMsg}`,
@@ -158,7 +181,6 @@ export async function POST(request: NextRequest) {
 
         const setupApp = initApp({
           credential: firebaseCert(serviceAccount as any),
-          databaseURL: `https://${serviceAccount.project_id}.firebaseio.com`
         }, `setup-${Date.now()}`)
 
         const newDb = getFs(setupApp)
