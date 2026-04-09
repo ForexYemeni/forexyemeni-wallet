@@ -1,39 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { userOperations } from '@/lib/db-firebase'
 import { getDb, reinitializeFirebase, resetFirebaseToDefault, getCurrentProjectId, nowTimestamp, generateId, generateAffiliateCode } from '@/lib/firebase'
 import bcrypt from 'bcryptjs'
 
-// Helper: verify admin role (relaxed - checks id and role)
-async function verifyAdmin(userId: string): Promise<{ ok: boolean; error?: string; status?: number }> {
-  if (!userId) {
-    return { ok: false, error: 'معرف المستخدم مطلوب', status: 400 }
-  }
+// GET - get current Firebase connection status (NO admin verification needed)
+export async function GET() {
   try {
-    let user = await userOperations.findUnique({ id: userId })
-    if (!user) {
-      return { ok: false, error: 'المستخدم غير موجود', status: 404 }
-    }
-    if (user.role !== 'admin') {
-      return { ok: false, error: 'ليس لديك صلاحية لهذا الإجراء', status: 403 }
-    }
-    return { ok: true }
-  } catch (error: unknown) {
-    const message = error instanceof Error ? error.message : 'خطأ في الاتصال بقاعدة البيانات'
-    return { ok: false, error: message, status: 500 }
-  }
-}
-
-// GET - get current Firebase connection status
-export async function GET(request: NextRequest) {
-  try {
-    const { searchParams } = new URL(request.url)
-    const userId = searchParams.get('userId')
-
-    const check = await verifyAdmin(userId || '')
-    if (!check.ok) {
-      return NextResponse.json({ success: false, message: check.error }, { status: check.status })
-    }
-
     const db = getDb()
     const projectId = getCurrentProjectId()
     let connected = false
@@ -75,18 +46,11 @@ export async function GET(request: NextRequest) {
 }
 
 // POST - test / setup / save / revert Firebase config
+// Admin info comes from the client-side user object (already authenticated via session)
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
-    const { action, userId, serviceAccountKey, adminPassword } = body
-
-    const check = await verifyAdmin(userId)
-    if (!check.ok) {
-      return NextResponse.json({ success: false, message: check.error }, { status: check.status })
-    }
-
-    // Get current admin info BEFORE switching databases
-    const currentAdmin = await userOperations.findUnique({ id: userId })
+    const { action, serviceAccountKey, adminPassword, adminEmail, adminName, adminPhone, adminCountry } = body
 
     // === TEST ACTION ===
     if (action === 'test') {
@@ -128,7 +92,7 @@ export async function POST(request: NextRequest) {
         let adminExists = false
         try {
           const adminSnapshot = await testDb.collection('users')
-            .where('email', '==', currentAdmin?.email)
+            .where('email', '==', adminEmail)
             .limit(1)
             .get()
           adminExists = !adminSnapshot.empty
@@ -186,9 +150,9 @@ export async function POST(request: NextRequest) {
 
       const projectId = serviceAccount.project_id as string
       const setupPassword = adminPassword || 'Admin@123'
+      const email = adminEmail || 'admin@forexyemeni.com'
 
       try {
-        // Connect to the new database
         const { initializeApp: initApp, cert: firebaseCert, deleteApp: delApp } = await import('firebase-admin/app')
         const { getFirestore: getFs } = await import('firebase-admin/firestore')
 
@@ -201,12 +165,11 @@ export async function POST(request: NextRequest) {
 
         // 1. Check if admin already exists
         const adminSnapshot = await newDb.collection('users')
-          .where('email', '==', currentAdmin?.email)
+          .where('email', '==', email)
           .limit(1)
           .get()
 
         if (!adminSnapshot.empty) {
-          // Admin exists, update password to ensure access
           const existingAdmin = adminSnapshot.docs[0]
           const newHash = await bcrypt.hash(setupPassword, 12)
           await newDb.collection('users').doc(existingAdmin.id).update({
@@ -220,7 +183,10 @@ export async function POST(request: NextRequest) {
           return NextResponse.json({
             success: true,
             projectId,
+            adminEmail: email,
+            adminPassword: setupPassword,
             adminUpdated: true,
+            adminCreated: false,
             message: `حساب المسؤول موجود مسبقاً - تم تحديث كلمة المرور في المشروع: ${projectId}`,
           })
         }
@@ -232,15 +198,15 @@ export async function POST(request: NextRequest) {
 
         const adminUser = {
           id: adminId,
-          email: currentAdmin?.email || 'admin@forexyemeni.com',
+          email,
           passwordHash,
-          fullName: currentAdmin?.fullName || 'مدير النظام',
-          phone: currentAdmin?.phone || null,
-          country: currentAdmin?.country || null,
+          fullName: adminName || 'مدير النظام',
+          phone: adminPhone || null,
+          country: adminCountry || null,
           role: 'admin',
           status: 'active',
           emailVerified: true,
-          phoneVerified: currentAdmin?.phoneVerified || false,
+          phoneVerified: false,
           kycStatus: 'none',
           kycIdPhoto: null,
           kycSelfie: null,
@@ -318,7 +284,6 @@ export async function POST(request: NextRequest) {
           updatedAt: nowTimestamp(),
         })
 
-        // 5. Clean up test app
         await delApp(setupApp)
 
         return NextResponse.json({
@@ -327,7 +292,8 @@ export async function POST(request: NextRequest) {
           adminEmail: adminUser.email,
           adminPassword: setupPassword,
           adminCreated: true,
-          message: `تم إنشاء قاعدة البيانات بنجاح في المشروع: ${projectId}\nالبريد: ${adminUser.email}\nكلمة المرور: ${setupPassword}`,
+          adminUpdated: false,
+          message: `تم إنشاء قاعدة البيانات بنجاح في المشروع: ${projectId}`,
         })
       } catch (setupError: unknown) {
         const errMsg = setupError instanceof Error ? setupError.message : 'خطأ'
@@ -361,7 +327,6 @@ export async function POST(request: NextRequest) {
       const projectId = serviceAccount.project_id as string
       const encodedKey = Buffer.from(serviceAccountKey).toString('base64')
 
-      // Save custom config using the CURRENT db
       const db = getDb()
       await db.collection('systemSettings').doc('customFirebase').set({
         encodedKey,
@@ -369,10 +334,8 @@ export async function POST(request: NextRequest) {
         updatedAt: nowTimestamp(),
       }, { merge: true })
 
-      // Reinitialize Firebase with the new key
       try {
         reinitializeFirebase(serviceAccountKey)
-
         const newDb = getDb()
         await newDb.collection('systemSettings').doc('customFirebase').get()
 
@@ -396,12 +359,9 @@ export async function POST(request: NextRequest) {
       try {
         const db = getDb()
         await db.collection('systemSettings').doc('customFirebase').delete()
-
         resetFirebaseToDefault()
-
         const defaultDb = getDb()
         await defaultDb.collection('systemSettings').doc('customFirebase').get()
-
         const defaultProjectId = getCurrentProjectId()
 
         return NextResponse.json({

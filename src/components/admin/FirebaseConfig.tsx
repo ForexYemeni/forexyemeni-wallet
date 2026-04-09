@@ -78,36 +78,23 @@ export default function FirebaseConfig() {
   const [showPassword, setShowPassword] = useState(false)
 
   const fetchStatus = useCallback(async () => {
-    if (!user?.id) {
-      setError({ type: 'user_not_found', message: 'لم يتم تحديد هوية المستخدم. يرجى تسجيل الدخول مجدداً.' })
-      setLoading(false)
-      return
-    }
     setLoading(true)
     setError(null)
     try {
-      const res = await fetch(`/api/admin/firebase-config?userId=${user.id}`)
+      const res = await fetch('/api/admin/firebase-config')
       const data = await res.json()
       if (data.success) {
         setStatus(data)
         setError(null)
       } else {
-        if (data.message?.includes('المستخدم غير موجود')) {
-          setError({ type: 'user_not_found', message: data.message })
-        } else if (data.message?.includes('صلاحية')) {
-          setError({ type: 'permission_denied', message: data.message })
-        } else if (res.status === 500 || res.status === 503) {
-          setError({ type: 'network', message: data.message || 'خطأ في الاتصال بالخادم' })
-        } else {
-          setError({ type: 'unknown', message: data.message || 'حدث خطأ غير متوقع' })
-        }
+        setError({ type: 'network', message: data.message || 'خطأ في الاتصال بالخادم' })
       }
     } catch {
       setError({ type: 'network', message: 'تعذر الاتصال بالخادم. تحقق من اتصالك بالإنترنت.' })
     } finally {
       setLoading(false)
     }
-  }, [user?.id])
+  }, [])
 
   useEffect(() => {
     fetchStatus()
@@ -150,7 +137,7 @@ export default function FirebaseConfig() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           action: 'test',
-          userId: user?.id,
+          adminEmail: user?.email,
           serviceAccountKey: serviceAccountKey.trim(),
         }),
       })
@@ -197,7 +184,10 @@ export default function FirebaseConfig() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           action: 'setup',
-          userId: user?.id,
+          adminEmail: user?.email,
+          adminName: user?.fullName,
+          adminPhone: user?.phone,
+          adminCountry: user?.country,
           serviceAccountKey: serviceAccountKey.trim(),
           adminPassword: adminPassword.trim(),
         }),
@@ -245,7 +235,6 @@ export default function FirebaseConfig() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           action: 'save',
-          userId: user?.id,
           serviceAccountKey: serviceAccountKey.trim(),
         }),
       })
@@ -278,7 +267,7 @@ export default function FirebaseConfig() {
       const res = await fetch('/api/admin/firebase-config', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'revert', userId: user?.id }),
+        body: JSON.stringify({ action: 'revert' }),
       })
       const data = await res.json()
       if (data.success) {
@@ -315,7 +304,7 @@ export default function FirebaseConfig() {
     )
   }
 
-  // Error state
+  // Error state - only for network/server errors (not user-not-found since GET doesn't verify)
   if (error) {
     return (
       <div className="space-y-4">
@@ -330,20 +319,15 @@ export default function FirebaseConfig() {
         </div>
         <div className="glass-card p-4 rounded-xl border border-red-500/20 bg-red-500/5 space-y-3">
           <div className="flex items-start gap-3">
-            {error.type === 'user_not_found' ? <UserX className="w-5 h-5 text-red-400 mt-0.5 flex-shrink-0" /> :
-             error.type === 'network' ? <WifiOff className="w-5 h-5 text-red-400 mt-0.5 flex-shrink-0" /> :
-             <AlertTriangle className="w-5 h-5 text-red-400 mt-0.5 flex-shrink-0" />}
+            <WifiOff className="w-5 h-5 text-red-400 mt-0.5 flex-shrink-0" />
             <div className="space-y-2 flex-1">
-              <h4 className="text-sm font-bold text-red-400">
-                {error.type === 'user_not_found' ? 'حساب المسؤول غير موجود' :
-                 error.type === 'permission_denied' ? 'صلاحية مرفوضة' : 'خطأ في الاتصال'}
-              </h4>
+              <h4 className="text-sm font-bold text-red-400">خطأ في الاتصال</h4>
               <p className="text-xs text-muted-foreground leading-relaxed">{error.message}</p>
               <div className="p-3 rounded-lg bg-white/5 border border-white/10">
                 <p className="text-xs text-muted-foreground font-medium mb-1">الحلول:</p>
                 <ul className="text-xs text-muted-foreground space-y-1 mr-2">
                   <li>• تأكد من اتصالك بالإنترنت</li>
-                  <li>• سجّل الخروج ثم الدخول مجدداً</li>
+                  <li>• حاول مرة أخرى بعد قليل</li>
                   <li>• تأكد أن حسابك له صلاحية المسؤول</li>
                 </ul>
               </div>
