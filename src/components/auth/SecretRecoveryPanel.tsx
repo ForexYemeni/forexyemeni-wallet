@@ -8,10 +8,12 @@ import { toast } from 'sonner'
 import {
   X, Eye, EyeOff, Loader2, CheckCircle, XCircle,
   Database, KeyRound, Mail, Lock, Link2, AlertTriangle,
-  ShieldCheck, RefreshCw
+  ShieldCheck, RefreshCw, Bell, BellRing, Trash2, Send,
+  Volume2, Smartphone, Wifi, WifiOff, ChevronDown, ChevronUp
 } from 'lucide-react'
 
 type Step = 'closed' | 'pin' | 'main'
+type PanelTab = 'database' | 'fcm'
 
 interface TestResult {
   success: boolean
@@ -19,6 +21,26 @@ interface TestResult {
   projectId?: string
   totalUsers?: number
   adminExists?: boolean
+}
+
+interface FcmDiagnostics {
+  projectId?: string
+  firebaseMessaging?: string
+  totalTokens?: number
+  adminTokenCount?: number
+  uniqueUsersWithTokens?: number
+  tokens?: { id: string; token: string; deviceName?: string; userId?: string; createdAt?: string }[]
+  error?: string
+}
+
+interface FcmTestResult {
+  success: boolean
+  message: string
+  projectId?: string
+  sentTo?: number
+  successCount?: number
+  failureCount?: number
+  errors?: { token: string; code: string; message: string }[]
 }
 
 // PIN pad keys
@@ -42,6 +64,9 @@ export default function SecretRecoveryPanel({ currentProjectId }: { currentProje
   const [testResult, setTestResult] = useState<TestResult | null>(null)
   const [currentDb, setCurrentDb] = useState(currentProjectId || '')
 
+  // Panel tab
+  const [activeTab, setActiveTab] = useState<PanelTab>('database')
+
   // PIN pad state
   const [pinDigits, setPinDigits] = useState<string[]>([])
   const [pinError, setPinError] = useState(false)
@@ -53,6 +78,20 @@ export default function SecretRecoveryPanel({ currentProjectId }: { currentProje
   const [currentPinInput, setCurrentPinInput] = useState('')
   const [newPinInput, setNewPinInput] = useState('')
   const [changingPin, setChangingPin] = useState(false)
+
+  // FCM state
+  const [fcmDiagnostics, setFcmDiagnostics] = useState<FcmDiagnostics | null>(null)
+  const [fcmLoading, setFcmLoading] = useState(false)
+  const [fcmTesting, setFcmTesting] = useState(false)
+  const [fcmTestResult, setFcmTestResult] = useState<FcmTestResult | null>(null)
+  const [fcmCleaning, setFcmCleaning] = useState(false)
+  const [fcmCleanupResult, setFcmCleanupResult] = useState<{ success: boolean; message: string; cleanedCount?: number; totalTokens?: number; validCount?: number } | null>(null)
+  const [fcmSendUserId, setFcmSendUserId] = useState('')
+  const [fcmSendTitle, setFcmSendTitle] = useState('')
+  const [fcmSendMessage, setFcmSendMessage] = useState('')
+  const [fcmSending, setFcmSending] = useState(false)
+  const [showFcmSendForm, setShowFcmSendForm] = useState(false)
+  const [showFcmTokens, setShowFcmTokens] = useState(false)
 
   // Header tap: 10 taps → show PIN pad
   const handleHeaderTap = useCallback(() => {
@@ -98,6 +137,8 @@ export default function SecretRecoveryPanel({ currentProjectId }: { currentProje
       if (data.success) {
         setStep('main')
         fetchStatus()
+        // Auto-load FCM status
+        fetchFcmStatus()
       } else {
         setPinError(true)
         setPinShake(true)
@@ -287,12 +328,146 @@ export default function SecretRecoveryPanel({ currentProjectId }: { currentProje
     }
   }
 
+  // ===== FCM Functions =====
+
+  const fetchFcmStatus = async () => {
+    setFcmLoading(true)
+    setFcmDiagnostics(null)
+    setFcmTestResult(null)
+    setFcmCleanupResult(null)
+    try {
+      const res = await fetch('/api/emergency/secret-recovery', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'fcm-status',
+          serviceAccountKey: serviceAccountKey.trim() || undefined,
+        }),
+      })
+      const data = await res.json()
+      if (data.success) {
+        setFcmDiagnostics(data.diagnostics)
+      } else {
+        setFcmDiagnostics({ error: data.message })
+      }
+    } catch {
+      setFcmDiagnostics({ error: 'خطأ في الاتصال' })
+    } finally {
+      setFcmLoading(false)
+    }
+  }
+
+  const handleFcmTest = async () => {
+    setFcmTesting(true)
+    setFcmTestResult(null)
+    try {
+      const res = await fetch('/api/emergency/secret-recovery', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'fcm-test',
+          serviceAccountKey: serviceAccountKey.trim() || undefined,
+          userId: fcmSendUserId.trim() || undefined,
+        }),
+      })
+      const data = await res.json()
+      setFcmTestResult(data)
+      if (data.success) {
+        toast.success(data.message)
+      } else {
+        toast.error(data.message)
+      }
+    } catch {
+      setFcmTestResult({ success: false, message: 'خطأ في الاتصال' })
+    } finally {
+      setFcmTesting(false)
+    }
+  }
+
+  const handleFcmCleanup = async () => {
+    setFcmCleaning(true)
+    setFcmCleanupResult(null)
+    try {
+      const res = await fetch('/api/emergency/secret-recovery', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'fcm-cleanup',
+          serviceAccountKey: serviceAccountKey.trim() || undefined,
+        }),
+      })
+      const data = await res.json()
+      setFcmCleanupResult(data)
+      if (data.success) {
+        toast.success(data.message)
+        // Refresh FCM status after cleanup
+        fetchFcmStatus()
+      } else {
+        toast.error(data.message)
+      }
+    } catch {
+      setFcmCleanupResult({ success: false, message: 'خطأ في الاتصال' })
+    } finally {
+      setFcmCleaning(false)
+    }
+  }
+
+  const handleFcmSend = async () => {
+    if (!fcmSendUserId.trim()) {
+      toast.error('أدخل معرف المستخدم')
+      return
+    }
+    if (!fcmSendMessage.trim()) {
+      toast.error('أدخل نص الإشعار')
+      return
+    }
+
+    setFcmSending(true)
+    try {
+      const res = await fetch('/api/emergency/secret-recovery', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'fcm-send',
+          serviceAccountKey: serviceAccountKey.trim() || undefined,
+          userId: fcmSendUserId.trim(),
+          title: fcmSendTitle.trim() || 'إشعار جديد',
+          message: fcmSendMessage.trim(),
+          fcmType: 'info',
+        }),
+      })
+      const data = await res.json()
+      if (data.success) {
+        toast.success(data.message)
+        setFcmSendUserId('')
+        setFcmSendTitle('')
+        setFcmSendMessage('')
+        setShowFcmSendForm(false)
+      } else {
+        toast.error(data.message)
+      }
+    } catch {
+      toast.error('خطأ في الاتصال')
+    } finally {
+      setFcmSending(false)
+    }
+  }
+
   const handleClose = () => {
     setStep('closed')
     setTapCount(0)
     setShowChangePin(false)
     setCurrentPinInput('')
     setNewPinInput('')
+    setFcmDiagnostics(null)
+    setFcmTestResult(null)
+    setFcmCleanupResult(null)
+    setActiveTab('database')
+    setFcmSendUserId('')
+    setFcmSendTitle('')
+    setFcmSendMessage('')
+    setShowFcmSendForm(false)
+    setShowFcmTokens(false)
   }
 
   const isValidEmail = (e: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e)
@@ -404,7 +579,7 @@ export default function SecretRecoveryPanel({ currentProjectId }: { currentProje
             <div className="flex items-center justify-between p-4 border-b border-white/10">
               <div className="flex items-center gap-2">
                 <Database className="w-5 h-5 text-amber-400" />
-                <h3 className="text-sm font-bold text-amber-400">🔒 استعادة قاعدة البيانات</h3>
+                <h3 className="text-sm font-bold text-amber-400">🔒 لوحة التحكم السرية</h3>
               </div>
               <button onClick={handleClose}
                 className="w-8 h-8 rounded-lg bg-white/5 hover:bg-white/10 flex items-center justify-center">
@@ -412,210 +587,503 @@ export default function SecretRecoveryPanel({ currentProjectId }: { currentProje
               </button>
             </div>
 
-            <div className="p-4 space-y-4 max-h-[70vh] overflow-y-auto">
-              {/* Current Status */}
-              <div className="p-3 rounded-xl bg-white/5 border border-white/10 space-y-2">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs text-muted-foreground">القاعدة الحالية</span>
-                  <span className="text-xs font-mono text-amber-400" dir="ltr">{currentDb}</span>
-                </div>
-              </div>
+            {/* Tab Switcher */}
+            <div className="flex mx-4 gap-1 p-1 rounded-xl bg-white/5">
+              <button
+                onClick={() => setActiveTab('database')}
+                className={`flex-1 py-2 rounded-lg text-xs font-bold flex items-center justify-center gap-1.5 transition-all ${
+                  activeTab === 'database'
+                    ? 'bg-amber-500/20 text-amber-400'
+                    : 'text-muted-foreground hover:text-white hover:bg-white/5'
+                }`}
+              >
+                <Database className="w-3.5 h-3.5" />
+                قاعدة البيانات
+              </button>
+              <button
+                onClick={() => { setActiveTab('fcm'); if (!fcmDiagnostics && !fcmLoading) fetchFcmStatus() }}
+                className={`flex-1 py-2 rounded-lg text-xs font-bold flex items-center justify-center gap-1.5 transition-all ${
+                  activeTab === 'fcm'
+                    ? 'bg-green-500/20 text-green-400'
+                    : 'text-muted-foreground hover:text-white hover:bg-white/5'
+                }`}
+              >
+                <BellRing className="w-3.5 h-3.5" />
+                الإشعارات الصوتية
+              </button>
+            </div>
 
-              {/* Change PIN Button */}
-              {!showChangePin && !testResult?.success && (
-                <button
-                  onClick={() => setShowChangePin(true)}
-                  className="w-full p-3 rounded-xl bg-white/5 border border-white/10 hover:bg-white/10 transition-colors flex items-center justify-center gap-2 text-sm text-muted-foreground hover:text-white"
-                >
-                  <KeyRound className="w-4 h-4" />
-                  تغيير رمز PIN
-                </button>
-              )}
-
-              {/* Change PIN Panel */}
-              {showChangePin && (
-                <div className="p-3 rounded-xl bg-blue-500/5 border border-blue-500/20 space-y-3">
-                  <h4 className="text-xs font-bold text-blue-400 flex items-center gap-1">
-                    <RefreshCw className="w-3 h-3" />
-                    تغيير رمز PIN
-                  </h4>
-                  <div className="space-y-2">
-                    <div className="space-y-1">
-                      <Label className="text-[10px] text-muted-foreground">رمز PIN الحالي</Label>
-                      <Input
-                        type="password"
-                        inputMode="numeric"
-                        maxLength={8}
-                        value={currentPinInput}
-                        onChange={e => setCurrentPinInput(e.target.value.replace(/\D/g, ''))}
-                        placeholder="أدخل PIN الحالي"
-                        dir="ltr"
-                        className="bg-white/5 border border-white/10 h-10 text-sm text-center tracking-widest font-mono rounded-lg"
-                      />
-                    </div>
-                    <div className="space-y-1">
-                      <Label className="text-[10px] text-muted-foreground">رمز PIN الجديد (4 أرقام على الأقل)</Label>
-                      <Input
-                        type="password"
-                        inputMode="numeric"
-                        maxLength={8}
-                        value={newPinInput}
-                        onChange={e => setNewPinInput(e.target.value.replace(/\D/g, ''))}
-                        placeholder="أدخل PIN الجديد"
-                        dir="ltr"
-                        className="bg-white/5 border border-white/10 h-10 text-sm text-center tracking-widest font-mono rounded-lg"
-                      />
-                      {newPinInput.length > 0 && newPinInput.length < 4 && (
-                        <p className="text-[10px] text-red-400">4 أرقام على الأقل</p>
-                      )}
+            <div className="px-4 pb-4 max-h-[65vh] overflow-y-auto space-y-4">
+              {/* =================== DATABASE TAB =================== */}
+              {activeTab === 'database' && (
+                <>
+                  {/* Current Status */}
+                  <div className="p-3 rounded-xl bg-white/5 border border-white/10 space-y-2">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs text-muted-foreground">القاعدة الحالية</span>
+                      <span className="text-xs font-mono text-amber-400" dir="ltr">{currentDb}</span>
                     </div>
                   </div>
-                  <div className="flex gap-2">
-                    <Button
-                      onClick={() => { setShowChangePin(false); setCurrentPinInput(''); setNewPinInput('') }}
-                      variant="outline"
-                      className="flex-1 h-9 text-xs rounded-lg border-white/10 text-muted-foreground hover:text-white hover:bg-white/10"
-                    >
-                      إلغاء
-                    </Button>
-                    <Button
-                      onClick={handleChangePin}
-                      disabled={changingPin || !currentPinInput || currentPinInput.length < 4 || !newPinInput || newPinInput.length < 4}
-                      className="flex-1 h-9 bg-blue-500/20 hover:bg-blue-500/30 text-blue-400 rounded-lg disabled:opacity-40 text-xs font-bold"
-                    >
-                      {changingPin ? <Loader2 className="w-3 h-3 animate-spin" /> : <CheckCircle className="w-3 h-3" />}
-                      <span className="mr-1">{changingPin ? 'جارٍ الحفظ...' : 'حفظ PIN'}</span>
-                    </Button>
-                  </div>
-                  <p className="text-[10px] text-muted-foreground text-center">
-                    سيتم حفظ رمز PIN الجديد بشكل دائم في قاعدة البيانات
-                  </p>
-                </div>
-              )}
 
-              {/* Service Account Key */}
-              <div className="space-y-2">
-                <Label className="text-xs text-muted-foreground flex items-center gap-1">
-                  <KeyRound className="w-3 h-3 text-amber-400" />
-                  مفتاح Service Account (JSON)
-                </Label>
-                <div className="relative">
-                  <textarea
-                    value={serviceAccountKey}
-                    onChange={e => { setServiceAccountKey(e.target.value); setTestResult(null) }}
-                    placeholder='{"type": "service_account", ...}'
-                    dir="ltr"
-                    rows={4}
-                    className="w-full rounded-lg bg-white/5 border border-white/10 p-3 text-xs font-mono resize-none focus:outline-none focus:ring-1 focus:ring-amber-500/50"
-                  />
-                  <button onClick={handlePaste}
-                    className="absolute top-2 left-2 px-2 py-1 rounded-md bg-white/10 hover:bg-white/20 text-[10px] text-amber-400">
-                    لصق
-                  </button>
-                </div>
-              </div>
+                  {/* Change PIN Button */}
+                  {!showChangePin && !testResult?.success && (
+                    <button
+                      onClick={() => setShowChangePin(true)}
+                      className="w-full p-3 rounded-xl bg-white/5 border border-white/10 hover:bg-white/10 transition-colors flex items-center justify-center gap-2 text-sm text-muted-foreground hover:text-white"
+                    >
+                      <KeyRound className="w-4 h-4" />
+                      تغيير رمز PIN
+                    </button>
+                  )}
 
-              {/* Test Result */}
-              {testResult && (
-                <div className={`p-3 rounded-lg border ${testResult.success ? 'bg-green-500/5 border-green-500/20' : 'bg-red-500/5 border-red-500/20'}`}>
-                  <div className="flex items-center gap-2">
-                    {testResult.success ? <CheckCircle className="w-4 h-4 text-green-400" /> : <XCircle className="w-4 h-4 text-red-400" />}
-                    <span className={`text-xs font-bold ${testResult.success ? 'text-green-400' : 'text-red-400'}`}>
-                      {testResult.success ? 'اتصال ناجح ✓' : 'فشل ✗'}
-                    </span>
-                  </div>
-                  {testResult.success && (
-                    <div className="mt-2 flex items-center gap-3 text-xs">
-                      <span className="font-mono text-green-400/70" dir="ltr">{testResult.projectId}</span>
-                      <span className="text-muted-foreground">{testResult.totalUsers} مستخدم</span>
+                  {/* Change PIN Panel */}
+                  {showChangePin && (
+                    <div className="p-3 rounded-xl bg-blue-500/5 border border-blue-500/20 space-y-3">
+                      <h4 className="text-xs font-bold text-blue-400 flex items-center gap-1">
+                        <RefreshCw className="w-3 h-3" />
+                        تغيير رمز PIN
+                      </h4>
+                      <div className="space-y-2">
+                        <div className="space-y-1">
+                          <Label className="text-[10px] text-muted-foreground">رمز PIN الحالي</Label>
+                          <Input
+                            type="password"
+                            inputMode="numeric"
+                            maxLength={8}
+                            value={currentPinInput}
+                            onChange={e => setCurrentPinInput(e.target.value.replace(/\D/g, ''))}
+                            placeholder="أدخل PIN الحالي"
+                            dir="ltr"
+                            className="bg-white/5 border border-white/10 h-10 text-sm text-center tracking-widest font-mono rounded-lg"
+                          />
+                        </div>
+                        <div className="space-y-1">
+                          <Label className="text-[10px] text-muted-foreground">رمز PIN الجديد (4 أرقام على الأقل)</Label>
+                          <Input
+                            type="password"
+                            inputMode="numeric"
+                            maxLength={8}
+                            value={newPinInput}
+                            onChange={e => setNewPinInput(e.target.value.replace(/\D/g, ''))}
+                            placeholder="أدخل PIN الجديد"
+                            dir="ltr"
+                            className="bg-white/5 border border-white/10 h-10 text-sm text-center tracking-widest font-mono rounded-lg"
+                          />
+                          {newPinInput.length > 0 && newPinInput.length < 4 && (
+                            <p className="text-[10px] text-red-400">4 أرقام على الأقل</p>
+                          )}
+                        </div>
+                      </div>
+                      <div className="flex gap-2">
+                        <Button
+                          onClick={() => { setShowChangePin(false); setCurrentPinInput(''); setNewPinInput('') }}
+                          variant="outline"
+                          className="flex-1 h-9 text-xs rounded-lg border-white/10 text-muted-foreground hover:text-white hover:bg-white/10"
+                        >
+                          إلغاء
+                        </Button>
+                        <Button
+                          onClick={handleChangePin}
+                          disabled={changingPin || !currentPinInput || currentPinInput.length < 4 || !newPinInput || newPinInput.length < 4}
+                          className="flex-1 h-9 bg-blue-500/20 hover:bg-blue-500/30 text-blue-400 rounded-lg disabled:opacity-40 text-xs font-bold"
+                        >
+                          {changingPin ? <Loader2 className="w-3 h-3 animate-spin" /> : <CheckCircle className="w-3 h-3" />}
+                          <span className="mr-1">{changingPin ? 'جارٍ الحفظ...' : 'حفظ PIN'}</span>
+                        </Button>
+                      </div>
+                      <p className="text-[10px] text-muted-foreground text-center">
+                        سيتم حفظ رمز PIN الجديد بشكل دائم في قاعدة البيانات
+                      </p>
                     </div>
                   )}
-                </div>
+
+                  {/* Service Account Key */}
+                  <div className="space-y-2">
+                    <Label className="text-xs text-muted-foreground flex items-center gap-1">
+                      <KeyRound className="w-3 h-3 text-amber-400" />
+                      مفتاح Service Account (JSON)
+                    </Label>
+                    <div className="relative">
+                      <textarea
+                        value={serviceAccountKey}
+                        onChange={e => { setServiceAccountKey(e.target.value); setTestResult(null) }}
+                        placeholder='{"type": "service_account", ...}'
+                        dir="ltr"
+                        rows={4}
+                        className="w-full rounded-lg bg-white/5 border border-white/10 p-3 text-xs font-mono resize-none focus:outline-none focus:ring-1 focus:ring-amber-500/50"
+                      />
+                      <button onClick={handlePaste}
+                        className="absolute top-2 left-2 px-2 py-1 rounded-md bg-white/10 hover:bg-white/20 text-[10px] text-amber-400">
+                        لصق
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Test Result */}
+                  {testResult && (
+                    <div className={`p-3 rounded-lg border ${testResult.success ? 'bg-green-500/5 border-green-500/20' : 'bg-red-500/5 border-red-500/20'}`}>
+                      <div className="flex items-center gap-2">
+                        {testResult.success ? <CheckCircle className="w-4 h-4 text-green-400" /> : <XCircle className="w-4 h-4 text-red-400" />}
+                        <span className={`text-xs font-bold ${testResult.success ? 'text-green-400' : 'text-red-400'}`}>
+                          {testResult.success ? 'اتصال ناجح ✓' : 'فشل ✗'}
+                        </span>
+                      </div>
+                      {testResult.success && (
+                        <div className="mt-2 flex items-center gap-3 text-xs">
+                          <span className="font-mono text-green-400/70" dir="ltr">{testResult.projectId}</span>
+                          <span className="text-muted-foreground">{testResult.totalUsers} مستخدم</span>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Test Button */}
+                  <Button onClick={handleTest} disabled={testing || !serviceAccountKey.trim()}
+                    className="w-full h-10 bg-white/10 hover:bg-white/20 text-white rounded-lg disabled:opacity-40">
+                    {testing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Link2 className="w-4 h-4" />}
+                    <span className="text-xs font-medium mr-2">{testing ? 'جارٍ الاختبار...' : 'اختبار الاتصال'}</span>
+                  </Button>
+
+                  {/* Admin Credentials */}
+                  {testResult?.success && (
+                    <div className="space-y-3 p-3 rounded-xl bg-amber-500/5 border border-amber-500/20">
+                      <h4 className="text-xs font-bold text-amber-400 flex items-center gap-1">
+                        <AlertTriangle className="w-3 h-3" />
+                        بيانات المسؤول الجديدة
+                      </h4>
+
+                      <div className="space-y-2">
+                        <div className="space-y-1">
+                          <Label className="text-[10px] text-muted-foreground flex items-center gap-1">
+                            <Mail className="w-3 h-3 text-amber-400" />
+                            البريد الإلكتروني <span className="text-red-400">*</span>
+                          </Label>
+                          <Input type="email"
+                            value={adminEmail}
+                            onChange={e => setAdminEmail(e.target.value)}
+                            placeholder="admin@example.com"
+                            dir="ltr"
+                            className="bg-white/5 border border-white/10 h-10 text-sm rounded-lg"
+                          />
+                          {adminEmail && !isValidEmail(adminEmail) && (
+                            <p className="text-[10px] text-red-400">بريد غير صحيح</p>
+                          )}
+                        </div>
+
+                        <div className="space-y-1">
+                          <Label className="text-[10px] text-muted-foreground flex items-center gap-1">
+                            <Lock className="w-3 h-3 text-amber-400" />
+                            كلمة المرور <span className="text-red-400">*</span>
+                          </Label>
+                          <div className="relative">
+                            <Input type={showPassword ? 'text' : 'password'}
+                              value={adminPassword}
+                              onChange={e => setAdminPassword(e.target.value)}
+                              placeholder="6 أحرف على الأقل"
+                              className="bg-white/5 border border-white/10 h-10 text-sm pl-10 rounded-lg"
+                              dir="ltr"
+                            />
+                            <button onClick={() => setShowPassword(!showPassword)}
+                              className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-amber-400">
+                              {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                            </button>
+                          </div>
+                          {adminPassword.length > 0 && adminPassword.length < 6 && (
+                            <p className="text-[10px] text-red-400">6 أحرف على الأقل</p>
+                          )}
+                        </div>
+
+                        {testResult.adminExists && adminEmail && isValidEmail(adminEmail) && (
+                          <div className="p-2 rounded-lg bg-amber-500/10 border border-amber-500/10">
+                            <p className="text-[10px] text-amber-400">⚠️ هذا البريد موجود مسبقاً — سيتم تحديث كلمة المرور فقط</p>
+                          </div>
+                        )}
+                      </div>
+
+                      <Button onClick={handleSave}
+                        disabled={saving || !isValidEmail(adminEmail) || adminPassword.length < 6}
+                        className="w-full h-10 bg-green-500/20 hover:bg-green-500/30 text-green-400 rounded-lg disabled:opacity-40">
+                        {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <ShieldCheck className="w-4 h-4" />}
+                        <span className="text-xs font-bold mr-2">
+                          {saving ? 'جارٍ الحفظ...' : '✅ حفظ وتفعيل القاعدة الجديدة'}
+                        </span>
+                      </Button>
+                    </div>
+                  )}
+
+                  {/* Warning */}
+                  <div className="p-2.5 rounded-lg bg-red-500/5 border border-red-500/10">
+                    <div className="flex items-start gap-2">
+                      <AlertTriangle className="w-3.5 h-3.5 text-red-400 mt-0.5 flex-shrink-0" />
+                      <p className="text-[10px] text-red-400/80 leading-relaxed">
+                        ⚠️ هذه اللوحة سرية — فقط صاحب التطبيق يستطيع الوصول إليها
+                      </p>
+                    </div>
+                  </div>
+                </>
               )}
 
-              {/* Test Button */}
-              <Button onClick={handleTest} disabled={testing || !serviceAccountKey.trim()}
-                className="w-full h-10 bg-white/10 hover:bg-white/20 text-white rounded-lg disabled:opacity-40">
-                {testing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Link2 className="w-4 h-4" />}
-                <span className="text-xs font-medium mr-2">{testing ? 'جارٍ الاختبار...' : 'اختبار الاتصال'}</span>
-              </Button>
+              {/* =================== FCM NOTIFICATIONS TAB =================== */}
+              {activeTab === 'fcm' && (
+                <>
+                  {/* FCM Status Card */}
+                  <div className="p-3 rounded-xl bg-white/5 border border-white/10 space-y-3">
+                    <h4 className="text-xs font-bold text-green-400 flex items-center gap-1.5">
+                      <Wifi className="w-3.5 h-3.5" />
+                      حالة الإشعارات الصوتية
+                    </h4>
 
-              {/* Admin Credentials */}
-              {testResult?.success && (
-                <div className="space-y-3 p-3 rounded-xl bg-amber-500/5 border border-amber-500/20">
-                  <h4 className="text-xs font-bold text-amber-400 flex items-center gap-1">
-                    <AlertTriangle className="w-3 h-3" />
-                    بيانات المسؤول الجديدة
-                  </h4>
-
-                  <div className="space-y-2">
-                    <div className="space-y-1">
-                      <Label className="text-[10px] text-muted-foreground flex items-center gap-1">
-                        <Mail className="w-3 h-3 text-amber-400" />
-                        البريد الإلكتروني <span className="text-red-400">*</span>
-                      </Label>
-                      <Input type="email"
-                        value={adminEmail}
-                        onChange={e => setAdminEmail(e.target.value)}
-                        placeholder="admin@example.com"
-                        dir="ltr"
-                        className="bg-white/5 border border-white/10 h-10 text-sm rounded-lg"
-                      />
-                      {adminEmail && !isValidEmail(adminEmail) && (
-                        <p className="text-[10px] text-red-400">بريد غير صحيح</p>
-                      )}
-                    </div>
-
-                    <div className="space-y-1">
-                      <Label className="text-[10px] text-muted-foreground flex items-center gap-1">
-                        <Lock className="w-3 h-3 text-amber-400" />
-                        كلمة المرور <span className="text-red-400">*</span>
-                      </Label>
-                      <div className="relative">
-                        <Input type={showPassword ? 'text' : 'password'}
-                          value={adminPassword}
-                          onChange={e => setAdminPassword(e.target.value)}
-                          placeholder="6 أحرف على الأقل"
-                          className="bg-white/5 border border-white/10 h-10 text-sm pl-10 rounded-lg"
-                          dir="ltr"
-                        />
-                        <button onClick={() => setShowPassword(!showPassword)}
-                          className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-amber-400">
-                          {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                        </button>
+                    {fcmLoading ? (
+                      <div className="flex items-center justify-center py-4">
+                        <Loader2 className="w-5 h-5 animate-spin text-green-400" />
                       </div>
-                      {adminPassword.length > 0 && adminPassword.length < 6 && (
-                        <p className="text-[10px] text-red-400">6 أحرف على الأقل</p>
-                      )}
-                    </div>
+                    ) : fcmDiagnostics ? (
+                      <div className="space-y-2.5">
+                        {/* Connection Status */}
+                        <div className="flex items-center justify-between">
+                          <span className="text-[11px] text-muted-foreground">اتصال FCM</span>
+                          <span className={`text-[11px] font-bold flex items-center gap-1 ${
+                            fcmDiagnostics.firebaseMessaging?.includes('متصل') ? 'text-green-400' : 'text-red-400'
+                          }`}>
+                            {fcmDiagnostics.firebaseMessaging?.includes('متصل')
+                              ? <><CheckCircle className="w-3 h-3" /> متصل</>
+                              : <><XCircle className="w-3 h-3" /> غير متصل</>
+                            }
+                          </span>
+                        </div>
 
-                    {testResult.adminExists && adminEmail && isValidEmail(adminEmail) && (
-                      <div className="p-2 rounded-lg bg-amber-500/10 border border-amber-500/10">
-                        <p className="text-[10px] text-amber-400">⚠️ هذا البريد موجود مسبقاً — سيتم تحديث كلمة المرور فقط</p>
+                        {/* Project */}
+                        {fcmDiagnostics.projectId && (
+                          <div className="flex items-center justify-between">
+                            <span className="text-[11px] text-muted-foreground">المشروع</span>
+                            <span className="text-[11px] font-mono text-blue-400" dir="ltr">{fcmDiagnostics.projectId}</span>
+                          </div>
+                        )}
+
+                        {/* Token Stats */}
+                        <div className="grid grid-cols-3 gap-2 pt-1">
+                          <div className="text-center p-2 rounded-lg bg-white/5">
+                            <div className="text-lg font-bold text-green-400">{fcmDiagnostics.totalTokens || 0}</div>
+                            <div className="text-[9px] text-muted-foreground">توكنات</div>
+                          </div>
+                          <div className="text-center p-2 rounded-lg bg-white/5">
+                            <div className="text-lg font-bold text-blue-400">{fcmDiagnostics.uniqueUsersWithTokens || 0}</div>
+                            <div className="text-[9px] text-muted-foreground">مستخدمين</div>
+                          </div>
+                          <div className="text-center p-2 rounded-lg bg-white/5">
+                            <div className="text-lg font-bold text-amber-400">{fcmDiagnostics.adminTokenCount || 0}</div>
+                            <div className="text-[9px] text-muted-foreground">أجهزة إدارة</div>
+                          </div>
+                        </div>
+
+                        {/* Tokens List (collapsible) */}
+                        {fcmDiagnostics.tokens && fcmDiagnostics.tokens.length > 0 && (
+                          <div className="space-y-1">
+                            <button
+                              onClick={() => setShowFcmTokens(!showFcmTokens)}
+                              className="flex items-center justify-between w-full text-[10px] text-muted-foreground hover:text-white py-1"
+                            >
+                              <span>الأجهزة المسجلة</span>
+                              {showFcmTokens ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
+                            </button>
+                            {showFcmTokens && (
+                              <div className="space-y-1 max-h-32 overflow-y-auto">
+                                {fcmDiagnostics.tokens.map((t, i) => (
+                                  <div key={i} className="flex items-center justify-between p-1.5 rounded-md bg-white/5 text-[9px]" dir="ltr">
+                                    <div className="flex items-center gap-1.5">
+                                      <Smartphone className="w-3 h-3 text-muted-foreground" />
+                                      <span className="text-muted-foreground font-mono truncate max-w-[150px]">{t.token}</span>
+                                    </div>
+                                    <span className="text-muted-foreground">{t.deviceName || '—'}</span>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        )}
+
+                        {fcmDiagnostics.error && (
+                          <div className="p-2 rounded-lg bg-red-500/5 border border-red-500/10">
+                            <p className="text-[10px] text-red-400">خطأ: {fcmDiagnostics.error}</p>
+                          </div>
+                        )}
+                      </div>
+                    ) : (
+                      <p className="text-xs text-muted-foreground text-center py-2">اضغط تحديث لفحص حالة الإشعارات</p>
+                    )}
+
+                    {/* Refresh Button */}
+                    <Button
+                      onClick={fetchFcmStatus}
+                      disabled={fcmLoading}
+                      className="w-full h-8 bg-white/5 hover:bg-white/10 text-white rounded-lg disabled:opacity-40"
+                    >
+                      {fcmLoading ? <Loader2 className="w-3 h-3 animate-spin" /> : <RefreshCw className="w-3 h-3" />}
+                      <span className="text-[10px] mr-1.5">{fcmLoading ? 'جارٍ الفحص...' : 'تحديث حالة FCM'}</span>
+                    </Button>
+                  </div>
+
+                  {/* Test Notification */}
+                  <div className="p-3 rounded-xl bg-green-500/5 border border-green-500/20 space-y-3">
+                    <h4 className="text-xs font-bold text-green-400 flex items-center gap-1.5">
+                      <Volume2 className="w-3.5 h-3.5" />
+                      اختبار التنبيه الصوتي
+                    </h4>
+                    <p className="text-[10px] text-muted-foreground leading-relaxed">
+                      إرسال إشعار اختباري صوتي لجميع الأجهزة المسجلة للتأكد من عمل التنبيهات بشكل صحيح بعد تغيير قاعدة البيانات.
+                    </p>
+
+                    {/* FCM Test Result */}
+                    {fcmTestResult && (
+                      <div className={`p-2.5 rounded-lg border ${
+                        fcmTestResult.success
+                          ? 'bg-green-500/10 border-green-500/20'
+                          : 'bg-red-500/10 border-red-500/20'
+                      }`}>
+                        <div className="flex items-center gap-1.5">
+                          {fcmTestResult.success
+                            ? <CheckCircle className="w-3.5 h-3.5 text-green-400" />
+                            : <XCircle className="w-3.5 h-3.5 text-red-400" />
+                          }
+                          <span className={`text-[11px] font-bold ${
+                            fcmTestResult.success ? 'text-green-400' : 'text-red-400'
+                          }`}>
+                            {fcmTestResult.message}
+                          </span>
+                        </div>
+                        {fcmTestResult.successCount !== undefined && (
+                          <div className="mt-1.5 flex gap-3 text-[10px] text-muted-foreground">
+                            <span>✓ {fcmTestResult.successCount} تم</span>
+                            {fcmTestResult.failureCount > 0 && (
+                              <span>✗ {fcmTestResult.failureCount} فشل</span>
+                            )}
+                          </div>
+                        )}
+                        {/* Show errors if any */}
+                        {fcmTestResult.errors && fcmTestResult.errors.length > 0 && (
+                          <div className="mt-2 space-y-1 max-h-24 overflow-y-auto">
+                            {fcmTestResult.errors.map((err, i) => (
+                              <div key={i} className="text-[9px] text-red-400/80 font-mono" dir="ltr">
+                                {err.code}: {err.message?.substring(0, 60)}
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    <Button
+                      onClick={handleFcmTest}
+                      disabled={fcmTesting || !fcmDiagnostics}
+                      className="w-full h-10 bg-green-500/20 hover:bg-green-500/30 text-green-400 rounded-lg disabled:opacity-40"
+                    >
+                      {fcmTesting ? <Loader2 className="w-4 h-4 animate-spin" /> : <BellRing className="w-4 h-4" />}
+                      <span className="text-xs font-bold mr-2">{fcmTesting ? 'جارٍ الإرسال...' : '🔔 إرسال إشعار اختباري صوتي'}</span>
+                    </Button>
+                  </div>
+
+                  {/* Cleanup Invalid Tokens */}
+                  {fcmDiagnostics && fcmDiagnostics.totalTokens > 0 && (
+                    <div className="p-3 rounded-xl bg-white/5 border border-white/10 space-y-2">
+                      <h4 className="text-xs font-bold text-orange-400 flex items-center gap-1.5">
+                        <Trash2 className="w-3.5 h-3.5" />
+                        تنظيف التوكنات القديمة
+                      </h4>
+                      <p className="text-[10px] text-muted-foreground leading-relaxed">
+                        عند تغيير قاعدة بيانات Firebase، التوكنات القديمة من المشروع السابق تصبح غير صالحة. هذا الزر يزيلها تلقائياً.
+                      </p>
+
+                      {fcmCleanupResult && (
+                        <div className={`p-2 rounded-lg ${
+                          fcmCleanupResult.success ? 'bg-green-500/10' : 'bg-red-500/10'
+                        }`}>
+                          <span className={`text-[10px] ${fcmCleanupResult.success ? 'text-green-400' : 'text-red-400'}`}>
+                            {fcmCleanupResult.message}
+                          </span>
+                        </div>
+                      )}
+
+                      <Button
+                        onClick={handleFcmCleanup}
+                        disabled={fcmCleaning}
+                        variant="outline"
+                        className="w-full h-8 border-orange-500/20 text-orange-400 hover:bg-orange-500/10 hover:text-orange-300 rounded-lg disabled:opacity-40"
+                      >
+                        {fcmCleaning ? <Loader2 className="w-3 h-3 animate-spin" /> : <Trash2 className="w-3 h-3" />}
+                        <span className="text-[10px] mr-1.5">{fcmCleaning ? 'جارٍ التنظيف...' : 'تنظيف التوكنات غير الصالحة'}</span>
+                      </Button>
+                    </div>
+                  )}
+
+                  {/* Send Custom Notification */}
+                  <div className="p-3 rounded-xl bg-white/5 border border-white/10 space-y-2">
+                    <button
+                      onClick={() => setShowFcmSendForm(!showFcmSendForm)}
+                      className="w-full flex items-center justify-between"
+                    >
+                      <h4 className="text-xs font-bold text-blue-400 flex items-center gap-1.5">
+                        <Send className="w-3.5 h-3.5" />
+                        إرسال إشعار مخصص
+                      </h4>
+                      {showFcmSendForm ? <ChevronUp className="w-3.5 h-3.5 text-muted-foreground" /> : <ChevronDown className="w-3.5 h-3.5 text-muted-foreground" />}
+                    </button>
+
+                    {showFcmSendForm && (
+                      <div className="space-y-2 pt-1">
+                        <div className="space-y-1">
+                          <Label className="text-[10px] text-muted-foreground">معرف المستخدم (userId)</Label>
+                          <Input
+                            value={fcmSendUserId}
+                            onChange={e => setFcmSendUserId(e.target.value)}
+                            placeholder="admin_xxxx أو أي معرف مستخدم"
+                            dir="ltr"
+                            className="bg-white/5 border border-white/10 h-9 text-xs rounded-lg font-mono"
+                          />
+                        </div>
+                        <div className="space-y-1">
+                          <Label className="text-[10px] text-muted-foreground">عنوان الإشعار (اختياري)</Label>
+                          <Input
+                            value={fcmSendTitle}
+                            onChange={e => setFcmSendTitle(e.target.value)}
+                            placeholder="عنوان الإشعار"
+                            className="bg-white/5 border border-white/10 h-9 text-xs rounded-lg"
+                          />
+                        </div>
+                        <div className="space-y-1">
+                          <Label className="text-[10px] text-muted-foreground">نص الإشعار</Label>
+                          <textarea
+                            value={fcmSendMessage}
+                            onChange={e => setFcmSendMessage(e.target.value)}
+                            placeholder="اكتب نص الإشعار هنا..."
+                            rows={2}
+                            className="w-full rounded-lg bg-white/5 border border-white/10 p-2.5 text-xs resize-none focus:outline-none focus:ring-1 focus:ring-blue-500/50"
+                          />
+                        </div>
+                        <Button
+                          onClick={handleFcmSend}
+                          disabled={fcmSending || !fcmSendUserId.trim() || !fcmSendMessage.trim()}
+                          className="w-full h-9 bg-blue-500/20 hover:bg-blue-500/30 text-blue-400 rounded-lg disabled:opacity-40"
+                        >
+                          {fcmSending ? <Loader2 className="w-3 h-3 animate-spin" /> : <Send className="w-3 h-3" />}
+                          <span className="text-[10px] font-bold mr-1.5">{fcmSending ? 'جارٍ الإرسال...' : 'إرسال الإشعار'}</span>
+                        </Button>
                       </div>
                     )}
                   </div>
 
-                  <Button onClick={handleSave}
-                    disabled={saving || !isValidEmail(adminEmail) || adminPassword.length < 6}
-                    className="w-full h-10 bg-green-500/20 hover:bg-green-500/30 text-green-400 rounded-lg disabled:opacity-40">
-                    {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <ShieldCheck className="w-4 h-4" />}
-                    <span className="text-xs font-bold mr-2">
-                      {saving ? 'جارٍ الحفظ...' : '✅ حفظ وتفعيل القاعدة الجديدة'}
-                    </span>
-                  </Button>
-                </div>
+                  {/* FCM Info Note */}
+                  <div className="p-2.5 rounded-lg bg-blue-500/5 border border-blue-500/10">
+                    <div className="flex items-start gap-2">
+                      <Bell className="w-3.5 h-3.5 text-blue-400 mt-0.5 flex-shrink-0" />
+                      <div className="text-[10px] text-blue-400/80 leading-relaxed space-y-1">
+                        <p>📡 الإشعارات تعمل عبر نفس مفتاح Service Account — عند تغيير قاعدة البيانات، يمكنك اختبار الإشعارات من هنا للتأكد من عملها.</p>
+                        <p>📱 بعد تغيير المشروع، يجب على المستخدمين فتح التطبيق مجدداً لتسجيل أجهزتهم في المشروع الجديد.</p>
+                        <p>🗑️ استخدم &quot;تنظيف التوكنات&quot; لإزالة الأجهزة القديمة من المشروع السابق.</p>
+                      </div>
+                    </div>
+                  </div>
+                </>
               )}
-
-              {/* Warning */}
-              <div className="p-2.5 rounded-lg bg-red-500/5 border border-red-500/10">
-                <div className="flex items-start gap-2">
-                  <AlertTriangle className="w-3.5 h-3.5 text-red-400 mt-0.5 flex-shrink-0" />
-                  <p className="text-[10px] text-red-400/80 leading-relaxed">
-                    ⚠️ هذه اللوحة سرية — فقط صاحب التطبيق يستطيع الوصول إليها
-                  </p>
-                </div>
-              </div>
             </div>
           </div>
         </div>
