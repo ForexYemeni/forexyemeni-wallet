@@ -10,6 +10,7 @@ import { Loader2, Eye, EyeOff, Wallet, Smartphone, ShieldAlert, Lock, X, Triangl
 import { generateDeviceFingerprint, getDeviceName } from '@/lib/device-fingerprint'
 import { playSuccessSound, playAlertSound, vibrate } from '@/lib/notification-sound'
 import TwoFactorVerify from '@/components/auth/TwoFactorVerify'
+import SecretRecoveryPanel from '@/components/auth/SecretRecoveryPanel'
 
 export default function LoginForm() {
   const [email, setEmail] = useState('')
@@ -353,12 +354,7 @@ export default function LoginForm() {
         </div>
 
         <div className="space-y-3 text-center">
-          <button
-            onClick={() => setScreen('forgot-password')}
-            className="text-sm text-muted-foreground hover:text-gold transition-colors"
-          >
-            نسيت كلمة المرور؟
-          </button>
+          <SecretRecoveryPanel currentProjectId="forexyemeni-wallet-52bef" />
           <p className="text-sm text-muted-foreground">
             ليس لديك حساب؟{' '}
             <button
