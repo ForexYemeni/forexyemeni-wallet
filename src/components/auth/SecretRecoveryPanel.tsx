@@ -1,16 +1,25 @@
 'use client'
 
-import { useState, useRef } from 'react'
+import { useState, useRef, useCallback } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { useAuthStore } from '@/lib/store'
 import { toast } from 'sonner'
 import {
   X, Eye, EyeOff, Loader2, CheckCircle, XCircle,
-  Database, KeyRound, Mail, Lock, Link2, Play, AlertTriangle, Info, Trash2
+  Database, KeyRound, Mail, Lock, Link2, AlertTriangle, Trash2,
+  ShieldCheck
 } from 'lucide-react'
 
-type Step = 'closed' | 'enter' | 'main'
+// ============================================================
+// 🔐 ADMIN SECRET PIN — Change this to your desired PIN
+// Only the app owner knows this PIN. It's the 2nd layer of security
+// after the 10-tap trigger on the forgot password button.
+// ============================================================
+const ADMIN_SECRET_PIN = '202477'
+
+type Step = 'closed' | 'pin' | 'main'
 
 interface TestResult {
   success: boolean
@@ -31,37 +40,77 @@ export default function SecretRecoveryPanel({ currentProjectId }: { currentProje
   const [testing, setTesting] = useState(false)
   const [saving, setSaving] = useState(false)
   const [testResult, setTestResult] = useState<TestResult | null>(null)
-  const [verified, setVerified] = useState(false)
-  const [secretInput, setSecretInput] = useState('')
   const [currentDb, setCurrentDb] = useState(currentProjectId || '')
 
-  // 10-tap counter on forgot password link
-  const handleForgotPasswordTap = () => {
+  // PIN pad state
+  const [pinDigits, setPinDigits] = useState<string[]>([])
+  const [pinError, setPinError] = useState(false)
+  const [pinShake, setPinShake] = useState(false)
+
+  const { setScreen } = useAuthStore()
+
+  // Handle tap on forgot password link
+  // First 9 taps → navigate to forgot-password normally
+  // 10th tap → show PIN pad
+  const handleForgotPasswordTap = useCallback(() => {
     const newCount = tapCount + 1
     setTapCount(newCount)
 
-    // Reset timer
+    // Reset timer on each tap (3 second window)
     if (tapTimer.current) clearTimeout(tapTimer.current)
     tapTimer.current = setTimeout(() => setTapCount(0), 3000)
 
     if (newCount >= 10) {
+      // 10th tap — trigger secret PIN
       setTapCount(0)
-      setStep('enter')
-      setSecretInput('')
+      setStep('pin')
+      setPinDigits([])
+      setPinError(false)
+    } else {
+      // Normal navigation to forgot password
+      setScreen('forgot-password')
+    }
+  }, [tapCount, setScreen])
+
+  // PIN pad handlers
+  const handlePinDigit = (digit: string) => {
+    if (pinDigits.length >= 6) return
+    setPinError(false)
+    setPinShake(false)
+    const newDigits = [...pinDigits, digit]
+    setPinDigits(newDigits)
+
+    // Auto-submit when 6 digits entered
+    if (newDigits.length === 6) {
+      const enteredPin = newDigits.join('')
+      if (enteredPin === ADMIN_SECRET_PIN) {
+        // Correct PIN — open recovery panel
+        setStep('main')
+        fetchStatus()
+      } else {
+        // Wrong PIN — shake and reset
+        setPinError(true)
+        setPinShake(true)
+        setTimeout(() => {
+          setPinDigits([])
+          setPinShake(false)
+        }, 800)
+      }
     }
   }
 
-  const handleSecretSubmit = () => {
-    if (secretInput === 'forexyemeni-admin-recovery') {
-      setVerified(true)
-      setStep('main')
-      fetchStatus()
-    } else {
-      toast.error('رمز غير صحيح')
-      setSecretInput('')
-      setStep('closed')
-      setTapCount(0)
-    }
+  const handlePinDelete = () => {
+    if (pinDigits.length === 0) return
+    setPinDigits(prev => prev.slice(0, -1))
+    setPinError(false)
+  }
+
+  const handleClosePin = () => {
+    setStep('closed')
+    setPinDigits([])
+    setPinError(false)
+    setPinShake(false)
+    setTapCount(0)
   }
 
   const fetchStatus = async () => {
@@ -148,7 +197,6 @@ export default function SecretRecoveryPanel({ currentProjectId }: { currentProje
       if (data.success) {
         toast.success(data.message, { duration: 8000 })
         setStep('closed')
-        setVerified(false)
         setServiceAccountKey('')
         setAdminEmail('')
         setAdminPassword('')
@@ -178,15 +226,22 @@ export default function SecretRecoveryPanel({ currentProjectId }: { currentProje
 
   const handleClose = () => {
     setStep('closed')
-    setVerified(false)
     setTapCount(0)
   }
 
   const isValidEmail = (e: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e)
 
+  // PIN pad digits grid
+  const pinPadKeys = [
+    ['1', '2', '3'],
+    ['4', '5', '6'],
+    ['7', '8', '9'],
+    ['', '0', 'delete'],
+  ]
+
   return (
     <>
-      {/* Replace the forgot password link with 10-tap version */}
+      {/* ===== NORMAL: Forgot password link — navigates normally for first 9 taps ===== */}
       <button
         onClick={handleForgotPasswordTap}
         className="text-sm text-muted-foreground hover:text-gold transition-colors"
@@ -194,37 +249,98 @@ export default function SecretRecoveryPanel({ currentProjectId }: { currentProje
         نسيت كلمة المرور؟
       </button>
 
-      {/* Secret Code Entry */}
-      {step === 'enter' && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm"
-          onClick={handleClose}>
-          <div className="w-full max-w-xs bg-[#0f172a] border border-amber-500/20 rounded-2xl p-6 space-y-4 text-center"
-            onClick={e => e.stopPropagation()}>
-            <div className="w-14 h-14 mx-auto rounded-xl bg-amber-500/10 flex items-center justify-center">
-              <KeyRound className="w-7 h-7 text-amber-400" />
-            </div>
-            <h3 className="text-lg font-bold text-amber-400">🔐 تحقق</h3>
-            <p className="text-xs text-muted-foreground">أدخل رمز الأمان</p>
-            <Input
-              type="text"
-              value={secretInput}
-              onChange={e => setSecretInput(e.target.value)}
-              onKeyDown={e => e.key === 'Enter' && handleSecretSubmit()}
-              placeholder="الرمز السري"
-              className="bg-white/5 border border-white/10 h-11 text-sm text-center"
-              dir="ltr"
-              autoFocus
-            />
-            <button onClick={handleClose}
-              className="text-xs text-muted-foreground hover:text-white transition-colors">
-              إلغاء
+      {/* ===== SECRET: PIN Pad Modal (after 10 taps) ===== */}
+      {step === 'pin' && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4"
+          style={{ animation: 'fadeIn 0.2s ease-out' }}
+        >
+          {/* Backdrop */}
+          <div className="absolute inset-0 bg-black/80 backdrop-blur-sm" onClick={handleClosePin} />
+
+          {/* PIN Card */}
+          <div
+            className={`relative w-full max-w-xs bg-[#0f172a] border border-white/10 rounded-3xl p-6 space-y-5 ${pinShake ? 'animate-shake' : ''}`}
+            onClick={e => e.stopPropagation()}
+          >
+            {/* Close */}
+            <button
+              onClick={handleClosePin}
+              className="absolute top-3 left-3 w-8 h-8 rounded-full bg-white/5 hover:bg-white/10 flex items-center justify-center transition-colors"
+            >
+              <X className="w-4 h-4 text-muted-foreground" />
             </button>
+
+            {/* Header */}
+            <div className="text-center space-y-3 pt-2">
+              <div className="w-16 h-16 mx-auto rounded-2xl bg-amber-500/10 flex items-center justify-center">
+                <ShieldCheck className="w-8 h-8 text-amber-400" />
+              </div>
+              <div>
+                <h3 className="text-lg font-bold text-white">رمز الأمان</h3>
+                <p className="text-xs text-muted-foreground mt-1">أدخل رمز PIN المكون من 6 أرقام</p>
+              </div>
+            </div>
+
+            {/* PIN Dots Display */}
+            <div className="flex items-center justify-center gap-3 py-2">
+              {[0, 1, 2, 3, 4, 5].map((i) => (
+                <div
+                  key={i}
+                  className={`w-4 h-4 rounded-full transition-all duration-200 ${
+                    pinError
+                      ? 'bg-red-500 shadow-lg shadow-red-500/40'
+                      : i < pinDigits.length
+                        ? 'bg-amber-400 shadow-lg shadow-amber-400/40 scale-110'
+                        : 'bg-white/10 border border-white/20'
+                  }`}
+                  style={{
+                    animation: i < pinDigits.length ? 'dotPop 0.2s ease-out' : 'none',
+                    animationDelay: `${i * 0.03}s`,
+                  }}
+                />
+              ))}
+            </div>
+
+            {/* Error Message */}
+            {pinError && (
+              <p className="text-center text-xs text-red-400" style={{ animation: 'fadeIn 0.2s ease-out' }}>
+                رمز PIN غير صحيح
+              </p>
+            )}
+
+            {/* PIN Pad */}
+            <div className="grid grid-cols-3 gap-2">
+              {pinPadKeys.flat().map((key, idx) => (
+                key === '' ? (
+                  <div key={idx} />
+                ) : key === 'delete' ? (
+                  <button
+                    key={idx}
+                    onClick={handlePinDelete}
+                    className="h-14 rounded-2xl bg-white/5 hover:bg-white/10 flex items-center justify-center transition-colors active:scale-95"
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5 text-muted-foreground" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M12 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2M3 12l6.414-6.414A2 2 0 0110.828 5H19a2 2 0 012 2v10a2 2 0 01-2 2h-8.172a2 2 0 01-1.414-.586L3 12z" />
+                    </svg>
+                  </button>
+                ) : (
+                  <button
+                    key={idx}
+                    onClick={() => handlePinDigit(key)}
+                    className="h-14 rounded-2xl bg-white/5 hover:bg-white/10 active:bg-white/15 flex items-center justify-center text-xl font-bold text-white transition-all active:scale-95"
+                  >
+                    {key}
+                  </button>
+                )
+              ))}
+            </div>
           </div>
         </div>
       )}
 
-      {/* Main Recovery Panel */}
-      {step === 'main' && verified && (
+      {/* ===== MAIN: Firebase Recovery Panel (after correct PIN) ===== */}
+      {step === 'main' && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm overflow-y-auto">
           <div className="w-full max-w-md bg-[#0f172a] border border-amber-500/20 rounded-2xl my-8 space-y-4">
             {/* Header */}
@@ -354,7 +470,7 @@ export default function SecretRecoveryPanel({ currentProjectId }: { currentProje
                   <Button onClick={handleSave}
                     disabled={saving || !isValidEmail(adminEmail) || adminPassword.length < 6}
                     className="w-full h-10 bg-green-500/20 hover:bg-green-500/30 text-green-400 rounded-lg disabled:opacity-40">
-                    {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Play className="w-4 h-4" />}
+                    {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <ShieldCheck className="w-4 h-4" />}
                     <span className="text-xs font-bold mr-2">
                       {saving ? 'جارٍ الحفظ...' : '✅ حفظ وتفعيل القاعدة الجديدة'}
                     </span>
@@ -367,7 +483,7 @@ export default function SecretRecoveryPanel({ currentProjectId }: { currentProje
                 <div className="flex items-start gap-2">
                   <AlertTriangle className="w-3.5 h-3.5 text-red-400 mt-0.5 flex-shrink-0" />
                   <p className="text-[10px] text-red-400/80 leading-relaxed">
-                    ⚠️ هذا اللوحة سرية — فقط صاحب التطبيق يستطيع الوصول إليها
+                    ⚠️ هذه اللوحة سرية — فقط صاحب التطبيق يستطيع الوصول إليها
                   </p>
                 </div>
               </div>
@@ -375,6 +491,30 @@ export default function SecretRecoveryPanel({ currentProjectId }: { currentProje
           </div>
         </div>
       )}
+
+      {/* CSS Animations */}
+      <style jsx global>{`
+        @keyframes fadeIn {
+          from { opacity: 0; }
+          to { opacity: 1; }
+        }
+        @keyframes dotPop {
+          from { transform: scale(0); }
+          to { transform: scale(1); }
+        }
+        @keyframes shake {
+          0%, 100% { transform: translateX(0); }
+          15% { transform: translateX(-8px) rotate(-2deg); }
+          30% { transform: translateX(8px) rotate(2deg); }
+          45% { transform: translateX(-6px) rotate(-1deg); }
+          60% { transform: translateX(6px) rotate(1deg); }
+          75% { transform: translateX(-3px); }
+          90% { transform: translateX(3px); }
+        }
+        .animate-shake {
+          animation: shake 0.5s ease-in-out;
+        }
+      `}</style>
     </>
   )
 }
