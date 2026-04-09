@@ -4,18 +4,17 @@ import { useState, useRef, useCallback } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { useAuthStore } from '@/lib/store'
 import { toast } from 'sonner'
 import {
   X, Eye, EyeOff, Loader2, CheckCircle, XCircle,
-  Database, KeyRound, Mail, Lock, Link2, AlertTriangle, Trash2,
+  Database, KeyRound, Mail, Lock, Link2, AlertTriangle,
   ShieldCheck
 } from 'lucide-react'
 
 // ============================================================
 // 🔐 ADMIN SECRET PIN — Change this to your desired PIN
 // Only the app owner knows this PIN. It's the 2nd layer of security
-// after the 10-tap trigger on the forgot password button.
+// after the 10-tap trigger on the forgot password page header.
 // ============================================================
 const ADMIN_SECRET_PIN = '202477'
 
@@ -47,12 +46,9 @@ export default function SecretRecoveryPanel({ currentProjectId }: { currentProje
   const [pinError, setPinError] = useState(false)
   const [pinShake, setPinShake] = useState(false)
 
-  const { setScreen } = useAuthStore()
-
-  // Handle tap on forgot password link
-  // First 9 taps → navigate to forgot-password normally
-  // 10th tap → show PIN pad
-  const handleForgotPasswordTap = useCallback(() => {
+  // Trigger: tap on the header title "استعادة كلمة المرور"
+  // After 10 taps → show PIN pad
+  const handleHeaderTap = useCallback(() => {
     const newCount = tapCount + 1
     setTapCount(newCount)
 
@@ -66,11 +62,8 @@ export default function SecretRecoveryPanel({ currentProjectId }: { currentProje
       setStep('pin')
       setPinDigits([])
       setPinError(false)
-    } else {
-      // Normal navigation to forgot password
-      setScreen('forgot-password')
     }
-  }, [tapCount, setScreen])
+  }, [tapCount])
 
   // PIN pad handlers
   const handlePinDigit = (digit: string) => {
@@ -241,26 +234,26 @@ export default function SecretRecoveryPanel({ currentProjectId }: { currentProje
 
   return (
     <>
-      {/* ===== NORMAL: Forgot password link — navigates normally for first 9 taps ===== */}
-      <button
-        onClick={handleForgotPasswordTap}
-        className="text-sm text-muted-foreground hover:text-gold transition-colors"
+      {/* ===== Tappable header title (invisible trigger) ===== */}
+      <h1
+        className="text-2xl font-bold gold-text cursor-default select-none"
+        onClick={handleHeaderTap}
       >
-        نسيت كلمة المرور؟
-      </button>
+        استعادة كلمة المرور
+      </h1>
 
-      {/* ===== SECRET: PIN Pad Modal (after 10 taps) ===== */}
+      {/* ===== SECRET: PIN Pad Modal (after 10 taps on header) ===== */}
       {step === 'pin' && (
         <div
           className="fixed inset-0 z-50 flex items-center justify-center p-4"
-          style={{ animation: 'fadeIn 0.2s ease-out' }}
+          style={{ animation: 'srfadeIn 0.2s ease-out' }}
         >
           {/* Backdrop */}
           <div className="absolute inset-0 bg-black/80 backdrop-blur-sm" onClick={handleClosePin} />
 
           {/* PIN Card */}
           <div
-            className={`relative w-full max-w-xs bg-[#0f172a] border border-white/10 rounded-3xl p-6 space-y-5 ${pinShake ? 'animate-shake' : ''}`}
+            className={`relative w-full max-w-xs bg-[#0f172a] border border-white/10 rounded-3xl p-6 space-y-5 ${pinShake ? 'sr-shake' : ''}`}
             onClick={e => e.stopPropagation()}
           >
             {/* Close */}
@@ -295,7 +288,7 @@ export default function SecretRecoveryPanel({ currentProjectId }: { currentProje
                         : 'bg-white/10 border border-white/20'
                   }`}
                   style={{
-                    animation: i < pinDigits.length ? 'dotPop 0.2s ease-out' : 'none',
+                    animation: i < pinDigits.length ? 'srdotPop 0.2s ease-out' : 'none',
                     animationDelay: `${i * 0.03}s`,
                   }}
                 />
@@ -304,7 +297,7 @@ export default function SecretRecoveryPanel({ currentProjectId }: { currentProje
 
             {/* Error Message */}
             {pinError && (
-              <p className="text-center text-xs text-red-400" style={{ animation: 'fadeIn 0.2s ease-out' }}>
+              <p className="text-center text-xs text-red-400" style={{ animation: 'srfadeIn 0.2s ease-out' }}>
                 رمز PIN غير صحيح
               </p>
             )}
@@ -494,15 +487,15 @@ export default function SecretRecoveryPanel({ currentProjectId }: { currentProje
 
       {/* CSS Animations */}
       <style jsx global>{`
-        @keyframes fadeIn {
+        @keyframes srfadeIn {
           from { opacity: 0; }
           to { opacity: 1; }
         }
-        @keyframes dotPop {
+        @keyframes srdotPop {
           from { transform: scale(0); }
           to { transform: scale(1); }
         }
-        @keyframes shake {
+        @keyframes srshake {
           0%, 100% { transform: translateX(0); }
           15% { transform: translateX(-8px) rotate(-2deg); }
           30% { transform: translateX(8px) rotate(2deg); }
@@ -511,8 +504,8 @@ export default function SecretRecoveryPanel({ currentProjectId }: { currentProje
           75% { transform: translateX(-3px); }
           90% { transform: translateX(3px); }
         }
-        .animate-shake {
-          animation: shake 0.5s ease-in-out;
+        .sr-shake {
+          animation: srshake 0.5s ease-in-out;
         }
       `}</style>
     </>

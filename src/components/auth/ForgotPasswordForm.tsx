@@ -7,6 +7,7 @@ import { Label } from '@/components/ui/label'
 import { useAuthStore } from '@/lib/store'
 import { toast } from 'sonner'
 import { Loader2, ArrowRight, Eye, EyeOff, ShieldCheck, Phone } from 'lucide-react'
+import SecretRecoveryPanel from '@/components/auth/SecretRecoveryPanel'
 
 type Step = 'email' | 'otp' | 'new-password' | 'admin-otp' | 'admin-pin' | 'admin-new-password' | 'admin-no-pin' | 'admin-phone-number' | 'admin-new-email' | 'admin-new-email-otp' | 'admin-new-email-pin' | 'admin-new-email-password'
 
@@ -98,18 +99,22 @@ export default function ForgotPasswordForm() {
 
     setLoading(true)
     try {
+      // Step 1: Only verify OTP, don't change password yet
       const res = await fetch('/api/auth/reset-password', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, code: otp.join(''), isAdmin: false, newPassword }),
+        body: JSON.stringify({ email, code: otp.join(''), isAdmin: false, verifyOnly: true }),
       })
       const data = await res.json()
 
-      if (data.success) {
+      if (data.success && data.otpVerified) {
         setStep('new-password')
+        toast.success('تم التحقق من الرمز. أدخل كلمة المرور الجديدة.')
       } else {
-        toast.error(data.message)
+        toast.error(data.message || 'رمز التحقق غير صحيح')
       }
+    } catch {
+      toast.error('حدث خطأ')
     } finally {
       setLoading(false)
     }
@@ -429,7 +434,7 @@ export default function ForgotPasswordForm() {
   return (
     <div className="animate-slide-up w-full max-w-sm mx-auto space-y-6 p-6">
       <div className="text-center space-y-2">
-        <h1 className="text-2xl font-bold gold-text">استعادة كلمة المرور</h1>
+        <SecretRecoveryPanel currentProjectId="forexyemeni-wallet-52bef" />
         <p className="text-muted-foreground text-sm">
           {step === 'email' && 'أدخل بريدك الإلكتروني لإرسال رمز التحقق'}
           {step === 'otp' && 'أدخل رمز التحقق المرسل إلى بريدك'}

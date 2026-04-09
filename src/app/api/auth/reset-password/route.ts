@@ -4,7 +4,8 @@ import bcrypt from 'bcryptjs'
 
 export async function POST(request: NextRequest) {
   try {
-    const { email, code, newPassword, isAdmin, pin, adminNumber, newEmail } = await request.json()
+    const body = await request.json()
+    const { email, code, newPassword, isAdmin, pin, adminNumber, newEmail, verifyOnly } = body
 
     if (!email || !code) {
       return NextResponse.json(
@@ -46,7 +47,17 @@ export async function POST(request: NextRequest) {
       })
     }
 
-    // Normal user: verify OTP and change password directly
+    // Normal user: verify OTP only (verifyOnly) or verify + change password
+    if (body.verifyOnly) {
+      // Only verify OTP, don't change password yet — user enters password on next step
+      await otpCodeOperations.update(otpRecord.id, { verified: true })
+      return NextResponse.json({
+        success: true,
+        otpVerified: true,
+        message: 'تم التحقق من الرمز بنجاح',
+      })
+    }
+
     if (!newPassword) {
       return NextResponse.json(
         { success: false, message: 'كلمة المرور الجديدة مطلوبة' },
