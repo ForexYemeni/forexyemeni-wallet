@@ -8,15 +8,8 @@ import { toast } from 'sonner'
 import {
   X, Eye, EyeOff, Loader2, CheckCircle, XCircle,
   Database, KeyRound, Mail, Lock, Link2, AlertTriangle,
-  ShieldCheck
+  ShieldCheck, RefreshCw
 } from 'lucide-react'
-
-// ============================================================
-// 🔐 ADMIN SECRET PIN — Change this to your desired PIN
-// Only the app owner knows this PIN. It's the 2nd layer of security
-// after the 10-tap trigger on the forgot password page header.
-// ============================================================
-const ADMIN_SECRET_PIN = '202477'
 
 type Step = 'closed' | 'pin' | 'main'
 
@@ -27,6 +20,14 @@ interface TestResult {
   totalUsers?: number
   adminExists?: boolean
 }
+
+// PIN pad keys
+const pinPadKeys = [
+  ['1', '2', '3'],
+  ['4', '5', '6'],
+  ['7', '8', '9'],
+  ['', '0', 'delete'],
+]
 
 export default function SecretRecoveryPanel({ currentProjectId }: { currentProjectId?: string }) {
   const [step, setStep] = useState<Step>('closed')
@@ -45,27 +46,32 @@ export default function SecretRecoveryPanel({ currentProjectId }: { currentProje
   const [pinDigits, setPinDigits] = useState<string[]>([])
   const [pinError, setPinError] = useState(false)
   const [pinShake, setPinShake] = useState(false)
+  const [pinVerifying, setPinVerifying] = useState(false)
 
-  // Trigger: tap on the header title "استعادة كلمة المرور"
-  // After 10 taps → show PIN pad
+  // Change PIN state
+  const [showChangePin, setShowChangePin] = useState(false)
+  const [currentPinInput, setCurrentPinInput] = useState('')
+  const [newPinInput, setNewPinInput] = useState('')
+  const [changingPin, setChangingPin] = useState(false)
+
+  // Header tap: 10 taps → show PIN pad
   const handleHeaderTap = useCallback(() => {
     const newCount = tapCount + 1
     setTapCount(newCount)
 
-    // Reset timer on each tap (3 second window)
     if (tapTimer.current) clearTimeout(tapTimer.current)
     tapTimer.current = setTimeout(() => setTapCount(0), 3000)
 
     if (newCount >= 10) {
-      // 10th tap — trigger secret PIN
       setTapCount(0)
       setStep('pin')
       setPinDigits([])
       setPinError(false)
+      setShowChangePin(false)
     }
   }, [tapCount])
 
-  // PIN pad handlers
+  // PIN digit handler — auto-submit when 6 digits
   const handlePinDigit = (digit: string) => {
     if (pinDigits.length >= 6) return
     setPinError(false)
@@ -73,15 +79,26 @@ export default function SecretRecoveryPanel({ currentProjectId }: { currentProje
     const newDigits = [...pinDigits, digit]
     setPinDigits(newDigits)
 
-    // Auto-submit when 6 digits entered
     if (newDigits.length === 6) {
       const enteredPin = newDigits.join('')
-      if (enteredPin === ADMIN_SECRET_PIN) {
-        // Correct PIN — open recovery panel
+      verifyPin(enteredPin)
+    }
+  }
+
+  const verifyPin = async (pin: string) => {
+    setPinVerifying(true)
+    try {
+      const res = await fetch('/api/emergency/recovery-pin', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'verify', pin }),
+      })
+      const data = await res.json()
+
+      if (data.success) {
         setStep('main')
         fetchStatus()
       } else {
-        // Wrong PIN — shake and reset
         setPinError(true)
         setPinShake(true)
         setTimeout(() => {
@@ -89,6 +106,15 @@ export default function SecretRecoveryPanel({ currentProjectId }: { currentProje
           setPinShake(false)
         }, 800)
       }
+    } catch {
+      setPinError(true)
+      setPinShake(true)
+      setTimeout(() => {
+        setPinDigits([])
+        setPinShake(false)
+      }, 800)
+    } finally {
+      setPinVerifying(false)
     }
   }
 
@@ -104,6 +130,7 @@ export default function SecretRecoveryPanel({ currentProjectId }: { currentProje
     setPinError(false)
     setPinShake(false)
     setTapCount(0)
+    setShowChangePin(false)
   }
 
   const fetchStatus = async () => {
@@ -217,24 +244,62 @@ export default function SecretRecoveryPanel({ currentProjectId }: { currentProje
     }
   }
 
+  // Change PIN handler
+  const handleChangePin = async () => {
+    if (!currentPinInput || currentPinInput.length < 4) {
+      toast.error('أدخل رمز PIN الحالي')
+      return
+    }
+    if (!newPinInput || newPinInput.length < 4) {
+      toast.error('أدخل رمز PIN الجديد (4 أرقام على الأقل)')
+      return
+    }
+    if (!/^\d+$/.test(newPinInput)) {
+      toast.error('رمز PIN يجب أن يكون أرقاماً فقط')
+      return
+    }
+
+    setChangingPin(true)
+    try {
+      const res = await fetch('/api/emergency/recovery-pin', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'change',
+          pin: currentPinInput,
+          newPin: newPinInput,
+        }),
+      })
+      const data = await res.json()
+
+      if (data.success) {
+        toast.success(data.message, { duration: 5000 })
+        setCurrentPinInput('')
+        setNewPinInput('')
+        setShowChangePin(false)
+      } else {
+        toast.error(data.message)
+      }
+    } catch {
+      toast.error('خطأ في الاتصال')
+    } finally {
+      setChangingPin(false)
+    }
+  }
+
   const handleClose = () => {
     setStep('closed')
     setTapCount(0)
+    setShowChangePin(false)
+    setCurrentPinInput('')
+    setNewPinInput('')
   }
 
   const isValidEmail = (e: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e)
 
-  // PIN pad digits grid
-  const pinPadKeys = [
-    ['1', '2', '3'],
-    ['4', '5', '6'],
-    ['7', '8', '9'],
-    ['', '0', 'delete'],
-  ]
-
   return (
     <>
-      {/* ===== Tappable header title (invisible trigger) ===== */}
+      {/* ===== Tappable header title (invisible 10-tap trigger) ===== */}
       <h1
         className="text-2xl font-bold gold-text cursor-default select-none"
         onClick={handleHeaderTap}
@@ -242,21 +307,18 @@ export default function SecretRecoveryPanel({ currentProjectId }: { currentProje
         استعادة كلمة المرور
       </h1>
 
-      {/* ===== SECRET: PIN Pad Modal (after 10 taps on header) ===== */}
+      {/* ===== PIN Pad Modal ===== */}
       {step === 'pin' && (
         <div
           className="fixed inset-0 z-50 flex items-center justify-center p-4"
           style={{ animation: 'srfadeIn 0.2s ease-out' }}
         >
-          {/* Backdrop */}
           <div className="absolute inset-0 bg-black/80 backdrop-blur-sm" onClick={handleClosePin} />
 
-          {/* PIN Card */}
           <div
             className={`relative w-full max-w-xs bg-[#0f172a] border border-white/10 rounded-3xl p-6 space-y-5 ${pinShake ? 'sr-shake' : ''}`}
             onClick={e => e.stopPropagation()}
           >
-            {/* Close */}
             <button
               onClick={handleClosePin}
               className="absolute top-3 left-3 w-8 h-8 rounded-full bg-white/5 hover:bg-white/10 flex items-center justify-center transition-colors"
@@ -264,7 +326,6 @@ export default function SecretRecoveryPanel({ currentProjectId }: { currentProje
               <X className="w-4 h-4 text-muted-foreground" />
             </button>
 
-            {/* Header */}
             <div className="text-center space-y-3 pt-2">
               <div className="w-16 h-16 mx-auto rounded-2xl bg-amber-500/10 flex items-center justify-center">
                 <ShieldCheck className="w-8 h-8 text-amber-400" />
@@ -275,34 +336,35 @@ export default function SecretRecoveryPanel({ currentProjectId }: { currentProje
               </div>
             </div>
 
-            {/* PIN Dots Display */}
+            {/* PIN Dots */}
             <div className="flex items-center justify-center gap-3 py-2">
               {[0, 1, 2, 3, 4, 5].map((i) => (
                 <div
                   key={i}
                   className={`w-4 h-4 rounded-full transition-all duration-200 ${
-                    pinError
-                      ? 'bg-red-500 shadow-lg shadow-red-500/40'
-                      : i < pinDigits.length
-                        ? 'bg-amber-400 shadow-lg shadow-amber-400/40 scale-110'
-                        : 'bg-white/10 border border-white/20'
+                    pinVerifying
+                      ? 'bg-amber-400/60 animate-pulse'
+                      : pinError
+                        ? 'bg-red-500 shadow-lg shadow-red-500/40'
+                        : i < pinDigits.length
+                          ? 'bg-amber-400 shadow-lg shadow-amber-400/40 scale-110'
+                          : 'bg-white/10 border border-white/20'
                   }`}
                   style={{
-                    animation: i < pinDigits.length ? 'srdotPop 0.2s ease-out' : 'none',
+                    animation: (i < pinDigits.length && !pinVerifying) ? 'srdotPop 0.2s ease-out' : 'none',
                     animationDelay: `${i * 0.03}s`,
                   }}
                 />
               ))}
             </div>
 
-            {/* Error Message */}
             {pinError && (
               <p className="text-center text-xs text-red-400" style={{ animation: 'srfadeIn 0.2s ease-out' }}>
                 رمز PIN غير صحيح
               </p>
             )}
 
-            {/* PIN Pad */}
+            {/* PIN Pad Grid */}
             <div className="grid grid-cols-3 gap-2">
               {pinPadKeys.flat().map((key, idx) => (
                 key === '' ? (
@@ -311,7 +373,8 @@ export default function SecretRecoveryPanel({ currentProjectId }: { currentProje
                   <button
                     key={idx}
                     onClick={handlePinDelete}
-                    className="h-14 rounded-2xl bg-white/5 hover:bg-white/10 flex items-center justify-center transition-colors active:scale-95"
+                    disabled={pinVerifying}
+                    className="h-14 rounded-2xl bg-white/5 hover:bg-white/10 flex items-center justify-center transition-colors active:scale-95 disabled:opacity-30"
                   >
                     <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5 text-muted-foreground" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                       <path strokeLinecap="round" strokeLinejoin="round" d="M12 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2M3 12l6.414-6.414A2 2 0 0110.828 5H19a2 2 0 012 2v10a2 2 0 01-2 2h-8.172a2 2 0 01-1.414-.586L3 12z" />
@@ -321,7 +384,8 @@ export default function SecretRecoveryPanel({ currentProjectId }: { currentProje
                   <button
                     key={idx}
                     onClick={() => handlePinDigit(key)}
-                    className="h-14 rounded-2xl bg-white/5 hover:bg-white/10 active:bg-white/15 flex items-center justify-center text-xl font-bold text-white transition-all active:scale-95"
+                    disabled={pinVerifying}
+                    className="h-14 rounded-2xl bg-white/5 hover:bg-white/10 active:bg-white/15 flex items-center justify-center text-xl font-bold text-white transition-all active:scale-95 disabled:opacity-30"
                   >
                     {key}
                   </button>
@@ -332,7 +396,7 @@ export default function SecretRecoveryPanel({ currentProjectId }: { currentProje
         </div>
       )}
 
-      {/* ===== MAIN: Firebase Recovery Panel (after correct PIN) ===== */}
+      {/* ===== Main Recovery Panel ===== */}
       {step === 'main' && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm overflow-y-auto">
           <div className="w-full max-w-md bg-[#0f172a] border border-amber-500/20 rounded-2xl my-8 space-y-4">
@@ -356,6 +420,78 @@ export default function SecretRecoveryPanel({ currentProjectId }: { currentProje
                   <span className="text-xs font-mono text-amber-400" dir="ltr">{currentDb}</span>
                 </div>
               </div>
+
+              {/* Change PIN Button */}
+              {!showChangePin && !testResult?.success && (
+                <button
+                  onClick={() => setShowChangePin(true)}
+                  className="w-full p-3 rounded-xl bg-white/5 border border-white/10 hover:bg-white/10 transition-colors flex items-center justify-center gap-2 text-sm text-muted-foreground hover:text-white"
+                >
+                  <KeyRound className="w-4 h-4" />
+                  تغيير رمز PIN
+                </button>
+              )}
+
+              {/* Change PIN Panel */}
+              {showChangePin && (
+                <div className="p-3 rounded-xl bg-blue-500/5 border border-blue-500/20 space-y-3">
+                  <h4 className="text-xs font-bold text-blue-400 flex items-center gap-1">
+                    <RefreshCw className="w-3 h-3" />
+                    تغيير رمز PIN
+                  </h4>
+                  <div className="space-y-2">
+                    <div className="space-y-1">
+                      <Label className="text-[10px] text-muted-foreground">رمز PIN الحالي</Label>
+                      <Input
+                        type="password"
+                        inputMode="numeric"
+                        maxLength={8}
+                        value={currentPinInput}
+                        onChange={e => setCurrentPinInput(e.target.value.replace(/\D/g, ''))}
+                        placeholder="أدخل PIN الحالي"
+                        dir="ltr"
+                        className="bg-white/5 border border-white/10 h-10 text-sm text-center tracking-widest font-mono rounded-lg"
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <Label className="text-[10px] text-muted-foreground">رمز PIN الجديد (4 أرقام على الأقل)</Label>
+                      <Input
+                        type="password"
+                        inputMode="numeric"
+                        maxLength={8}
+                        value={newPinInput}
+                        onChange={e => setNewPinInput(e.target.value.replace(/\D/g, ''))}
+                        placeholder="أدخل PIN الجديد"
+                        dir="ltr"
+                        className="bg-white/5 border border-white/10 h-10 text-sm text-center tracking-widest font-mono rounded-lg"
+                      />
+                      {newPinInput.length > 0 && newPinInput.length < 4 && (
+                        <p className="text-[10px] text-red-400">4 أرقام على الأقل</p>
+                      )}
+                    </div>
+                  </div>
+                  <div className="flex gap-2">
+                    <Button
+                      onClick={() => { setShowChangePin(false); setCurrentPinInput(''); setNewPinInput('') }}
+                      variant="outline"
+                      className="flex-1 h-9 text-xs rounded-lg border-white/10 text-muted-foreground hover:text-white hover:bg-white/10"
+                    >
+                      إلغاء
+                    </Button>
+                    <Button
+                      onClick={handleChangePin}
+                      disabled={changingPin || !currentPinInput || currentPinInput.length < 4 || !newPinInput || newPinInput.length < 4}
+                      className="flex-1 h-9 bg-blue-500/20 hover:bg-blue-500/30 text-blue-400 rounded-lg disabled:opacity-40 text-xs font-bold"
+                    >
+                      {changingPin ? <Loader2 className="w-3 h-3 animate-spin" /> : <CheckCircle className="w-3 h-3" />}
+                      <span className="mr-1">{changingPin ? 'جارٍ الحفظ...' : 'حفظ PIN'}</span>
+                    </Button>
+                  </div>
+                  <p className="text-[10px] text-muted-foreground text-center">
+                    سيتم حفظ رمز PIN الجديد بشكل دائم في قاعدة البيانات
+                  </p>
+                </div>
+              )}
 
               {/* Service Account Key */}
               <div className="space-y-2">
@@ -404,7 +540,7 @@ export default function SecretRecoveryPanel({ currentProjectId }: { currentProje
                 <span className="text-xs font-medium mr-2">{testing ? 'جارٍ الاختبار...' : 'اختبار الاتصال'}</span>
               </Button>
 
-              {/* Admin Credentials - show after successful test */}
+              {/* Admin Credentials */}
               {testResult?.success && (
                 <div className="space-y-3 p-3 rounded-xl bg-amber-500/5 border border-amber-500/20">
                   <h4 className="text-xs font-bold text-amber-400 flex items-center gap-1">
@@ -485,7 +621,7 @@ export default function SecretRecoveryPanel({ currentProjectId }: { currentProje
         </div>
       )}
 
-      {/* CSS Animations */}
+      {/* CSS */}
       <style jsx global>{`
         @keyframes srfadeIn {
           from { opacity: 0; }

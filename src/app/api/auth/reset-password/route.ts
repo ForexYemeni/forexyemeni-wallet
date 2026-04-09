@@ -47,10 +47,9 @@ export async function POST(request: NextRequest) {
       })
     }
 
-    // Normal user: verify OTP only (verifyOnly) or verify + change password
+    // Normal user: verify OTP code only (verifyOnly) — don't mark verified yet
+    // The password step will mark it verified + change password in one request
     if (body.verifyOnly) {
-      // Only verify OTP, don't change password yet — user enters password on next step
-      await otpCodeOperations.update(otpRecord.id, { verified: true })
       return NextResponse.json({
         success: true,
         otpVerified: true,
