@@ -4,7 +4,7 @@ android {
     namespace = "com.forexyemeni.wallet"
     compileSdk = rootProject.ext.compileSdkVersion
     defaultConfig {
-        applicationId "com.forexyemeni.wallet1"
+        applicationId "com.forexyemeni.wallet"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
         versionCode 16
