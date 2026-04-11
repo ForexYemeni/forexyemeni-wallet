@@ -5,7 +5,7 @@ import dynamic from 'next/dynamic'
 import { useAuthStore } from '@/lib/store'
 import { Portal } from '@/components/ui/portal'
 import { toast } from 'sonner'
-import { convertUSDTtoYER, formatYER } from '@/lib/currency'
+import { convertUSDTtoYER, formatYER, refreshExchangeRates } from '@/lib/currency'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -3374,7 +3374,10 @@ function AdminSettingsPanel({ settings, onRefresh }: { settings: { email: string
         }
         if (actionKey === 'update_fees') fetchFees()
         if (actionKey === 'update_commission') fetchFees()
-        if (actionKey === 'update_exchange_rates') fetchFees()
+        if (actionKey === 'update_exchange_rates') {
+          await fetchFees()
+          await refreshExchangeRates()
+        }
         onRefresh()
       } else {
         toast.error(data.message)

@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react'
 import { useAuthStore } from '@/lib/store'
 import { useOfflineStore } from '@/lib/offline-store'
 import { useOfflineMode } from '@/hooks/useOfflineMode'
-import { convertUSDTtoYER, formatYER, ExchangeRateBadge } from '@/lib/currency'
+import { convertUSDTtoYER, formatYER, ExchangeRateBadge, BalanceCurrencySelector } from '@/lib/currency'
 import { toast } from 'sonner'
 import BannerSlider from '@/components/BannerSlider'
 import {
@@ -189,19 +189,10 @@ export default function Dashboard() {
             <span className="text-xs text-muted-foreground bg-white/5 px-2 py-1 rounded-md">USDT TRC20</span>
           </div>
 
-          <div className="text-4xl font-bold gold-text tracking-tight">
-            {user?.balance?.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) ?? '0.00'}
-          </div>
-          <div className="text-sm text-muted-foreground">
-            ≈ {formatYER(convertUSDTtoYER(user?.balance ?? 0))}
-          </div>
-
-          <div className="flex items-center gap-2 text-sm">
-            <span className="text-muted-foreground">المجمّد:</span>
-            <span className="text-foreground/70">
-              {user?.frozenBalance?.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) ?? '0.00'} USDT
-            </span>
-          </div>
+          <BalanceCurrencySelector
+            balance={user?.balance ?? 0}
+            frozenBalance={user?.frozenBalance ?? 0}
+          />
 
           {/* Quick Actions */}
           <div className="grid grid-cols-3 gap-3 pt-2">
