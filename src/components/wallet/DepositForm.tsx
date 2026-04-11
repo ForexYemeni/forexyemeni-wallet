@@ -25,42 +25,37 @@ import {
 import { compressImage } from '@/lib/image-compress'
 import { useExchangeRates, convertUSDTtoYER, convertUSDTtoSAR, convertYERtoUSDT, formatYER, formatSAR, formatUSDT } from '@/lib/currency'
 
-type DepositCategory = 'bank_deposit' | 'bank_transfer' | 'crypto'
-type Step = 'category' | 'methods' | 'details'
+type Step = 'currency' | 'methods' | 'details'
 
-interface CategoryOption {
-  key: DepositCategory
+type CurrencyOption = {
+  code: string
   label: string
   icon: React.ReactNode
   description: string
-  matchTypes: string[]
-  matchCategory?: string
+  color: string
 }
 
-const CATEGORIES: CategoryOption[] = [
+const CURRENCY_OPTIONS: CurrencyOption[] = [
   {
-    key: 'bank_deposit',
-    label: 'إيداع بنكي',
-    icon: <Building className="w-7 h-7" />,
-    description: 'إيداع مباشر في الحساب البنكي',
-    matchTypes: ['bank_deposit'],
-    matchCategory: 'bank',
-  },
-  {
-    key: 'bank_transfer',
-    label: 'تحويل بنكي',
-    icon: <Landmark className="w-7 h-7" />,
-    description: 'تحويل عبر البنك أو الصراف',
-    matchTypes: ['bank_transfer', 'atm_transfer'],
-    matchCategory: 'bank',
-  },
-  {
-    key: 'crypto',
-    label: 'إيداع بالعملات الرقمية',
+    code: 'USDT',
+    label: 'دولار (USDT)',
     icon: <Coins className="w-7 h-7" />,
-    description: 'USDT وغيرها من العملات الرقمية',
-    matchTypes: [],
-    matchCategory: 'crypto',
+    description: 'إيداع مباشر بالعملات الرقمية',
+    color: 'bg-green-500/10 text-green-400 group-hover:bg-green-500/20',
+  },
+  {
+    code: 'YER',
+    label: 'ريال يمني (ر.ي)',
+    icon: <Building className="w-7 h-7" />,
+    description: 'إيداع بالريال اليمني عبر الحساب البنكي',
+    color: 'bg-blue-500/10 text-blue-400 group-hover:bg-blue-500/20',
+  },
+  {
+    code: 'SAR',
+    label: 'ريال سعودي (ر.س)',
+    icon: <Landmark className="w-7 h-7" />,
+    description: 'إيداع بالريال السعودي عبر التحويل البنكي',
+    color: 'bg-purple-500/10 text-purple-400 group-hover:bg-purple-500/20',
   },
 ]
 
@@ -96,8 +91,8 @@ export default function DepositForm() {
   const { user } = useAuthStore()
   const [methods, setMethods] = useState<any[]>([])
   const [selectedMethod, setSelectedMethod] = useState<any>(null)
-  const [selectedCategory, setSelectedCategory] = useState<DepositCategory | null>(null)
-  const [step, setStep] = useState<Step>('category')
+  const [selectedCurrency, setSelectedCurrency] = useState<string | null>(null)
+  const [step, setStep] = useState<Step>('currency')
   const [amount, setAmount] = useState('')
   const [txId, setTxId] = useState('')
   const [loading, setLoading] = useState(false)
@@ -137,22 +132,16 @@ export default function DepositForm() {
     } catch { /* silent */ }
   }
 
-  const fetchMethods = async (category: DepositCategory) => {
+  const fetchMethods = async (currencyCode: string) => {
     setLoadingMethods(true)
     try {
       const res = await fetch('/api/payment-methods?purpose=deposit')
       const data = await res.json()
       if (data.success) {
         const allMethods = data.methods || []
-        const catConfig = CATEGORIES.find(c => c.key === category)
         const filtered = allMethods.filter((m: any) => {
-          // Crypto: match all crypto-category methods
-          if (catConfig?.matchCategory === 'crypto') return m.category === 'crypto'
-          // Bank categories: match ONLY the specific types listed in matchTypes
-          if (catConfig && catConfig.matchTypes.length > 0) {
-            return catConfig.matchTypes.includes(m.type)
-          }
-          return false
+          if (currencyCode === 'USDT') return m.category === 'crypto' || (m.category === 'bank' && (!m.currency || m.currency === 'USDT'))
+          return m.currency === currencyCode
         })
         setMethods(filtered)
       }
@@ -163,7 +152,7 @@ export default function DepositForm() {
     }
   }
 
-  const handleCategorySelect = async (category: DepositCategory) => {
+  const handleCurrencySelect = async (currencyCode: string) => {
     // Check for pending deposit before allowing new deposit
     setPendingCheckLoading(true)
     try {
@@ -176,9 +165,9 @@ export default function DepositForm() {
       }
     } catch { /* silent */ }
     setPendingCheckLoading(false)
-    setSelectedCategory(category)
+    setSelectedCurrency(currencyCode)
     setStep('methods')
-    fetchMethods(category)
+    fetchMethods(currencyCode)
   }
 
   const handleMethodSelect = (method: any) => {
@@ -191,8 +180,8 @@ export default function DepositForm() {
       setStep('methods')
       setSelectedMethod(null)
     } else if (step === 'methods') {
-      setStep('category')
-      setSelectedCategory(null)
+      setStep('currency')
+      setSelectedCurrency(null)
       setMethods([])
     }
   }
@@ -305,12 +294,12 @@ export default function DepositForm() {
     return '0.00'
   }
 
-  const getCategoryInfo = () => {
-    if (!selectedCategory) return null
-    return CATEGORIES.find(c => c.key === selectedCategory)
+  const getCurrencyInfo = () => {
+    if (!selectedCurrency) return null
+    return CURRENCY_OPTIONS.find(c => c.code === selectedCurrency)
   }
 
-  const currentCategoryInfo = getCategoryInfo()
+  const currentCurrencyInfo = getCurrencyInfo()
 
   return (
     <div className="space-y-6 animate-fade-in pb-24">
@@ -353,19 +342,19 @@ export default function DepositForm() {
           <ArrowDownLeft className="w-5 h-5 text-green-400" />
         </div>
         <div>
-          <h1 className="text-xl font-bold">إيداع USDT</h1>
-          <p className="text-sm text-muted-foreground">اختر طريقة الإيداع المناسبة</p>
+          <h1 className="text-xl font-bold">إيداع</h1>
+          <p className="text-sm text-muted-foreground">اختر عملة الإيداع ثم طريقة الدفع</p>
         </div>
       </div>
 
       {/* Step Indicator */}
       <div className="flex items-center gap-2">
         {[
-          { key: 'category', label: 'النوع' },
+          { key: 'currency', label: 'العملة' },
           { key: 'methods', label: 'الطريقة' },
           { key: 'details', label: 'التفاصيل' },
         ].map((s, idx) => {
-          const stepOrder: Step[] = ['category', 'methods', 'details']
+          const stepOrder: Step[] = ['currency', 'methods', 'details']
           const currentIdx = stepOrder.indexOf(step)
           const thisIdx = idx
           const isActive = step === s.key
@@ -390,26 +379,22 @@ export default function DepositForm() {
         })}
       </div>
 
-      {/* Step 1: Category Selection */}
-      {step === 'category' && (
+      {/* Step 1: Currency Selection */}
+      {step === 'currency' && (
         <div className="space-y-3 animate-fade-in">
-          <p className="text-sm text-muted-foreground mb-2">اختر نوع الإيداع</p>
-          {CATEGORIES.map((cat) => (
+          <p className="text-sm text-muted-foreground mb-2">اختر عملة الإيداع</p>
+          {CURRENCY_OPTIONS.map((cur) => (
             <button
-              key={cat.key}
-              onClick={() => handleCategorySelect(cat.key)}
+              key={cur.code}
+              onClick={() => handleCurrencySelect(cur.code)}
               className="w-full glass-card p-5 rounded-xl flex items-center gap-4 hover:border-gold/30 transition-all text-right group"
             >
-              <div className={`w-14 h-14 rounded-2xl flex items-center justify-center flex-shrink-0 transition-colors ${
-                cat.key === 'bank_deposit' ? 'bg-blue-500/10 text-blue-400 group-hover:bg-blue-500/20' :
-                cat.key === 'bank_transfer' ? 'bg-purple-500/10 text-purple-400 group-hover:bg-purple-500/20' :
-                'bg-orange-500/10 text-orange-400 group-hover:bg-orange-500/20'
-              }`}>
-                {cat.icon}
+              <div className={`w-14 h-14 rounded-2xl flex items-center justify-center flex-shrink-0 transition-colors ${cur.color}`}>
+                {cur.icon}
               </div>
               <div className="flex-1 min-w-0">
-                <p className="text-base font-bold">{cat.label}</p>
-                <p className="text-xs text-muted-foreground mt-0.5">{cat.description}</p>
+                <p className="text-base font-bold">{cur.label}</p>
+                <p className="text-xs text-muted-foreground mt-0.5">{cur.description}</p>
               </div>
               <ChevronLeft className="w-5 h-5 text-muted-foreground group-hover:text-gold transition-colors flex-shrink-0" />
             </button>
@@ -423,20 +408,16 @@ export default function DepositForm() {
           {/* Back Button */}
           <button onClick={handleBack} className="flex items-center gap-1 text-sm text-muted-foreground hover:text-gold transition-colors">
             <ArrowRight className="w-4 h-4" />
-            رجوع لاختيار نوع الإيداع
+            رجوع لاختيار العملة
           </button>
 
-          {/* Category Badge */}
-          {currentCategoryInfo && (
+          {/* Currency Badge */}
+          {currentCurrencyInfo && (
             <div className="flex items-center gap-2">
-              <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${
-                selectedCategory === 'bank_deposit' ? 'bg-blue-500/10 text-blue-400' :
-                selectedCategory === 'bank_transfer' ? 'bg-purple-500/10 text-purple-400' :
-                'bg-orange-500/10 text-orange-400'
-              }`}>
-                {currentCategoryInfo.icon && <div className="scale-75">{currentCategoryInfo.icon}</div>}
+              <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${currentCurrencyInfo.color.split(' ')[0]} ${currentCurrencyInfo.color.split(' ')[1]}`}>
+                <div className="scale-75">{currentCurrencyInfo.icon}</div>
               </div>
-              <p className="text-sm font-bold">{currentCategoryInfo.label}</p>
+              <p className="text-sm font-bold">{currentCurrencyInfo.label}</p>
             </div>
           )}
 
@@ -450,9 +431,9 @@ export default function DepositForm() {
           ) : methods.length === 0 ? (
             <div className="glass-card p-8 text-center">
               <CreditCard className="w-10 h-10 text-muted-foreground/30 mx-auto mb-3" />
-              <p className="text-muted-foreground text-sm">لا توجد طرق إيداع متاحة لهذا النوع حالياً</p>
+              <p className="text-muted-foreground text-sm">لا توجد طرق إيداع متاحة لهذه العملة حالياً</p>
               <button onClick={handleBack} className="mt-4 text-sm text-gold hover:text-gold/80 transition-colors">
-                اختر نوع إيداع آخر
+                اختر عملة أخرى
               </button>
             </div>
           ) : (
@@ -470,14 +451,7 @@ export default function DepositForm() {
                       {m.category === 'crypto' ? <Wallet className="w-5 h-5" /> : <Building className="w-5 h-5" />}
                     </div>
                     <div className="text-right">
-                      <div className="flex items-center gap-2">
-                        <p className="text-sm font-medium">{getMethodLabel(m)}</p>
-                        {m.currency && m.currency !== 'USDT' && (
-                          <span className="text-[10px] px-1.5 py-0.5 rounded-md bg-gold/10 text-gold font-medium">
-                            {m.currency === 'YER' ? '🇾🇪 ر.ي' : m.currency === 'SAR' ? '🇸🇦 ر.س' : m.currency}
-                          </span>
-                        )}
-                      </div>
+                      <p className="text-sm font-medium">{getMethodLabel(m)}</p>
                       <div className="flex items-center gap-2 mt-0.5">
                         <p className="text-[10px] text-muted-foreground">
                           {getMethodSubtitle(m)}
