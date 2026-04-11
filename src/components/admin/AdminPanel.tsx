@@ -3069,7 +3069,7 @@ function PaymentMethodsManager({ methods, onRefresh }: { methods: any[]; onRefre
     } catch { toast.error('خطأ') }
   }
 
-  const TYPE_LABELS: Record<string, string> = { bank_deposit: 'إيداع لمحفظة', atm_transfer: 'تحويل عبر صراف', crypto: 'عملات رقمية' }
+  const TYPE_LABELS: Record<string, string> = { bank_deposit: 'إيداع بنكي', bank_transfer: 'تحويل بنكي', atm_transfer: 'تحويل عبر صراف', crypto: 'عملات رقمية' }
   const CATEGORY_LABELS: Record<string, string> = { bank: '🏦 بنكي', crypto: '₿ عملات رقمية' }
   const CURRENCY_LABELS: Record<string, string> = { USDT: '💵 دولار', YER: '🇾🇪 ريال يمني', SAR: '🇸🇦 ريال سعودي' }
   const CURRENCY_OPTIONS = [
@@ -3161,7 +3161,7 @@ function PaymentMethodsManager({ methods, onRefresh }: { methods: any[]; onRefre
                     <label className="text-xs text-muted-foreground">النوع</label>
                     <select value={form.type} onChange={(e) => setForm({ ...form, type: e.target.value })} className="w-full h-10 rounded-lg bg-white/5 border border-white/10 px-3 text-sm text-foreground">
                       {form.category === 'bank' ? (
-                        <><option value="bank_deposit">إيداع لمحفظة</option><option value="atm_transfer">تحويل عبر صراف</option></>
+                        <><option value="bank_deposit">إيداع بنكي</option><option value="bank_transfer">تحويل بنكي</option><option value="atm_transfer">تحويل عبر صراف</option></>
                       ) : (
                         <option value="crypto">عملات رقمية</option>
                       )}
@@ -3197,6 +3197,16 @@ function PaymentMethodsManager({ methods, onRefresh }: { methods: any[]; onRefre
                   </div>
                 )}
 
+                {form.category === 'bank' && form.type === 'bank_transfer' && (
+                  <div className="space-y-2 p-3 rounded-lg bg-emerald-500/5 border border-emerald-500/10">
+                    <p className="text-xs text-emerald-400 font-medium">بيانات التحويل البنكي:</p>
+                    <div className="space-y-1">
+                      <Input value={form.recipientName} onChange={(e) => setForm({ ...form, recipientName: e.target.value })} className="glass-input h-9 text-sm" placeholder="اسم المستلم" />
+                      <Input value={form.recipientPhone} onChange={(e) => setForm({ ...form, recipientPhone: e.target.value })} className="glass-input h-9 text-sm" placeholder="رقم الجوال" dir="ltr" />
+                      <Input value={form.network} onChange={(e) => setForm({ ...form, network: e.target.value })} className="glass-input h-9 text-sm" placeholder="اسم البنك / الشبكة" />
+                    </div>
+                  </div>
+                )}
                 {form.category === 'bank' && form.type === 'atm_transfer' && (
                   <div className="space-y-2 p-3 rounded-lg bg-green-500/5 border border-green-500/10">
                     <p className="text-xs text-green-400 font-medium">بيانات التحويل عبر صراف:</p>
