@@ -1,6 +1,9 @@
 import { NextResponse } from 'next/server'
 import { getDb, nowTimestamp } from '@/lib/firebase'
 
+// Force dynamic rendering - never cache exchange rates
+export const dynamic = 'force-dynamic'
+
 // GET - public settings (fees, social links, referral settings, bot settings)
 export async function GET() {
   try {

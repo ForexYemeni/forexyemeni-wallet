@@ -397,7 +397,7 @@ export default function AdminPanel() {
 
   const fetchFees = async () => {
     try {
-      const res = await fetch('/api/settings')
+      const res = await fetch('/api/settings?t=' + Date.now(), { cache: 'no-store' })
       const data = await res.json()
       return data.settings || {}
     } catch { return {} }
@@ -3273,7 +3273,7 @@ function AdminSettingsPanel({ settings, onRefresh }: { settings: { email: string
 
   const fetchFees = async () => {
     try {
-      const res = await fetch('/api/settings')
+      const res = await fetch('/api/settings?t=' + Date.now(), { cache: 'no-store' })
       const data = await res.json()
       if (data.success && data.settings) {
         setDepositFee(String(data.settings.depositFee || 0))

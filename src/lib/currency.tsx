@@ -26,7 +26,7 @@ async function loadExchangeRates(forceRefresh = false): Promise<ExchangeRates> {
 
   refreshPromise = (async () => {
     try {
-      const res = await fetch('/api/settings')
+      const res = await fetch('/api/settings?t=' + Date.now(), { cache: 'no-store' })
       const data = await res.json()
       if (data.success && data.settings?.exchangeRates) {
         const r = data.settings.exchangeRates
