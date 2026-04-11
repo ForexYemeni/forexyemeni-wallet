@@ -23,6 +23,7 @@ import {
   Clock,
 } from 'lucide-react'
 import { compressImage } from '@/lib/image-compress'
+import { useExchangeRates, convertUSDTtoYER, convertUSDTtoSAR, convertYERtoUSDT, formatYER, formatSAR, formatUSDT } from '@/lib/currency'
 
 type DepositCategory = 'bank_deposit' | 'bank_transfer' | 'crypto'
 type Step = 'category' | 'methods' | 'details'
@@ -101,6 +102,7 @@ export default function DepositForm() {
   const [txId, setTxId] = useState('')
   const [loading, setLoading] = useState(false)
   const [loadingMethods, setLoadingMethods] = useState(false)
+  const rates = useExchangeRates()
   const [copiedField, setCopiedField] = useState<string | null>(null)
   const [screenshot, setScreenshot] = useState<File | null>(null)
   const [screenshotPreview, setScreenshotPreview] = useState<string | null>(null)
@@ -127,7 +129,7 @@ export default function DepositForm() {
 
   const fetchSettings = async () => {
     try {
-      const res = await fetch('/api/settings')
+      const res = await fetch('/api/settings?t=' + Date.now(), { cache: 'no-store' })
       const data = await res.json()
       if (data.success && data.settings) {
         setFeePercentage(data.settings.depositFee || 0)
@@ -240,11 +242,14 @@ export default function DepositForm() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           userId: user?.id,
-          amount: parseFloat(amount),
+          amount: isLocalCurrency ? usdtAmount : parseFloat(amount),
+          localAmount: isLocalCurrency ? parseFloat(amount) : null,
+          currency: methodCurrency,
           method: selectedMethod?.category === 'crypto' ? 'blockchain' : selectedMethod?.type || 'bank_transfer',
           txId: txId || undefined,
           network: selectedMethod?.network || undefined,
           screenshot: screenshotBase64,
+          paymentMethodId: selectedMethod?.id || undefined,
         }),
       })
       const data = await res.json()
@@ -272,6 +277,33 @@ export default function DepositForm() {
   const depositFee = amount && feePercentage > 0 ? (parseFloat(amount) * (feePercentage / 100)).toFixed(2) : '0.00'
   const netAmount = amount ? (parseFloat(amount) - parseFloat(depositFee)).toFixed(2) : '0.00'
   const isCrypto = selectedMethod?.category === 'crypto'
+  const methodCurrency = selectedMethod?.currency || 'USDT'
+  const isLocalCurrency = methodCurrency !== 'USDT'
+
+  // Convert local currency amount to USDT
+  const getUSDTAmount = (): number => {
+    if (!amount || parseFloat(amount) <= 0) return 0
+    const localAmount = parseFloat(amount)
+    if (methodCurrency === 'YER') return convertYERtoUSDT(localAmount, rates.usdToYer)
+    if (methodCurrency === 'SAR') return parseFloat((localAmount / rates.usdToSar).toFixed(2))
+    return localAmount
+  }
+
+  const usdtAmount = isLocalCurrency ? getUSDTAmount() : (parseFloat(amount) || 0)
+  const usdtFee = usdtAmount > 0 && feePercentage > 0 ? parseFloat((usdtAmount * (feePercentage / 100)).toFixed(2)) : 0
+  const usdtNet = usdtAmount > 0 ? parseFloat((usdtAmount - usdtFee).toFixed(2)) : 0
+
+  const getCurrencyLabel = () => {
+    if (methodCurrency === 'YER') return 'ر.ي'
+    if (methodCurrency === 'SAR') return 'ر.س'
+    return 'USDT'
+  }
+
+  const getCurrencyPlaceholder = () => {
+    if (methodCurrency === 'YER') return '0 (ريال يمني)'
+    if (methodCurrency === 'SAR') return '0.00 (ريال سعودي)'
+    return '0.00'
+  }
 
   const getCategoryInfo = () => {
     if (!selectedCategory) return null
@@ -438,7 +470,14 @@ export default function DepositForm() {
                       {m.category === 'crypto' ? <Wallet className="w-5 h-5" /> : <Building className="w-5 h-5" />}
                     </div>
                     <div className="text-right">
-                      <p className="text-sm font-medium">{getMethodLabel(m)}</p>
+                      <div className="flex items-center gap-2">
+                        <p className="text-sm font-medium">{getMethodLabel(m)}</p>
+                        {m.currency && m.currency !== 'USDT' && (
+                          <span className="text-[10px] px-1.5 py-0.5 rounded-md bg-gold/10 text-gold font-medium">
+                            {m.currency === 'YER' ? '🇾🇪 ر.ي' : m.currency === 'SAR' ? '🇸🇦 ر.س' : m.currency}
+                          </span>
+                        )}
+                      </div>
                       <div className="flex items-center gap-2 mt-0.5">
                         <p className="text-[10px] text-muted-foreground">
                           {getMethodSubtitle(m)}
@@ -541,26 +580,68 @@ export default function DepositForm() {
           {/* Deposit Amount + Screenshot */}
           <div className="glass-card p-5 space-y-4">
             <h2 className="text-sm font-bold">تسجيل الإيداع</h2>
+
+            {/* Exchange Rate Info for local currency */}
+            {isLocalCurrency && (
+              <div className="p-3 rounded-xl bg-gold/5 border border-gold/10 text-xs space-y-1">
+                <p className="text-gold font-medium">سعر الصرف الحالي:</p>
+                {methodCurrency === 'YER' && <p>1 USDT = {rates.usdToYer.toLocaleString()} ر.ي</p>}
+                {methodCurrency === 'SAR' && <p>1 USDT = {rates.usdToSar} ر.س</p>}
+              </div>
+            )}
+
             <form onSubmit={handleSubmit} className="space-y-4">
               <div className="space-y-2">
-                <Label className="text-sm text-muted-foreground">المبلغ (USDT)</Label>
+                <Label className="text-sm text-muted-foreground">المبلغ ({getCurrencyLabel()})</Label>
                 <Input
                   type="number"
-                  placeholder="0.00"
+                  placeholder={getCurrencyPlaceholder()}
                   value={amount}
                   onChange={(e) => setAmount(e.target.value)}
                   className="glass-input h-12 text-base"
                   dir="ltr"
                   min="0"
-                  step="0.01"
+                  step={methodCurrency === 'YER' ? '1' : '0.01'}
                 />
+                {isLocalCurrency && amount && parseFloat(amount) > 0 && usdtAmount > 0 && (
+                  <p className="text-[11px] text-muted-foreground">
+                    ≈ {formatUSDT(usdtAmount)} USDT
+                  </p>
+                )}
               </div>
 
-              {amount && parseFloat(amount) > 0 && feePercentage > 0 && (
+              {amount && parseFloat(amount) > 0 && usdtAmount > 0 && (
                 <div className="p-3 rounded-xl bg-white/5 text-xs space-y-1">
-                  <div className="flex justify-between"><span className="text-muted-foreground">المبلغ المدفوع</span><span>{parseFloat(amount).toFixed(2)} USDT</span></div>
-                  <div className="flex justify-between"><span className="text-muted-foreground">الرسوم ({feePercentage}%) → حساب الإدارة</span><span className="text-gold font-medium">-{depositFee} USDT</span></div>
-                  <div className="border-t border-white/5 pt-1 mt-1 flex justify-between"><span className="text-muted-foreground">المبلغ الصافي الذي سيُضاف لحسابك</span><span className="text-green-400 font-bold">{netAmount} USDT</span></div>
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">
+                      {isLocalCurrency ? `المبلغ المدفوع (${getCurrencyLabel()})` : 'المبلغ المدفوع'}
+                    </span>
+                    <span>{isLocalCurrency ? `${parseFloat(amount).toLocaleString()} ${getCurrencyLabel()}` : `${usdtAmount.toFixed(2)} USDT`}</span>
+                  </div>
+                  {isLocalCurrency && (
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">المعادل بالدولار</span>
+                      <span className="text-gold font-medium">{formatUSDT(usdtAmount)}</span>
+                    </div>
+                  )}
+                  {feePercentage > 0 && (
+                    <>
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">الرسوم ({feePercentage}%) → حساب الإدارة</span>
+                        <span className="text-gold font-medium">-{usdtFee.toFixed(2)} USDT</span>
+                      </div>
+                      <div className="border-t border-white/5 pt-1 mt-1 flex justify-between">
+                        <span className="text-muted-foreground">المبلغ الصافي الذي سيُضاف لحسابك</span>
+                        <span className="text-green-400 font-bold">{usdtNet.toFixed(2)} USDT</span>
+                      </div>
+                    </>
+                  )}
+                  {!feePercentage && isLocalCurrency && (
+                    <div className="border-t border-white/5 pt-1 mt-1 flex justify-between">
+                      <span className="text-muted-foreground">المبلغ الصافي الذي سيُضاف لحسابك</span>
+                      <span className="text-green-400 font-bold">{formatUSDT(usdtAmount)}</span>
+                    </div>
+                  )}
                 </div>
               )}
 

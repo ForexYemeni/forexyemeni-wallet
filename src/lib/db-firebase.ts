@@ -128,6 +128,7 @@ export interface PaymentMethod {
   type: string // 'bank_transfer' | 'bank_deposit' | 'atm_transfer' | 'crypto'
   category: string // 'bank' | 'crypto'
   purpose: string // 'deposit' | 'withdrawal' | 'both'
+  currency?: string // 'USDT' | 'YER' | 'SAR' | null
   isActive: boolean
   network?: string | null
   walletAddress?: string | null

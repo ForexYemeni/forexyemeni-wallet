@@ -38,7 +38,7 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    const { userId, amount, method = 'blockchain', txId, screenshot, network } = await request.json()
+    const { userId, amount, localAmount, currency = 'USDT', method = 'blockchain', txId, screenshot, network, paymentMethodId } = await request.json()
 
     if (!userId || !amount) {
       return NextResponse.json(
@@ -96,7 +96,9 @@ export async function POST(request: NextRequest) {
       amount,
       fee,
       netAmount,
-      currency: 'USDT',
+      currency,
+      localAmount: localAmount || null,
+      paymentMethodId: paymentMethodId || null,
       network: network || 'TRC20',
       txId: txId || null,
       fromAddress: null,
@@ -111,12 +113,14 @@ export async function POST(request: NextRequest) {
     // Notify admin(s) about new deposit request
     try {
       const adminDocs = await db.collection('users').where('role', '==', 'admin').get()
+      const currencyLabel = currency === 'YER' ? 'ر.ي' : currency === 'SAR' ? 'ر.س' : 'USDT'
+      const localInfo = localAmount ? ` (${localAmount.toLocaleString()} ${currencyLabel})` : ''
       for (const adminDoc of adminDocs.docs) {
         const admin = adminDoc.data() as any
         const adminId = adminDoc.id
         const title = 'طلب إيداع جديد'
         const feeInfo = depositFeePercentage > 0 ? ` (الرسوم: ${fee.toFixed(2)} USDT - الصافي: ${netAmount.toFixed(2)} USDT)` : ''
-        const message = `طلب إيداع بقيمة ${amount} USDT من ${user.fullName || user.email}${feeInfo}`
+        const message = `طلب إيداع بقيمة ${amount} USDT${localInfo} من ${user.fullName || user.email}${feeInfo}`
         await notificationOperations.create({ userId: adminId, title, message, type: 'info', read: false })
         sendPushNotification(adminId, title, message, 'info').catch(() => {})
 

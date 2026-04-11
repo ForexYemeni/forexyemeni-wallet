@@ -3009,18 +3009,18 @@ function PaymentMethodsManager({ methods, onRefresh }: { methods: any[]; onRefre
     network: '', walletAddress: '', accountName: '', accountNumber: '',
     beneficiaryName: '', phone: '', recipientName: '', recipientPhone: '',
     instructions: '', minAmount: '', maxAmount: '',
-    purpose: 'deposit',
+    purpose: 'deposit', currency: 'USDT',
   })
 
   const resetForm = () => {
-    setForm({ type: 'bank_deposit', category: 'bank', network: '', walletAddress: '', accountName: '', accountNumber: '', beneficiaryName: '', phone: '', recipientName: '', recipientPhone: '', instructions: '', minAmount: '', maxAmount: '', purpose: 'deposit' })
+    setForm({ type: 'bank_deposit', category: 'bank', network: '', walletAddress: '', accountName: '', accountNumber: '', beneficiaryName: '', phone: '', recipientName: '', recipientPhone: '', instructions: '', minAmount: '', maxAmount: '', purpose: 'deposit', currency: 'USDT' })
     setEditMethod(null)
     setShowAdd(false)
   }
 
   const handleEdit = (m: any) => {
     setEditMethod(m)
-    setForm({ type: m.type || 'bank_deposit', category: m.category || 'bank', network: m.network || '', walletAddress: m.walletAddress || '', accountName: m.accountName || '', accountNumber: m.accountNumber || '', beneficiaryName: m.beneficiaryName || '', phone: m.phone || '', recipientName: m.recipientName || '', recipientPhone: m.recipientPhone || '', instructions: m.instructions || '', minAmount: m.minAmount?.toString() || '', maxAmount: m.maxAmount?.toString() || '', purpose: m.purpose || 'deposit' })
+    setForm({ type: m.type || 'bank_deposit', category: m.category || 'bank', network: m.network || '', walletAddress: m.walletAddress || '', accountName: m.accountName || '', accountNumber: m.accountNumber || '', beneficiaryName: m.beneficiaryName || '', phone: m.phone || '', recipientName: m.recipientName || '', recipientPhone: m.recipientPhone || '', instructions: m.instructions || '', minAmount: m.minAmount?.toString() || '', maxAmount: m.maxAmount?.toString() || '', purpose: m.purpose || 'deposit', currency: m.currency || 'USDT' })
     setShowAdd(true)
   }
 
@@ -3071,6 +3071,12 @@ function PaymentMethodsManager({ methods, onRefresh }: { methods: any[]; onRefre
 
   const TYPE_LABELS: Record<string, string> = { bank_deposit: 'إيداع لمحفظة', atm_transfer: 'تحويل عبر صراف', crypto: 'عملات رقمية' }
   const CATEGORY_LABELS: Record<string, string> = { bank: '🏦 بنكي', crypto: '₿ عملات رقمية' }
+  const CURRENCY_LABELS: Record<string, string> = { USDT: '💵 دولار', YER: '🇾🇪 ريال يمني', SAR: '🇸🇦 ريال سعودي' }
+  const CURRENCY_OPTIONS = [
+    { value: 'USDT', label: '💵 دولار (USDT)' },
+    { value: 'YER', label: '🇾🇪 ريال يمني (ر.ي)' },
+    { value: 'SAR', label: '🇸🇦 ريال سعودي (ر.س)' },
+  ]
 
   const getMethodTitle = (m: any) => {
     if (m.category === 'crypto') { return m.network ? `عملات رقمية - ${m.network}` : 'عملات رقمية' }
@@ -3097,6 +3103,11 @@ function PaymentMethodsManager({ methods, onRefresh }: { methods: any[]; onRefre
                   <div>
                     <div className="flex items-center gap-2">
                       <p className="text-sm font-medium">{getMethodTitle(m)}</p>
+                      {m.currency && m.currency !== 'USDT' && (
+                        <span className="text-[10px] px-1.5 py-0.5 rounded-md bg-gold/10 text-gold font-medium">
+                          {CURRENCY_LABELS[m.currency] || m.currency}
+                        </span>
+                      )}
                     </div>
                     <p className="text-[10px] text-muted-foreground">{CATEGORY_LABELS[m.category] || m.category}</p>
                   </div>
@@ -3157,6 +3168,23 @@ function PaymentMethodsManager({ methods, onRefresh }: { methods: any[]; onRefre
                     </select>
                   </div>
                 </div>
+
+                {/* Currency Selector - for bank methods */}
+                {form.category === 'bank' && (
+                  <div className="space-y-1">
+                    <label className="text-xs text-muted-foreground">عملة الإيداع</label>
+                    <select value={form.currency} onChange={(e) => setForm({ ...form, currency: e.target.value })} className="w-full h-10 rounded-lg bg-white/5 border border-white/10 px-3 text-sm text-foreground">
+                      {CURRENCY_OPTIONS.map(c => (
+                        <option key={c.value} value={c.value}>{c.label}</option>
+                      ))}
+                    </select>
+                    <p className="text-[10px] text-muted-foreground">
+                      {form.currency === 'USDT' ? 'المستخدم يدخل المبلغ بالدولار مباشرة' :
+                       form.currency === 'YER' ? 'المستخدم يدخل المبلغ بالريال اليمني ويُحوّل تلقائياً' :
+                       'المستخدم يدخل المبلغ بالريال السعودي ويُحوّل تلقائياً'}
+                    </p>
+                  </div>
+                )}
 
                 {form.category === 'bank' && form.type === 'bank_deposit' && (
                   <div className="space-y-2 p-3 rounded-lg bg-blue-500/5 border border-blue-500/10">

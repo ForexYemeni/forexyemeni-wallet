@@ -36,6 +36,7 @@ export async function POST(request: NextRequest) {
       type: data.type || 'bank_transfer',
       category: data.category || 'bank',
       purpose: data.purpose || 'both',
+      currency: data.currency || null,
       isActive: data.isActive !== false,
       network: data.network || null,
       walletAddress: data.walletAddress || null,
