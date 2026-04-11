@@ -79,8 +79,22 @@ export async function POST(req: NextRequest) {
         )
       }
 
+      // Get commission settings from database
+      const db = (await import('@/lib/firebase')).getDb()
+      let commissionSettings: { p2pFeePercent?: number; adminCommissionPercent?: number } = {}
+      try {
+        const commDoc = await db.collection('systemSettings').doc('commission').get()
+        if (commDoc.exists) {
+          commissionSettings = commDoc.data() as typeof commissionSettings
+        }
+      } catch {}
+      
+      const p2pFeePercent = commissionSettings.p2pFeePercent ?? 0.5
+      const adminCommissionPercent = commissionSettings.adminCommissionPercent ?? 1
+      
       // Calculate fees
-      const p2pFee = parseFloat((amount * 0.005).toFixed(2)) // 0.5% fee
+      const p2pFee = parseFloat((amount * (p2pFeePercent / 100)).toFixed(2))
+      const adminCommission = parseFloat((amount * (adminCommissionPercent / 100)).toFixed(2))
       const escrowAmount = type === 'sell' ? amount : 0
       const totalAmount = amount - p2pFee
 
@@ -106,6 +120,9 @@ export async function POST(req: NextRequest) {
         p2pFee,
         totalAmount,
         expiresAt,
+        p2pFeePercent,
+        adminCommissionPercent,
+        adminCommission: 0, // Will be set when trade completes
       })
 
       await notificationOperations.create({
@@ -119,7 +136,11 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({
         success: true,
         message: 'تم إنشاء الطلب بنجاح',
-        order,
+        order: {
+          ...order,
+          p2pFeePercent,
+          adminCommissionPercent,
+        },
       })
     }
 

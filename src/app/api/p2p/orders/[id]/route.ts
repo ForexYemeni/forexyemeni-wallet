@@ -208,6 +208,50 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
         sellerReleasedAt: new Date().toISOString(),
       })
 
+      // === ADMIN COMMISSION ===
+      // Calculate and add admin commission from completed trade
+      try {
+        const adminCommissionPct = order.adminCommissionPercent || 1
+        const tradeAmount = order.amount || order.escrowAmount || 0
+        const adminCommissionAmount = parseFloat((tradeAmount * (adminCommissionPct / 100)).toFixed(2))
+        
+        if (adminCommissionAmount > 0) {
+          // Find admin user (role = 'admin')
+          const adminSnap = await (await import('@/lib/firebase')).getDb()
+            .collection('users').where('role', '==', 'admin').limit(1).get()
+          
+          if (!adminSnap.empty) {
+            const adminDoc = adminSnap.docs[0]
+            const adminData = adminDoc.data()
+            const adminId = adminDoc.id
+            
+            // Add commission to admin balance
+            await userOperations.incrementBalance(adminId, adminCommissionAmount)
+            
+            // Save commission amount on order
+            await p2pOrderOperations.updateStatus(id, 'completed', {
+              adminCommission: adminCommissionAmount,
+            })
+            
+            // Record transaction for admin
+            await transactionOperations.create({
+              userId: adminId,
+              type: 'p2p_commission',
+              amount: adminCommissionAmount,
+              balanceBefore: adminData.balance || 0,
+              balanceAfter: (adminData.balance || 0) + adminCommissionAmount,
+              description: `عمولة إدارة من صفقة P2P - طلب ${id.substring(0, 8)} (${adminCommissionPct}%)`,
+              referenceId: id,
+            })
+            
+            console.log(`[P2P Commission] Added ${adminCommissionAmount} USDT to admin ${adminId} from order ${id}`)
+          }
+        }
+      } catch (commErr: any) {
+        console.error('[P2P Commission] Failed to add admin commission:', commErr?.message)
+        // Non-fatal — the trade still completes successfully
+      }
+
       // Notify buyer
       if (order.buyerId) {
         await notificationOperations.create({

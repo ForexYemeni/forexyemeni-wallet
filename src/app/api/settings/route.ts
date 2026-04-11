@@ -7,11 +7,13 @@ export async function GET() {
     const db = getDb()
 
     // Fetch all settings documents in parallel
-    const [feesDoc, socialLinksDoc, referralSettingsDoc, botSettingsDoc] = await Promise.all([
+    const [feesDoc, socialLinksDoc, referralSettingsDoc, botSettingsDoc, commissionDoc, exchangeRatesDoc] = await Promise.all([
       db.collection('systemSettings').doc('fees').get(),
       db.collection('systemSettings').doc('socialLinks').get(),
       db.collection('systemSettings').doc('referralSettings').get(),
       db.collection('systemSettings').doc('botSettings').get(),
+      db.collection('systemSettings').doc('commission').get(),
+      db.collection('systemSettings').doc('exchangeRates').get(),
     ])
 
     // Fee settings (with defaults)
@@ -40,6 +42,22 @@ export async function GET() {
     // Bot settings (may not exist)
     const botSettings = botSettingsDoc.exists ? botSettingsDoc.data() : null
 
+    // Commission settings (with defaults)
+    let commission = { p2pFeePercent: 0.5, adminCommissionPercent: 1, updatedAt: nowTimestamp() }
+    if (commissionDoc.exists) {
+      commission = commissionDoc.data() as typeof commission
+    } else {
+      await db.collection('systemSettings').doc('commission').set(commission)
+    }
+
+    // Exchange rates (with defaults)
+    let exchangeRates = { usdToYer: 535, usdToSar: 3.75, sarToYer: 142.67, updatedAt: nowTimestamp() }
+    if (exchangeRatesDoc.exists) {
+      exchangeRates = exchangeRatesDoc.data() as typeof exchangeRates
+    } else {
+      await db.collection('systemSettings').doc('exchangeRates').set(exchangeRates)
+    }
+
     return NextResponse.json({
       success: true,
       settings: {
@@ -47,6 +65,8 @@ export async function GET() {
         socialLinks,
         referralSettings,
         botSettings,
+        commission,
+        exchangeRates,
       },
     })
   } catch (error: unknown) {

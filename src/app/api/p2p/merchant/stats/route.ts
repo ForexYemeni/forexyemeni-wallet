@@ -122,12 +122,12 @@ export async function GET(req: NextRequest) {
       0
     )
 
-    // Calculate earnings: assume a 1% commission on completed trades
-    // (This can be adjusted based on actual fee structure)
-    const totalEarnings = completedTrades.reduce(
-      (sum, t) => sum + t.amount * 0.01,
+    // Calculate total earnings (sum of completed trade amounts)
+    // Note: actual commission deducted is shown per-order (p2pFee, adminCommission)
+    const totalEarnings = parseFloat(completedTrades.reduce(
+      (sum, t) => sum + (t.amount || 0),
       0
-    )
+    ).toFixed(2))
 
     const totalCompleted = completedTrades.length
     const totalAll = allTrades.length

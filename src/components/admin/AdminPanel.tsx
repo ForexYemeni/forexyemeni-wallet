@@ -58,6 +58,8 @@ import {
   Repeat,
   Store,
   KeyRound,
+  Percent,
+  RefreshCw,
   RotateCcw,
   ShieldOff,
   Hash,
@@ -3244,6 +3246,13 @@ function AdminSettingsPanel({ settings, onRefresh }: { settings: { email: string
   // Fee form
   const [depositFee, setDepositFee] = useState('')
   const [withdrawalFee, setWithdrawalFee] = useState('')
+  // Commission settings
+  const [p2pFeePercent, setP2pFeePercent] = useState('')
+  const [adminCommissionPercent, setAdminCommissionPercent] = useState('')
+  // Exchange rates
+  const [usdToYer, setUsdToYer] = useState('')
+  const [usdToSar, setUsdToSar] = useState('')
+  const [sarToYer, setSarToYer] = useState('')
   // Social links form
   const [socialWhatsapp, setSocialWhatsapp] = useState('')
   const [socialPhone, setSocialPhone] = useState('')
@@ -3269,6 +3278,17 @@ function AdminSettingsPanel({ settings, onRefresh }: { settings: { email: string
       if (data.success && data.settings) {
         setDepositFee(String(data.settings.depositFee || 0))
         setWithdrawalFee(String(data.settings.withdrawalFee || 0.1))
+        // Commission
+        if (data.settings.commission) {
+          setP2pFeePercent(String(data.settings.commission.p2pFeePercent ?? 0.5))
+          setAdminCommissionPercent(String(data.settings.commission.adminCommissionPercent ?? 1))
+        }
+        // Exchange rates
+        if (data.settings.exchangeRates) {
+          setUsdToYer(String(data.settings.exchangeRates.usdToYer ?? 535))
+          setUsdToSar(String(data.settings.exchangeRates.usdToSar ?? 3.75))
+          setSarToYer(String(data.settings.exchangeRates.sarToYer ?? 142.67))
+        }
       }
     } catch { /* silent */ }
   }
@@ -3353,6 +3373,8 @@ function AdminSettingsPanel({ settings, onRefresh }: { settings: { email: string
           setTimeout(() => useAuthStore.getState().logout(), 2000)
         }
         if (actionKey === 'update_fees') fetchFees()
+        if (actionKey === 'update_commission') fetchFees()
+        if (actionKey === 'update_exchange_rates') fetchFees()
         onRefresh()
       } else {
         toast.error(data.message)
@@ -3475,6 +3497,68 @@ function AdminSettingsPanel({ settings, onRefresh }: { settings: { email: string
           >
             {loading ? <Loader2 className="w-4 h-4 animate-spin mx-auto" /> : 'حفظ الرسوم'}
           </button>
+
+          {/* === Commission Section === */}
+          <div className="border-t border-white/10 pt-4 mt-2 space-y-3">
+            <h3 className="text-sm font-bold flex items-center gap-2">
+              <Percent className="w-4 h-4 text-amber-400" />
+              عمولة التجار P2P
+            </h3>
+            <p className="text-xs text-muted-foreground leading-relaxed">
+              عند إتمام أي صفقة P2P، يتم خصم نسبة من التاجر تُضاف تلقائياً لحساب الإدارة. النسبتين يظهرن للتاجر بوضوح عند إنشاء الطلب.
+            </p>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1">
+                <Label className="text-xs text-muted-foreground">رسوم P2P للتاجر (%)</Label>
+                <Input type="number" value={p2pFeePercent} onChange={(e) => setP2pFeePercent(e.target.value)} className="glass-input h-10 text-sm" placeholder="0.5" dir="ltr" step="0.1" min="0" max="10" />
+                <p className="text-[10px] text-muted-foreground">تُخصم من التاجر عند إنشاء الطلب</p>
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs text-muted-foreground">عمولة الإدارة (%)</Label>
+                <Input type="number" value={adminCommissionPercent} onChange={(e) => setAdminCommissionPercent(e.target.value)} className="glass-input h-10 text-sm" placeholder="1" dir="ltr" step="0.1" min="0" max="50" />
+                <p className="text-[10px] text-muted-foreground">تُضاف لحساب الإدارة عند إتمام الصفقة</p>
+              </div>
+            </div>
+            <button
+              onClick={() => handleSave('update_commission', { p2pFeePercent: parseFloat(p2pFeePercent) || 0.5, adminCommissionPercent: parseFloat(adminCommissionPercent) || 1 })}
+              disabled={loading}
+              className="w-full h-11 bg-amber-500/20 hover:bg-amber-500/30 text-amber-400 font-bold rounded-xl transition-all"
+            >
+              {loading ? <Loader2 className="w-4 h-4 animate-spin mx-auto" /> : 'حفظ إعدادات العمولة'}
+            </button>
+          </div>
+
+          {/* === Exchange Rates Section === */}
+          <div className="border-t border-white/10 pt-4 mt-2 space-y-3">
+            <h3 className="text-sm font-bold flex items-center gap-2">
+              <RefreshCw className="w-4 h-4 text-green-400" />
+              أسعار الصرف
+            </h3>
+            <p className="text-xs text-muted-foreground leading-relaxed">
+              تحديث أسعار الصرف الظاهرة للمستخدمين في المحفظة و P2P والإيداعات
+            </p>
+            <div className="grid grid-cols-3 gap-3">
+              <div className="space-y-1">
+                <Label className="text-[10px] text-muted-foreground">1 دولار = ؟ ريال يمني</Label>
+                <Input type="number" value={usdToYer} onChange={(e) => setUsdToYer(e.target.value)} className="glass-input h-10 text-sm text-center" placeholder="535" dir="ltr" step="1" min="0" />
+              </div>
+              <div className="space-y-1">
+                <Label className="text-[10px] text-muted-foreground">1 دولار = ؟ ريال سعودي</Label>
+                <Input type="number" value={usdToSar} onChange={(e) => setUsdToSar(e.target.value)} className="glass-input h-10 text-sm text-center" placeholder="3.75" dir="ltr" step="0.01" min="0" />
+              </div>
+              <div className="space-y-1">
+                <Label className="text-[10px] text-muted-foreground">1 ريال سعودي = ؟ ريال يمني</Label>
+                <Input type="number" value={sarToYer} onChange={(e) => setSarToYer(e.target.value)} className="glass-input h-10 text-sm text-center" placeholder="142.67" dir="ltr" step="0.01" min="0" />
+              </div>
+            </div>
+            <button
+              onClick={() => handleSave('update_exchange_rates', { usdToYer: parseFloat(usdToYer) || 535, usdToSar: parseFloat(usdToSar) || 3.75, sarToYer: parseFloat(sarToYer) || 142.67 })}
+              disabled={loading}
+              className="w-full h-11 bg-green-500/20 hover:bg-green-500/30 text-green-400 font-bold rounded-xl transition-all"
+            >
+              {loading ? <Loader2 className="w-4 h-4 animate-spin mx-auto" /> : 'حفظ أسعار الصرف'}
+            </button>
+          </div>
         </div>
       )}
 

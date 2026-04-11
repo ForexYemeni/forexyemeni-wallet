@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react'
 import { useAuthStore } from '@/lib/store'
 import { useOfflineStore } from '@/lib/offline-store'
 import { useOfflineMode } from '@/hooks/useOfflineMode'
-import { convertUSDTtoYER, formatYER } from '@/lib/currency'
+import { convertUSDTtoYER, formatYER, ExchangeRateBadge } from '@/lib/currency'
 import { toast } from 'sonner'
 import BannerSlider from '@/components/BannerSlider'
 import {
@@ -171,6 +171,9 @@ export default function Dashboard() {
 
       {/* Banner Slider */}
       <BannerSlider />
+
+      {/* Exchange Rates Badge */}
+      <ExchangeRateBadge className="justify-center flex-wrap" />
 
       {/* Balance Card */}
       <div className="glass-card gold-border gold-glow p-6 relative overflow-hidden">

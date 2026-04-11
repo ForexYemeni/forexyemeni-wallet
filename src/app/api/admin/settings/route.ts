@@ -284,6 +284,46 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ success: true, message: 'تم تحديث الرسوم بنجاح' })
     }
 
+    // === UPDATE COMMISSION SETTINGS ===
+    if (action === 'update_commission') {
+      const { p2pFeePercent, adminCommissionPercent } = body
+      if (typeof p2pFeePercent !== 'number' || typeof adminCommissionPercent !== 'number') {
+        return NextResponse.json({ success: false, message: 'قيم العمولة مطلوبة' }, { status: 400 })
+      }
+      if (p2pFeePercent < 0 || p2pFeePercent > 10) {
+        return NextResponse.json({ success: false, message: 'رسوم P2P يجب أن تكون بين 0 و 10%' }, { status: 400 })
+      }
+      if (adminCommissionPercent < 0 || adminCommissionPercent > 50) {
+        return NextResponse.json({ success: false, message: 'عمولة الإدارة يجب أن تكون بين 0 و 50%' }, { status: 400 })
+      }
+      const db = getDb()
+      await db.collection('systemSettings').doc('commission').set({
+        p2pFeePercent,
+        adminCommissionPercent,
+        updatedAt: nowTimestamp(),
+      }, { merge: true })
+      return NextResponse.json({ success: true, message: 'تم تحديث إعدادات العمولة بنجاح' })
+    }
+
+    // === UPDATE EXCHANGE RATES ===
+    if (action === 'update_exchange_rates') {
+      const { usdToYer, usdToSar, sarToYer } = body
+      if (typeof usdToYer !== 'number' || typeof usdToSar !== 'number' || typeof sarToYer !== 'number') {
+        return NextResponse.json({ success: false, message: 'جميع أسعار الصرف مطلوبة' }, { status: 400 })
+      }
+      if (usdToYer <= 0 || usdToSar <= 0 || sarToYer <= 0) {
+        return NextResponse.json({ success: false, message: 'أسعار الصرف يجب أن تكون أكبر من صفر' }, { status: 400 })
+      }
+      const db = getDb()
+      await db.collection('systemSettings').doc('exchangeRates').set({
+        usdToYer,
+        usdToSar,
+        sarToYer,
+        updatedAt: nowTimestamp(),
+      }, { merge: true })
+      return NextResponse.json({ success: true, message: 'تم تحديث أسعار الصرف بنجاح' })
+    }
+
     return NextResponse.json({ success: false, message: 'إجراء غير معروف' }, { status: 400 })
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : 'حدث خطأ'

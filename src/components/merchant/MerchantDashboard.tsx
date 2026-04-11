@@ -267,7 +267,7 @@ export default function MerchantDashboard({ onNavigateToListings, onNavigateToTr
           <p className="relative text-2xl font-bold gold-text">
             {formatAmount(stats.totalEarnings)}
           </p>
-          <p className="relative text-[10px] text-muted-foreground">USDT (عمولة 1%)</p>
+          <p className="relative text-[10px] text-muted-foreground">USDT (إجمالي الصفقات المكتملة)</p>
         </div>
 
         {/* Success Rate */}
