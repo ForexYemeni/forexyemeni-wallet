@@ -308,20 +308,28 @@ export async function POST(request: NextRequest) {
     // === UPDATE EXCHANGE RATES ===
     if (action === 'update_exchange_rates') {
       const { usdToYer, usdToSar, sarToYer } = body
-      if (typeof usdToYer !== 'number' || typeof usdToSar !== 'number' || typeof sarToYer !== 'number') {
-        return NextResponse.json({ success: false, message: 'جميع أسعار الصرف مطلوبة' }, { status: 400 })
+      // Parse as float to handle decimal values like 3.75
+      const parsedYer = parseFloat(String(usdToYer))
+      const parsedSar = parseFloat(String(usdToSar))
+      const parsedSarToYer = parseFloat(String(sarToYer))
+      if (isNaN(parsedYer) || isNaN(parsedSar) || isNaN(parsedSarToYer)) {
+        return NextResponse.json({ success: false, message: 'جميع أسعار الصرف مطلوبة ويجب أن تكون أرقاماً' }, { status: 400 })
       }
-      if (usdToYer <= 0 || usdToSar <= 0 || sarToYer <= 0) {
+      if (parsedYer <= 0 || parsedSar <= 0 || parsedSarToYer <= 0) {
         return NextResponse.json({ success: false, message: 'أسعار الصرف يجب أن تكون أكبر من صفر' }, { status: 400 })
       }
       const db = getDb()
       await db.collection('systemSettings').doc('exchangeRates').set({
-        usdToYer,
-        usdToSar,
-        sarToYer,
+        usdToYer: parsedYer,
+        usdToSar: parsedSar,
+        sarToYer: parsedSarToYer,
         updatedAt: nowTimestamp(),
       }, { merge: true })
-      return NextResponse.json({ success: true, message: 'تم تحديث أسعار الصرف بنجاح' })
+      return NextResponse.json({
+        success: true,
+        message: 'تم تحديث أسعار الصرف بنجاح',
+        saved: { usdToYer: parsedYer, usdToSar: parsedSar, sarToYer: parsedSarToYer },
+      })
     }
 
     return NextResponse.json({ success: false, message: 'إجراء غير معروف' }, { status: 400 })

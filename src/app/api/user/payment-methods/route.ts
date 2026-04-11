@@ -45,6 +45,7 @@ export async function POST(request: NextRequest) {
       name: data.name || '',
       type: data.type || 'bank_transfer',
       category: data.category || 'bank',
+      currency: data.currency || null,
       isActive: true,
       network: data.network || null,
       walletAddress: data.walletAddress || null,

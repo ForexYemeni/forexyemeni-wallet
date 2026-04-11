@@ -150,6 +150,7 @@ export interface UserPaymentMethod {
   name: string // e.g., "حسابي البنكي", "محفظة TRC20"
   type: string // 'bank_transfer' | 'bank_deposit' | 'atm_transfer' | 'crypto'
   category: string // 'bank' | 'crypto'
+  currency?: string // 'YER' | 'SAR' | 'USD' | null
   isActive: boolean
   network?: string | null
   walletAddress?: string | null

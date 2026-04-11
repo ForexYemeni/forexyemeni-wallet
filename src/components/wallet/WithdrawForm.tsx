@@ -68,7 +68,7 @@ export default function WithdrawForm() {
   const [editMethodData, setEditMethodData] = useState<any>(null)
   const [methodLoading, setMethodLoading] = useState(false)
   const [methodForm, setMethodForm] = useState({
-    type: 'bank_deposit', category: 'bank',
+    type: 'bank_deposit', category: 'bank', currency: 'YER',
     network: '', walletAddress: '', accountName: '', accountNumber: '',
     beneficiaryName: '', phone: '', recipientName: '', recipientPhone: '',
   })
@@ -124,7 +124,7 @@ export default function WithdrawForm() {
 
   // ===== METHOD CRUD =====
   const resetMethodForm = () => {
-    setMethodForm({ type: 'bank_deposit', category: 'bank', network: '', walletAddress: '', accountName: '', accountNumber: '', beneficiaryName: '', phone: '', recipientName: '', recipientPhone: '' })
+    setMethodForm({ type: 'bank_deposit', category: 'bank', currency: 'YER', network: '', walletAddress: '', accountName: '', accountNumber: '', beneficiaryName: '', phone: '', recipientName: '', recipientPhone: '' })
     setEditMethodData(null)
     setShowAddMethod(false)
   }
@@ -132,7 +132,7 @@ export default function WithdrawForm() {
   const handleEditMethod = (m: any) => {
     setEditMethodData(m)
     setMethodForm({
-      type: m.type || 'bank_deposit', category: m.category || 'bank',
+      type: m.type || 'bank_deposit', category: m.category || 'bank', currency: m.currency || 'YER',
       network: m.network || '', walletAddress: m.walletAddress || '', accountName: m.accountName || '',
       accountNumber: m.accountNumber || '', beneficiaryName: m.beneficiaryName || '',
       phone: m.phone || '', recipientName: m.recipientName || '', recipientPhone: m.recipientPhone || '',
@@ -419,7 +419,21 @@ export default function WithdrawForm() {
                     </div>
                     <div className="flex-1">
                       <p className="text-sm font-medium">{getMethodTitle(m)}</p>
-                      <p className="text-[10px] text-muted-foreground">{CATEGORY_LABELS[m.category] || m.category}</p>
+                      <p className="text-[10px] text-muted-foreground flex items-center gap-1.5">
+                        <span>{CATEGORY_LABELS[m.category] || m.category}</span>
+                        {m.currency && m.category === 'bank' && (
+                          <>
+                            <span className="text-white/10">|</span>
+                            <span className={
+                              m.currency === 'YER' ? 'text-green-400' :
+                              m.currency === 'SAR' ? 'text-amber-400' :
+                              'text-blue-400'
+                            }>
+                              {m.currency === 'YER' ? '🇾🇪 ريال يمني' : m.currency === 'SAR' ? '🇸🇦 ريال سعودي' : '💵 دولار'}
+                            </span>
+                          </>
+                        )}
+                      </p>
                     </div>
                     <ChevronLeft className="w-5 h-5 text-muted-foreground" />
                   </button>
@@ -573,6 +587,34 @@ export default function WithdrawForm() {
                     </select>
                   </div>
                 </div>
+
+                {/* Bank: Account Currency Type */}
+                {methodForm.category === 'bank' && (
+                  <div className="space-y-1">
+                    <label className="text-xs text-muted-foreground">نوع الحساب / العملة</label>
+                    <div className="grid grid-cols-3 gap-2">
+                      {[
+                        { value: 'YER', label: 'ريال يمني', flag: '🇾🇪', color: 'border-green-500/20 bg-green-500/5 text-green-400' },
+                        { value: 'SAR', label: 'ريال سعودي', flag: '🇸🇦', color: 'border-amber-500/20 bg-amber-500/5 text-amber-400' },
+                        { value: 'USD', label: 'دولار', flag: '💵', color: 'border-blue-500/20 bg-blue-500/5 text-blue-400' },
+                      ].map((opt) => (
+                        <button
+                          key={opt.value}
+                          type="button"
+                          onClick={() => setMethodForm({ ...methodForm, currency: opt.value })}
+                          className={`flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl text-xs font-medium border transition-all ${
+                            methodForm.currency === opt.value
+                              ? `${opt.color} shadow-sm`
+                              : 'border-white/5 bg-white/3 text-muted-foreground hover:bg-white/5'
+                          }`}
+                        >
+                          <span className="text-sm">{opt.flag}</span>
+                          <span>{opt.label}</span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
 
                 {/* Bank: Deposit fields */}
                 {methodForm.category === 'bank' && methodForm.type === 'bank_deposit' && (

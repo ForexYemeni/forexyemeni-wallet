@@ -3375,7 +3375,12 @@ function AdminSettingsPanel({ settings, onRefresh }: { settings: { email: string
         if (actionKey === 'update_fees') fetchFees()
         if (actionKey === 'update_commission') fetchFees()
         if (actionKey === 'update_exchange_rates') {
-          await fetchFees()
+          // Use server-confirmed values to prevent UI/state mismatch
+          if (data.saved) {
+            setUsdToYer(String(data.saved.usdToYer))
+            setUsdToSar(String(data.saved.usdToSar))
+            setSarToYer(String(data.saved.sarToYer))
+          }
           await refreshExchangeRates()
         }
         onRefresh()
@@ -3540,26 +3545,114 @@ function AdminSettingsPanel({ settings, onRefresh }: { settings: { email: string
             <p className="text-xs text-muted-foreground leading-relaxed">
               تحديث أسعار الصرف الظاهرة للمستخدمين في المحفظة و P2P والإيداعات
             </p>
-            <div className="grid grid-cols-3 gap-3">
-              <div className="space-y-1">
-                <Label className="text-[10px] text-muted-foreground">1 دولار = ؟ ريال يمني</Label>
-                <Input type="number" value={usdToYer} onChange={(e) => setUsdToYer(e.target.value)} className="glass-input h-10 text-sm text-center" placeholder="535" dir="ltr" step="1" min="0" />
+            <div className="space-y-3">
+              {/* USD to YER */}
+              <div className="flex items-center gap-3 p-3 rounded-xl bg-gradient-to-l from-green-500/5 to-transparent border border-green-500/10">
+                <div className="flex items-center justify-center w-10 h-10 rounded-xl bg-green-500/10 flex-shrink-0">
+                  <span className="text-lg">🇺🇸</span>
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 mb-1">
+                    <span className="text-xs font-medium text-green-400">دولار أمريكي ← ريال يمني</span>
+                    <span className="text-[10px] text-muted-foreground bg-white/5 px-1.5 py-0.5 rounded">1 USD = ? YER</span>
+                  </div>
+                  <Input
+                    type="number"
+                    value={usdToYer}
+                    onChange={(e) => setUsdToYer(e.target.value)}
+                    className="glass-input h-9 text-sm font-bold text-green-400"
+                    placeholder="535"
+                    dir="ltr"
+                    step="1"
+                    min="0"
+                  />
+                </div>
               </div>
-              <div className="space-y-1">
-                <Label className="text-[10px] text-muted-foreground">1 دولار = ؟ ريال سعودي</Label>
-                <Input type="number" value={usdToSar} onChange={(e) => setUsdToSar(e.target.value)} className="glass-input h-10 text-sm text-center" placeholder="3.75" dir="ltr" step="0.01" min="0" />
+
+              {/* USD to SAR */}
+              <div className="flex items-center gap-3 p-3 rounded-xl bg-gradient-to-l from-amber-500/5 to-transparent border border-amber-500/10">
+                <div className="flex items-center justify-center w-10 h-10 rounded-xl bg-amber-500/10 flex-shrink-0">
+                  <span className="text-lg">🇸🇦</span>
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 mb-1">
+                    <span className="text-xs font-medium text-amber-400">دولار أمريكي ← ريال سعودي</span>
+                    <span className="text-[10px] text-muted-foreground bg-white/5 px-1.5 py-0.5 rounded">1 USD = ? SAR</span>
+                  </div>
+                  <Input
+                    type="number"
+                    value={usdToSar}
+                    onChange={(e) => setUsdToSar(e.target.value)}
+                    className="glass-input h-9 text-sm font-bold text-amber-400"
+                    placeholder="3.75"
+                    dir="ltr"
+                    step="0.01"
+                    min="0"
+                  />
+                </div>
               </div>
-              <div className="space-y-1">
-                <Label className="text-[10px] text-muted-foreground">1 ريال سعودي = ؟ ريال يمني</Label>
-                <Input type="number" value={sarToYer} onChange={(e) => setSarToYer(e.target.value)} className="glass-input h-10 text-sm text-center" placeholder="142.67" dir="ltr" step="0.01" min="0" />
+
+              {/* SAR to YER */}
+              <div className="flex items-center gap-3 p-3 rounded-xl bg-gradient-to-l from-blue-500/5 to-transparent border border-blue-500/10">
+                <div className="flex items-center justify-center w-10 h-10 rounded-xl bg-blue-500/10 flex-shrink-0">
+                  <div className="text-lg">🔄</div>
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 mb-1">
+                    <span className="text-xs font-medium text-blue-400">ريال سعودي ← ريال يمني</span>
+                    <span className="text-[10px] text-muted-foreground bg-white/5 px-1.5 py-0.5 rounded">1 SAR = ? YER</span>
+                  </div>
+                  <Input
+                    type="number"
+                    value={sarToYer}
+                    onChange={(e) => setSarToYer(e.target.value)}
+                    className="glass-input h-9 text-sm font-bold text-blue-400"
+                    placeholder="142.67"
+                    dir="ltr"
+                    step="0.01"
+                    min="0"
+                  />
+                </div>
               </div>
             </div>
+
+            {/* Live preview */}
+            <div className="p-3 rounded-xl bg-white/3 border border-white/5">
+              <p className="text-[10px] text-muted-foreground mb-2 font-medium">معاينة مباشرة:</p>
+              <div className="flex items-center justify-around text-[11px]">
+                <div className="text-center">
+                  <span className="text-muted-foreground">1$ = </span>
+                  <span className="font-bold text-green-400">{Number(usdToYer || 535).toLocaleString()}</span>
+                  <span className="text-muted-foreground"> ر.ي</span>
+                </div>
+                <div className="w-px h-4 bg-white/10" />
+                <div className="text-center">
+                  <span className="text-muted-foreground">1$ = </span>
+                  <span className="font-bold text-amber-400">{Number(usdToSar || 3.75).toFixed(2)}</span>
+                  <span className="text-muted-foreground"> ر.س</span>
+                </div>
+                <div className="w-px h-4 bg-white/10" />
+                <div className="text-center">
+                  <span className="text-muted-foreground">1 ر.س = </span>
+                  <span className="font-bold text-blue-400">{Number(sarToYer || 142.67).toLocaleString()}</span>
+                  <span className="text-muted-foreground"> ر.ي</span>
+                </div>
+              </div>
+            </div>
+
             <button
-              onClick={() => handleSave('update_exchange_rates', { usdToYer: parseFloat(usdToYer) || 535, usdToSar: parseFloat(usdToSar) || 3.75, sarToYer: parseFloat(sarToYer) || 142.67 })}
+              onClick={() => handleSave('update_exchange_rates', {
+                usdToYer: parseFloat(usdToYer) || 535,
+                usdToSar: parseFloat(usdToSar) || 3.75,
+                sarToYer: parseFloat(sarToYer) || 142.67
+              })}
               disabled={loading}
-              className="w-full h-11 bg-green-500/20 hover:bg-green-500/30 text-green-400 font-bold rounded-xl transition-all"
+              className="w-full h-11 bg-green-500/20 hover:bg-green-500/30 text-green-400 font-bold rounded-xl transition-all flex items-center justify-center gap-2"
             >
-              {loading ? <Loader2 className="w-4 h-4 animate-spin mx-auto" /> : 'حفظ أسعار الصرف'}
+              {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <>
+                <RefreshCw className="w-4 h-4" />
+                حفظ أسعار الصرف
+              </>}
             </button>
           </div>
         </div>
