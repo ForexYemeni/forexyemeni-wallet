@@ -55,14 +55,14 @@ const DEPOSIT_CATEGORIES: DepositCategory[] = [
   },
   {
     code: 'bank_transfer',
-    label: 'تحويل بنكي',
+    label: 'تحويل',
     icon: <Smartphone className="w-7 h-7" />,
     description: 'تحويل عبر الصراف الآلي أو البنك',
     color: 'bg-emerald-500/10 text-emerald-400 group-hover:bg-emerald-500/20',
   },
   {
     code: 'crypto',
-    label: 'إيداع بالعملات الرقمية',
+    label: 'عملات رقمية',
     icon: <Bitcoin className="w-7 h-7" />,
     description: 'إيداع عبر USDT والعملات الرقمية',
     color: 'bg-orange-500/10 text-orange-400 group-hover:bg-orange-500/20',
@@ -71,25 +71,25 @@ const DEPOSIT_CATEGORIES: DepositCategory[] = [
 
 const CURRENCY_OPTIONS: CurrencyOption[] = [
   {
-    code: 'USDT',
-    label: 'دولار (USDT)',
-    icon: <Coins className="w-6 h-6" />,
-    description: 'إيداع بالدولار مباشرة',
-    color: 'bg-green-500/10 text-green-400 group-hover:bg-green-500/20',
-  },
-  {
     code: 'YER',
-    label: 'ريال يمني (ر.ي)',
+    label: 'يمني',
     icon: <Landmark className="w-6 h-6" />,
-    description: `سعر الصرف: 1 USDT = ... ر.ي`,
+    description: 'ريال يمني',
     color: 'bg-blue-500/10 text-blue-400 group-hover:bg-blue-500/20',
   },
   {
     code: 'SAR',
-    label: 'ريال سعودي (ر.س)',
+    label: 'سعودي',
     icon: <Landmark className="w-6 h-6" />,
-    description: `سعر الصرف: 1 USDT = ... ر.س`,
+    description: 'ريال سعودي',
     color: 'bg-purple-500/10 text-purple-400 group-hover:bg-purple-500/20',
+  },
+  {
+    code: 'USDT',
+    label: 'دولار',
+    icon: <Coins className="w-6 h-6" />,
+    description: 'USDT',
+    color: 'bg-green-500/10 text-green-400 group-hover:bg-green-500/20',
   },
 ]
 
@@ -424,10 +424,10 @@ export default function DepositForm() {
   const getCurrencyOptionsWithRates = (): CurrencyOption[] => {
     return CURRENCY_OPTIONS.map(opt => {
       if (opt.code === 'YER') {
-        return { ...opt, description: `سعر الصرف: 1 USDT = ${rates.usdToYer.toLocaleString()} ر.ي` }
+        return { ...opt, description: `1 USDT = ${rates.usdToYer.toLocaleString()} ر.ي` }
       }
       if (opt.code === 'SAR') {
-        return { ...opt, description: `سعر الصرف: 1 USDT = ${rates.usdToSar} ر.س` }
+        return { ...opt, description: `1 USDT = ${rates.usdToSar} ر.س` }
       }
       return opt
     })
@@ -479,7 +479,7 @@ export default function DepositForm() {
         </div>
         <div>
           <h1 className="text-xl font-bold">إيداع</h1>
-          <p className="text-sm text-muted-foreground">اختر نوع الإيداع وطريقة الدفع</p>
+          <p className="text-sm text-muted-foreground">اختر طريقة الإيداع</p>
         </div>
       </div>
 
