@@ -13,6 +13,7 @@ import {
   AlertTriangle,
   Info,
   ChevronLeft,
+  ChevronRight,
   Wallet,
   Building,
   CreditCard,
@@ -25,6 +26,7 @@ import {
   Clock,
   Smartphone,
   Bitcoin,
+  Landmark,
 } from 'lucide-react'
 import PinDots from '@/components/ui/PinDots'
 import SuccessResult from '@/components/ui/SuccessResult'
@@ -41,10 +43,13 @@ const CRYPTO_NETWORKS = [
 ]
 
 const TYPE_LABELS: Record<string, string> = {
-  bank_deposit: 'إيداع لمحفظة', atm_transfer: 'تحويل عبر صراف', crypto: 'عملات رقمية'
+  bank_deposit: 'إيداع بنكي',
+  bank_transfer: 'تحويل بنكي',
+  atm_transfer: 'تحويل عبر صراف',
+  crypto: 'عملات رقمية',
 }
 
-const CATEGORY_LABELS: Record<string, string> = { bank: '🏦 بنكي', crypto: '₿ عملات رقمية' }
+const CATEGORY_LABELS: Record<string, string> = { bank: 'بنكي', crypto: 'عملات رقمية' }
 
 const getMethodTitle = (m: any) => {
   if (m.category === 'crypto') {
@@ -52,6 +57,9 @@ const getMethodTitle = (m: any) => {
   }
   return TYPE_LABELS[m.type] || m.type
 }
+
+// Add Method Wizard Step Type
+type AddMethodStep = 'category' | 'type' | 'currency' | 'details'
 
 export default function WithdrawForm() {
   const { user, updateUser, setScreen } = useAuthStore()
@@ -71,14 +79,23 @@ export default function WithdrawForm() {
   const [pinError, setPinError] = useState(false)
   // Withdraw success state
   const [withdrawSuccess, setWithdrawSuccess] = useState(false)
-  // Add/Edit method dialog
+  // Add/Edit method wizard
   const [showAddMethod, setShowAddMethod] = useState(false)
   const [editMethodData, setEditMethodData] = useState<any>(null)
   const [methodLoading, setMethodLoading] = useState(false)
+  const [addMethodStep, setAddMethodStep] = useState<AddMethodStep>('category')
   const [methodForm, setMethodForm] = useState({
-    type: 'bank_deposit', category: 'bank', currency: 'YER',
-    network: '', walletAddress: '', accountName: '', accountNumber: '',
-    beneficiaryName: '', phone: '', recipientName: '', recipientPhone: '',
+    type: 'bank_deposit',
+    category: 'bank',
+    currency: 'YER',
+    network: '',
+    walletAddress: '',
+    accountName: '',
+    accountNumber: '',
+    beneficiaryName: '',
+    phone: '',
+    recipientName: '',
+    recipientPhone: '',
   })
 
   useEffect(() => {
@@ -132,9 +149,14 @@ export default function WithdrawForm() {
 
   // ===== METHOD CRUD =====
   const resetMethodForm = () => {
-    setMethodForm({ type: 'bank_deposit', category: 'bank', currency: 'YER', network: '', walletAddress: '', accountName: '', accountNumber: '', beneficiaryName: '', phone: '', recipientName: '', recipientPhone: '' })
+    setMethodForm({
+      type: 'bank_deposit', category: 'bank', currency: 'YER',
+      network: '', walletAddress: '', accountName: '', accountNumber: '',
+      beneficiaryName: '', phone: '', recipientName: '', recipientPhone: '',
+    })
     setEditMethodData(null)
     setShowAddMethod(false)
+    setAddMethodStep('category')
   }
 
   const handleEditMethod = (m: any) => {
@@ -145,10 +167,29 @@ export default function WithdrawForm() {
       accountNumber: m.accountNumber || '', beneficiaryName: m.beneficiaryName || '',
       phone: m.phone || '', recipientName: m.recipientName || '', recipientPhone: m.recipientPhone || '',
     })
+    // Set wizard to details step when editing
     setShowAddMethod(true)
+    setAddMethodStep('details')
   }
 
   const handleSaveMethod = async () => {
+    // Validate required fields based on type
+    if (methodForm.category === 'crypto') {
+      if (!methodForm.network) { toast.error('يرجى اختيار الشبكة'); return }
+      if (!methodForm.walletAddress) { toast.error('يرجى إدخال عنوان المحفظة'); return }
+    } else if (methodForm.type === 'bank_deposit') {
+      if (!methodForm.accountName) { toast.error('يرجى إدخال اسم المحفظة'); return }
+      if (!methodForm.accountNumber) { toast.error('يرجى إدخال رقم الحساب'); return }
+      if (!methodForm.beneficiaryName) { toast.error('يرجى إدخال اسم المستفيد'); return }
+    } else if (methodForm.type === 'bank_transfer') {
+      if (!methodForm.accountName) { toast.error('يرجى إدخال اسم المحفظة'); return }
+      if (!methodForm.accountNumber) { toast.error('يرجى إدخال رقم الحساب / IBAN'); return }
+      if (!methodForm.beneficiaryName) { toast.error('يرجى إدخال اسم المستفيد'); return }
+    } else if (methodForm.type === 'atm_transfer') {
+      if (!methodForm.recipientName) { toast.error('يرجى إدخال اسم المستلم'); return }
+      if (!methodForm.recipientPhone) { toast.error('يرجى إدخال رقم الجوال'); return }
+    }
+
     setMethodLoading(true)
     try {
       const body: any = { ...methodForm, userId: user?.id }
@@ -189,6 +230,60 @@ export default function WithdrawForm() {
     } catch { toast.error('خطأ') }
   }
 
+  // ===== WIZARD NAVIGATION =====
+  const getWizardSteps = (): { key: AddMethodStep; label: string }[] => {
+    if (methodForm.category === 'crypto') {
+      return [
+        { key: 'category', label: 'النوع' },
+        { key: 'details', label: 'البيانات' },
+      ]
+    }
+    return [
+      { key: 'category', label: 'النوع' },
+      { key: 'type', label: 'الطريقة' },
+      { key: 'currency', label: 'العملة' },
+      { key: 'details', label: 'البيانات' },
+    ]
+  }
+
+  const wizardSteps = getWizardSteps()
+  const currentStepIndex = wizardSteps.findIndex(s => s.key === addMethodStep)
+
+  const canGoNext = (): boolean => {
+    if (addMethodStep === 'category') return !!methodForm.category
+    if (addMethodStep === 'type') return !!methodForm.type
+    if (addMethodStep === 'currency') return !!methodForm.currency
+    return false // details step has save button instead
+  }
+
+  const handleWizardNext = () => {
+    if (addMethodStep === 'category') {
+      if (methodForm.category === 'crypto') {
+        setAddMethodStep('details')
+      } else {
+        setAddMethodStep('type')
+      }
+    } else if (addMethodStep === 'type') {
+      setAddMethodStep('currency')
+    } else if (addMethodStep === 'currency') {
+      setAddMethodStep('details')
+    }
+  }
+
+  const handleWizardBack = () => {
+    if (addMethodStep === 'details') {
+      if (methodForm.category === 'crypto') {
+        setAddMethodStep('category')
+      } else {
+        setAddMethodStep('currency')
+      }
+    } else if (addMethodStep === 'currency') {
+      setAddMethodStep('type')
+    } else if (addMethodStep === 'type') {
+      setAddMethodStep('category')
+    }
+  }
+
   // ===== SUBMIT WITHDRAWAL =====
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -211,7 +306,10 @@ export default function WithdrawForm() {
       network = selectedMethod.network || 'TRC20'
     } else if (selectedMethod?.type === 'bank_deposit') {
       toAddress = `بنكي: ${selectedMethod.beneficiaryName || ''} - ${selectedMethod.accountNumber || ''}`
-      paymentMethodName = selectedMethod.accountName || 'إيداع لمحفظة'
+      paymentMethodName = selectedMethod.accountName || 'إيداع بنكي'
+    } else if (selectedMethod?.type === 'bank_transfer') {
+      toAddress = `تحويل: ${selectedMethod.beneficiaryName || ''} - ${selectedMethod.accountNumber || ''}`
+      paymentMethodName = selectedMethod.accountName || 'تحويل بنكي'
     } else if (selectedMethod?.type === 'atm_transfer') {
       toAddress = `صراف: ${selectedMethod.recipientName || ''} - ${selectedMethod.recipientPhone || ''} - ${selectedMethod.network || ''}`
     }
@@ -221,13 +319,11 @@ export default function WithdrawForm() {
       return
     }
 
-    // Show PIN dialog instead of directly submitting
     setShowPinDialog(true)
     setPinCode('')
     setPinError(false)
   }
 
-  // Execute the actual withdrawal after PIN verification
   const executeWithdrawal = async () => {
     setLoading(true)
     try {
@@ -241,7 +337,10 @@ export default function WithdrawForm() {
         network = selectedMethod.network || 'TRC20'
       } else if (selectedMethod?.type === 'bank_deposit') {
         toAddress = `بنكي: ${selectedMethod.beneficiaryName || ''} - ${selectedMethod.accountNumber || ''}`
-        paymentMethodName = selectedMethod.accountName || 'إيداع لمحفظة'
+        paymentMethodName = selectedMethod.accountName || 'إيداع بنكي'
+      } else if (selectedMethod?.type === 'bank_transfer') {
+        toAddress = `تحويل: ${selectedMethod.beneficiaryName || ''} - ${selectedMethod.accountNumber || ''}`
+        paymentMethodName = selectedMethod.accountName || 'تحويل بنكي'
       } else if (selectedMethod?.type === 'atm_transfer') {
         toAddress = `صراف: ${selectedMethod.recipientName || ''} - ${selectedMethod.recipientPhone || ''} - ${selectedMethod.network || ''}`
       }
@@ -266,7 +365,6 @@ export default function WithdrawForm() {
         setShowPinDialog(false)
         setPinCode('')
         setWithdrawSuccess(true)
-        // Refresh balance
         try {
           const profileRes = await apiFetch('/api/auth/complete-registration')
           if (profileRes.ok) {
@@ -284,12 +382,10 @@ export default function WithdrawForm() {
     }
   }
 
-  // Verify PIN and proceed with withdrawal
   const handlePinSubmit = async () => {
     if (pinCode.length < 4) return
     setPinLoading(true)
     try {
-      // Verify PIN
       const pinRes = await apiFetch('/api/auth/verify-pin', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -305,7 +401,6 @@ export default function WithdrawForm() {
         setPinError(true)
         return
       }
-      // PIN verified, proceed with withdrawal
       await executeWithdrawal()
     } catch {
       toast.error('خطأ في التحقق')
@@ -425,7 +520,6 @@ export default function WithdrawForm() {
                 <div className="flex items-center justify-between">
                   <button
                     onClick={async () => {
-                      // Check for pending withdrawal before allowing new withdrawal
                       setPendingCheckLoading(true)
                       try {
                         const res = await apiFetch(`/api/withdrawals/create?checkPending=true&userId=${user?.id}&_t=${Date.now()}`, { cache: 'no-store' })
@@ -459,7 +553,7 @@ export default function WithdrawForm() {
                               m.currency === 'SAR' ? 'text-amber-400' :
                               'text-blue-400'
                             }>
-                              {m.currency === 'YER' ? '🇾🇪 ريال يمني' : m.currency === 'SAR' ? '🇸🇦 ريال سعودي' : '💵 دولار'}
+                              {m.currency === 'YER' ? 'ريال يمني' : m.currency === 'SAR' ? 'ريال سعودي' : 'دولار'}
                             </span>
                           </>
                         )}
@@ -580,10 +674,10 @@ export default function WithdrawForm() {
         </div>
       )}
 
-      {/* Add/Edit Payment Method Dialog - Same as admin */}
+      {/* ==================== ADD/EDIT METHOD - MULTI-STEP WIZARD ==================== */}
       {showAddMethod && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-end sm:items-center justify-center p-0 sm:p-4" onClick={resetMethodForm}>
-          <div className="glass-card bg-background/95 backdrop-blur-xl border-gold/20 w-full sm:max-w-md sm:rounded-2xl rounded-t-2xl flex flex-col max-h-[80vh] mb-16 sm:mb-0 animate-scale-in" onClick={(e) => e.stopPropagation()}>
+          <div className="glass-card bg-background/95 backdrop-blur-xl border-gold/20 w-full sm:max-w-md sm:rounded-2xl rounded-t-2xl flex flex-col max-h-[92vh] animate-scale-in" onClick={(e) => e.stopPropagation()}>
             {/* Header */}
             <div className="p-5 pb-3 border-b border-white/5 flex-shrink-0">
               <div className="flex items-center justify-between">
@@ -592,186 +686,407 @@ export default function WithdrawForm() {
                   <X className="w-4 h-4" />
                 </button>
               </div>
+
+              {/* Step Progress Indicator */}
+              {!editMethodData && (
+                <div className="flex items-center gap-1 mt-3">
+                  {wizardSteps.map((s, i) => (
+                    <div key={s.key} className="flex items-center flex-1">
+                      <div className="flex items-center justify-center w-6 h-6 rounded-full text-[10px] font-bold flex-shrink-0 transition-all duration-300"
+                        style={{
+                          backgroundColor: i <= currentStepIndex ? '#F0B90B' : 'rgba(255,255,255,0.1)',
+                          color: i <= currentStepIndex ? '#000' : 'rgba(255,255,255,0.4)',
+                        }}
+                      >
+                        {i < currentStepIndex ? <Check className="w-3 h-3" /> : (i + 1)}
+                      </div>
+                      {i < wizardSteps.length - 1 && (
+                        <div className="flex-1 h-[2px] mx-1.5 rounded-full transition-all duration-300"
+                          style={{
+                            backgroundColor: i < currentStepIndex ? '#F0B90B' : 'rgba(255,255,255,0.1)',
+                          }}
+                        />
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
 
-            {/* Content - Scrollable */}
-            <div className="p-5 space-y-4 overflow-y-auto flex-1 min-h-0">
-              <div className="space-y-3">
-                {/* Category Selection - Card Style */}
-                <div className="space-y-1">
-                  <label className="text-xs text-muted-foreground font-medium">نوع السحب</label>
-                  <div className="grid grid-cols-2 gap-2.5">
+            {/* Content - Full height available */}
+            <div className="flex-1 min-h-0 overflow-y-auto p-5 space-y-4">
+
+              {/* ========== STEP: Category Selection ========== */}
+              {addMethodStep === 'category' && (
+                <div className="space-y-4 animate-fade-in">
+                  <p className="text-sm text-muted-foreground">اختر نوع طريقة السحب</p>
+                  <div className="space-y-3">
+                    {/* Bank Option */}
                     <button
                       type="button"
                       onClick={() => setMethodForm({ ...methodForm, category: 'bank', type: 'bank_deposit', network: '' })}
-                      className={`p-3.5 rounded-xl flex flex-col items-center gap-2 border transition-all text-center ${
+                      className={`w-full p-5 rounded-2xl flex items-center gap-4 border-2 transition-all text-right group ${
                         methodForm.category === 'bank'
-                          ? 'border-blue-500/30 bg-blue-500/10 text-blue-400'
-                          : 'border-white/5 bg-white/[0.02] text-muted-foreground hover:border-white/10 hover:bg-white/[0.04]'
+                          ? 'border-blue-500/50 bg-blue-500/10'
+                          : 'border-white/10 bg-white/[0.02] hover:border-white/20 hover:bg-white/[0.04]'
                       }`}
                     >
-                      <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${methodForm.category === 'bank' ? 'bg-blue-500/20' : 'bg-white/5'}`}>
-                        <Building className="w-5 h-5" />
+                      <div className={`w-14 h-14 rounded-2xl flex items-center justify-center flex-shrink-0 transition-colors ${
+                        methodForm.category === 'bank' ? 'bg-blue-500/20' : 'bg-white/5'
+                      }`}>
+                        <Building className="w-7 h-7 text-blue-400" />
                       </div>
-                      <span className="text-xs font-bold">سحب بنكي</span>
-                      <span className="text-[10px] opacity-60">إيداع / تحويل</span>
+                      <div className="flex-1 min-w-0">
+                        <p className={`text-base font-bold ${methodForm.category === 'bank' ? 'text-blue-400' : ''}`}>سحب بنكي</p>
+                        <p className="text-xs text-muted-foreground mt-1">إيداع بنكي / تحويل بنكي / تحويل عبر صراف</p>
+                      </div>
+                      {methodForm.category === 'bank' && (
+                        <div className="w-6 h-6 rounded-full bg-blue-500/20 flex items-center justify-center flex-shrink-0">
+                          <Check className="w-4 h-4 text-blue-400" />
+                        </div>
+                      )}
                     </button>
+
+                    {/* Crypto Option */}
                     <button
                       type="button"
                       onClick={() => setMethodForm({ ...methodForm, category: 'crypto', type: 'crypto', network: 'TRC20' })}
-                      className={`p-3.5 rounded-xl flex flex-col items-center gap-2 border transition-all text-center ${
+                      className={`w-full p-5 rounded-2xl flex items-center gap-4 border-2 transition-all text-right group ${
                         methodForm.category === 'crypto'
-                          ? 'border-orange-500/30 bg-orange-500/10 text-orange-400'
-                          : 'border-white/5 bg-white/[0.02] text-muted-foreground hover:border-white/10 hover:bg-white/[0.04]'
+                          ? 'border-orange-500/50 bg-orange-500/10'
+                          : 'border-white/10 bg-white/[0.02] hover:border-white/20 hover:bg-white/[0.04]'
                       }`}
                     >
-                      <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${methodForm.category === 'crypto' ? 'bg-orange-500/20' : 'bg-white/5'}`}>
-                        <Bitcoin className="w-5 h-5" />
+                      <div className={`w-14 h-14 rounded-2xl flex items-center justify-center flex-shrink-0 transition-colors ${
+                        methodForm.category === 'crypto' ? 'bg-orange-500/20' : 'bg-white/5'
+                      }`}>
+                        <Bitcoin className="w-7 h-7 text-orange-400" />
                       </div>
-                      <span className="text-xs font-bold">عملات رقمية</span>
-                      <span className="text-[10px] opacity-60">USDT / Crypto</span>
+                      <div className="flex-1 min-w-0">
+                        <p className={`text-base font-bold ${methodForm.category === 'crypto' ? 'text-orange-400' : ''}`}>عملات رقمية</p>
+                        <p className="text-xs text-muted-foreground mt-1">USDT - TRC20, BEP20, ERC20, وأكثر</p>
+                      </div>
+                      {methodForm.category === 'crypto' && (
+                        <div className="w-6 h-6 rounded-full bg-orange-500/20 flex items-center justify-center flex-shrink-0">
+                          <Check className="w-4 h-4 text-orange-400" />
+                        </div>
+                      )}
                     </button>
                   </div>
                 </div>
+              )}
 
-                {/* Type Selection (Bank only) - Card Style */}
-                {methodForm.category === 'bank' && (
-                  <div className="space-y-1">
-                    <label className="text-xs text-muted-foreground font-medium">طريقة السحب البنكي</label>
-                    <div className="space-y-2">
+              {/* ========== STEP: Bank Type Selection ========== */}
+              {addMethodStep === 'type' && (
+                <div className="space-y-4 animate-fade-in">
+                  <p className="text-sm text-muted-foreground">اختر طريقة السحب البنكي</p>
+                  <div className="space-y-3">
+                    {/* Bank Deposit */}
+                    <button
+                      type="button"
+                      onClick={() => setMethodForm({ ...methodForm, type: 'bank_deposit' })}
+                      className={`w-full p-4 rounded-2xl flex items-center gap-4 border-2 transition-all text-right ${
+                        methodForm.type === 'bank_deposit'
+                          ? 'border-blue-500/50 bg-blue-500/10'
+                          : 'border-white/10 bg-white/[0.02] hover:border-white/20'
+                      }`}
+                    >
+                      <div className={`w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0 ${
+                        methodForm.type === 'bank_deposit' ? 'bg-blue-500/20' : 'bg-white/5'
+                      }`}>
+                        <Landmark className="w-6 h-6 text-blue-400" />
+                      </div>
+                      <div className="flex-1">
+                        <p className={`text-sm font-bold ${methodForm.type === 'bank_deposit' ? 'text-blue-400' : ''}`}>إيداع بنكي</p>
+                        <p className="text-[11px] text-muted-foreground mt-0.5">إيداع مباشر في حساب بنكي (محفظة)</p>
+                      </div>
+                      {methodForm.type === 'bank_deposit' && <Check className="w-5 h-5 text-blue-400 flex-shrink-0" />}
+                    </button>
+
+                    {/* Bank Transfer */}
+                    <button
+                      type="button"
+                      onClick={() => setMethodForm({ ...methodForm, type: 'bank_transfer' })}
+                      className={`w-full p-4 rounded-2xl flex items-center gap-4 border-2 transition-all text-right ${
+                        methodForm.type === 'bank_transfer'
+                          ? 'border-purple-500/50 bg-purple-500/10'
+                          : 'border-white/10 bg-white/[0.02] hover:border-white/20'
+                      }`}
+                    >
+                      <div className={`w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0 ${
+                        methodForm.type === 'bank_transfer' ? 'bg-purple-500/20' : 'bg-white/5'
+                      }`}>
+                        <Building className="w-6 h-6 text-purple-400" />
+                      </div>
+                      <div className="flex-1">
+                        <p className={`text-sm font-bold ${methodForm.type === 'bank_transfer' ? 'text-purple-400' : ''}`}>تحويل بنكي</p>
+                        <p className="text-[11px] text-muted-foreground mt-0.5">تحويل مصرفي بين الحسابات البنكية</p>
+                      </div>
+                      {methodForm.type === 'bank_transfer' && <Check className="w-5 h-5 text-purple-400 flex-shrink-0" />}
+                    </button>
+
+                    {/* ATM Transfer */}
+                    <button
+                      type="button"
+                      onClick={() => setMethodForm({ ...methodForm, type: 'atm_transfer' })}
+                      className={`w-full p-4 rounded-2xl flex items-center gap-4 border-2 transition-all text-right ${
+                        methodForm.type === 'atm_transfer'
+                          ? 'border-emerald-500/50 bg-emerald-500/10'
+                          : 'border-white/10 bg-white/[0.02] hover:border-white/20'
+                      }`}
+                    >
+                      <div className={`w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0 ${
+                        methodForm.type === 'atm_transfer' ? 'bg-emerald-500/20' : 'bg-white/5'
+                      }`}>
+                        <Smartphone className="w-6 h-6 text-emerald-400" />
+                      </div>
+                      <div className="flex-1">
+                        <p className={`text-sm font-bold ${methodForm.type === 'atm_transfer' ? 'text-emerald-400' : ''}`}>تحويل عبر صراف</p>
+                        <p className="text-[11px] text-muted-foreground mt-0.5">تحويل عبر الصراف الآلي أو البنك</p>
+                      </div>
+                      {methodForm.type === 'atm_transfer' && <Check className="w-5 h-5 text-emerald-400 flex-shrink-0" />}
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* ========== STEP: Currency Selection (Bank only) ========== */}
+              {addMethodStep === 'currency' && (
+                <div className="space-y-4 animate-fade-in">
+                  <p className="text-sm text-muted-foreground">اختر عملة الحساب البنكي</p>
+                  <div className="space-y-3">
+                    {[
+                      { value: 'YER', label: 'ريال يمني', flag: 'YER', desc: 'للحسابات بالريال اليمني', color: 'border-green-500/50 bg-green-500/10 text-green-400', iconColor: 'bg-green-500/20' },
+                      { value: 'SAR', label: 'ريال سعودي', flag: 'SAR', desc: 'للحسابات بالريال السعودي', color: 'border-amber-500/50 bg-amber-500/10 text-amber-400', iconColor: 'bg-amber-500/20' },
+                      { value: 'USD', label: 'دولار أمريكي', flag: 'USD', desc: 'للحسابات بالدولار', color: 'border-blue-500/50 bg-blue-500/10 text-blue-400', iconColor: 'bg-blue-500/20' },
+                    ].map((opt) => (
                       <button
+                        key={opt.value}
                         type="button"
-                        onClick={() => setMethodForm({ ...methodForm, type: 'bank_deposit' })}
-                        className={`w-full p-3.5 rounded-xl flex items-center gap-3 border transition-all text-right ${
-                          methodForm.type === 'bank_deposit'
-                            ? 'border-blue-500/30 bg-blue-500/8'
-                            : 'border-white/5 bg-white/[0.02] hover:border-white/10 hover:bg-white/[0.04]'
+                        onClick={() => setMethodForm({ ...methodForm, currency: opt.value })}
+                        className={`w-full p-4 rounded-2xl flex items-center gap-4 border-2 transition-all text-right ${
+                          methodForm.currency === opt.value
+                            ? opt.color
+                            : 'border-white/10 bg-white/[0.02] hover:border-white/20'
                         }`}
                       >
-                        <div className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 ${methodForm.type === 'bank_deposit' ? 'bg-blue-500/15' : 'bg-white/5'}`}>
-                          <Wallet className="w-5 h-5" />
+                        <div className={`w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0 ${
+                          methodForm.currency === opt.value ? opt.iconColor : 'bg-white/5'
+                        }`}>
+                          <span className={`text-sm font-bold ${methodForm.currency === opt.value ? '' : 'text-muted-foreground'}`}>{opt.flag}</span>
                         </div>
                         <div className="flex-1">
-                          <p className={`text-sm font-bold ${methodForm.type === 'bank_deposit' ? 'text-blue-400' : ''}`}>إيداع لمحفظة</p>
-                          <p className="text-[10px] text-muted-foreground">إيداع مباشر في حساب بنكي</p>
+                          <p className={`text-sm font-bold ${methodForm.currency === opt.value ? '' : ''}`}>{opt.label}</p>
+                          <p className="text-[11px] text-muted-foreground mt-0.5">{opt.desc}</p>
                         </div>
-                        {methodForm.type === 'bank_deposit' && <Check className="w-4 h-4 text-blue-400 flex-shrink-0" />}
+                        {methodForm.currency === opt.value && <Check className="w-5 h-5 flex-shrink-0" />}
                       </button>
-                      <button
-                        type="button"
-                        onClick={() => setMethodForm({ ...methodForm, type: 'atm_transfer' })}
-                        className={`w-full p-3.5 rounded-xl flex items-center gap-3 border transition-all text-right ${
-                          methodForm.type === 'atm_transfer'
-                            ? 'border-emerald-500/30 bg-emerald-500/8'
-                            : 'border-white/5 bg-white/[0.02] hover:border-white/10 hover:bg-white/[0.04]'
-                        }`}
-                      >
-                        <div className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 ${methodForm.type === 'atm_transfer' ? 'bg-emerald-500/15' : 'bg-white/5'}`}>
-                          <Smartphone className="w-5 h-5" />
-                        </div>
-                        <div className="flex-1">
-                          <p className={`text-sm font-bold ${methodForm.type === 'atm_transfer' ? 'text-emerald-400' : ''}`}>تحويل عبر صراف</p>
-                          <p className="text-[10px] text-muted-foreground">تحويل عبر الصراف الآلي أو البنك</p>
-                        </div>
-                        {methodForm.type === 'atm_transfer' && <Check className="w-4 h-4 text-emerald-400 flex-shrink-0" />}
-                      </button>
-                    </div>
+                    ))}
                   </div>
-                )}
+                </div>
+              )}
 
-                {/* Bank: Account Currency Type */}
-                {methodForm.category === 'bank' && (
-                  <div className="space-y-1">
-                    <label className="text-xs text-muted-foreground">نوع الحساب / العملة</label>
-                    <div className="grid grid-cols-3 gap-2">
-                      {[
-                        { value: 'YER', label: 'ريال يمني', flag: '🇾🇪', color: 'border-green-500/20 bg-green-500/5 text-green-400' },
-                        { value: 'SAR', label: 'ريال سعودي', flag: '🇸🇦', color: 'border-amber-500/20 bg-amber-500/5 text-amber-400' },
-                        { value: 'USD', label: 'دولار', flag: '💵', color: 'border-blue-500/20 bg-blue-500/5 text-blue-400' },
-                      ].map((opt) => (
-                        <button
-                          key={opt.value}
-                          type="button"
-                          onClick={() => setMethodForm({ ...methodForm, currency: opt.value })}
-                          className={`flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl text-xs font-medium border transition-all ${
-                            methodForm.currency === opt.value
-                              ? `${opt.color} shadow-sm`
-                              : 'border-white/5 bg-white/3 text-muted-foreground hover:bg-white/5'
-                          }`}
-                        >
-                          <span className="text-sm">{opt.flag}</span>
-                          <span>{opt.label}</span>
-                        </button>
-                      ))}
+              {/* ========== STEP: Details / Data Entry ========== */}
+              {addMethodStep === 'details' && (
+                <div className="space-y-4 animate-fade-in">
+                  {/* Title based on type */}
+                  <div className="flex items-center gap-2">
+                    <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${
+                      methodForm.category === 'crypto' ? 'bg-orange-500/20' :
+                      methodForm.type === 'bank_deposit' ? 'bg-blue-500/20' :
+                      methodForm.type === 'bank_transfer' ? 'bg-purple-500/20' :
+                      'bg-emerald-500/20'
+                    }`}>
+                      {methodForm.category === 'crypto' ? <Bitcoin className="w-4 h-4 text-orange-400" /> :
+                       methodForm.type === 'bank_deposit' ? <Landmark className="w-4 h-4 text-blue-400" /> :
+                       methodForm.type === 'bank_transfer' ? <Building className="w-4 h-4 text-purple-400" /> :
+                       <Smartphone className="w-4 h-4 text-emerald-400" />}
                     </div>
+                    <p className="text-sm font-bold">{editMethodData ? 'تعديل البيانات' : 'أدخل بيانات طريقة السحب'}</p>
                   </div>
-                )}
 
-                {/* Bank: Deposit fields */}
-                {methodForm.category === 'bank' && methodForm.type === 'bank_deposit' && (
-                  <div className="space-y-2 p-3 rounded-lg bg-blue-500/5 border border-blue-500/10">
-                    <p className="text-xs text-blue-400 font-medium">بيانات الإيداع البنكي:</p>
-                    <div className="space-y-1">
-                      <Input value={methodForm.accountName} onChange={(e) => setMethodForm({ ...methodForm, accountName: e.target.value })} className="glass-input h-9 text-sm" placeholder="اسم المحفظة" />
-                      <Input value={methodForm.accountNumber} onChange={(e) => setMethodForm({ ...methodForm, accountNumber: e.target.value })} className="glass-input h-9 text-sm" placeholder="رقم الحساب" dir="ltr" />
-                      <Input value={methodForm.beneficiaryName} onChange={(e) => setMethodForm({ ...methodForm, beneficiaryName: e.target.value })} className="glass-input h-9 text-sm" placeholder="اسم المستفيد" />
-                    </div>
-                  </div>
-                )}
+                  {/* Crypto: Network + Wallet Address */}
+                  {methodForm.category === 'crypto' && (
+                    <div className="space-y-4 p-4 rounded-2xl bg-orange-500/5 border border-orange-500/15">
+                      <p className="text-xs text-orange-400 font-bold flex items-center gap-2">
+                        <Bitcoin className="w-4 h-4" />
+                        بيانات المحفظة الرقمية
+                      </p>
 
-                {/* Bank: ATM Transfer fields */}
-                {methodForm.category === 'bank' && methodForm.type === 'atm_transfer' && (
-                  <div className="space-y-2 p-3 rounded-lg bg-green-500/5 border border-green-500/10">
-                    <p className="text-xs text-green-400 font-medium">بيانات التحويل عبر صراف:</p>
-                    <div className="space-y-1">
-                      <Input value={methodForm.recipientName} onChange={(e) => setMethodForm({ ...methodForm, recipientName: e.target.value })} className="glass-input h-9 text-sm" placeholder="اسم المستلم" />
-                      <Input value={methodForm.recipientPhone} onChange={(e) => setMethodForm({ ...methodForm, recipientPhone: e.target.value })} className="glass-input h-9 text-sm" placeholder="رقم الجوال" dir="ltr" />
-                      <Input value={methodForm.network} onChange={(e) => setMethodForm({ ...methodForm, network: e.target.value })} className="glass-input h-9 text-sm" placeholder="اسم البنك / الشبكة" />
-                    </div>
-                  </div>
-                )}
-
-                {/* Crypto fields */}
-                {methodForm.category === 'crypto' && (
-                  <div className="space-y-3 p-3 rounded-xl bg-orange-500/5 border border-orange-500/10">
-                    <p className="text-xs text-orange-400 font-medium flex items-center gap-1.5">
-                      <Bitcoin className="w-3.5 h-3.5" />
-                      بيانات المحفظة الرقمية
-                    </p>
-                    <div className="space-y-3">
-                      {/* Network selection - chip style */}
-                      <div className="space-y-1.5">
-                        <label className="text-[10px] text-muted-foreground">الشبكة</label>
+                      {/* Network selection */}
+                      <div className="space-y-2">
+                        <label className="text-xs text-muted-foreground font-medium">اختر الشبكة <span className="text-red-400">*</span></label>
                         <div className="flex flex-wrap gap-2">
                           {CRYPTO_NETWORKS.map(n => (
                             <button
                               key={n.value}
                               type="button"
                               onClick={() => setMethodForm({ ...methodForm, network: n.value })}
-                              className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition-all ${
+                              className={`px-3.5 py-2 rounded-xl text-xs font-medium border-2 transition-all ${
                                 methodForm.network === n.value
-                                  ? 'border-orange-500/40 bg-orange-500/15 text-orange-400'
-                                  : 'border-white/5 bg-white/[0.02] text-muted-foreground hover:border-white/10'
+                                  ? 'border-orange-500/50 bg-orange-500/15 text-orange-400'
+                                  : 'border-white/10 bg-white/[0.02] text-muted-foreground hover:border-white/20'
                               }`}
                             >
-                              {n.value}
+                              {n.label}
                             </button>
                           ))}
                         </div>
                       </div>
-                      <Input value={methodForm.walletAddress} onChange={(e) => setMethodForm({ ...methodForm, walletAddress: e.target.value })} className="glass-input h-9 text-sm" placeholder="عنوان المحفظة" dir="ltr" />
+
+                      {/* Wallet Address */}
+                      <div className="space-y-2">
+                        <label className="text-xs text-muted-foreground font-medium">عنوان المحفظة <span className="text-red-400">*</span></label>
+                        <Input
+                          value={methodForm.walletAddress}
+                          onChange={(e) => setMethodForm({ ...methodForm, walletAddress: e.target.value })}
+                          className="glass-input h-11 text-sm"
+                          placeholder="أدخل عنوان المحفظة الرقمية"
+                          dir="ltr"
+                        />
+                        <p className="text-[10px] text-muted-foreground">تأكد من صحة العنوان لتجنب فقدان الأموال</p>
+                      </div>
                     </div>
-                  </div>
-                )}
-              </div>
+                  )}
+
+                  {/* Bank Deposit fields */}
+                  {methodForm.category === 'bank' && methodForm.type === 'bank_deposit' && (
+                    <div className="space-y-4 p-4 rounded-2xl bg-blue-500/5 border border-blue-500/15">
+                      <p className="text-xs text-blue-400 font-bold flex items-center gap-2">
+                        <Landmark className="w-4 h-4" />
+                        بيانات الإيداع البنكي
+                      </p>
+                      <p className="text-[10px] text-muted-foreground">أدخل بيانات الحساب البنكي الذي تريد الإيداع فيه</p>
+                      <div className="space-y-3">
+                        <div className="space-y-1.5">
+                          <label className="text-xs text-muted-foreground font-medium">اسم المحفظة <span className="text-red-400">*</span></label>
+                          <Input value={methodForm.accountName} onChange={(e) => setMethodForm({ ...methodForm, accountName: e.target.value })} className="glass-input h-11 text-sm" placeholder="مثال: محفظة بنك اليمن الكويتي" />
+                        </div>
+                        <div className="space-y-1.5">
+                          <label className="text-xs text-muted-foreground font-medium">رقم الحساب <span className="text-red-400">*</span></label>
+                          <Input value={methodForm.accountNumber} onChange={(e) => setMethodForm({ ...methodForm, accountNumber: e.target.value })} className="glass-input h-11 text-sm" placeholder="أدخل رقم الحساب" dir="ltr" />
+                        </div>
+                        <div className="space-y-1.5">
+                          <label className="text-xs text-muted-foreground font-medium">اسم المستفيد <span className="text-red-400">*</span></label>
+                          <Input value={methodForm.beneficiaryName} onChange={(e) => setMethodForm({ ...methodForm, beneficiaryName: e.target.value })} className="glass-input h-11 text-sm" placeholder="الاسم الكامل للمستفيد" />
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Bank Transfer fields */}
+                  {methodForm.category === 'bank' && methodForm.type === 'bank_transfer' && (
+                    <div className="space-y-4 p-4 rounded-2xl bg-purple-500/5 border border-purple-500/15">
+                      <p className="text-xs text-purple-400 font-bold flex items-center gap-2">
+                        <Building className="w-4 h-4" />
+                        بيانات التحويل البنكي
+                      </p>
+                      <p className="text-[10px] text-muted-foreground">أدخل بيانات الحساب لاستقبال التحويل المصرفي</p>
+                      <div className="space-y-3">
+                        <div className="space-y-1.5">
+                          <label className="text-xs text-muted-foreground font-medium">اسم المحفظة / البنك <span className="text-red-400">*</span></label>
+                          <Input value={methodForm.accountName} onChange={(e) => setMethodForm({ ...methodForm, accountName: e.target.value })} className="glass-input h-11 text-sm" placeholder="مثال: حساب بنك الأهلي" />
+                        </div>
+                        <div className="space-y-1.5">
+                          <label className="text-xs text-muted-foreground font-medium">رقم الحساب / IBAN <span className="text-red-400">*</span></label>
+                          <Input value={methodForm.accountNumber} onChange={(e) => setMethodForm({ ...methodForm, accountNumber: e.target.value })} className="glass-input h-11 text-sm" placeholder="أدخل رقم الحساب أو IBAN" dir="ltr" />
+                        </div>
+                        <div className="space-y-1.5">
+                          <label className="text-xs text-muted-foreground font-medium">اسم المستفيد <span className="text-red-400">*</span></label>
+                          <Input value={methodForm.beneficiaryName} onChange={(e) => setMethodForm({ ...methodForm, beneficiaryName: e.target.value })} className="glass-input h-11 text-sm" placeholder="الاسم الكامل للمستفيد" />
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* ATM Transfer fields */}
+                  {methodForm.category === 'bank' && methodForm.type === 'atm_transfer' && (
+                    <div className="space-y-4 p-4 rounded-2xl bg-emerald-500/5 border border-emerald-500/15">
+                      <p className="text-xs text-emerald-400 font-bold flex items-center gap-2">
+                        <Smartphone className="w-4 h-4" />
+                        بيانات التحويل عبر صراف
+                      </p>
+                      <p className="text-[10px] text-muted-foreground">أدخل بيانات استقبال التحويل عبر الصراف الآلي</p>
+                      <div className="space-y-3">
+                        <div className="space-y-1.5">
+                          <label className="text-xs text-muted-foreground font-medium">اسم المستلم <span className="text-red-400">*</span></label>
+                          <Input value={methodForm.recipientName} onChange={(e) => setMethodForm({ ...methodForm, recipientName: e.target.value })} className="glass-input h-11 text-sm" placeholder="اسم مستلم التحويل" />
+                        </div>
+                        <div className="space-y-1.5">
+                          <label className="text-xs text-muted-foreground font-medium">رقم الجوال <span className="text-red-400">*</span></label>
+                          <Input value={methodForm.recipientPhone} onChange={(e) => setMethodForm({ ...methodForm, recipientPhone: e.target.value })} className="glass-input h-11 text-sm" placeholder="رقم جوال المستلم" dir="ltr" />
+                        </div>
+                        <div className="space-y-1.5">
+                          <label className="text-xs text-muted-foreground font-medium">اسم البنك / الشبكة</label>
+                          <Input value={methodForm.network} onChange={(e) => setMethodForm({ ...methodForm, network: e.target.value })} className="glass-input h-11 text-sm" placeholder="مثال: بنك اليمن والكويت" />
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Summary of selections */}
+                  {!editMethodData && (
+                    <div className="p-3 rounded-xl bg-white/5 space-y-1.5 text-xs text-muted-foreground">
+                      <p className="font-medium text-foreground text-[11px]">ملخص الاختيارات:</p>
+                      <div className="flex flex-wrap gap-x-4 gap-y-1">
+                        <span>{methodForm.category === 'crypto' ? 'عملات رقمية' : 'سحب بنكي'}</span>
+                        {methodForm.category === 'bank' && (
+                          <>
+                            <span className="text-white/20">|</span>
+                            <span>{TYPE_LABELS[methodForm.type] || methodForm.type}</span>
+                            <span className="text-white/20">|</span>
+                            <span>{methodForm.currency}</span>
+                          </>
+                        )}
+                        {methodForm.category === 'crypto' && methodForm.network && (
+                          <>
+                            <span className="text-white/20">|</span>
+                            <span>{methodForm.network}</span>
+                          </>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
 
-            {/* Footer - Fixed at bottom */}
+            {/* Footer - Navigation Buttons */}
             <div className="p-5 pt-3 border-t border-white/5 flex gap-3 flex-shrink-0">
-              <button onClick={handleSaveMethod} disabled={methodLoading} className="flex-1 h-11 gold-gradient text-gray-900 font-bold rounded-xl hover:opacity-90 transition-all">
-                {methodLoading ? <Loader2 className="w-4 h-4 animate-spin mx-auto" /> : editMethodData ? 'حفظ التعديلات' : 'إضافة'}
-              </button>
-              <button onClick={resetMethodForm} className="flex-1 h-11 bg-white/10 hover:bg-white/20 text-foreground font-medium rounded-xl transition-all">إلغاء</button>
+              {/* Back button */}
+              {addMethodStep !== 'category' && !editMethodData && (
+                <button onClick={handleWizardBack} className="h-11 px-5 bg-white/10 hover:bg-white/20 text-foreground font-medium rounded-xl transition-all flex items-center gap-2">
+                  <ArrowRight className="w-4 h-4" />
+                  رجوع
+                </button>
+              )}
+
+              {/* Spacer */}
+              <div className="flex-1" />
+
+              {/* Details step: Save button */}
+              {addMethodStep === 'details' ? (
+                <button onClick={handleSaveMethod} disabled={methodLoading} className="h-11 px-8 gold-gradient text-gray-900 font-bold rounded-xl hover:opacity-90 transition-all flex items-center gap-2">
+                  {methodLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : editMethodData ? 'حفظ التعديلات' : 'حفظ طريقة السحب'}
+                </button>
+              ) : editMethodData ? null : (
+                /* Next step button */
+                <button onClick={handleWizardNext} disabled={!canGoNext()} className={`h-11 px-8 font-bold rounded-xl transition-all flex items-center gap-2 ${
+                  canGoNext()
+                    ? 'gold-gradient text-gray-900 hover:opacity-90'
+                    : 'bg-white/5 text-muted-foreground cursor-not-allowed'
+                }`}>
+                  التالي
+                  <ChevronLeft className="w-4 h-4" />
+                </button>
+              )}
+
+              {/* Cancel on details or edit */}
+              {(addMethodStep === 'details' || editMethodData) && (
+                <button onClick={resetMethodForm} className="h-11 px-5 bg-white/10 hover:bg-white/20 text-foreground font-medium rounded-xl transition-all">
+                  إلغاء
+                </button>
+              )}
             </div>
           </div>
         </div>
