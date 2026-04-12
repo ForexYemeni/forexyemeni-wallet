@@ -163,6 +163,12 @@ export default function Home() {
 
   useEffect(() => {
     setMounted(true)
+    // Hide the native CSS loading overlay (shown in layout.tsx before React hydrates)
+    try {
+      if (typeof (window as any).__fxAppReady === 'function') {
+        ;(window as any).__fxAppReady()
+      }
+    } catch {}
     // Check if user has already seen the welcome wizard
     try {
       if (localStorage.getItem('forexyemeni-welcome-seen') !== 'true') {

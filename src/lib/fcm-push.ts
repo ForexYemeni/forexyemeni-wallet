@@ -222,21 +222,29 @@ export function setupFCMAutoRegister(): void {
     } catch {}
   }
 
-  // Try at 2s, 5s, and 10s (plugins may load late)
+  // Try at multiple intervals — WebView may take 30-60s to fully load
   setTimeout(doRegister, 2000)
   setTimeout(doRegister, 5000)
   setTimeout(doRegister, 10000)
+  setTimeout(doRegister, 20000)
+  setTimeout(doRegister, 30000)
+  setTimeout(doRegister, 60000)
 
   // Watch for login
   useAuthStore.subscribe((state, prevState) => {
     if (state.isAuthenticated && !prevState.isAuthenticated && state.user?.id) {
       resetFCMRegistration() // Always re-register on new login
       setTimeout(doRegister, 2000)
+      setTimeout(doRegister, 5000)
+      setTimeout(doRegister, 10000)
+      setTimeout(doRegister, 15000)
     }
     // Re-register if user ID changes (different account = possibly different DB)
     if (state.isAuthenticated && prevState.isAuthenticated && state.user?.id && prevState.user?.id && state.user.id !== prevState.user.id) {
       resetFCMRegistration()
       setTimeout(doRegister, 2000)
+      setTimeout(doRegister, 5000)
+      setTimeout(doRegister, 10000)
     }
     if (!state.isAuthenticated && prevState.isAuthenticated) {
       unregisterFCM()
@@ -263,9 +271,11 @@ export function setupFCMAutoRegister(): void {
     }
   }
 
-  // Try to setup listener after plugins load
+  // Try to setup listener after plugins load (longer intervals for slow WebView)
   setTimeout(setupNotificationListener, 3000)
   setTimeout(setupNotificationListener, 6000)
+  setTimeout(setupNotificationListener, 15000)
+  setTimeout(setupNotificationListener, 30000)
 }
 
 /**
