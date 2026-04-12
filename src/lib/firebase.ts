@@ -34,9 +34,7 @@ export function initializeFirebase() {
     })
   }
   if (!db) {
-    db = getFirestore(app, {
-      preferRest: true,
-    })
+    db = getFirestore(app)
   }
   return { app, db }
 }
@@ -69,7 +67,7 @@ export async function getDefaultDb(): Promise<Firestore> {
     credential: firebaseCert(serviceAccount),
     projectId: serviceAccount.project_id,
   }, `temp-${Date.now()}`)
-  const tempDb = getFs(tempApp, { preferRest: true })
+  const tempDb = getFs(tempApp)
   return tempDb
 }
 
@@ -85,7 +83,7 @@ export async function createTempCustomDb(serviceAccountKeyJson: string): Promise
     credential: firebaseCert(serviceAccount),
     projectId: serviceAccount.project_id,
   }, `custom-test-${Date.now()}`)
-  const tempDb = getFs(tempApp, { preferRest: true })
+  const tempDb = getFs(tempApp)
   return {
     tempDb,
     cleanup: async () => { try { await delApp(tempApp) } catch {} }
@@ -158,7 +156,7 @@ export function reinitializeFirebase(serviceAccountKeyJson: string): { app: App;
     credential: cert(serviceAccount),
     projectId: serviceAccount.project_id,
   })
-  db = getFirestore(app, { preferRest: true })
+  db = getFirestore(app)
   return { app, db }
 }
 
