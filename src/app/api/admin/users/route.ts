@@ -33,7 +33,7 @@ export async function POST(request: NextRequest) {
   if (!auth.success) return NextResponse.json({ success: false, message: auth.error }, { status: auth.status })
 
   try {
-    const { userId, status, role, balance, balanceAdjustment, kycStatus, notes, permissions, merchantId, approvePinReset, rejectPinReset, removeMerchant, resetUserPin, adminId } = await request.json()
+    const { userId, status, role, balance, balanceAdjustment, kycStatus, notes, permissions, merchantId, approvePinReset, rejectPinReset, removeMerchant, resetUserPin, resetKyc, adminId } = await request.json()
 
     if (!userId) {
       return NextResponse.json({ success: false, message: 'معرف المستخدم مطلوب' }, { status: 400 })
@@ -122,6 +122,45 @@ export async function POST(request: NextRequest) {
       await sendPushNotification(userId, 'تم رفض طلب إعادة تعيين PIN', 'يرجى التواصل مع الإدارة إذا كنت بحاجة إلى مساعدة.', 'error')
 
       return NextResponse.json({ success: true, message: 'تم رفض طلب إعادة تعيين PIN' })
+    }
+
+    // Handle KYC reset — admin forces user to re-verify identity
+    if (resetKyc) {
+      const targetUser = await userOperations.findUnique({ id: userId })
+      if (!targetUser) {
+        return NextResponse.json({ success: false, message: 'المستخدم غير موجود' }, { status: 404 })
+      }
+
+      // 1. Reset user's KYC status to 'none'
+      await userOperations.update({ id: userId }, { kycStatus: 'none' })
+
+      // 2. Delete all existing KYC records for this user
+      const db = getDb()
+      try {
+        const kycRecords = await db.collection('kycRecords').where('userId', '==', userId).get()
+        const batch = db.batch()
+        for (const doc of kycRecords.docs) {
+          batch.delete(doc.ref)
+        }
+        if (kycRecords.docs.length > 0) await batch.commit()
+      } catch (err) {
+        // Non-critical: continue even if record cleanup fails
+      }
+
+      // 3. Notify user
+      await notificationOperations.create({
+        userId,
+        title: 'تحديث التوثيق مطلوب',
+        message: 'تم إعادة تعيين حالة التوثيق الخاصة بك بواسطة الإدارة. يرجى إعادة رفع مستندات الهوية لتوثيق حسابك من جديد.',
+        type: 'warning',
+        read: false,
+      })
+      await sendPushNotification(userId, 'تحديث التوثيق مطلوب', 'يرجى إعادة رفع مستندات الهوية لتوثيق حسابك من جديد.', 'warning')
+
+      // 4. Audit log
+      if (adminId) logAudit(adminId, 'kyc_reset', 'user', userId, targetUser?.fullName || targetUser?.email || '', 'إعادة تعيين التوثيق').catch(() => {})
+
+      return NextResponse.json({ success: true, message: 'تم إعادة تعيين التوثيق بنجاح' })
     }
 
     // Handle full merchant removal (from all sources)

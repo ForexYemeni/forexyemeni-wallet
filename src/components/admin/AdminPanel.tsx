@@ -286,6 +286,9 @@ export default function AdminPanel() {
   // Remove merchant dialog state
   const [removeMerchantDialogUser, setRemoveMerchantDialogUser] = useState<AdminUser | null>(null)
   const [removeMerchantLoading, setRemoveMerchantLoading] = useState(false)
+  // Reset KYC dialog state
+  const [resetKycDialogUser, setResetKycDialogUser] = useState<AdminUser | null>(null)
+  const [resetKycLoading, setResetKycLoading] = useState(false)
   // PIN reset requests state
   const [pinResetRequests, setPinResetRequests] = useState<any[]>([])
 
@@ -970,6 +973,36 @@ export default function AdminPanel() {
       toast.error('خطأ في إزالة حالة التاجر')
     } finally {
       setRemoveMerchantLoading(false)
+    }
+  }
+
+  // ===== RESET KYC HANDLER =====
+  const handleResetKyc = async () => {
+    if (!resetKycDialogUser) return
+    setResetKycLoading(true)
+    try {
+      const res = await apiFetch('/api/admin/users', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          userId: resetKycDialogUser.id,
+          adminId: user?.id,
+          resetKyc: true,
+        }),
+      })
+      const data = await res.json()
+      if (data.success) {
+        toast.success('تم إعادة تعيين التوثيق بنجاح')
+        setResetKycDialogUser(null)
+        fetchUsers()
+        fetchKYC()
+      } else {
+        toast.error(data.message)
+      }
+    } catch {
+      toast.error('خطأ في إعادة تعيين التوثيق')
+    } finally {
+      setResetKycLoading(false)
     }
   }
 
@@ -1708,6 +1741,16 @@ export default function AdminPanel() {
                               >
                                 <UserX className="w-3.5 h-3.5" />
                                 إزالة التاجر
+                              </button>
+                            )}
+                            {/* Reset KYC — users with KYC (approved/rejected/pending) */}
+                            {u.kycStatus && u.kycStatus !== 'none' && u.role !== 'admin' && (
+                              <button
+                                onClick={() => setResetKycDialogUser(u)}
+                                className="flex items-center justify-center gap-1 text-xs py-2.5 rounded-lg bg-cyan-500/10 text-cyan-400 hover:bg-cyan-500/20 transition-colors font-medium"
+                              >
+                                <RotateCcw className="w-3.5 h-3.5" />
+                                تحديث الهوية
                               </button>
                             )}
                             {/* Send temp PIN — admin only, non-admin users */}
@@ -3072,6 +3115,47 @@ export default function AdminPanel() {
               </button>
               <button
                 onClick={() => setRemoveMerchantDialogUser(null)}
+                className="w-full h-10 bg-white/10 text-foreground rounded-xl text-sm"
+              >
+                إلغاء
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ===================== RESET KYC CONFIRMATION DIALOG ===================== */}
+      {resetKycDialogUser && (
+        <div className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4" onClick={() => setResetKycDialogUser(null)}>
+          <div className="glass-card p-6 space-y-4 w-full max-w-sm animate-scale-in" onClick={e => e.stopPropagation()} dir="rtl">
+            <div className="text-center space-y-3">
+              <div className="w-14 h-14 mx-auto rounded-2xl bg-cyan-500/10 flex items-center justify-center">
+                <Shield className="w-7 h-7 text-cyan-400" />
+              </div>
+              <h3 className="text-lg font-bold text-cyan-400">تحديث الهوية</h3>
+              <p className="text-sm text-muted-foreground">
+                سيتم إعادة تعيين حالة التوثيق لحساب <strong>{resetKycDialogUser.fullName || resetKycDialogUser.email}</strong>.
+              </p>
+              <div className="p-3 rounded-xl bg-cyan-500/5 border border-cyan-500/10">
+                <p className="text-xs text-cyan-400">
+                  {resetKycDialogUser.merchantId
+                    ? 'سيتم حذف جميع مستندات التوثيق الحالية ويجب على التاجر إعادة رفع مستندات الهوية لتوثيق حسابه من جديد.'
+                    : 'سيتم حذف جميع مستندات التوثيق الحالية ويجب على المستخدم إعادة رفع مستندات الهوية لتوثيق حسابه من جديد.'
+                  }
+                </p>
+              </div>
+              <p className="text-[11px] text-muted-foreground">سيتم إرسال إشعار للمستخدم بضرورة التوثيق من جديد.</p>
+            </div>
+            <div className="space-y-2">
+              <button
+                onClick={handleResetKyc}
+                disabled={resetKycLoading}
+                className="w-full h-12 bg-cyan-500 text-white font-bold rounded-xl hover:opacity-90 transition-all disabled:opacity-50"
+              >
+                {resetKycLoading ? <Loader2 className="w-5 h-5 animate-spin mx-auto" /> : 'تأكيد تحديث الهوية'}
+              </button>
+              <button
+                onClick={() => setResetKycDialogUser(null)}
                 className="w-full h-10 bg-white/10 text-foreground rounded-xl text-sm"
               >
                 إلغاء
