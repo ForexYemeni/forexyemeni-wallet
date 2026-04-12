@@ -1,3 +1,4 @@
+import { apiFetch } from '@/lib/api-client'
 'use client'
 
 import { useState, useRef, useCallback, useEffect } from 'react'
@@ -72,7 +73,7 @@ export default function TwoFactorSettings({ onClose }: TwoFactorSettingsProps) {
   const handleEnable = async () => {
     setLoading(true)
     try {
-      const res = await fetch('/api/auth/2fa', {
+      const res = await apiFetch('/api/auth/2fa', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -106,7 +107,7 @@ export default function TwoFactorSettings({ onClose }: TwoFactorSettingsProps) {
 
     setLoading(true)
     try {
-      const res = await fetch('/api/auth/2fa', {
+      const res = await apiFetch('/api/auth/2fa', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -141,7 +142,7 @@ export default function TwoFactorSettings({ onClose }: TwoFactorSettingsProps) {
 
     setLoading(true)
     try {
-      const res = await fetch('/api/auth/2fa', {
+      const res = await apiFetch('/api/auth/2fa', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -177,7 +178,7 @@ export default function TwoFactorSettings({ onClose }: TwoFactorSettingsProps) {
 
     setLoading(true)
     try {
-      const res = await fetch('/api/auth/2fa', {
+      const res = await apiFetch('/api/auth/2fa', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

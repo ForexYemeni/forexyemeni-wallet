@@ -1,3 +1,4 @@
+import { apiFetch } from '@/lib/api-client'
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
@@ -17,17 +18,17 @@ export default function AdminSystemMonitor() {
     setLoading(true)
     try {
       // Fetch stats
-      const statsRes = await fetch('/api/admin/stats')
+      const statsRes = await apiFetch('/api/admin/stats')
       const statsData = await statsRes.json()
       if (statsData.success) setStats(statsData)
 
       // Fetch users count
-      const usersRes = await fetch('/api/admin/users')
+      const usersRes = await apiFetch('/api/admin/users')
       const usersData = await usersRes.json()
       if (usersData.success) setUsers(usersData.users || [])
 
       // Fetch recent audit logs
-      const auditRes = await fetch(`/api/admin/audit?adminId=${user.id}&limit=10`)
+      const auditRes = await apiFetch(`/api/admin/audit?adminId=${user.id}&limit=10`)
       const auditData = await auditRes.json()
       if (auditData.success) setRecentLogs(auditData.logs || [])
     } catch {
@@ -48,7 +49,7 @@ export default function AdminSystemMonitor() {
   const exportAll = async (type: string) => {
     try {
       const params = new URLSearchParams({ adminId: user!.id, type })
-      const res = await fetch(`/api/admin/export?${params}`)
+      const res = await apiFetch(`/api/admin/export?${params}`)
       if (!res.ok) throw new Error()
       const blob = await res.blob()
       const url = window.URL.createObjectURL(blob)

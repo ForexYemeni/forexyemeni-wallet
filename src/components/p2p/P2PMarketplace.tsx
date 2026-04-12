@@ -1,3 +1,4 @@
+import { apiFetch } from '@/lib/api-client'
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
@@ -85,7 +86,7 @@ export default function P2PMarketplace() {
       const params = new URLSearchParams({ type })
       if (networkFilter) params.set('network', networkFilter)
 
-      const res = await fetch(`/api/p2p/orders?${params.toString()}`)
+      const res = await apiFetch(`/api/p2p/orders?${params.toString()}`)
       const data = await res.json()
       if (data.success) {
         setOrders((data.orders || []).filter((o: P2POrder) => o.status === 'open'))
@@ -106,7 +107,7 @@ export default function P2PMarketplace() {
     if (!user?.id) return
     const checkMerchant = async () => {
       try {
-        const res = await fetch(`/api/p2p/merchant?userId=${user.id}`)
+        const res = await apiFetch(`/api/p2p/merchant?userId=${user.id}`)
         const data = await res.json()
         if (data.success && data.application?.status === 'approved') {
           setIsMerchant(true)
@@ -122,7 +123,7 @@ export default function P2PMarketplace() {
     if (!user?.id) return
     setActionLoading(order.id)
     try {
-      const res = await fetch(`/api/p2p/orders/${order.id}`, {
+      const res = await apiFetch(`/api/p2p/orders/${order.id}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action: 'take_order', userId: user.id }),

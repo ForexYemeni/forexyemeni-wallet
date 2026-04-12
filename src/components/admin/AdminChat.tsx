@@ -1,3 +1,4 @@
+import { apiFetch } from '@/lib/api-client'
 'use client'
 
 import { useState, useEffect, useRef, useCallback } from 'react'
@@ -244,7 +245,7 @@ export default function AdminChat() {
   const fetchUsers = useCallback(async () => {
     setLoadingUsers(true)
     try {
-      const res = await fetch('/api/admin/users-list')
+      const res = await apiFetch('/api/admin/users-list')
       const data = await res.json()
       if (data.success) {
         setAllUsers(data.users || [])
@@ -260,7 +261,7 @@ export default function AdminChat() {
   const fetchChats = useCallback(async () => {
     if (!user?.id) return
     try {
-      const res = await fetch(`/api/chats?userId=${user.id}&role=admin`)
+      const res = await apiFetch(`/api/chats?userId=${user.id}&role=admin`)
       const data = await res.json()
       if (data.success) {
         const sorted = (data.chats || []).sort((a: AdminChatItem, b: AdminChatItem) => {
@@ -284,12 +285,12 @@ export default function AdminChat() {
     if (!user?.id) return
     setLoadingMessages(true)
     try {
-      const res = await fetch(`/api/chats/${chatId}?userId=${user.id}&role=admin`)
+      const res = await apiFetch(`/api/chats/${chatId}?userId=${user.id}&role=admin`)
       const data = await res.json()
       if (data.success) {
         setMessages(data.messages || [])
         if (data.chat) setSelectedChatData(data.chat)
-        fetch(`/api/chats/${chatId}`, {
+        apiFetch(`/api/chats/${chatId}`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ action: 'mark_read', readerType: 'admin' }),
@@ -325,7 +326,7 @@ export default function AdminChat() {
     if (!selectedChatId || !user?.id) return
     pollingRef.current = setInterval(async () => {
       try {
-        const chatsRes = await fetch(`/api/chats?userId=${user.id}&role=admin`)
+        const chatsRes = await apiFetch(`/api/chats?userId=${user.id}&role=admin`)
         const chatsData = await chatsRes.json()
         if (chatsData.success) {
           const sorted = (chatsData.chats || []).sort((a: AdminChatItem, b: AdminChatItem) => {
@@ -339,7 +340,7 @@ export default function AdminChat() {
         }
 
         if (messages.length > 0) {
-          const msgRes = await fetch(`/api/chats/${selectedChatId}?userId=${user.id}&role=admin&limit=50`)
+          const msgRes = await apiFetch(`/api/chats/${selectedChatId}?userId=${user.id}&role=admin&limit=50`)
           const msgData = await msgRes.json()
           if (msgData.success && msgData.messages) {
             const existingIds = new Set(messages.map(m => m.id))
@@ -347,7 +348,7 @@ export default function AdminChat() {
             if (newMsgs.length > 0) {
               setMessages(msgData.messages)
               if (msgData.chat) setSelectedChatData(msgData.chat)
-              fetch(`/api/chats/${selectedChatId}`, {
+              apiFetch(`/api/chats/${selectedChatId}`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ action: 'mark_read', readerType: 'admin' }),
@@ -369,7 +370,7 @@ export default function AdminChat() {
   const handleStartChat = async (targetUser: SimpleUser) => {
     if (!user?.id) return
     try {
-      const res = await fetch('/api/chats', {
+      const res = await apiFetch('/api/chats', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -397,7 +398,7 @@ export default function AdminChat() {
     if (!newMessage.trim() || !selectedChatId || !user?.id || sendingMessage) return
     setSendingMessage(true)
     try {
-      const res = await fetch(`/api/chats/${selectedChatId}`, {
+      const res = await apiFetch(`/api/chats/${selectedChatId}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -428,7 +429,7 @@ export default function AdminChat() {
     if (!selectedChatId || !user?.id || closingChat) return
     setClosingChat(true)
     try {
-      const res = await fetch(`/api/chats/${selectedChatId}`, {
+      const res = await apiFetch(`/api/chats/${selectedChatId}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action: 'close_chat', userId: user.id, role: 'admin' }),
@@ -453,7 +454,7 @@ export default function AdminChat() {
     if (!selectedChatId || !user?.id || deletingChat) return
     setDeletingChat(true)
     try {
-      const res = await fetch(`/api/chats/${selectedChatId}`, {
+      const res = await apiFetch(`/api/chats/${selectedChatId}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action: 'delete_chat', userId: user.id, role: 'admin' }),
@@ -481,7 +482,7 @@ export default function AdminChat() {
     if (!selectedChatId || !user?.id || closingChat) return
     setClosingChat(true)
     try {
-      const res = await fetch(`/api/chats/${selectedChatId}`, {
+      const res = await apiFetch(`/api/chats/${selectedChatId}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action: 'reopen_chat', userId: user.id, role: 'admin' }),

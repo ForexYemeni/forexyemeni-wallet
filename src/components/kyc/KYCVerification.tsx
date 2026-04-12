@@ -1,3 +1,4 @@
+import { apiFetch } from '@/lib/api-client'
 'use client'
 
 import { useState } from 'react'
@@ -41,7 +42,7 @@ export default function KYCVerification() {
 
     setLoading(true)
     try {
-      const res = await fetch('/api/kyc/submit-phone', {
+      const res = await apiFetch('/api/kyc/submit-phone', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ userId: user?.id, phone, country }),
@@ -71,7 +72,7 @@ export default function KYCVerification() {
 
     setLoading(true)
     try {
-      const res = await fetch('/api/kyc/verify-phone', {
+      const res = await apiFetch('/api/kyc/verify-phone', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ userId: user?.id, code: otp.join('') }),
@@ -117,7 +118,7 @@ export default function KYCVerification() {
       formData.append('type', type)
       formData.append('file', file)
 
-      const res = await fetch('/api/kyc/upload', {
+      const res = await apiFetch('/api/kyc/upload', {
         method: 'POST',
         body: formData,
       })

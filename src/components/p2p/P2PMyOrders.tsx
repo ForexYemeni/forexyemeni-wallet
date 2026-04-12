@@ -1,3 +1,4 @@
+import { apiFetch } from '@/lib/api-client'
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
@@ -77,7 +78,7 @@ export default function P2PMyOrders() {
     if (!user?.id) return
     setLoading(true)
     try {
-      const res = await fetch('/api/p2p/orders', {
+      const res = await apiFetch('/api/p2p/orders', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action: 'my_orders', userId: user.id }),
@@ -114,7 +115,7 @@ export default function P2PMyOrders() {
         body.disputeReason = disputeReason.trim()
       }
 
-      const res = await fetch(`/api/p2p/orders/${orderId}`, {
+      const res = await apiFetch(`/api/p2p/orders/${orderId}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body),

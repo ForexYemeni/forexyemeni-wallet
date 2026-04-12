@@ -1,3 +1,4 @@
+import { apiFetch } from '@/lib/api-client'
 'use client'
 
 import { useState, useEffect, useRef, useCallback, lazy, Suspense } from 'react'
@@ -341,7 +342,7 @@ export default function AdminPanel() {
 
   const fetchUsers = async () => {
     try {
-      const res = await fetch('/api/admin/users')
+      const res = await apiFetch('/api/admin/users')
       const data = await res.json()
       if (data.success) setUsers(data.users || [])
     } catch { /* silent */ }
@@ -349,7 +350,7 @@ export default function AdminPanel() {
 
   const fetchPinResetRequests = async () => {
     try {
-      const res = await fetch('/api/auth/request-pin-reset')
+      const res = await apiFetch('/api/auth/request-pin-reset')
       const data = await res.json()
       if (data.success) setPinResetRequests(data.requests || [])
     } catch { /* silent */ }
@@ -357,7 +358,7 @@ export default function AdminPanel() {
 
   const fetchDeposits = async () => {
     try {
-      const res = await fetch(`/api/admin/deposits?_t=${Date.now()}`, { cache: 'no-store' })
+      const res = await apiFetch(`/api/admin/deposits?_t=${Date.now()}`, { cache: 'no-store' })
       const data = await res.json()
       if (data.success) setDeposits(data.deposits || [])
     } catch { /* silent */ }
@@ -365,7 +366,7 @@ export default function AdminPanel() {
 
   const fetchWithdrawals = async () => {
     try {
-      const res = await fetch(`/api/admin/withdrawals?_t=${Date.now()}`, { cache: 'no-store' })
+      const res = await apiFetch(`/api/admin/withdrawals?_t=${Date.now()}`, { cache: 'no-store' })
       const data = await res.json()
       if (data.success) setWithdrawals(data.withdrawals || [])
     } catch { /* silent */ }
@@ -373,7 +374,7 @@ export default function AdminPanel() {
 
   const fetchKYC = async () => {
     try {
-      const res = await fetch(`/api/admin/kyc?_t=${Date.now()}`, { cache: 'no-store' })
+      const res = await apiFetch(`/api/admin/kyc?_t=${Date.now()}`, { cache: 'no-store' })
       const data = await res.json()
       if (data.success) setKycRecords(data.kycRecords || [])
     } catch { /* silent */ }
@@ -381,7 +382,7 @@ export default function AdminPanel() {
 
   const fetchPaymentMethods = async () => {
     try {
-      const res = await fetch('/api/admin/payment-methods')
+      const res = await apiFetch('/api/admin/payment-methods')
       const data = await res.json()
       if (data.success) setPaymentMethods(data.methods || [])
     } catch { /* silent */ }
@@ -389,7 +390,7 @@ export default function AdminPanel() {
 
   const fetchAdminSettings = async () => {
     try {
-      const res = await fetch(`/api/admin/settings?userId=${user.id}`)
+      const res = await apiFetch(`/api/admin/settings?userId=${user.id}`)
       const data = await res.json()
       if (data.success) setAdminSettings(data.settings)
     } catch { /* silent */ }
@@ -397,7 +398,7 @@ export default function AdminPanel() {
 
   const fetchFees = async () => {
     try {
-      const res = await fetch('/api/settings?t=' + Date.now(), { cache: 'no-store' })
+      const res = await apiFetch('/api/settings?t=' + Date.now(), { cache: 'no-store' })
       const data = await res.json()
       return data.settings || {}
     } catch { return {} }
@@ -406,7 +407,7 @@ export default function AdminPanel() {
   const fetchStats = async () => {
     setStatsLoading(true)
     try {
-      const res = await fetch(`/api/admin/stats?_t=${Date.now()}`, { cache: 'no-store' })
+      const res = await apiFetch(`/api/admin/stats?_t=${Date.now()}`, { cache: 'no-store' })
       const data = await res.json()
       if (data.success) setStats(data.stats)
     } catch { /* silent */ }
@@ -437,7 +438,7 @@ export default function AdminPanel() {
   const handleUpdateDeposit = async (depositId: string, status: string) => {
     setActionLoading(depositId)
     try {
-      const res = await fetch('/api/admin/deposits', {
+      const res = await apiFetch('/api/admin/deposits', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ depositId, status }),
@@ -465,7 +466,7 @@ export default function AdminPanel() {
     if (!depositRejectDialog || !depositRejectReason.trim()) return
     setDepositRejectLoading(true)
     try {
-      const res = await fetch('/api/admin/deposits', {
+      const res = await apiFetch('/api/admin/deposits', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -496,7 +497,7 @@ export default function AdminPanel() {
     setDepositConfirmLoading(true)
     try {
       // First verify admin PIN
-      const pinRes = await fetch('/api/auth/verify-pin', {
+      const pinRes = await apiFetch('/api/auth/verify-pin', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ userId: user?.id, pin: depositConfirmPin }),
@@ -508,7 +509,7 @@ export default function AdminPanel() {
         return
       }
       // PIN verified, proceed with confirmation
-      const res = await fetch('/api/admin/deposits', {
+      const res = await apiFetch('/api/admin/deposits', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ depositId: depositConfirmDialog.depositId, status: 'confirmed' }),
@@ -532,7 +533,7 @@ export default function AdminPanel() {
   const handleUpdateWithdrawal = async (withdrawalId: string, status: string, txId?: string) => {
     setActionLoading(withdrawalId)
     try {
-      const res = await fetch('/api/admin/withdrawals', {
+      const res = await apiFetch('/api/admin/withdrawals', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ withdrawalId, status, txId }),
@@ -554,7 +555,7 @@ export default function AdminPanel() {
   const handleUpdateKYC = async (recordId: string, status: string, userId: string, adminNote?: string) => {
     setActionLoading(recordId)
     try {
-      const res = await fetch('/api/admin/kyc', {
+      const res = await apiFetch('/api/admin/kyc', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ recordId, status, userId, adminNote }),
@@ -577,7 +578,7 @@ export default function AdminPanel() {
   const handleUpdateUser = async (userId: string, updates: Record<string, unknown>) => {
     setActionLoading(userId)
     try {
-      const res = await fetch('/api/admin/users', {
+      const res = await apiFetch('/api/admin/users', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ userId, adminId: user?.id, ...updates }),
@@ -605,7 +606,7 @@ export default function AdminPanel() {
     if (!roleDialogUser) return
     setActionLoading(roleDialogUser.id)
     try {
-      const res = await fetch('/api/admin/users', {
+      const res = await apiFetch('/api/admin/users', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ userId: roleDialogUser.id, role: roleDialogUser.role === 'admin' ? 'user' : 'admin', permissions: selectedPermissions }),
@@ -645,7 +646,7 @@ export default function AdminPanel() {
     if (!deleteDialogUser || !user?.id) return
     setDeleteLoading(true)
     try {
-      const res = await fetch('/api/admin/delete-user', {
+      const res = await apiFetch('/api/admin/delete-user', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ adminId: user.id, userId: deleteDialogUser.id, step: 'send_otp' }),
@@ -671,7 +672,7 @@ export default function AdminPanel() {
     if (!deleteDialogUser || !user?.id || !deleteOtp) return
     setDeleteLoading(true)
     try {
-      const res = await fetch('/api/admin/delete-user', {
+      const res = await apiFetch('/api/admin/delete-user', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ adminId: user.id, userId: deleteDialogUser.id, step: 'verify_otp', otp: deleteOtp }),
@@ -694,7 +695,7 @@ export default function AdminPanel() {
     if (!deleteDialogUser || !user?.id || !deletePassword) return
     setDeleteLoading(true)
     try {
-      const res = await fetch('/api/admin/delete-user', {
+      const res = await apiFetch('/api/admin/delete-user', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ adminId: user.id, userId: deleteDialogUser.id, step: 'confirm_delete', password: deletePassword }),
@@ -738,7 +739,7 @@ export default function AdminPanel() {
     if (!rejectReason.trim()) { toast.error('يرجى إدخال سبب الرفض'); return }
     setRejectLoading(true)
     try {
-      const res = await fetch('/api/admin/withdrawals', {
+      const res = await apiFetch('/api/admin/withdrawals', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ withdrawalId: rejectDialog.withdrawalId, status: 'rejected', adminNote: rejectReason.trim() }),
@@ -764,7 +765,7 @@ export default function AdminPanel() {
     setDeviceDialogUser(targetUser)
     setDeviceLoading(true)
     try {
-      const res = await fetch('/api/admin/devices', {
+      const res = await apiFetch('/api/admin/devices', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ adminId: user?.id, targetUserId: targetUser.id, action: 'list' }),
@@ -789,7 +790,7 @@ export default function AdminPanel() {
     if (!deviceDialogUser) return
     setDeviceLoading(true)
     try {
-      const res = await fetch('/api/admin/devices', {
+      const res = await apiFetch('/api/admin/devices', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -817,7 +818,7 @@ export default function AdminPanel() {
     if (!deviceDialogUser || !confirm('هل أنت متأكد من إزالة جميع الأجهزة؟')) return
     setDeviceLoading(true)
     try {
-      const res = await fetch('/api/admin/devices', {
+      const res = await apiFetch('/api/admin/devices', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ adminId: user?.id, targetUserId: deviceDialogUser.id, action: 'remove_all' }),
@@ -850,7 +851,7 @@ export default function AdminPanel() {
       const compressed = await compressImage(file)
       const screenshotBase64 = await fileToBase64(compressed)
 
-      const res = await fetch('/api/admin/withdrawals', {
+      const res = await apiFetch('/api/admin/withdrawals', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -884,7 +885,7 @@ export default function AdminPanel() {
     setBalanceLoading(true)
     try {
       const amount = parseFloat(balanceAmount)
-      const res = await fetch('/api/admin/users', {
+      const res = await apiFetch('/api/admin/users', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -921,7 +922,7 @@ export default function AdminPanel() {
   const handlePinResetAction = async (userId: string, action: 'approve' | 'reject') => {
     setActionLoading(userId)
     try {
-      const res = await fetch('/api/admin/users', {
+      const res = await apiFetch('/api/admin/users', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ userId, [action === 'approve' ? 'approvePinReset' : 'rejectPinReset']: true }),
@@ -945,7 +946,7 @@ export default function AdminPanel() {
     if (!removeMerchantDialogUser) return
     setRemoveMerchantLoading(true)
     try {
-      const res = await fetch('/api/admin/users', {
+      const res = await apiFetch('/api/admin/users', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -972,7 +973,7 @@ export default function AdminPanel() {
   const handleSendPin = async (userId: string, userEmail: string) => {
     setActionLoading(userId)
     try {
-      const res = await fetch('/api/admin/send-pin', {
+      const res = await apiFetch('/api/admin/send-pin', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ userId }),
@@ -995,7 +996,7 @@ export default function AdminPanel() {
     if (!confirm(`هل أنت متأكد من إعادة تعيين PIN للمستخدم ${userEmail}؟\nسيُطلب من المستخدم إعداد رمز PIN جديد عند تسجيل الدخول.`)) return
     setActionLoading(userId)
     try {
-      const res = await fetch('/api/admin/users', {
+      const res = await apiFetch('/api/admin/users', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ userId, resetUserPin: true }),
@@ -1018,7 +1019,7 @@ export default function AdminPanel() {
     if (!confirm(`هل أنت متأكد من تعطيل المصادقة الثنائية للمستخدم ${targetUser.email}؟\nهذا الإجراء لا يمكن التراجع عنه.`)) return
     setActionLoading(targetUser.id)
     try {
-      const res = await fetch('/api/auth/2fa', {
+      const res = await apiFetch('/api/auth/2fa', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -3033,7 +3034,7 @@ function PaymentMethodsManager({ methods, onRefresh }: { methods: any[]; onRefre
       } else {
         body.action = 'create'
       }
-      const res = await fetch('/api/admin/payment-methods', {
+      const res = await apiFetch('/api/admin/payment-methods', {
         method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
       })
       const data = await res.json()
@@ -3047,7 +3048,7 @@ function PaymentMethodsManager({ methods, onRefresh }: { methods: any[]; onRefre
     if (!confirm('هل أنت متأكد من حذف هذه الطريقة؟')) return
     setLoading(true)
     try {
-      const res = await fetch('/api/admin/payment-methods', {
+      const res = await apiFetch('/api/admin/payment-methods', {
         method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'delete', id }),
       })
       const data = await res.json()
@@ -3059,7 +3060,7 @@ function PaymentMethodsManager({ methods, onRefresh }: { methods: any[]; onRefre
 
   const handleToggle = async (m: any) => {
     try {
-      const res = await fetch('/api/admin/payment-methods', {
+      const res = await apiFetch('/api/admin/payment-methods', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action: 'update', id: m.id, isActive: !m.isActive }),
       })
@@ -3311,7 +3312,7 @@ function AdminSettingsPanel({ settings, onRefresh }: { settings: { email: string
 
   const fetchFees = async () => {
     try {
-      const res = await fetch('/api/settings?t=' + Date.now(), { cache: 'no-store' })
+      const res = await apiFetch('/api/settings?t=' + Date.now(), { cache: 'no-store' })
       const data = await res.json()
       if (data.success && data.settings) {
         setDepositFee(String(data.settings.depositFee || 0))
@@ -3333,7 +3334,7 @@ function AdminSettingsPanel({ settings, onRefresh }: { settings: { email: string
 
   const fetchSocialLinks = async () => {
     try {
-      const res = await fetch('/api/admin/social-links')
+      const res = await apiFetch('/api/admin/social-links')
       const data = await res.json()
       if (data.success && data.socialLinks) {
         setSocialWhatsapp(data.socialLinks.whatsapp || '')
@@ -3366,7 +3367,7 @@ function AdminSettingsPanel({ settings, onRefresh }: { settings: { email: string
   const handleSaveSocialLinks = async () => {
     setLoading(true)
     try {
-      const res = await fetch('/api/admin/social-links', {
+      const res = await apiFetch('/api/admin/social-links', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -3398,7 +3399,7 @@ function AdminSettingsPanel({ settings, onRefresh }: { settings: { email: string
     setLoading(true)
     try {
       const body = payload || {}
-      const res = await fetch('/api/admin/settings', {
+      const res = await apiFetch('/api/admin/settings', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ userId: user?.id, action: actionKey, ...body }),
@@ -3435,7 +3436,7 @@ function AdminSettingsPanel({ settings, onRefresh }: { settings: { email: string
   const handleCleanup = async () => {
     setLoading(true)
     try {
-      const res = await fetch('/api/admin/cleanup', {
+      const res = await apiFetch('/api/admin/cleanup', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ userId: user?.id, password: cleanupPassword, confirmText: cleanupConfirmText }),
@@ -4006,7 +4007,7 @@ function AdminDevicesSection() {
     if (!user?.id) return
     setLoading(true)
     try {
-      const res = await fetch('/api/user/devices', {
+      const res = await apiFetch('/api/user/devices', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ userId: user.id, action: 'list' }),
@@ -4030,7 +4031,7 @@ function AdminDevicesSection() {
     if (!confirm('هل أنت متأكد من إزالة هذا الجهاز؟')) return
     setActionLoading(deviceId)
     try {
-      const res = await fetch('/api/user/devices', {
+      const res = await apiFetch('/api/user/devices', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ userId: user!.id, action: 'remove', tokenId: deviceId }),
@@ -4057,7 +4058,7 @@ function AdminDevicesSection() {
     if (!confirm(`سيتم إزالة ${devices.length - 1} جهاز آخر. هل أنت متأكد؟`)) return
     setActionLoading('all')
     try {
-      const res = await fetch('/api/user/devices', {
+      const res = await apiFetch('/api/user/devices', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ userId: user!.id, action: 'remove-others' }),

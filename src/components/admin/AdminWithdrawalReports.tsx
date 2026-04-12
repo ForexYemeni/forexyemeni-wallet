@@ -1,3 +1,4 @@
+import { apiFetch } from '@/lib/api-client'
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
@@ -31,7 +32,7 @@ export default function AdminWithdrawalReports() {
     if (!user?.id) return
     setLoading(true)
     try {
-      const res = await fetch('/api/admin/withdrawal-reports', {
+      const res = await apiFetch('/api/admin/withdrawal-reports', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ adminId: user.id, action: 'list' }),
@@ -52,7 +53,7 @@ export default function AdminWithdrawalReports() {
   const handleResolve = async (report: WithdrawalReport) => {
     setActionLoading(report.id)
     try {
-      const res = await fetch('/api/admin/withdrawal-reports', {
+      const res = await apiFetch('/api/admin/withdrawal-reports', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ adminId: user!.id, action: 'resolve', reportId: report.id }),
@@ -75,7 +76,7 @@ export default function AdminWithdrawalReports() {
     if (!confirm('هل أنت متأكد من حذف هذا البلاغ؟')) return
     setActionLoading(report.id)
     try {
-      const res = await fetch('/api/admin/withdrawal-reports', {
+      const res = await apiFetch('/api/admin/withdrawal-reports', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ adminId: user!.id, action: 'delete', reportId: report.id }),

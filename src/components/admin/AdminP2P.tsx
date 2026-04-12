@@ -1,3 +1,4 @@
+import { apiFetch } from '@/lib/api-client'
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
@@ -133,7 +134,7 @@ export default function AdminP2P() {
   const fetchMerchantApplications = useCallback(async () => {
     if (!user?.id) return
     try {
-      const res = await fetch('/api/admin/p2p/merchants', {
+      const res = await apiFetch('/api/admin/p2p/merchants', {
         headers: { 'x-user-id': user.id },
       })
       const data = await res.json()
@@ -153,7 +154,7 @@ export default function AdminP2P() {
       if (orderStatusFilter) params.set('status', orderStatusFilter)
       const url = `/api/admin/p2p/orders${params.toString() ? `?${params.toString()}` : ''}`
 
-      const res = await fetch(url, {
+      const res = await apiFetch(url, {
         headers: { 'x-user-id': user.id },
       })
       const data = await res.json()
@@ -188,7 +189,7 @@ export default function AdminP2P() {
     if (!user?.id) return
     setActionLoading(application.id)
     try {
-      const res = await fetch('/api/admin/p2p/merchants', {
+      const res = await apiFetch('/api/admin/p2p/merchants', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -218,7 +219,7 @@ export default function AdminP2P() {
     if (!rejectDialog || !user?.id || !rejectReason.trim()) return
     setActionLoading(rejectDialog.id)
     try {
-      const res = await fetch('/api/admin/p2p/merchants', {
+      const res = await apiFetch('/api/admin/p2p/merchants', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -253,7 +254,7 @@ export default function AdminP2P() {
     if (!user?.id) return
     setActionLoading(order.id)
     try {
-      const res = await fetch('/api/admin/p2p/orders', {
+      const res = await apiFetch('/api/admin/p2p/orders', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

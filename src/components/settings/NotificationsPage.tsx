@@ -1,3 +1,4 @@
+import { apiFetch } from '@/lib/api-client'
 'use client'
 
 import { useState, useEffect } from 'react'
@@ -33,7 +34,7 @@ export default function NotificationsPage() {
   const fetchNotifications = async () => {
     if (!user?.id) return
     try {
-      const res = await fetch(`/api/notifications?userId=${user.id}`)
+      const res = await apiFetch(`/api/notifications?userId=${user.id}`)
       const data = await res.json()
       if (data.success) setNotifications(data.notifications)
     } catch {
@@ -46,7 +47,7 @@ export default function NotificationsPage() {
   const markAllRead = async () => {
     if (!user?.id) return
     try {
-      await fetch('/api/notifications', {
+      await apiFetch('/api/notifications', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ userId: user.id }),

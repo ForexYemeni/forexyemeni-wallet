@@ -1,3 +1,4 @@
+import { apiFetch } from '@/lib/api-client'
 'use client'
 
 import { useState, useEffect } from 'react'
@@ -82,7 +83,7 @@ export default function WithdrawForm() {
   const checkPendingWithdrawal = async () => {
     if (!user?.id) return
     try {
-      const res = await fetch(`/api/withdrawals/create?checkPending=true&userId=${user.id}`)
+      const res = await apiFetch(`/api/withdrawals/create?checkPending=true&userId=${user.id}`)
       const data = await res.json()
       if (data.hasPending) setHasPending(true)
     } catch { /* silent */ }
@@ -90,7 +91,7 @@ export default function WithdrawForm() {
 
   const fetchSettings = async () => {
     try {
-      const res = await fetch('/api/settings')
+      const res = await apiFetch('/api/settings')
       const data = await res.json()
       if (data.success && data.settings) {
         setFeePercentage(data.settings.withdrawalFee || 0.1)
@@ -102,7 +103,7 @@ export default function WithdrawForm() {
     if (!user?.id) return
     setLoadingMethods(true)
     try {
-      const res = await fetch(`/api/user/payment-methods?userId=${user.id}`)
+      const res = await apiFetch(`/api/user/payment-methods?userId=${user.id}`)
       const data = await res.json()
       if (data.success) setMethods(data.methods || [])
     } catch {
@@ -150,7 +151,7 @@ export default function WithdrawForm() {
       } else {
         body.action = 'create'
       }
-      const res = await fetch('/api/user/payment-methods', {
+      const res = await apiFetch('/api/user/payment-methods', {
         method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
       })
       const data = await res.json()
@@ -171,7 +172,7 @@ export default function WithdrawForm() {
   const handleDeleteMethod = async (id: string) => {
     if (!confirm('هل أنت متأكد من حذف هذه الطريقة؟')) return
     try {
-      const res = await fetch('/api/user/payment-methods', {
+      const res = await apiFetch('/api/user/payment-methods', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action: 'delete', id, userId: user?.id }),
       })
@@ -237,7 +238,7 @@ export default function WithdrawForm() {
         toAddress = `صراف: ${selectedMethod.recipientName || ''} - ${selectedMethod.recipientPhone || ''} - ${selectedMethod.network || ''}`
       }
 
-      const res = await fetch('/api/withdrawals/create', {
+      const res = await apiFetch('/api/withdrawals/create', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -259,7 +260,7 @@ export default function WithdrawForm() {
         resetForm()
         // Refresh balance
         try {
-          const profileRes = await fetch('/api/auth/complete-registration')
+          const profileRes = await apiFetch('/api/auth/complete-registration')
           if (profileRes.ok) {
             const profileData = await profileRes.json()
             if (profileData.user) updateUser(profileData.user)
@@ -281,7 +282,7 @@ export default function WithdrawForm() {
     setPinLoading(true)
     try {
       // Verify PIN
-      const pinRes = await fetch('/api/auth/verify-pin', {
+      const pinRes = await apiFetch('/api/auth/verify-pin', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ userId: user?.id, pin: pinCode }),
@@ -398,7 +399,7 @@ export default function WithdrawForm() {
                       // Check for pending withdrawal before allowing new withdrawal
                       setPendingCheckLoading(true)
                       try {
-                        const res = await fetch(`/api/withdrawals/create?checkPending=true&userId=${user?.id}&_t=${Date.now()}`, { cache: 'no-store' })
+                        const res = await apiFetch(`/api/withdrawals/create?checkPending=true&userId=${user?.id}&_t=${Date.now()}`, { cache: 'no-store' })
                         const data = await res.json()
                         if (data.hasPending) {
                           setHasPending(true)

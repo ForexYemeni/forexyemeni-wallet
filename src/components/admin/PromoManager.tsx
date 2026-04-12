@@ -1,3 +1,4 @@
+import { apiFetch } from '@/lib/api-client'
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
@@ -50,7 +51,7 @@ export default function PromoManager() {
     if (!user?.id) return
     setLoading(true)
     try {
-      const res = await fetch('/api/promo', {
+      const res = await apiFetch('/api/promo', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action: 'list_all', adminId: user.id }),
@@ -73,7 +74,7 @@ export default function PromoManager() {
     }
     setSubmitting(true)
     try {
-      const res = await fetch('/api/promo', {
+      const res = await apiFetch('/api/promo', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -111,7 +112,7 @@ export default function PromoManager() {
     if (!confirm(`هل أنت متأكد من حذف الكود ${promoCode}؟`)) return
     setDeleting(promoId)
     try {
-      const res = await fetch('/api/promo', {
+      const res = await apiFetch('/api/promo', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action: 'delete', adminId: user?.id, promoId }),

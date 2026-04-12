@@ -1,3 +1,4 @@
+import { apiFetch } from '@/lib/api-client'
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
@@ -46,7 +47,7 @@ export default function AdminFinancial() {
     if (!user?.id) return
     setLoading(true)
     try {
-      const res = await fetch(`/api/admin/super-admin?adminId=${user.id}`)
+      const res = await apiFetch(`/api/admin/super-admin?adminId=${user.id}`)
       const data = await res.json()
       if (data.success) {
         setFinancialSummary(data.data.financialSummary || null)

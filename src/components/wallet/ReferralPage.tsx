@@ -1,3 +1,4 @@
+import { apiFetch } from '@/lib/api-client'
 'use client'
 
 import { useState, useEffect } from 'react'
@@ -83,9 +84,9 @@ export default function ReferralPage() {
     setLoading(true)
     try {
       const [statsRes, settingsRes, commissionsRes] = await Promise.all([
-        fetch(`/api/referral?action=my_stats&userId=${user.id}`),
-        fetch('/api/referral?action=get_settings'),
-        fetch(`/api/referral?action=my_commissions&userId=${user.id}`),
+        apiFetch(`/api/referral?action=my_stats&userId=${user.id}`),
+        apiFetch('/api/referral?action=get_settings'),
+        apiFetch(`/api/referral?action=my_commissions&userId=${user.id}`),
       ])
 
       const statsData = await statsRes.json()

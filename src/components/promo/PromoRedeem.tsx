@@ -1,3 +1,4 @@
+import { apiFetch } from '@/lib/api-client'
 'use client'
 
 import { useState } from 'react'
@@ -23,7 +24,7 @@ export default function PromoRedeem() {
     setResult(null)
 
     try {
-      const res = await fetch('/api/promo', {
+      const res = await apiFetch('/api/promo', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

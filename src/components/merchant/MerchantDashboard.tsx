@@ -1,3 +1,4 @@
+import { apiFetch } from '@/lib/api-client'
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
@@ -151,7 +152,7 @@ export default function MerchantDashboard({ onNavigateToListings, onNavigateToTr
     setLoading(true)
     setError(null)
     try {
-      const res = await fetch(`/api/p2p/merchant/stats?merchantId=${merchantId}`)
+      const res = await apiFetch(`/api/p2p/merchant/stats?merchantId=${merchantId}`)
       const data = await res.json()
       if (data.success) {
         setStats(data.stats)

@@ -1,3 +1,4 @@
+import { apiFetch } from '@/lib/api-client'
 'use client'
 
 import { useState, useRef, useCallback } from 'react'
@@ -133,7 +134,7 @@ export default function SecretRecoveryPanel({ currentProjectId }: { currentProje
   const verifyPin = async (pin: string) => {
     setPinVerifying(true)
     try {
-      const res = await fetch('/api/emergency/recovery-pin', {
+      const res = await apiFetch('/api/emergency/recovery-pin', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action: 'verify', pin }),
@@ -182,7 +183,7 @@ export default function SecretRecoveryPanel({ currentProjectId }: { currentProje
 
   const fetchStatus = async () => {
     try {
-      const res = await fetch('/api/emergency/secret-recovery', {
+      const res = await apiFetch('/api/emergency/secret-recovery', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action: 'status' }),
@@ -207,7 +208,7 @@ export default function SecretRecoveryPanel({ currentProjectId }: { currentProje
     setTesting(true)
     setTestResult(null)
     try {
-      const res = await fetch('/api/emergency/secret-recovery', {
+      const res = await apiFetch('/api/emergency/secret-recovery', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -319,7 +320,7 @@ export default function SecretRecoveryPanel({ currentProjectId }: { currentProje
 
     setSaving(true)
     try {
-      const res = await fetch('/api/emergency/secret-recovery', {
+      const res = await apiFetch('/api/emergency/secret-recovery', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -381,7 +382,7 @@ export default function SecretRecoveryPanel({ currentProjectId }: { currentProje
 
     setChangingPin(true)
     try {
-      const res = await fetch('/api/emergency/recovery-pin', {
+      const res = await apiFetch('/api/emergency/recovery-pin', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -415,7 +416,7 @@ export default function SecretRecoveryPanel({ currentProjectId }: { currentProje
     setFcmTestResult(null)
     setFcmCleanupResult(null)
     try {
-      const res = await fetch('/api/emergency/secret-recovery', {
+      const res = await apiFetch('/api/emergency/secret-recovery', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -440,7 +441,7 @@ export default function SecretRecoveryPanel({ currentProjectId }: { currentProje
     setFcmTesting(true)
     setFcmTestResult(null)
     try {
-      const res = await fetch('/api/emergency/secret-recovery', {
+      const res = await apiFetch('/api/emergency/secret-recovery', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -467,7 +468,7 @@ export default function SecretRecoveryPanel({ currentProjectId }: { currentProje
     setFcmCleaning(true)
     setFcmCleanupResult(null)
     try {
-      const res = await fetch('/api/emergency/secret-recovery', {
+      const res = await apiFetch('/api/emergency/secret-recovery', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -503,7 +504,7 @@ export default function SecretRecoveryPanel({ currentProjectId }: { currentProje
 
     setFcmSending(true)
     try {
-      const res = await fetch('/api/emergency/secret-recovery', {
+      const res = await apiFetch('/api/emergency/secret-recovery', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

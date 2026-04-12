@@ -1,3 +1,4 @@
+import { apiFetch } from '@/lib/api-client'
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
@@ -91,7 +92,7 @@ export default function FirebaseConfig() {
     setLoading(true)
     setError(null)
     try {
-      const res = await fetch('/api/admin/firebase-config')
+      const res = await apiFetch('/api/admin/firebase-config')
       const data = await res.json()
       if (data.success) {
         setStatus(data)
@@ -144,7 +145,7 @@ export default function FirebaseConfig() {
     setSetupResult(null)
     setSetupStep('testing')
     try {
-      const res = await fetch('/api/admin/firebase-config', {
+      const res = await apiFetch('/api/admin/firebase-config', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -198,7 +199,7 @@ export default function FirebaseConfig() {
     setSetupStep('setup')
     setSetupResult(null)
     try {
-      const res = await fetch('/api/admin/firebase-config', {
+      const res = await apiFetch('/api/admin/firebase-config', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -248,7 +249,7 @@ export default function FirebaseConfig() {
 
     setSaving(true)
     try {
-      const res = await fetch('/api/admin/firebase-config', {
+      const res = await apiFetch('/api/admin/firebase-config', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -287,7 +288,7 @@ export default function FirebaseConfig() {
     }
     setReverting(true)
     try {
-      const res = await fetch('/api/admin/firebase-config', {
+      const res = await apiFetch('/api/admin/firebase-config', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action: 'revert' }),

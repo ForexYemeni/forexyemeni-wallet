@@ -1,3 +1,4 @@
+import { apiFetch } from '@/lib/api-client'
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
@@ -51,7 +52,7 @@ export default function P2PMyListings() {
       setCheckingMerchant(true)
       setMerchantCheckFailed(false)
       try {
-        const res = await fetch(`/api/p2p/merchant?userId=${user.id}`)
+        const res = await apiFetch(`/api/p2p/merchant?userId=${user.id}`)
         const data = await res.json()
         if (data.success && data.hasApplication && data.application?.status === 'approved') {
           setIsMerchant(true)
@@ -76,7 +77,7 @@ export default function P2PMyListings() {
     setLoading(true)
     try {
       // Use merchantId query param to get ALL listings (including paused) for this merchant
-      const res = await fetch(`/api/p2p/listings?merchantId=${effectiveMerchantId}`)
+      const res = await apiFetch(`/api/p2p/listings?merchantId=${effectiveMerchantId}`)
       const data = await res.json()
       if (data.success) {
         setListings(data.listings || [])
@@ -92,7 +93,7 @@ export default function P2PMyListings() {
       if (!confirm('هل أنت متأكد من حذف هذا الإعلان؟')) return
       setActionLoading(id)
       try {
-        const res = await fetch(`/api/p2p/listings/${id}`, { method: 'DELETE', headers: { 'x-user-id': user?.id || '' } })
+        const res = await apiFetch(`/api/p2p/listings/${id}`, { method: 'DELETE', headers: { 'x-user-id': user?.id || '' } })
         const data = await res.json()
         if (data.success) { toast.success('تم حذف الإعلان'); fetchListings() }
         else toast.error(data.message)
@@ -103,7 +104,7 @@ export default function P2PMyListings() {
 
     setActionLoading(id)
     try {
-      const res = await fetch(`/api/p2p/listings/${id}`, {
+      const res = await apiFetch(`/api/p2p/listings/${id}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'x-user-id': user?.id || '' },
         body: JSON.stringify({ action }),

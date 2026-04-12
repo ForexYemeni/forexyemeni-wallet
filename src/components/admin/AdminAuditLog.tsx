@@ -1,3 +1,4 @@
+import { apiFetch } from '@/lib/api-client'
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
@@ -81,7 +82,7 @@ export default function AdminAuditLog() {
       if (filters.fromDate) params.set('fromDate', filters.fromDate)
       if (filters.toDate) params.set('toDate', filters.toDate)
 
-      const res = await fetch(`/api/admin/audit?${params}`)
+      const res = await apiFetch(`/api/admin/audit?${params}`)
       const data = await res.json()
       if (data.success) {
         setLogs(data.logs || [])
@@ -108,7 +109,7 @@ export default function AdminAuditLog() {
   const exportCSV = async () => {
     try {
       const params = new URLSearchParams({ adminId: user!.id, type: 'audit' })
-      const res = await fetch(`/api/admin/export?${params}`)
+      const res = await apiFetch(`/api/admin/export?${params}`)
       if (!res.ok) throw new Error()
       const blob = await res.blob()
       const url = window.URL.createObjectURL(blob)

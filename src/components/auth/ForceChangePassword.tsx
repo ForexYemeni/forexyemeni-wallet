@@ -1,3 +1,4 @@
+import { apiFetch } from '@/lib/api-client'
 'use client'
 
 import { useState } from 'react'
@@ -57,7 +58,7 @@ export default function ForceChangePassword() {
 
     setLoading(true)
     try {
-      const res = await fetch('/api/auth/force-change-password', {
+      const res = await apiFetch('/api/auth/force-change-password', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

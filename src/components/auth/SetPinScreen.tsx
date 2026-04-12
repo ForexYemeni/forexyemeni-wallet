@@ -1,3 +1,4 @@
+import { apiFetch } from '@/lib/api-client'
 'use client'
 
 import { useState } from 'react'
@@ -27,7 +28,7 @@ export default function SetPinScreen() {
     }
     setLoading(true)
     try {
-      const res = await fetch('/api/auth/set-pin', {
+      const res = await apiFetch('/api/auth/set-pin', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ userId: user?.id, pin }),

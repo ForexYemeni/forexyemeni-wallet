@@ -1,3 +1,4 @@
+import { apiFetch } from '@/lib/api-client'
 'use client'
 
 import { useState, useEffect } from 'react'
@@ -60,7 +61,7 @@ export default function AdminFaqManager() {
   const fetchItems = async () => {
     try {
       // We need all items (not just active), so use the search with empty query
-      const res = await fetch('/api/faq', {
+      const res = await apiFetch('/api/faq', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action: 'search', query: '' }),
@@ -78,7 +79,7 @@ export default function AdminFaqManager() {
       setLoading(true)
       // Fetch bot settings
       try {
-        const settingsRes = await fetch('/api/faq', {
+        const settingsRes = await apiFetch('/api/faq', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ action: 'get_bot_settings' }),
@@ -92,7 +93,7 @@ export default function AdminFaqManager() {
 
       // Fetch active items first
       try {
-        const res = await fetch('/api/faq')
+        const res = await apiFetch('/api/faq')
         const data = await res.json()
         if (data.success) {
           setItems(data.items || [])
@@ -108,7 +109,7 @@ export default function AdminFaqManager() {
     if (!user?.id) return
     setSettingsLoading(true)
     try {
-      const res = await fetch('/api/faq', {
+      const res = await apiFetch('/api/faq', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -175,7 +176,7 @@ export default function AdminFaqManager() {
       }
       if (editingId) body.faqId = editingId
 
-      const res = await fetch('/api/faq', {
+      const res = await apiFetch('/api/faq', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body),
@@ -186,7 +187,7 @@ export default function AdminFaqManager() {
         setShowForm(false)
         setEditingId(null)
         // Refresh - we need to get all items
-        const refreshRes = await fetch('/api/faq')
+        const refreshRes = await apiFetch('/api/faq')
         const refreshData = await refreshRes.json()
         if (refreshData.success) setItems(refreshData.items || [])
       } else {
@@ -205,7 +206,7 @@ export default function AdminFaqManager() {
 
     setActionLoading(id)
     try {
-      const res = await fetch('/api/faq', {
+      const res = await apiFetch('/api/faq', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action: 'delete', userId: user.id, faqId: id }),
@@ -228,7 +229,7 @@ export default function AdminFaqManager() {
     if (!user?.id) return
     setActionLoading(`toggle-${item.id}`)
     try {
-      const res = await fetch('/api/faq', {
+      const res = await apiFetch('/api/faq', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

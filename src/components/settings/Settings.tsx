@@ -1,3 +1,4 @@
+import { apiFetch } from '@/lib/api-client'
 'use client'
 
 import { useState, useCallback, useEffect } from 'react'
@@ -123,7 +124,7 @@ export default function SettingsPage() {
 
     setLoading(true)
     try {
-      const res = await fetch('/api/user/change-password', {
+      const res = await apiFetch('/api/user/change-password', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -490,7 +491,7 @@ export default function SettingsPage() {
                 <button
                   onClick={async () => {
                     try {
-                      const res = await fetch('/api/notifications/test', {
+                      const res = await apiFetch('/api/notifications/test', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({ userId: user.id }),

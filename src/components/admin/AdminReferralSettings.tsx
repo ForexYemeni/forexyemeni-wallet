@@ -1,3 +1,4 @@
+import { apiFetch } from '@/lib/api-client'
 'use client'
 
 import { useState, useEffect } from 'react'
@@ -60,7 +61,7 @@ export default function AdminReferralSettings() {
 
   const fetchSettings = async () => {
     try {
-      const res = await fetch('/api/referral?action=get_settings')
+      const res = await apiFetch('/api/referral?action=get_settings')
       const data = await res.json()
       if (data.success) {
         setSettings(prev => ({
@@ -80,9 +81,9 @@ export default function AdminReferralSettings() {
 
   const fetchStats = async () => {
     try {
-      const res = await fetch('/api/referral?action=get_settings')
+      const res = await apiFetch('/api/referral?action=get_settings')
       // Fetch admin stats via a separate call
-      const statsRes = await fetch(`/api/referral?action=admin_stats`)
+      const statsRes = await apiFetch(`/api/referral?action=admin_stats`)
       if (statsRes.ok) {
         const statsData = await statsRes.json()
         if (statsData.success) setStats(statsData.stats)
@@ -96,7 +97,7 @@ export default function AdminReferralSettings() {
     if (!user?.id) return
     setSaving(true)
     try {
-      const res = await fetch('/api/referral', {
+      const res = await apiFetch('/api/referral', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

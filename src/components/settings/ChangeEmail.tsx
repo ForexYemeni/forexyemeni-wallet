@@ -1,3 +1,4 @@
+import { apiFetch } from '@/lib/api-client'
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
@@ -54,7 +55,7 @@ export default function ChangeEmail({ onClose }: ChangeEmailProps) {
 
     setLoading(true)
     try {
-      const res = await fetch('/api/user/change-email', {
+      const res = await apiFetch('/api/user/change-email', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -91,7 +92,7 @@ export default function ChangeEmail({ onClose }: ChangeEmailProps) {
 
     setLoading(true)
     try {
-      const res = await fetch('/api/user/change-email', {
+      const res = await apiFetch('/api/user/change-email', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -123,7 +124,7 @@ export default function ChangeEmail({ onClose }: ChangeEmailProps) {
     if (!newEmail) return
     setLoading(true)
     try {
-      const res = await fetch('/api/user/change-email', {
+      const res = await apiFetch('/api/user/change-email', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

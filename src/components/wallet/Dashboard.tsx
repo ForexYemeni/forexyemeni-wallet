@@ -1,3 +1,4 @@
+import { apiFetch } from '@/lib/api-client'
 'use client'
 
 import { useState, useEffect } from 'react'
@@ -84,7 +85,7 @@ export default function Dashboard() {
     }
 
     try {
-      const res = await fetch(`/api/transactions?userId=${user.id}`)
+      const res = await apiFetch(`/api/transactions?userId=${user.id}`)
       const data = await res.json()
       if (data.success) {
         const txs = (data.transactions || []).slice(0, 5)

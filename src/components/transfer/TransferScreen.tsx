@@ -1,3 +1,4 @@
+import { apiFetch } from '@/lib/api-client'
 'use client'
 
 import { useState } from 'react'
@@ -101,7 +102,7 @@ export default function TransferScreen() {
     // Lookup receiver to show their info before PIN
     setLookupLoading(true)
     try {
-      const res = await fetch('/api/transfer/lookup', {
+      const res = await apiFetch('/api/transfer/lookup', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ receiver: receiver.trim(), senderId: user?.id }),
@@ -136,7 +137,7 @@ export default function TransferScreen() {
     setError('')
 
     try {
-      const res = await fetch('/api/transfer', {
+      const res = await apiFetch('/api/transfer', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

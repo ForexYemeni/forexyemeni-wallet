@@ -1,3 +1,4 @@
+import { apiFetch } from '@/lib/api-client'
 'use client'
 
 import { useState } from 'react'
@@ -23,7 +24,7 @@ export default function ExportStatement() {
 
     setLoading(true)
     try {
-      const res = await fetch('/api/transactions/export-pdf', {
+      const res = await apiFetch('/api/transactions/export-pdf', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -75,7 +76,7 @@ export default function ExportStatement() {
 
     setLoading(true)
     try {
-      const res = await fetch('/api/transactions/export-pdf', {
+      const res = await apiFetch('/api/transactions/export-pdf', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

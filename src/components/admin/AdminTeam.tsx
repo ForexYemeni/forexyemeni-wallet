@@ -1,3 +1,4 @@
+import { apiFetch } from '@/lib/api-client'
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
@@ -102,7 +103,7 @@ export default function AdminTeam() {
     if (!user?.id) return
     setLoading(true)
     try {
-      const res = await fetch(`/api/admin/super-admin?adminId=${user.id}`)
+      const res = await apiFetch(`/api/admin/super-admin?adminId=${user.id}`)
       const data = await res.json()
       if (data.success) {
         setAdminTeam(data.data?.adminTeam || [])
@@ -136,7 +137,7 @@ export default function AdminTeam() {
     if (!user?.id || !editingAdmin) return
     setSaving(true)
     try {
-      const res = await fetch('/api/admin/super-admin', {
+      const res = await apiFetch('/api/admin/super-admin', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -172,7 +173,7 @@ export default function AdminTeam() {
     if (!confirm(`هل أنت متأكد من خفض ${adminEmail} من الإدارة؟`)) return
     setSaving(true)
     try {
-      const res = await fetch('/api/admin/super-admin', {
+      const res = await apiFetch('/api/admin/super-admin', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

@@ -1,3 +1,4 @@
+import { apiFetch } from '@/lib/api-client'
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
@@ -36,8 +37,8 @@ export default function P2PPage() {
     setStatsLoading(true)
     try {
       const [tradesRes, listingsRes] = await Promise.all([
-        fetch('/api/p2p/trades'),
-        fetch('/api/p2p/listings'),
+        apiFetch('/api/p2p/trades'),
+        apiFetch('/api/p2p/listings'),
       ])
       const [tradesData, listingsData] = await Promise.all([tradesRes.json(), listingsRes.json()])
 
@@ -79,7 +80,7 @@ export default function P2PPage() {
   const handleCreateTrade = async () => {
     if (!creatingTrade) return
     try {
-      const res = await fetch('/api/p2p/trades', {
+      const res = await apiFetch('/api/p2p/trades', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

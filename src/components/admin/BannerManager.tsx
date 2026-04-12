@@ -1,3 +1,4 @@
+import { apiFetch } from '@/lib/api-client'
 'use client'
 
 import { useState, useEffect } from 'react'
@@ -37,7 +38,7 @@ export default function BannerManager() {
 
   const fetchBanners = async () => {
     try {
-      const res = await fetch('/api/admin/banners')
+      const res = await apiFetch('/api/admin/banners')
       const data = await res.json()
       if (data.success) {
         setBanners(data.banners || [])
@@ -68,7 +69,7 @@ export default function BannerManager() {
 
     setActionLoading('create')
     try {
-      const res = await fetch('/api/admin/banners', {
+      const res = await apiFetch('/api/admin/banners', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -102,7 +103,7 @@ export default function BannerManager() {
 
     setActionLoading(bannerId)
     try {
-      const res = await fetch(`/api/admin/banners?id=${bannerId}&userId=${user.id}`, {
+      const res = await apiFetch(`/api/admin/banners?id=${bannerId}&userId=${user.id}`, {
         method: 'DELETE',
       })
       const data = await res.json()
@@ -127,7 +128,7 @@ export default function BannerManager() {
       // Use POST to update - we need to create a simple update approach
       // Since we only have GET/POST/DELETE, we'll delete and re-create with new active status
       // Actually, let's use the Firestore directly via a POST update
-      const res = await fetch('/api/admin/banners', {
+      const res = await apiFetch('/api/admin/banners', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -168,7 +169,7 @@ export default function BannerManager() {
     setActionLoading(`reorder-${banner.id}`)
     try {
       // Update by swapping orders - delete both and recreate
-      const res = await fetch('/api/admin/banners', {
+      const res = await apiFetch('/api/admin/banners', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

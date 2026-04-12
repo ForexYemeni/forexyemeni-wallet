@@ -1,3 +1,4 @@
+import { apiFetch } from '@/lib/api-client'
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
@@ -57,7 +58,7 @@ export default function P2PMerchantApply({ onBack }: { onBack?: () => void }) {
     if (!user?.id) return
     setStatus('loading')
     try {
-      const res = await fetch(`/api/p2p/merchant?userId=${user.id}`)
+      const res = await apiFetch(`/api/p2p/merchant?userId=${user.id}`)
       const data = await res.json()
       if (data.success && data.hasApplication && data.application) {
         const app = data.application
@@ -116,7 +117,7 @@ export default function P2PMerchantApply({ onBack }: { onBack?: () => void }) {
 
     setSubmitting(true)
     try {
-      const res = await fetch('/api/p2p/merchant', {
+      const res = await apiFetch('/api/p2p/merchant', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

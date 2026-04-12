@@ -1,3 +1,4 @@
+import { apiFetch } from '@/lib/api-client'
 'use client'
 
 import { useState, useEffect, useRef, useCallback } from 'react'
@@ -208,7 +209,7 @@ export default function ChatPage() {
   const fetchChats = useCallback(async () => {
     if (!user?.id) return
     try {
-      const res = await fetch(`/api/chats?userId=${user.id}&role=user`)
+      const res = await apiFetch(`/api/chats?userId=${user.id}&role=user`)
       const data = await res.json()
       if (data.success) {
         setChats(data.chats || [])
@@ -225,12 +226,12 @@ export default function ChatPage() {
     if (!user?.id) return
     setLoadingMessages(true)
     try {
-      const res = await fetch(`/api/chats/${chatId}?userId=${user.id}&role=user`)
+      const res = await apiFetch(`/api/chats/${chatId}?userId=${user.id}&role=user`)
       const data = await res.json()
       if (data.success) {
         setMessages(data.messages || [])
         // Mark as read
-        fetch(`/api/chats/${chatId}`, {
+        apiFetch(`/api/chats/${chatId}`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ action: 'mark_read', readerType: 'user' }),
@@ -296,7 +297,7 @@ export default function ChatPage() {
     pollingRef.current = setInterval(async () => {
       try {
         // Poll chat list for unread counts
-        const chatsRes = await fetch(`/api/chats?userId=${user.id}&role=user`)
+        const chatsRes = await apiFetch(`/api/chats?userId=${user.id}&role=user`)
         const chatsData = await chatsRes.json()
         if (chatsData.success) {
           setChats(chatsData.chats || [])
@@ -325,7 +326,7 @@ export default function ChatPage() {
               }
               setMessages(msgData.messages)
               // Mark as read
-              fetch(`/api/chats/${selectedChatId}`, {
+              apiFetch(`/api/chats/${selectedChatId}`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ action: 'mark_read', readerType: 'user' }),
@@ -348,7 +349,7 @@ export default function ChatPage() {
     if (!newMessage.trim() || !selectedChatId || !user?.id || sendingMessage) return
     setSendingMessage(true)
     try {
-      const res = await fetch('/api/chats', {
+      const res = await apiFetch('/api/chats', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -382,7 +383,7 @@ export default function ChatPage() {
     if (!firstMessage.trim() || !user?.id || creatingChat) return
     setCreatingChat(true)
     try {
-      const res = await fetch('/api/chats', {
+      const res = await apiFetch('/api/chats', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

@@ -1,3 +1,4 @@
+import { apiFetch } from '@/lib/api-client'
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
@@ -43,7 +44,7 @@ export default function P2PMyTrades({ onTradeClick }: { onTradeClick?: (tradeId:
     if (!user?.id) return
     setLoading(true)
     try {
-      const res = await fetch('/api/p2p/trades')
+      const res = await apiFetch('/api/p2p/trades')
       const data = await res.json()
       if (data.success) setTrades(data.trades || [])
     } catch { /* silent */ }

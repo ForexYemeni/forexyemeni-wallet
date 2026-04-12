@@ -1,3 +1,4 @@
+import { apiFetch } from '@/lib/api-client'
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
@@ -69,7 +70,7 @@ export default function AdminReports() {
       if (useCustomRange && fromDate) params.set('fromDate', fromDate + 'T00:00:00.000Z')
       if (useCustomRange && toDate) params.set('toDate', toDate + 'T23:59:59.999Z')
 
-      const res = await fetch(`/api/admin/reports?${params}`)
+      const res = await apiFetch(`/api/admin/reports?${params}`)
       const data = await res.json()
       if (data.success) {
         setReport(data)
@@ -90,7 +91,7 @@ export default function AdminReports() {
     if (!user?.id) return
     setAutoReportLoading(true)
     try {
-      const res = await fetch('/api/admin/reports/generate', {
+      const res = await apiFetch('/api/admin/reports/generate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ adminId: user.id, period: reportPeriod }),
@@ -211,7 +212,7 @@ export default function AdminReports() {
           <button onClick={async () => {
             try {
               const params = new URLSearchParams({ adminId: user!.id, type: 'deposits' })
-              const res = await fetch(`/api/admin/export?${params}`)
+              const res = await apiFetch(`/api/admin/export?${params}`)
               if (!res.ok) throw new Error()
               const blob = await res.blob()
               const url = window.URL.createObjectURL(blob)

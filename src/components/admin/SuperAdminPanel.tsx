@@ -1,3 +1,4 @@
+import { apiFetch } from '@/lib/api-client'
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
@@ -246,7 +247,7 @@ export default function SuperAdminPanel() {
     if (!user?.id) return
     setLoading(true)
     try {
-      const res = await fetch(`/api/admin/super-admin?adminId=${user.id}`)
+      const res = await apiFetch(`/api/admin/super-admin?adminId=${user.id}`)
       const data = await res.json()
       if (data.success) {
         setDashboardData(data.data)
@@ -274,7 +275,7 @@ export default function SuperAdminPanel() {
     if (!user?.id) return
     setSaving(true)
     try {
-      const res = await fetch('/api/admin/super-admin', {
+      const res = await apiFetch('/api/admin/super-admin', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ adminId: user.id, action: 'update_settings', ...updates }),
@@ -299,7 +300,7 @@ export default function SuperAdminPanel() {
     if (!newVal || confirm('هل تريد تفعيل وضع الصيانة؟ سيتم منع جميع المستخدمين من تسجيل الدخول.')) {
       setSaving(true)
       try {
-        const res = await fetch('/api/admin/super-admin', {
+        const res = await apiFetch('/api/admin/super-admin', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ adminId: user.id, action: 'toggle_maintenance' }),
@@ -326,7 +327,7 @@ export default function SuperAdminPanel() {
     }
     setSaving(true)
     try {
-      const res = await fetch('/api/admin/super-admin', {
+      const res = await apiFetch('/api/admin/super-admin', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -357,7 +358,7 @@ export default function SuperAdminPanel() {
   const handleDeleteAnnouncement = async (id: string) => {
     if (!user?.id || !confirm('هل أنت متأكد من حذف هذا الإعلان؟')) return
     try {
-      const res = await fetch('/api/admin/super-admin', {
+      const res = await apiFetch('/api/admin/super-admin', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ adminId: user.id, action: 'delete_announcement', announcementId: id }),
@@ -377,7 +378,7 @@ export default function SuperAdminPanel() {
   const handleToggleAnnouncement = async (id: string) => {
     if (!user?.id) return
     try {
-      const res = await fetch('/api/admin/super-admin', {
+      const res = await apiFetch('/api/admin/super-admin', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ adminId: user.id, action: 'toggle_announcement', announcementId: id }),
@@ -393,7 +394,7 @@ export default function SuperAdminPanel() {
     }
     setBroadcastLoading(true)
     try {
-      const res = await fetch('/api/admin/super-admin/broadcast', {
+      const res = await apiFetch('/api/admin/super-admin/broadcast', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ adminId: user.id, ...broadcastForm }),
@@ -419,7 +420,7 @@ export default function SuperAdminPanel() {
       return
     }
     try {
-      const res = await fetch('/api/admin/super-admin', {
+      const res = await apiFetch('/api/admin/super-admin', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ adminId: user.id, action: 'ban_ip', ip: banIpInput.trim() }),
@@ -441,7 +442,7 @@ export default function SuperAdminPanel() {
   const handleUnbanIp = async (ip: string) => {
     if (!user?.id) return
     try {
-      const res = await fetch('/api/admin/super-admin', {
+      const res = await apiFetch('/api/admin/super-admin', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ adminId: user.id, action: 'unban_ip', ip }),
@@ -461,7 +462,7 @@ export default function SuperAdminPanel() {
   const handleResolveSuspicious = async (userId: string) => {
     if (!user?.id) return
     try {
-      const res = await fetch('/api/admin/super-admin', {
+      const res = await apiFetch('/api/admin/super-admin', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ adminId: user.id, action: 'resolve_suspicious', userId }),
@@ -488,7 +489,7 @@ export default function SuperAdminPanel() {
     if (!user?.id || !editingAdmin) return
     setPermissionsLoading(true)
     try {
-      const res = await fetch('/api/admin/super-admin', {
+      const res = await apiFetch('/api/admin/super-admin', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -523,7 +524,7 @@ export default function SuperAdminPanel() {
     }
     if (!confirm(`هل أنت متأكد من خفض المدير ${adminEmail}؟ سيتم تحويله إلى مستخدم عادي.`)) return
     try {
-      const res = await fetch('/api/admin/super-admin', {
+      const res = await apiFetch('/api/admin/super-admin', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -549,7 +550,7 @@ export default function SuperAdminPanel() {
     if (!user?.id) return
     if (!confirm(`هل تريد ترقية المستخدم ${userEmail} إلى مدير؟`)) return
     try {
-      const res = await fetch('/api/admin/super-admin', {
+      const res = await apiFetch('/api/admin/super-admin', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -582,7 +583,7 @@ export default function SuperAdminPanel() {
     if (!user?.id || !userSearchQuery.trim()) return
     setUserSearchLoading(true)
     try {
-      const res = await fetch('/api/admin/super-admin', {
+      const res = await apiFetch('/api/admin/super-admin', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -614,7 +615,7 @@ export default function SuperAdminPanel() {
     if (!confirm(`هل تريد إضافة ${quickOperationAmount} USDT إلى حساب ${selectedUser.email}؟`)) return
     setQuickOpLoading(true)
     try {
-      const res = await fetch('/api/admin/super-admin', {
+      const res = await apiFetch('/api/admin/super-admin', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -651,7 +652,7 @@ export default function SuperAdminPanel() {
     if (!confirm(`هل تريد خصم ${quickOperationAmount} USDT من حساب ${selectedUser.email}؟`)) return
     setQuickOpLoading(true)
     try {
-      const res = await fetch('/api/admin/super-admin', {
+      const res = await apiFetch('/api/admin/super-admin', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -687,7 +688,7 @@ export default function SuperAdminPanel() {
     if (!confirm(`هل تريد تنظيف ${label}؟`)) return
     setCleanupLoading(target)
     try {
-      const res = await fetch('/api/admin/super-admin', {
+      const res = await apiFetch('/api/admin/super-admin', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -715,7 +716,7 @@ export default function SuperAdminPanel() {
   const handleLoadMoreAuditLogs = async () => {
     if (!user?.id) return
     try {
-      const res = await fetch('/api/admin/super-admin', {
+      const res = await apiFetch('/api/admin/super-admin', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

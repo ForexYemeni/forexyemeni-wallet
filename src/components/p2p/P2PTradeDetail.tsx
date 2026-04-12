@@ -1,3 +1,4 @@
+import { apiFetch } from '@/lib/api-client'
 'use client'
 
 import { useState, useEffect } from 'react'
@@ -53,7 +54,7 @@ export default function P2PTradeDetail({ tradeId, onBack }: { tradeId: string; o
   const fetchTrade = async () => {
     setLoading(true)
     try {
-      const res = await fetch(`/api/p2p/trades/${tradeId}`)
+      const res = await apiFetch(`/api/p2p/trades/${tradeId}`)
       const data = await res.json()
       if (data.success) setTrade(data.trade)
       else toast.error(data.message)
@@ -64,7 +65,7 @@ export default function P2PTradeDetail({ tradeId, onBack }: { tradeId: string; o
   const handleAction = async (action: string, body?: any) => {
     setActionLoading(true)
     try {
-      const res = await fetch(`/api/p2p/trades/${tradeId}`, {
+      const res = await apiFetch(`/api/p2p/trades/${tradeId}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action, ...body }),

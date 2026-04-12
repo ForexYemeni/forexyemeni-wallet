@@ -1,3 +1,4 @@
+import { apiFetch } from '@/lib/api-client'
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
@@ -148,7 +149,7 @@ export default function DepositForm() {
   const checkPendingDeposit = async () => {
     if (!user?.id) { setPendingLoading(false); return }
     try {
-      const res = await fetch(`/api/deposits/create?checkPending=true&userId=${user.id}`)
+      const res = await apiFetch(`/api/deposits/create?checkPending=true&userId=${user.id}`)
       const data = await res.json()
       if (data.hasPending) setHasPending(true)
     } catch { /* silent */ }
@@ -157,7 +158,7 @@ export default function DepositForm() {
 
   const fetchSettings = async () => {
     try {
-      const res = await fetch('/api/settings?t=' + Date.now(), { cache: 'no-store' })
+      const res = await apiFetch('/api/settings?t=' + Date.now(), { cache: 'no-store' })
       const data = await res.json()
       if (data.success && data.settings) {
         setFeePercentage(data.settings.depositFee || 0)
@@ -171,7 +172,7 @@ export default function DepositForm() {
   const fetchMethods = async (categoryCode: string, currencyCode: string | null) => {
     setLoadingMethods(true)
     try {
-      const res = await fetch('/api/payment-methods?purpose=deposit')
+      const res = await apiFetch('/api/payment-methods?purpose=deposit')
       const data = await res.json()
       if (data.success) {
         const allMethods = data.methods || []
@@ -205,7 +206,7 @@ export default function DepositForm() {
   const checkPendingBeforeProceed = async (): Promise<boolean> => {
     setPendingCheckLoading(true)
     try {
-      const res = await fetch(`/api/deposits/create?checkPending=true&userId=${user?.id}&_t=${Date.now()}`, { cache: 'no-store' })
+      const res = await apiFetch(`/api/deposits/create?checkPending=true&userId=${user?.id}&_t=${Date.now()}`, { cache: 'no-store' })
       const data = await res.json()
       if (data.hasPending) {
         setHasPending(true)
@@ -315,7 +316,7 @@ export default function DepositForm() {
         screenshotBase64 = await base64Promise
       }
 
-      const res = await fetch('/api/deposits/create', {
+      const res = await apiFetch('/api/deposits/create', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

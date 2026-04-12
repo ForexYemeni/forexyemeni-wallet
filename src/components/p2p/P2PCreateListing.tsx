@@ -1,3 +1,4 @@
+import { apiFetch } from '@/lib/api-client'
 'use client'
 
 import { useState } from 'react'
@@ -68,7 +69,7 @@ export default function P2PCreateListing({ onCreated, onBack }: P2PCreateListing
 
     setLoading(true)
     try {
-      const res = await fetch('/api/p2p/listings', {
+      const res = await apiFetch('/api/p2p/listings', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'x-user-id': user.id },
         body: JSON.stringify({
