@@ -104,7 +104,7 @@ export async function POST(request: NextRequest) {
         phone: null,
         country: null,
         role: 'user',
-        status: 'active',
+        status: 'registered',
         emailVerified: false,
         phoneVerified: false,
         kycStatus: 'none',

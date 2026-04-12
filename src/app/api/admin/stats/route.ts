@@ -38,6 +38,7 @@ export async function GET(request: NextRequest) {
     const allUsers = totalUsersSnap.docs.map(d => d.data())
     const totalUsers = allUsers.length
     const activeUsers = allUsers.filter(u => u.status === 'active').length
+    const registeredUsers = allUsers.filter(u => u.status === 'registered').length
     const suspendedUsers = allUsers.filter(u => u.status === 'suspended').length
     
     // KYC counts from users (filtered from already-fetched data)
@@ -170,7 +171,7 @@ export async function GET(request: NextRequest) {
       .slice(0, 10)
 
     const statsData = {
-      totalUsers, activeUsers, suspendedUsers,
+      totalUsers, activeUsers, registeredUsers, suspendedUsers,
       newUsersToday, newUsersThisWeek, newUsersThisMonth,
       kycApproved, kycPending, kycRejected, kycRecordsPending,
       depositsPending, depositsReviewing, depositsConfirmed, depositsRejected,

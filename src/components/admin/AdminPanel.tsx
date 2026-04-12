@@ -1318,6 +1318,7 @@ export default function AdminPanel() {
                       </div>
                       <div className="flex gap-3 mt-2 text-[10px]">
                         <span className="text-green-400">نشط: {stats.activeUsers}</span>
+                        {(stats.registeredUsers ?? 0) > 0 && <span className="text-yellow-400">مسجل: {stats.registeredUsers}</span>}
                         <span className="text-red-400">معلق: {stats.suspendedUsers}</span>
                       </div>
                     </div>
@@ -1561,9 +1562,12 @@ export default function AdminPanel() {
                         </div>
                         <div className="flex items-center gap-2">
                           <span className={`text-[10px] px-2 py-1 rounded-md font-medium ${
-                            u.status === 'active' ? 'bg-green-500/10 text-green-400' : 'bg-red-500/10 text-red-400'
+                            u.status === 'active' ? 'bg-green-500/10 text-green-400' :
+                            u.status === 'registered' ? 'bg-yellow-500/10 text-yellow-400' :
+                            u.status === 'locked_device' ? 'bg-red-500/10 text-red-400' :
+                            'bg-red-500/10 text-red-400'
                           }`}>
-                            {u.status === 'active' ? 'نشط' : u.status === 'locked_device' ? '🔒 مقفل' : 'معلق'}
+                            {u.status === 'active' ? 'نشط' : u.status === 'registered' ? 'مسجل' : u.status === 'locked_device' ? '🔒 مقفل' : 'معلق'}
                           </span>
                           {expandedUserId === u.id ? <ChevronUp className="w-4 h-4 text-muted-foreground" /> : <ChevronDown className="w-4 h-4 text-muted-foreground" />}
                         </div>
