@@ -184,8 +184,11 @@ export default function TransactionHistory() {
         </div>
       ) : filtered.length === 0 ? (
         <div className="glass-card p-8 text-center">
-          <Filter className="w-10 h-10 text-muted-foreground/30 mx-auto mb-3" />
-          <p className="text-muted-foreground text-sm">لا توجد معاملات</p>
+          <div className="empty-state-icon">
+            <Filter className="w-12 h-12 text-gold/30 mx-auto mb-3" />
+          </div>
+          <p className="text-muted-foreground text-sm mb-1">لا توجد معاملات تطابق البحث</p>
+          <button onClick={() => setSearch('')} className="text-xs text-gold hover:text-gold-light transition-colors tap-effect">مسح البحث</button>
         </div>
       ) : (
         <div className="space-y-2">

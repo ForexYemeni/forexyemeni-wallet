@@ -286,6 +286,112 @@
   animation: pulse-gold 3s ease-in-out infinite;
 }
 
+/* ==================== Page Transitions ==================== */
+@keyframes pageEnter {
+  from {
+    opacity: 0;
+    transform: translateX(-16px) scale(0.99);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0) scale(1);
+  }
+}
+
+@keyframes pageExit {
+  from {
+    opacity: 1;
+    transform: translateX(0) scale(1);
+  }
+  to {
+    opacity: 0;
+    transform: translateX(16px) scale(0.99);
+  }
+}
+
+.page-enter {
+  animation: pageEnter 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94) forwards;
+}
+
+/* ==================== Micro-Interactions ==================== */
+@keyframes pressScale {
+  0% { transform: scale(1); }
+  50% { transform: scale(0.96); }
+  100% { transform: scale(1); }
+}
+
+@keyframes cardFloat {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-3px); }
+}
+
+/* Tap/press effect for buttons & cards */
+.tap-effect {
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+.tap-effect:active {
+  transform: scale(0.97) !important;
+}
+
+/* Hover lift for cards (desktop) */
+.card-hover {
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+@media (hover: hover) {
+  .card-hover:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 25px -5px rgba(240, 185, 11, 0.15);
+  }
+}
+
+/* ==================== Empty State Illustrations ==================== */
+.empty-state-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 3rem 1.5rem;
+  text-align: center;
+}
+
+@keyframes emptyBounce {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-8px); }
+}
+
+.empty-state-icon {
+  animation: emptyBounce 3s ease-in-out infinite;
+}
+
+/* ==================== Loading Skeleton ==================== */
+@keyframes skeletonPulse {
+  0% { opacity: 0.4; }
+  50% { opacity: 0.7; }
+  100% { opacity: 0.4; }
+}
+
+.skeleton-block {
+  border-radius: 12px;
+  background: linear-gradient(90deg, rgba(240, 185, 11, 0.05) 25%, rgba(240, 185, 11, 0.12) 50%, rgba(240, 185, 11, 0.05) 75%);
+  background-size: 200% 100%;
+  animation: shimmer 2s infinite;
+}
+
+.skeleton-line {
+  height: 14px;
+  border-radius: 7px;
+  background: linear-gradient(90deg, rgba(240, 185, 11, 0.05) 25%, rgba(240, 185, 11, 0.12) 50%, rgba(240, 185, 11, 0.05) 75%);
+  background-size: 200% 100%;
+  animation: shimmer 2s infinite;
+}
+
+.skeleton-circle {
+  border-radius: 50%;
+  background: linear-gradient(90deg, rgba(240, 185, 11, 0.05) 25%, rgba(240, 185, 11, 0.12) 50%, rgba(240, 185, 11, 0.05) 75%);
+  background-size: 200% 100%;
+  animation: shimmer 2s infinite;
+}
+
 .shimmer {
   background: linear-gradient(90deg, transparent 0%, rgba(240, 185, 11, 0.1) 50%, transparent 100%);
   background-size: 200% 100%;

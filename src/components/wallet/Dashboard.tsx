@@ -209,21 +209,21 @@ export default function Dashboard() {
           <div className="grid grid-cols-3 gap-2.5 pt-1">
             <button
               onClick={() => setScreen('deposit')}
-              className="flex items-center justify-center gap-1.5 h-11 rounded-xl bg-green-500/10 border border-green-500/20 text-green-400 hover:bg-green-500/20 transition-all text-sm font-medium"
+              className="flex items-center justify-center gap-1.5 h-11 rounded-xl bg-green-500/10 border border-green-500/20 text-green-400 hover:bg-green-500/20 transition-all text-sm font-medium tap-effect"
             >
               <ArrowDownLeft className="w-4 h-4" />
               إيداع
             </button>
             <button
               onClick={() => setScreen('withdraw')}
-              className="flex items-center justify-center gap-1.5 h-11 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400 hover:bg-red-500/20 transition-all text-sm font-medium"
+              className="flex items-center justify-center gap-1.5 h-11 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400 hover:bg-red-500/20 transition-all text-sm font-medium tap-effect"
             >
               <ArrowUpRight className="w-4 h-4" />
               سحب
             </button>
             <button
               onClick={() => setScreen('transfer')}
-              className="flex items-center justify-center gap-1.5 h-11 rounded-xl bg-blue-500/10 border border-blue-500/20 text-blue-400 hover:bg-blue-500/20 transition-all text-sm font-medium"
+              className="flex items-center justify-center gap-1.5 h-11 rounded-xl bg-blue-500/10 border border-blue-500/20 text-blue-400 hover:bg-blue-500/20 transition-all text-sm font-medium tap-effect"
             >
               <Send className="w-4 h-4" />
               تحويل
@@ -243,7 +243,7 @@ export default function Dashboard() {
 
         <div className="grid grid-cols-3 gap-2.5">
           {/* USD Dollar Card */}
-          <div className="glass-card p-3.5 rounded-xl space-y-3 relative overflow-hidden group hover:border-gold/30 transition-all">
+          <div className="glass-card p-3.5 rounded-xl space-y-3 relative overflow-hidden group hover:border-gold/30 transition-all card-hover">
             <div className="absolute top-0 left-0 w-16 h-16 bg-emerald-500/5 rounded-full -translate-x-4 -translate-y-4 group-hover:scale-125 transition-transform" />
             <div className="relative">
               <div className="w-10 h-10 rounded-xl bg-emerald-500/10 flex items-center justify-center mb-2">
@@ -261,7 +261,7 @@ export default function Dashboard() {
           </div>
 
           {/* YER Yemeni Card */}
-          <div className="glass-card p-3.5 rounded-xl space-y-3 relative overflow-hidden group hover:border-gold/30 transition-all">
+          <div className="glass-card p-3.5 rounded-xl space-y-3 relative overflow-hidden group hover:border-gold/30 transition-all card-hover">
             <div className="absolute top-0 left-0 w-16 h-16 bg-blue-500/5 rounded-full -translate-x-4 -translate-y-4 group-hover:scale-125 transition-transform" />
             <div className="relative">
               <div className="w-10 h-10 rounded-xl bg-blue-500/10 flex items-center justify-center mb-2">
@@ -279,7 +279,7 @@ export default function Dashboard() {
           </div>
 
           {/* SAR Saudi Card */}
-          <div className="glass-card p-3.5 rounded-xl space-y-3 relative overflow-hidden group hover:border-gold/30 transition-all">
+          <div className="glass-card p-3.5 rounded-xl space-y-3 relative overflow-hidden group hover:border-gold/30 transition-all card-hover">
             <div className="absolute top-0 left-0 w-16 h-16 bg-purple-500/5 rounded-full -translate-x-4 -translate-y-4 group-hover:scale-125 transition-transform" />
             <div className="relative">
               <div className="w-10 h-10 rounded-xl bg-purple-500/10 flex items-center justify-center mb-2">
@@ -409,8 +409,16 @@ export default function Dashboard() {
           </div>
         ) : transactions.length === 0 ? (
           <div className="glass-card p-8 text-center rounded-xl">
-            <Clock className="w-10 h-10 text-muted-foreground/30 mx-auto mb-3" />
-            <p className="text-muted-foreground text-sm">لا توجد معاملات بعد</p>
+            <div className="empty-state-icon">
+              <Clock className="w-12 h-12 text-gold/30 mx-auto mb-3" />
+            </div>
+            <p className="text-muted-foreground text-sm mb-4">لا توجد معاملات بعد</p>
+            <button
+              onClick={() => setScreen('deposit')}
+              className="text-xs gold-text font-semibold hover:opacity-80 transition-opacity tap-effect"
+            >
+              ابدأ بأول إيداع ←
+            </button>
           </div>
         ) : (
           <div className="space-y-2">

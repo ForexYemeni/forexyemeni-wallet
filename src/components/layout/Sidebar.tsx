@@ -13,6 +13,7 @@ import {
   Wallet,
   Clock,
   ChevronLeft,
+  ChevronRight,
   Gift,
   Repeat,
   MessageCircle,
@@ -56,6 +57,7 @@ const adminNavItems = [
 export default function Sidebar() {
   const { currentScreen, setScreen, user, logout } = useAuthStore()
   const [theme, setThemeState] = useState<Theme>('dark')
+  const [collapsed, setCollapsed] = useState(false)
 
   const isAdmin = user?.role === 'admin' || (user?.permissions && Object.values(user.permissions).some(v => v))
   const isMerchant = !!user?.merchantId && !isAdmin
@@ -73,54 +75,66 @@ export default function Sidebar() {
   }
 
   return (
-    <aside className="hidden md:flex flex-col w-64 h-screen fixed right-0 top-0 border-l border-gold/10 bg-sidebar z-50">
-      {/* Logo */}
-      <div className="p-6 border-b border-gold/10">
+    <aside className={`hidden md:flex flex-col h-screen fixed right-0 top-0 border-l border-gold/10 bg-sidebar z-50 transition-all duration-300 ${collapsed ? 'w-[72px]' : 'w-64'}`}>
+      {/* Logo + Collapse Toggle */}
+      <div className="p-4 border-b border-gold/10">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl gold-gradient flex items-center justify-center">
+          <div className="w-10 h-10 rounded-xl gold-gradient flex items-center justify-center shrink-0">
             <Wallet className="w-5 h-5 text-gray-900" />
           </div>
-          <div>
-            <h1 className="font-bold gold-text text-lg">فوركس يمني</h1>
-            <p className="text-[10px] text-muted-foreground">USDT TRC20 Wallet</p>
-          </div>
+          {!collapsed && (
+            <div className="animate-fade-in overflow-hidden">
+              <h1 className="font-bold gold-text text-lg whitespace-nowrap">فوركس يمني</h1>
+              <p className="text-[10px] text-muted-foreground">USDT TRC20 Wallet</p>
+            </div>
+          )}
         </div>
+        {/* Collapse button */}
+        <button
+          onClick={() => setCollapsed(!collapsed)}
+          className="absolute top-1/2 -translate-y-1/2 -left-3 w-6 h-6 rounded-full glass-card border border-gold/20 flex items-center justify-center text-muted-foreground hover:text-gold transition-colors tap-effect"
+          title={collapsed ? 'توسيع' : 'تصغير'}
+        >
+          {collapsed ? <ChevronRight className="w-3 h-3" /> : <ChevronLeft className="w-3 h-3" />}
+        </button>
       </div>
 
       {/* User Info */}
-      <div className="p-4 border-b border-gold/10">
-        <div className="glass-input p-3 rounded-xl">
-          <p className="text-sm font-medium truncate">{user?.fullName || user?.email}</p>
-          <p className="text-xs text-muted-foreground truncate" dir="ltr">{user?.email}</p>
-          <div className="mt-2 flex items-center gap-1">
-            {isAdmin ? (
-              <span className="text-[10px] px-2 py-0.5 rounded-md bg-gold/20 text-gold">
-                مدير النظام
-              </span>
-            ) : isMerchant ? (
-              <>
-                <span className="text-[10px] px-2 py-0.5 rounded-md bg-green-500/20 text-green-400">
-                  تاجر موثق ✓
+      {!collapsed && (
+        <div className="p-4 border-b border-gold/10 animate-fade-in">
+          <div className="glass-input p-3 rounded-xl">
+            <p className="text-sm font-medium truncate">{user?.fullName || user?.email}</p>
+            <p className="text-xs text-muted-foreground truncate" dir="ltr">{user?.email}</p>
+            <div className="mt-2 flex items-center gap-1">
+              {isAdmin ? (
+                <span className="text-[10px] px-2 py-0.5 rounded-md bg-gold/20 text-gold">
+                  مدير النظام
                 </span>
-                <span className="text-[10px] px-2 py-0.5 rounded-md bg-white/5 text-muted-foreground">
-                  P2P
-                </span>
-              </>
-            ) : (
-              <>
-                <span className={`text-[10px] px-2 py-0.5 rounded-md ${
-                  user?.kycStatus === 'approved' ? 'status-approved' : 'status-pending'
-                }`}>
-                  {user?.kycStatus === 'approved' ? 'متحقق' : 'غير متحقق'}
-                </span>
-                <span className="text-[10px] px-2 py-0.5 rounded-md bg-gold/10 text-gold">
-                  {(user?.balance ?? 0).toFixed(2)} USDT
-                </span>
-              </>
-            )}
+              ) : isMerchant ? (
+                <>
+                  <span className="text-[10px] px-2 py-0.5 rounded-md bg-green-500/20 text-green-400">
+                    تاجر موثق ✓
+                  </span>
+                  <span className="text-[10px] px-2 py-0.5 rounded-md bg-white/5 text-muted-foreground">
+                    P2P
+                  </span>
+                </>
+              ) : (
+                <>
+                  <span className={`text-[10px] px-2 py-0.5 rounded-md ${
+                    user?.kycStatus === 'approved' ? 'status-approved' : 'status-pending'
+                  }`}>
+                    {user?.kycStatus === 'approved' ? 'متحقق' : 'غير متحقق'}
+                  </span>
+                  <span className="text-[10px] px-2 py-0.5 rounded-md bg-gold/10 text-gold">
+                    {(user?.balance ?? 0).toFixed(2)} USDT
+                  </span>
+                </>
+              )}
+            </div>
           </div>
         </div>
-      </div>
+      )}
 
       {/* Navigation */}
       <nav className="flex-1 overflow-y-auto p-3 space-y-1">
@@ -130,15 +144,16 @@ export default function Sidebar() {
             <button
               key={item.key}
               onClick={() => setScreen(item.key)}
-              className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm transition-all ${
+              title={collapsed ? item.label : undefined}
+              className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm transition-all tap-effect ${
                 isActive
                   ? 'bg-gold/10 text-gold font-medium'
                   : 'text-muted-foreground hover:text-foreground hover:bg-white/5'
-              }`}
+              } ${collapsed ? 'justify-center' : ''}`}
             >
-              <item.icon className="w-4 h-4" />
-              {item.label}
-              {isActive && <ChevronLeft className="w-3 h-3 mr-auto" />}
+              <item.icon className="w-4 h-4 shrink-0" />
+              {!collapsed && <span className="whitespace-nowrap">{item.label}</span>}
+              {isActive && !collapsed && <ChevronLeft className="w-3 h-3 mr-auto" />}
             </button>
           )
         })}
@@ -149,28 +164,21 @@ export default function Sidebar() {
         {/* Theme Toggle */}
         <button
           onClick={handleToggleTheme}
-          className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm text-muted-foreground hover:text-foreground hover:bg-white/5 transition-all"
+          title={collapsed ? (theme === 'dark' ? 'الوضع المضيء' : 'الوضع المظلم') : undefined}
+          className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm text-muted-foreground hover:text-foreground hover:bg-white/5 transition-all tap-effect ${collapsed ? 'justify-center' : ''}`}
         >
-          {theme === 'dark' ? (
-            <>
-              <Sun className="w-4 h-4" />
-              الوضع المضيء
-            </>
-          ) : (
-            <>
-              <Moon className="w-4 h-4" />
-              الوضع المظلم
-            </>
-          )}
+          {theme === 'dark' ? <Sun className="w-4 h-4 shrink-0" /> : <Moon className="w-4 h-4 shrink-0" />}
+          {!collapsed && (theme === 'dark' ? 'الوضع المضيء' : 'الوضع المظلم')}
         </button>
 
         {/* Logout */}
         <button
           onClick={logout}
-          className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm text-red-400 hover:bg-red-500/10 transition-colors"
+          title={collapsed ? 'تسجيل الخروج' : undefined}
+          className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm text-red-400 hover:bg-red-500/10 transition-colors tap-effect ${collapsed ? 'justify-center' : ''}`}
         >
-          <ChevronLeft className="w-4 h-4" />
-          تسجيل الخروج
+          <ChevronLeft className="w-4 h-4 shrink-0" />
+          {!collapsed && 'تسجيل الخروج'}
         </button>
       </div>
     </aside>

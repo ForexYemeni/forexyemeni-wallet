@@ -5,6 +5,7 @@ import dynamic from 'next/dynamic'
 import { useAuthStore } from '@/lib/store'
 import { toast } from 'sonner'
 import { Loader2, Lock, Image as ImageIcon, RefreshCw, AlertTriangle, MessageCircle, X } from 'lucide-react'
+import ScreenTransition from '@/components/layout/ScreenTransition'
 
 // Lazy load ALL components — only loads what's needed
 const LoginForm = dynamic(() => import('@/components/auth/LoginForm'), { ssr: false })
@@ -635,11 +636,12 @@ export default function Home() {
         </div>
 
         <div className="relative z-10 w-full max-w-sm mx-auto px-4">
-          {currentScreen === 'login' && <LoginForm />}
-          {currentScreen === 'register' && <RegisterForm />}
-          {currentScreen === 'forgot-password' && <ForgotPasswordForm />}
-          {currentScreen === 'device-locked' && <DeviceLockedScreen />}
-          {currentScreen === 'verify-email' && (
+          <ScreenTransition screenKey={currentScreen}>
+            {currentScreen === 'login' && <LoginForm />}
+            {currentScreen === 'register' && <RegisterForm />}
+            {currentScreen === 'forgot-password' && <ForgotPasswordForm />}
+            {currentScreen === 'device-locked' && <DeviceLockedScreen />}
+            {currentScreen === 'verify-email' && (
             <div className="glass-card p-6 text-center space-y-4">
               <div className="w-16 h-16 mx-auto rounded-2xl gold-gradient flex items-center justify-center gold-glow">
                 <span className="text-2xl">✓</span>
@@ -654,6 +656,7 @@ export default function Home() {
               </button>
             </div>
           )}
+          </ScreenTransition>
         </div>
       </div>
     )
@@ -669,24 +672,26 @@ export default function Home() {
   const isAdmin = user?.role === 'admin'
   return (
     <AppLayout>
-      {currentScreen === 'dashboard' && <Dashboard />}
-      {currentScreen === 'deposit' && <DepositForm />}
-      {currentScreen === 'withdraw' && <WithdrawForm />}
-      {currentScreen === 'transactions' && <TransactionHistory />}
-      {currentScreen === 'kyc' && <KYCVerification />}
-      {currentScreen === 'referral' && <ReferralPage />}
-      {currentScreen === 'settings' && <SettingsPage />}
-      {currentScreen === 'notifications' && <NotificationsPage />}
-      {currentScreen === 'chat' && <ChatPage />}
-      {currentScreen === 'faq' && <FaqPage />}
-      {currentScreen === 'help' && <HelpCenter />}
-      {currentScreen === 'transfer' && <TransferScreen />}
-      {currentScreen === 'p2p' && <P2PPage />}
-      {currentScreen === 'admin' && (
-        <AdminErrorBoundary>
-          <AdminPanel />
-        </AdminErrorBoundary>
-      )}
+      <ScreenTransition screenKey={currentScreen}>
+        {currentScreen === 'dashboard' && <Dashboard />}
+        {currentScreen === 'deposit' && <DepositForm />}
+        {currentScreen === 'withdraw' && <WithdrawForm />}
+        {currentScreen === 'transactions' && <TransactionHistory />}
+        {currentScreen === 'kyc' && <KYCVerification />}
+        {currentScreen === 'referral' && <ReferralPage />}
+        {currentScreen === 'settings' && <SettingsPage />}
+        {currentScreen === 'notifications' && <NotificationsPage />}
+        {currentScreen === 'chat' && <ChatPage />}
+        {currentScreen === 'faq' && <FaqPage />}
+        {currentScreen === 'help' && <HelpCenter />}
+        {currentScreen === 'transfer' && <TransferScreen />}
+        {currentScreen === 'p2p' && <P2PPage />}
+        {currentScreen === 'admin' && (
+          <AdminErrorBoundary>
+            <AdminPanel />
+          </AdminErrorBoundary>
+        )}
+      </ScreenTransition>
 
       {/* Floating Support Bot - always visible when authenticated */}
       <SupportBot />

@@ -120,7 +120,7 @@ export default function BottomNav() {
                 <button
                   key="more-btn"
                   onClick={() => setShowMore(!showMore)}
-                  className={`flex flex-col items-center gap-1 px-3 py-2 rounded-xl transition-all ${
+                  className={`flex flex-col items-center gap-1 px-3 py-2 rounded-xl transition-all tap-effect ${
                     isInExtra
                       ? 'text-gold bg-gold/10'
                       : 'text-muted-foreground hover:text-foreground'
@@ -136,7 +136,7 @@ export default function BottomNav() {
               <button
                 key={item.key}
                 onClick={() => handleScreenClick(item.key)}
-                className={`flex flex-col items-center gap-1 px-3 py-2 rounded-xl transition-all ${
+                className={`flex flex-col items-center gap-1 px-3 py-2 rounded-xl transition-all tap-effect ${
                   isActive
                     ? 'text-gold bg-gold/10'
                     : 'text-muted-foreground hover:text-foreground'
@@ -151,7 +151,7 @@ export default function BottomNav() {
           {/* Theme Toggle */}
           <button
             onClick={handleToggleTheme}
-            className="flex flex-col items-center gap-1 px-3 py-2 rounded-xl transition-all text-muted-foreground hover:text-foreground"
+            className="flex flex-col items-center gap-1 px-3 py-2 rounded-xl transition-all text-muted-foreground hover:text-foreground tap-effect"
           >
             {theme === 'dark' ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
             <span className="text-[10px] font-medium">{theme === 'dark' ? 'مضيء' : 'مظلم'}</span>
