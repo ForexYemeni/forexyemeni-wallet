@@ -515,14 +515,6 @@ export default function LoginForm() {
           </div>
         </div>
 
-        {/* Biometric hint */}
-        <div className="flex items-center justify-center gap-2 py-1 animate-fade-in">
-          <div className="w-8 h-8 rounded-lg bg-white/5 flex items-center justify-center">
-            <Smartphone className="w-4 h-4 text-gold" />
-          </div>
-          <span className="text-[11px] text-muted-foreground/60">دعم تسجيل الدخول بالبصمة</span>
-        </div>
-
         {/* ===== Links Section ===== */}
         <div className="space-y-3 text-center animate-fade-in">
           {/* Divider */}
