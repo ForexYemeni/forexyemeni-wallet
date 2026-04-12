@@ -383,7 +383,7 @@ export default function WithdrawForm() {
   }
 
   const handlePinSubmit = async () => {
-    if (pinCode.length < 4) return
+    if (pinCode.length < 6) return
     setPinLoading(true)
     try {
       const pinRes = await apiFetch('/api/auth/verify-pin', {

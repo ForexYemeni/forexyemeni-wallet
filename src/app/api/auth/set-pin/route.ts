@@ -19,9 +19,9 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ success: false, message: 'البيانات مطلوبة' }, { status: 400 })
     }
 
-    // PIN must be 4-6 digits
-    if (!/^\d{4,6}$/.test(pin)) {
-      return NextResponse.json({ success: false, message: 'رمز PIN يجب أن يكون 4-6 أرقام' }, { status: 400 })
+    // PIN must be 6-8 digits
+    if (!/^\d{6,8}$/.test(pin)) {
+      return NextResponse.json({ success: false, message: 'رمز PIN يجب أن يكون 6-8 أرقام' }, { status: 400 })
     }
 
     const user = await userOperations.findUnique({ id: userId })

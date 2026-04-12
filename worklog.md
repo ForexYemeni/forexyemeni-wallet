@@ -158,3 +158,22 @@ Stage Summary:
 - File modified: src/components/admin/BannerManager.tsx
 - Banner images now uploaded from gallery, compressed, and stored as base64
 - No server changes needed - base64 string stored in existing imageUrl field
+
+---
+Task ID: 1
+Agent: main
+Task: Change user PIN requirement from 4 digits to 6 digits
+
+Work Log:
+- Changed PinDots component default length from 4 to 6
+- Updated RegisterForm.tsx: all PIN validations from 4 to 6 digits
+- Updated complete-registration API: pin.length < 4 → < 6
+- Updated set-pin API: regex from \d{4,6} to \d{6,8}, messages updated
+- Updated SetPinScreen.tsx: all validations and messages from 4 to 6
+- Updated WithdrawForm.tsx: pinCode.length < 4 → < 6
+- Kept admin/system recovery PIN at 4-8 digits (separate system)
+
+Stage Summary:
+- User PIN minimum changed from 4 to 6 digits across registration, set-pin, and withdrawal flows
+- Files modified: PinDots.tsx, RegisterForm.tsx, complete-registration/route.ts, set-pin/route.ts, SetPinScreen.tsx, WithdrawForm.tsx
+- Admin recovery PIN left unchanged (4-8 digits)

@@ -23,11 +23,11 @@ export default function SetPinScreen() {
   const [mismatchError, setMismatchError] = useState(false)
   const [showSecurityTips, setShowSecurityTips] = useState(false)
 
-  const isValid = /^\d{4,6}$/.test(pin)
+  const isValid = /^\d{6,8}$/.test(pin)
   const isMatch = pin === confirmPin && pin.length > 0
 
   const requirements = [
-    { label: '4-6 أرقام', met: /^\d{4,6}$/.test(pin) },
+    { label: '6-8 أرقام', met: /^\d{6,8}$/.test(pin) },
     { label: 'تطابق الرمز', met: isMatch },
   ]
 
@@ -35,7 +35,7 @@ export default function SetPinScreen() {
     (value: string) => {
       setPin(value)
       // Validate minimum length
-      if (value.length < 4) {
+      if (value.length < 6) {
         setPinError(true)
         return
       }
@@ -68,7 +68,7 @@ export default function SetPinScreen() {
   const handlePinChange = useCallback(
     (value: string) => {
       setPin(value)
-      if (value.length >= 4) {
+      if (value.length >= 6) {
         setPinError(false)
       }
     },
@@ -149,7 +149,7 @@ export default function SetPinScreen() {
             <div className="space-y-4">
               <div className="text-center">
                 <p className="text-sm font-medium text-foreground mb-1">أدخل رمز PIN</p>
-                <p className="text-xs text-muted-foreground">أدخل 4 إلى 6 أرقام كرمز حماية</p>
+                <p className="text-xs text-muted-foreground">أدخل 6 إلى 8 أرقام كرمز حماية</p>
               </div>
 
               <PinDots
@@ -177,10 +177,10 @@ export default function SetPinScreen() {
               )}
 
               {/* PIN length warning */}
-              {pin.length > 0 && pin.length < 4 && (
+              {pin.length > 0 && pin.length < 6 && (
                 <div className="flex items-center justify-center gap-1.5 text-xs text-amber-400 animate-fade-in">
                   <AlertTriangle className="w-3.5 h-3.5" />
-                  <span>يجب أن يكون 4 أرقام على الأقل</span>
+                  <span>يجب أن يكون 6 أرقام على الأقل</span>
                 </div>
               )}
 

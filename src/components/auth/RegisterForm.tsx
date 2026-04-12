@@ -357,9 +357,9 @@ function CompleteRegistration({ email }: { email: string }) {
   const formRef = useRef<HTMLFormElement>(null)
   const pinSectionRef = useRef<HTMLDivElement>(null)
 
-  const isPinValid = pin.length >= 4 && /^\d+$/.test(pin)
-  const isPinMatch = pin.length >= 4 && pin === confirmPin
-  const canSubmit = fullName && password.length >= 8 && termsAccepted && pin.length >= 4 && confirmPin.length >= 4 && pin === confirmPin
+  const isPinValid = pin.length >= 6 && /^\d+$/.test(pin)
+  const isPinMatch = pin.length >= 6 && pin === confirmPin
+  const canSubmit = fullName && password.length >= 8 && termsAccepted && pin.length >= 6 && confirmPin.length >= 6 && pin === confirmPin
 
   // Pre-fill referral code from URL ?ref=CODE
   useEffect(() => {
@@ -396,8 +396,8 @@ function CompleteRegistration({ email }: { email: string }) {
       toast.error('كلمة المرور يجب أن تكون 8 أحرف على الأقل')
       return
     }
-    if (pin.length < 4 || !/^\d+$/.test(pin)) {
-      toast.error('رمز PIN مكون من 4 أرقام على الأقل')
+    if (pin.length < 6 || !/^\d+$/.test(pin)) {
+      toast.error('رمز PIN مكون من 6 أرقام على الأقل')
       return
     }
     if (pin !== confirmPin) {
@@ -535,13 +535,13 @@ function CompleteRegistration({ email }: { email: string }) {
               value={pin}
               onChange={(val) => {
                 setPin(val)
-                if (val.length >= 4) {
+                if (val.length >= 6) {
                   setTimeout(() => setPinStep('confirm'), 300)
                 }
               }}
-              isError={pin.length >= 4 && !/^\d+$/.test(pin)}
+              isError={pin.length >= 6 && !/^\d+$/.test(pin)}
             />
-            <p className="text-[11px] text-muted-foreground text-center">أدخل رمز PIN مكون من 4-6 أرقام</p>
+            <p className="text-[11px] text-muted-foreground text-center">أدخل رمز PIN مكون من 6 أرقام</p>
           </div>
         ) : (
           <div className="space-y-3">
@@ -550,13 +550,13 @@ function CompleteRegistration({ email }: { email: string }) {
               onChange={(val) => {
                 setConfirmPin(val)
               }}
-              isError={confirmPin.length >= 4 && pin !== confirmPin}
-              isSuccess={confirmPin.length >= 4 && pin === confirmPin}
+              isError={confirmPin.length >= 6 && pin !== confirmPin}
+              isSuccess={confirmPin.length >= 6 && pin === confirmPin}
             />
             <p className="text-[11px] text-muted-foreground text-center">
-              {confirmPin.length >= 4 && pin === confirmPin
+              {confirmPin.length >= 6 && pin === confirmPin
                 ? <span className="text-green-400">✓ متطابق</span>
-                : confirmPin.length >= 4 && pin !== confirmPin
+                : confirmPin.length >= 6 && pin !== confirmPin
                   ? <span className="text-red-400">✗ غير متطابق</span>
                   : 'أعد إدخال رمز PIN للتأكيد'}
             </p>

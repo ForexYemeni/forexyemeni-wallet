@@ -23,9 +23,9 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    if (!pin || pin.length < 4) {
+    if (!pin || pin.length < 6) {
       return NextResponse.json(
-        { success: false, message: 'رمز PIN مكون من 4 أرقام على الأقل' },
+        { success: false, message: 'رمز PIN مكون من 6 أرقام على الأقل' },
         { status: 400 }
       )
     }

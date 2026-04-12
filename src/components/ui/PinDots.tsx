@@ -12,7 +12,7 @@ interface PinDotsProps {
 }
 
 export default function PinDots({
-  length = 4,
+  length = 6,
   value: externalValue,
   onChange: externalOnChange,
   onComplete,
