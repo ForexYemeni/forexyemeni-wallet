@@ -529,6 +529,15 @@
   z-index: 10;
 }
 
+:root:not(.dark) .wallet-card-inner .card-shine {
+  background: radial-gradient(
+    circle at var(--shine-x, 50%) var(--shine-y, 50%),
+    rgba(255, 255, 255, 0.18) 0%,
+    rgba(255, 255, 255, 0.06) 30%,
+    transparent 70%
+  );
+}
+
 .dark .wallet-card-bg {
   background: linear-gradient(145deg, #1a1a2e 0%, #16213e 30%, #1a1a2e 60%, #0f0f1a 100%);
   border: 1.5px solid rgba(240, 185, 11, 0.35);
@@ -538,13 +547,14 @@
     inset 0 1px 0 rgba(255, 255, 255, 0.05);
 }
 
+/* Light mode: wallet card stays dark (like real bank cards — Apple, Revolut) */
 :root:not(.dark) .wallet-card-bg {
-  background: linear-gradient(145deg, #ffffff 0%, #f8f4e8 30%, #faf8f0 60%, #f5f0e0 100%);
+  background: linear-gradient(145deg, #1e293b 0%, #1a2332 30%, #1e293b 60%, #0f172a 100%);
   border: 1.5px solid rgba(201, 154, 10, 0.3);
   box-shadow:
-    0 20px 60px -15px rgba(0, 0, 0, 0.15),
-    0 0 40px rgba(201, 154, 10, 0.06),
-    inset 0 1px 0 rgba(255, 255, 255, 0.8);
+    0 20px 60px -15px rgba(0, 0, 0, 0.25),
+    0 0 40px rgba(201, 154, 10, 0.08),
+    inset 0 1px 0 rgba(255, 255, 255, 0.08);
 }
 
 .wallet-chip {
