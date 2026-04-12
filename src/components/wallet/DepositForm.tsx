@@ -25,6 +25,9 @@ import {
   Smartphone,
   Bitcoin,
 } from 'lucide-react'
+import StepProgress from '@/components/ui/StepProgress'
+import EnhancedUploadZone from '@/components/ui/EnhancedUploadZone'
+import SuccessResult from '@/components/ui/SuccessResult'
 import { compressImage } from '@/lib/image-compress'
 import { useExchangeRates, convertUSDTtoYER, convertUSDTtoSAR, convertYERtoUSDT, formatYER, formatSAR, formatUSDT } from '@/lib/currency'
 
@@ -121,7 +124,7 @@ function getMethodLabel(m: any): string {
 }
 
 export default function DepositForm() {
-  const { user } = useAuthStore()
+  const { user, setScreen } = useAuthStore()
   const [methods, setMethods] = useState<any[]>([])
   const [selectedMethod, setSelectedMethod] = useState<any>(null)
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null)
@@ -135,6 +138,7 @@ export default function DepositForm() {
   const [copiedField, setCopiedField] = useState<string | null>(null)
   const [screenshot, setScreenshot] = useState<File | null>(null)
   const [screenshotPreview, setScreenshotPreview] = useState<string | null>(null)
+  const [depositSuccess, setDepositSuccess] = useState(false)
   const [feePercentage, setFeePercentage] = useState(0)
   const [hasPending, setHasPending] = useState(false)
   const [pendingLoading, setPendingLoading] = useState(true)
@@ -334,16 +338,7 @@ export default function DepositForm() {
       const data = await res.json()
       if (data.success) {
         toast.success('تم إنشاء طلب الإيداع بنجاح. سيتم مراجعته قريباً.')
-        // Reset everything
-        setStep('category')
-        setSelectedCategory(null)
-        setSelectedCurrency(null)
-        setSelectedMethod(null)
-        setMethods([])
-        setAmount('')
-        setTxId('')
-        setScreenshot(null)
-        setScreenshotPreview(null)
+        setDepositSuccess(true)
       } else {
         toast.error(data.message)
       }
@@ -484,34 +479,34 @@ export default function DepositForm() {
         </div>
       </div>
 
-      {/* Step Indicator */}
-      <div className="flex items-center gap-2">
-        {stepLabels.map((s, idx) => {
-          const stepOrder = getStepOrder()
-          const currentIdx = stepOrder.indexOf(step)
-          const thisIdx = stepOrder.indexOf(s.key as Step)
-          const isActive = step === s.key
-          const isDone = thisIdx >= 0 && thisIdx < currentIdx
-          const isUpcoming = thisIdx > currentIdx
-          return (
-            <div key={s.key} className="flex items-center gap-2 flex-1">
-              <div className={`flex items-center gap-2 flex-1 justify-center p-2 rounded-xl transition-all ${
-                isActive ? 'bg-gold/10 border border-gold/30' : isDone ? 'bg-green-500/5 border border-green-500/20' : 'bg-white/5 border border-transparent'
-              }`}>
-                <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${
-                  isActive ? 'bg-gold text-gray-900' : isDone ? 'bg-green-500 text-white' : 'bg-white/10 text-muted-foreground'
-                }`}>
-                  {isDone ? <Check className="w-3.5 h-3.5" /> : idx + 1}
-                </div>
-                <span className={`text-xs font-medium hidden sm:inline ${isActive ? 'text-gold' : isDone ? 'text-green-400' : 'text-muted-foreground'}`}>
-                  {s.label}
-                </span>
-              </div>
-              {idx < stepLabels.length - 1 && <ChevronLeft className="w-4 h-4 text-muted-foreground/30 -ml-2 flex-shrink-0" />}
-            </div>
-          )
-        })}
-      </div>
+      {/* Step Progress Bar */}
+      {!depositSuccess && (
+        <StepProgress steps={stepLabels} currentStep={step} />
+      )}
+
+      {/* Success Result */}
+      {depositSuccess && (
+        <SuccessResult
+          type="success"
+          title="تم إنشاء طلب الإيداع"
+          message="سيتم مراجعة طلبك وإيداع المبلغ في حسابك قريباً"
+          actionLabel="العودة للرئيسية"
+          onAction={() => setScreen('dashboard')}
+          secondaryLabel="إيداع آخر"
+          onSecondary={() => {
+            setDepositSuccess(false)
+            setStep('category')
+            setSelectedCategory(null)
+            setSelectedCurrency(null)
+            setSelectedMethod(null)
+            setMethods([])
+            setAmount('')
+            setTxId('')
+            setScreenshot(null)
+            setScreenshotPreview(null)
+          }}
+        />
+      )}
 
       {/* ==================== STEP 1: Category Selection ==================== */}
       {step === 'category' && (
@@ -841,30 +836,15 @@ export default function DepositForm() {
               {!isCrypto && (
                 <div className="space-y-2">
                   <Label className="text-sm text-muted-foreground">صورة إثبات الدفع <span className="text-red-400">*</span></Label>
-                  {screenshotPreview ? (
-                    <div className="relative rounded-xl overflow-hidden border border-gold/20">
-                      <img src={screenshotPreview} alt="Screenshot" className="w-full h-40 object-cover" />
-                      <button
-                        type="button"
-                        onClick={() => { setScreenshot(null); setScreenshotPreview(null) }}
-                        className="absolute top-2 left-2 w-8 h-8 bg-red-500/80 rounded-full flex items-center justify-center"
-                      >
-                        <X className="w-4 h-4" />
-                      </button>
-                    </div>
-                  ) : (
-                    <label className="flex flex-col items-center justify-center h-32 rounded-xl border-2 border-dashed border-gold/30 hover:border-gold/50 transition-colors cursor-pointer bg-gold/5">
-                      <Upload className="w-8 h-8 text-gold/60 mb-2" />
-                      <span className="text-xs text-gold/80">اضغط لرفع صورة إثبات الدفع</span>
-                      <input
-                        ref={fileInputRef}
-                        type="file"
-                        accept="image/*"
-                        className="hidden"
-                        onChange={(e) => e.target.files?.[0] && handleScreenshotChange(e.target.files[0])}
-                      />
-                    </label>
-                  )}
+                  <EnhancedUploadZone
+                    onFile={handleScreenshotChange}
+                    accept="image/*"
+                    preview={screenshotPreview}
+                    onClear={() => { setScreenshot(null); setScreenshotPreview(null) }}
+                    label="اضغط لرفع صورة إثبات الدفع"
+                    hint="JPG, PNG — حتى 10 ميغابايت"
+                    required
+                  />
                 </div>
               )}
 
@@ -872,30 +852,15 @@ export default function DepositForm() {
               {isCrypto && (
                 <div className="space-y-2">
                   <Label className="text-sm text-muted-foreground">صورة إثبات الدفع <span className="text-muted-foreground">(اختياري)</span></Label>
-                  {screenshotPreview ? (
-                    <div className="relative rounded-xl overflow-hidden border border-gold/20">
-                      <img src={screenshotPreview} alt="Screenshot" className="w-full h-40 object-cover" />
-                      <button
-                        type="button"
-                        onClick={() => { setScreenshot(null); setScreenshotPreview(null) }}
-                        className="absolute top-2 left-2 w-8 h-8 bg-red-500/80 rounded-full flex items-center justify-center"
-                      >
-                        <X className="w-4 h-4" />
-                      </button>
-                    </div>
-                  ) : (
-                    <label className="flex flex-col items-center justify-center h-24 rounded-xl border-2 border-dashed border-white/10 hover:border-gold/30 transition-colors cursor-pointer bg-white/[0.02]">
-                      <Upload className="w-6 h-6 text-muted-foreground/40 mb-1" />
-                      <span className="text-xs text-muted-foreground/60">رفع صورة اختياري</span>
-                      <input
-                        ref={fileInputRef}
-                        type="file"
-                        accept="image/*"
-                        className="hidden"
-                        onChange={(e) => e.target.files?.[0] && handleScreenshotChange(e.target.files[0])}
-                      />
-                    </label>
-                  )}
+                  <EnhancedUploadZone
+                    onFile={handleScreenshotChange}
+                    accept="image/*"
+                    preview={screenshotPreview}
+                    onClear={() => { setScreenshot(null); setScreenshotPreview(null) }}
+                    label="رفع صورة اختياري"
+                    hint="JPG, PNG — حتى 10 ميغابايت"
+                    compact
+                  />
                 </div>
               )}
 

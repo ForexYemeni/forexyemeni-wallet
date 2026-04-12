@@ -219,7 +219,7 @@ export default function SettingsPage() {
       {/* Profile Tab */}
       {activeTab === 'profile' && !showChangeEmail && (
         <div className="space-y-3 animate-fade-in">
-          <form onSubmit={handleUpdateProfile} className="glass-card p-5 space-y-4">
+          <form onSubmit={handleUpdateProfile} className="glass-card p-5 space-y-4 section-card gold-accent">
             <div className="flex items-center gap-2 mb-1">
               <User className="w-4 h-4 text-gold" />
               <h3 className="text-sm font-bold">المعلومات الشخصية</h3>
@@ -319,7 +319,7 @@ export default function SettingsPage() {
 
       {/* Password Tab */}
       {activeTab === 'password' && (
-        <div className="glass-card p-5 space-y-4 animate-fade-in">
+        <div className="glass-card p-5 space-y-4 animate-fade-in section-card red-accent">
           <div className="flex items-center gap-2 mb-1">
             <Lock className="w-4 h-4 text-gold" />
             <h3 className="text-sm font-bold">تغيير كلمة المرور</h3>
@@ -586,7 +586,7 @@ export default function SettingsPage() {
 
       {/* About Tab */}
       {activeTab === 'about' && (
-        <div className="glass-card p-5 space-y-4 animate-fade-in">
+        <div className="glass-card p-5 space-y-4 animate-fade-in section-card gold-accent">
           <div className="flex items-center gap-2 mb-1">
             <Settings className="w-4 h-4 text-gold" />
             <h3 className="text-sm font-bold">حول التطبيق</h3>

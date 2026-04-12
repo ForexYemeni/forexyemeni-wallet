@@ -44,3 +44,79 @@ Stage Summary:
 - Dashboard completely redesigned with world-class design
 - No new dependencies needed — pure CSS/SVG/React
 - All files pass lint checks
+
+---
+Task ID: 4
+Agent: Main Agent
+Task: Phase 4 Component Implementation — Create 4 new UI components and update 4 existing files
+
+Work Log:
+- Read worklog.md for project context (Phases 1-3 completed)
+- Read globals.css Phase 4 CSS classes (lines 1343-1863) to understand available CSS
+- Read all 4 target files (DepositForm, WithdrawForm, Settings, AppLayout) before editing
+
+### New Components Created:
+
+1. **StepProgress.tsx** (`/src/components/ui/StepProgress.tsx`)
+   - Beautiful step progress bar with circles, connectors, and labels
+   - Three states: active (gold glow), completed (green with Check icon), upcoming (muted)
+   - Connectors: "filled" (both sides completed), "current" (left completed, right active)
+   - Uses Phase 4 CSS: step-progress-bar, step-progress-item, step-progress-circle, step-progress-connector, step-progress-label
+
+2. **PinDots.tsx** (`/src/components/ui/PinDots.tsx`)
+   - Animated PIN dots input with hidden keyboard capture
+   - Gold gradient filled dots with pinDotPulse animation
+   - Error state with shake animation (animate-shake-error)
+   - Auto-focuses hidden input, supports configurable length (default 4)
+   - Calls onComplete when all digits entered
+
+3. **EnhancedUploadZone.tsx** (`/src/components/ui/EnhancedUploadZone.tsx`)
+   - Upload zone with drag-and-drop support (dragover class)
+   - Preview mode with X button to clear
+   - File size validation with error message (default 10MB)
+   - Compact mode for optional uploads
+   - Uses Phase 4 CSS: upload-zone, upload-zone-hint, upload-zone.dragover
+
+4. **SuccessResult.tsx** (`/src/components/ui/SuccessResult.tsx`)
+   - Three types: success (green bounce + expanding ring), error (red shake), warning (amber bounce)
+   - Uses Phase 4 CSS: success-anim-bounce, success-anim-ring, error-anim-shake
+   - Optional primary and secondary action buttons
+   - Arabic text support with centered layout
+
+### Files Updated:
+
+1. **DepositForm.tsx** (`/src/components/wallet/DepositForm.tsx`)
+   - Replaced manual step indicator with StepProgress component
+   - Replaced both upload zones (required + optional) with EnhancedUploadZone
+   - Added success state: shows SuccessResult with deposit confirmation + "العودة للرئيسية" action
+   - Added depositSuccess state variable and secondary "إيداع آخر" action
+   - Added setScreen from useAuthStore for navigation
+
+2. **WithdrawForm.tsx** (`/src/components/wallet/WithdrawForm.tsx`)
+   - Replaced PIN password input with PinDots component (6 digits)
+   - Added pinError state for visual feedback on wrong PIN
+   - Added withdrawSuccess state with SuccessResult display
+   - Success view: "تم إنشاء طلب السحب" + "سيتم معالجة طلبك خلال 24 ساعة"
+   - Action: "العودة للرئيسية" → dashboard, secondary: "سحب آخر" → reset form
+   - Removed old PIN input field and confirm button (PinDots auto-submits)
+
+3. **Settings.tsx** (`/src/components/settings/Settings.tsx`)
+   - Added section-card gold-accent to profile form
+   - Added section-card red-accent to password section
+   - Added section-card gold-accent to about section
+   - Profile card already had profile-card class ✓
+   - Info banners already had info-banner-gold and info-banner-blue ✓
+
+4. **AppLayout.tsx** (`/src/components/layout/AppLayout.tsx`)
+   - Added scrollIndicatorVisible state
+   - Added scroll event listener (show when scrolled > 20px)
+   - Added scroll-indicator div with visible class toggle
+   - Uses Phase 4 CSS: scroll-indicator, scroll-indicator.visible
+
+Stage Summary:
+- 4 new components created, 4 existing files updated
+- All Phase 4 CSS classes now utilized in React components
+- Zero new lint errors introduced
+- All text in Arabic
+- No external animation libraries used (CSS only)
+- Production-ready with proper TypeScript types

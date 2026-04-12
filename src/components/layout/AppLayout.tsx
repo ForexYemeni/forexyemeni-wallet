@@ -28,6 +28,7 @@ import {
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   const { user, setScreen, logout } = useAuthStore()
   const [logoutDialogOpen, setLogoutDialogOpen] = useState(false)
+  const [scrollIndicatorVisible, setScrollIndicatorVisible] = useState(false)
 
   // Pull-to-refresh
   const [refreshing, setRefreshing] = useState(false)
@@ -45,6 +46,15 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   // FCM Push Notifications (Android APK only)
   useEffect(() => {
     setupFCMAutoRegister()
+  }, [])
+
+  // Scroll indicator: show when scrolled > 20px
+  useEffect(() => {
+    const handleScroll = () => {
+      setScrollIndicatorVisible(window.scrollY > 20)
+    }
+    window.addEventListener('scroll', handleScroll, { passive: true })
+    return () => window.removeEventListener('scroll', handleScroll)
   }, [])
 
   const handleLogout = () => {
@@ -148,6 +158,8 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="min-h-screen bg-background">
+      {/* Scroll Indicator */}
+      <div className={`scroll-indicator ${scrollIndicatorVisible ? 'visible' : ''}`} />
       {/* Background atmosphere (z-index: 0, painted below content) */}
       <BackgroundEffects />
 

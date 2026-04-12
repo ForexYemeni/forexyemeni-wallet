@@ -24,6 +24,8 @@ import {
   Shield,
   Clock,
 } from 'lucide-react'
+import PinDots from '@/components/ui/PinDots'
+import SuccessResult from '@/components/ui/SuccessResult'
 
 const CRYPTO_NETWORKS = [
   { value: 'TRC20', label: 'TRC20 (Tron)' },
@@ -64,6 +66,9 @@ export default function WithdrawForm() {
   const [showPinDialog, setShowPinDialog] = useState(false)
   const [pinCode, setPinCode] = useState('')
   const [pinLoading, setPinLoading] = useState(false)
+  const [pinError, setPinError] = useState(false)
+  // Withdraw success state
+  const [withdrawSuccess, setWithdrawSuccess] = useState(false)
   // Add/Edit method dialog
   const [showAddMethod, setShowAddMethod] = useState(false)
   const [editMethodData, setEditMethodData] = useState<any>(null)
@@ -217,6 +222,7 @@ export default function WithdrawForm() {
     // Show PIN dialog instead of directly submitting
     setShowPinDialog(true)
     setPinCode('')
+    setPinError(false)
   }
 
   // Execute the actual withdrawal after PIN verification
@@ -257,7 +263,7 @@ export default function WithdrawForm() {
         toast.success('تم إنشاء طلب السحب بنجاح. سيتم مراجعته قريباً.')
         setShowPinDialog(false)
         setPinCode('')
-        resetForm()
+        setWithdrawSuccess(true)
         // Refresh balance
         try {
           const profileRes = await apiFetch('/api/auth/complete-registration')
@@ -294,6 +300,7 @@ export default function WithdrawForm() {
         } else {
           toast.error(pinData.message || 'رمز PIN غير صحيح')
         }
+        setPinError(true)
         return
       }
       // PIN verified, proceed with withdrawal
@@ -346,7 +353,24 @@ export default function WithdrawForm() {
         </div>
       )}
 
+      {/* Success Result */}
+      {withdrawSuccess && (
+        <SuccessResult
+          type="success"
+          title="تم إنشاء طلب السحب"
+          message="سيتم معالجة طلبك خلال 24 ساعة"
+          actionLabel="العودة للرئيسية"
+          onAction={() => setScreen('dashboard')}
+          secondaryLabel="سحب آخر"
+          onSecondary={() => {
+            setWithdrawSuccess(false)
+            resetForm()
+          }}
+        />
+      )}
+
       {/* Header */}
+      {!withdrawSuccess && (
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 rounded-xl bg-red-500/10 flex items-center justify-center">
@@ -358,8 +382,10 @@ export default function WithdrawForm() {
           </div>
         </div>
       </div>
+      )}
 
       {/* Balance Info */}
+      {!withdrawSuccess && (
       <div className="glass-card p-4">
         <div className="flex items-center justify-between">
           <span className="text-sm text-muted-foreground">الرصيد المتاح</span>
@@ -369,6 +395,7 @@ export default function WithdrawForm() {
           </div>
         </div>
       </div>
+      )}
 
       {/* Step: Select Method */}
       {step === 'select' && (
@@ -684,24 +711,20 @@ export default function WithdrawForm() {
               <h3 className="text-lg font-bold gold-text">أدخل رمز PIN</h3>
               <p className="text-sm text-muted-foreground">أدخل رمز الحماية لتأكيد عملية السحب</p>
             </div>
-            <input
-              type="password"
+            <PinDots
+              length={6}
               value={pinCode}
-              onChange={(e) => setPinCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
-              placeholder="• • • •"
-              className="w-full h-14 rounded-xl glass-input px-4 text-sm tracking-widest text-center text-2xl"
-              dir="ltr"
-              maxLength={6}
-              autoFocus
+              onChange={(val) => {
+                setPinCode(val)
+                setPinError(false)
+              }}
+              onComplete={handlePinSubmit}
+              error={pinError}
             />
             <button
-              onClick={handlePinSubmit}
-              disabled={pinLoading || pinCode.length < 4}
-              className="w-full h-12 gold-gradient text-gray-900 font-bold rounded-xl hover:opacity-90 transition-all disabled:opacity-50"
+              onClick={() => { setShowPinDialog(false); setPinCode(''); setPinError(false) }}
+              className="w-full h-10 bg-white/10 text-foreground rounded-xl text-sm hover:bg-white/20 transition-colors"
             >
-              {pinLoading ? <Loader2 className="w-5 h-5 animate-spin mx-auto" /> : 'تأكيد'}
-            </button>
-            <button onClick={() => { setShowPinDialog(false); setPinCode('') }} className="w-full h-10 bg-white/10 text-foreground rounded-xl text-sm hover:bg-white/20 transition-colors">
               إلغاء
             </button>
           </div>
