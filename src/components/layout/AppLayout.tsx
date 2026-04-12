@@ -11,6 +11,7 @@ import OfflineBanner from '@/components/OfflineBanner'
 import { TopProgressBar } from '@/components/ui/AnimatedCounter'
 import { ConfettiEffect } from '@/components/ui/ConfettiEffect'
 import { InPageFeedback } from '@/components/ui/InPageFeedback'
+import BackgroundEffects from '@/components/ui/BackgroundEffects'
 import { Bell, LogOut, Loader2 } from 'lucide-react'
 import {
   AlertDialog,
@@ -151,6 +152,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
       <TopProgressBar />
       <ConfettiEffect />
       <InPageFeedback />
+      <BackgroundEffects />
 
       {/* Offline Banner */}
       <OfflineBanner />
@@ -177,7 +179,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
           </div>
         )}
         {/* Top Bar */}
-        <header className="sticky top-0 z-40 px-4 md:px-6 py-3 glass-card rounded-none border-x-0 border-t-0">
+        <header className="sticky top-0 z-40 px-4 md:px-6 py-3 glass-header rounded-none">
           <div className="flex items-center justify-between max-w-2xl mx-auto">
             <div>
               <h2 className="text-sm font-bold gold-text">فوركس يمني</h2>
