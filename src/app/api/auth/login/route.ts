@@ -29,11 +29,10 @@ export async function POST(request: NextRequest) {
 
     const user = await userOperations.findUnique({ email })
     if (!user) {
-      rateLimit.recordFailedAttempt(ip, email)
-      const rlAfter = rateLimit.checkLoginRateLimit(ip, email)
+      // Don't count failed attempts for non-existent emails
       return NextResponse.json(
-        { success: false, message: 'البريد الإلكتروني أو كلمة المرور غير صحيحة', remaining: rlAfter.remaining },
-        { status: 401 }
+        { success: false, message: 'البريد الإلكتروني غير مسجل في النظام', emailNotFound: true },
+        { status: 404 }
       )
     }
 

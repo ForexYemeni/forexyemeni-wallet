@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { Button } from '@/components/ui/button'
 import { useAuthStore } from '@/lib/store'
 import { toast } from 'sonner'
-import { Loader2, Eye, EyeOff, Wallet, Smartphone, ShieldAlert, Lock, X, TriangleAlert, Mail } from 'lucide-react'
+import { Loader2, Eye, EyeOff, Wallet, Smartphone, ShieldAlert, Lock, X, TriangleAlert, Mail, UserPlus } from 'lucide-react'
 import { generateDeviceFingerprint, getDeviceName } from '@/lib/device-fingerprint'
 import { playSuccessSound, playAlertSound, vibrate } from '@/lib/notification-sound'
 import TwoFactorVerify from '@/components/auth/TwoFactorVerify'
@@ -14,7 +14,7 @@ export default function LoginForm() {
   const [password, setPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
   const [loading, setLoading] = useState(false)
-  const [loginError, setLoginError] = useState<{ message: string; remaining: number } | null>(null)
+  const [loginError, setLoginError] = useState<{ message: string; remaining: number | null; emailNotFound?: boolean } | null>(null)
   const [twoFAPending, setTwoFAPending] = useState<{ userId: string; pendingToken: string } | null>(null)
   const { setAuth, setScreen, setPendingRegistration, clearForLock } = useAuthStore()
 
@@ -78,6 +78,8 @@ export default function LoginForm() {
         setPendingRegistration({ email, fullName: '', password })
         setScreen('verify-email')
         toast.error('يرجى تفعيل البريد الإلكتروني أولاً')
+      } else if (data.emailNotFound) {
+        setLoginError({ message: data.message || 'البريد الإلكتروني غير مسجل', remaining: null, emailNotFound: true })
       } else {
         const remaining = data.remaining ?? null
         setLoginError({ message: data.message || 'حدث خطأ في تسجيل الدخول', remaining })
@@ -115,8 +117,9 @@ export default function LoginForm() {
   }
 
   const isLocked = loginError?.remaining === 0
-  const isCritical = loginError && loginError.remaining !== null && loginError.remaining <= 1
-  const isWarning = loginError && loginError.remaining !== null && loginError.remaining <= 3
+  const isEmailNotFound = loginError?.emailNotFound === true
+  const isCritical = !isEmailNotFound && loginError && loginError.remaining !== null && loginError.remaining <= 1
+  const isWarning = !isEmailNotFound && loginError && loginError.remaining !== null && loginError.remaining <= 3
 
   // Password strength indicator
   const getPasswordStrength = () => {
@@ -145,14 +148,18 @@ export default function LoginForm() {
             className="relative w-full max-w-xs sm:max-w-sm rounded-3xl p-6 text-center space-y-4 shadow-2xl"
             style={{
               animation: 'scaleIn 0.35s cubic-bezier(0.34, 1.56, 0.64, 1)',
-              background: isLocked
+              background: isEmailNotFound
+                ? 'linear-gradient(145deg, rgba(59,130,246,0.12) 0%, rgba(15,23,42,0.97) 100%)'
+                : isLocked
                 ? 'linear-gradient(145deg, rgba(239,68,68,0.15) 0%, rgba(15,23,42,0.97) 100%)'
                 : isCritical
                 ? 'linear-gradient(145deg, rgba(239,68,68,0.1) 0%, rgba(15,23,42,0.97) 100%)'
                 : isWarning
                 ? 'linear-gradient(145deg, rgba(249,115,22,0.1) 0%, rgba(15,23,42,0.97) 100%)'
                 : 'linear-gradient(145deg, rgba(245,158,11,0.1) 0%, rgba(15,23,42,0.97) 100%)',
-              border: isLocked
+              border: isEmailNotFound
+                ? '1px solid rgba(59,130,246,0.3)'
+                : isLocked
                 ? '1px solid rgba(239,68,68,0.3)'
                 : isCritical
                 ? '1px solid rgba(239,68,68,0.2)'
@@ -174,7 +181,9 @@ export default function LoginForm() {
             <div className="relative flex justify-center">
               <div
                 className={`w-20 h-20 rounded-3xl flex items-center justify-center ${
-                  isLocked
+                  isEmailNotFound
+                    ? 'bg-blue-500/20 shadow-lg shadow-blue-500/20'
+                    : isLocked
                     ? 'bg-red-500/20 shadow-lg shadow-red-500/20'
                     : isCritical
                     ? 'bg-red-500/15 shadow-lg shadow-red-500/10'
@@ -184,7 +193,9 @@ export default function LoginForm() {
                 }`}
                 style={{ animation: 'shakeError 0.5s ease-in-out 0.3s' }}
               >
-                {isLocked ? (
+                {isEmailNotFound ? (
+                  <UserPlus className="w-9 h-9 text-blue-400" />
+                ) : isLocked ? (
                   <Lock className="w-9 h-9 text-red-400" />
                 ) : isCritical ? (
                   <TriangleAlert className="w-9 h-9 text-red-400" />
@@ -205,16 +216,24 @@ export default function LoginForm() {
             <div className="space-y-1">
               <h3
                 className={`text-lg font-bold ${
-                  isLocked || isCritical ? 'text-red-400' : isWarning ? 'text-orange-400' : 'text-amber-400'
+                  isEmailNotFound
+                    ? 'text-blue-400'
+                    : isLocked || isCritical ? 'text-red-400' : isWarning ? 'text-orange-400' : 'text-amber-400'
                 }`}
               >
-                {isLocked ? 'تم قفل الحساب' : 'كلمة المرور غير صحيحة'}
+                {isEmailNotFound ? 'البريد غير مسجل' : isLocked ? 'تم قفل الحساب' : 'كلمة المرور غير صحيحة'}
               </h3>
-              {!isLocked && (
+              {!isLocked && !isEmailNotFound && (
                 <p className="text-sm text-muted-foreground">تحقق من كلمة المرور وحاول مرة أخرى</p>
               )}
               {isLocked && (
                 <p className="text-sm text-muted-foreground">تم قفل الحساب مؤقتاً لحمايتك</p>
+              )}
+              {isEmailNotFound && (
+                <>
+                  <p className="text-sm text-muted-foreground" dir="ltr">{email}</p>
+                  <p className="text-sm text-muted-foreground">ليس مسجلاً في النظام. هل تريد إنشاء حساب جديد؟</p>
+                </>
               )}
             </div>
 
@@ -276,7 +295,30 @@ export default function LoginForm() {
               </div>
             )}
 
-            {/* Dismiss Button */}
+            {/* Dismiss / Action Button */}
+            {isEmailNotFound ? (
+              <div className="space-y-2">
+                <button
+                  onClick={() => {
+                    setLoginError(null)
+                    setPendingRegistration({ email, fullName: '', password })
+                    setScreen('register')
+                  }}
+                  className="w-full py-3 rounded-xl font-bold text-sm transition-all bg-gold hover:bg-gold-light text-gray-900"
+                >
+                  <span className="flex items-center justify-center gap-2">
+                    <UserPlus className="w-4 h-4" />
+                    إنشاء حساب جديد
+                  </span>
+                </button>
+                <button
+                  onClick={dismissError}
+                  className="w-full py-2.5 rounded-xl text-sm transition-all text-muted-foreground hover:text-foreground"
+                >
+                  تسجيل دخول ببريد آخر
+                </button>
+              </div>
+            ) : (
             <button
               onClick={dismissError}
               className={`w-full py-3 rounded-xl font-bold text-sm transition-all ${
@@ -291,6 +333,7 @@ export default function LoginForm() {
             >
               حاول مرة أخرى
             </button>
+            )}
           </div>
         </div>
       )}
