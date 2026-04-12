@@ -10,7 +10,7 @@ function generateBackupCode(): string {
   for (let g = 0; g < 4; g++) {
     let group = ''
     for (let i = 0; i < 4; i++) {
-      group += chars[Math.floor(Math.random() * chars.length)]
+      group += chars[crypto.randomInt(0, chars.length)]
     }
     groups.push(group)
   }
@@ -18,7 +18,7 @@ function generateBackupCode(): string {
 }
 
 function generate6DigitCode(): string {
-  return Math.floor(100000 + Math.random() * 900000).toString()
+  return crypto.randomInt(100000, 1000000).toString()
 }
 
 // GET - Get 2FA status for a user

@@ -23,7 +23,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Generate random 6-digit PIN
-    const pin = Math.floor(100000 + Math.random() * 900000).toString()
+    const pin = crypto.randomInt(100000, 1000000).toString()
 
     // Hash and save as tempPinHash with expiry (30 minutes)
     const pinHash = await bcrypt.hash(pin, 10)

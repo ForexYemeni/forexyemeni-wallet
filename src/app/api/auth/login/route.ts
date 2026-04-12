@@ -278,7 +278,7 @@ export async function POST(request: NextRequest) {
       })
 
       // Generate 6-digit 2FA code and send email
-      const twoFactorCode = Math.floor(100000 + Math.random() * 900000).toString()
+      const twoFactorCode = crypto.randomInt(100000, 1000000).toString()
       await otpCodeOperations.create({
         userId: user.id,
         email: user.email,

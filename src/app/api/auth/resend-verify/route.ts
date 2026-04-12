@@ -44,7 +44,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Generate new OTP
-    const otp = Math.floor(100000 + Math.random() * 900000).toString()
+    const otp = crypto.randomInt(100000, 1000000).toString()
     const expiresAt = new Date(Date.now() + 10 * 60 * 1000).toISOString()
 
     await otpCodeOperations.create({

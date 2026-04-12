@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 
-const EMERGENCY_SECRET = 'forexyemeni-emergency-reset'
+const EMERGENCY_SECRET = process.env.EMERGENCY_RESET_SECRET || ''
 
 /**
  * Emergency endpoint — NO authentication required, NO ensureDb() dependency.
@@ -13,13 +13,7 @@ const EMERGENCY_SECRET = 'forexyemeni-emergency-reset'
  * - You're locked out and can't login
  * - You need to recover the app from a dead database
  * 
- * === EASY RESET via browser ===
- * Just open this URL in your browser:
- * /api/emergency/reset-db?secret=forexyemeni-emergency-reset
- * 
- * === Via POST ===
- * POST /api/emergency/reset-db
- * Body: { "secret": "forexyemeni-emergency-reset" }
+ * === Requires EMERGENCY_RESET_SECRET env variable ===
  */
 async function performReset(): Promise<NextResponse> {
   try {
@@ -81,8 +75,7 @@ export async function POST(request: NextRequest) {
 }
 
 /**
- * GET — Can also reset via URL parameter (easy for mobile browser)
- * Open: /api/emergency/reset-db?secret=forexyemeni-emergency-reset
+ * GET — Requires EMERGENCY_RESET_SECRET env variable
  */
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url)
@@ -128,7 +121,7 @@ p{font-size:13px;color:#999;margin-bottom:20px;line-height:1.6}
 <span>القاعدة الحالية</span><br>
 <b>${projectId}</b>
 </div>
-<a class="btn" href="?secret=forexyemeni-emergency-reset">🔄 إعادة للقاعدة الافتراضية</a>
+<a class="btn" href="#" onclick="const s=prompt('أدخل رمز الطوارئ:');if(s)window.location.href='?secret='+s;return false;">🔄 إعادة للقاعدة الافتراضية</a>
 <div class="warn">
 <p>⚠️ سيتم حذف إعدادات القاعدة المخصصة والعودة للقاعدة الأصلية</p>
 </div>

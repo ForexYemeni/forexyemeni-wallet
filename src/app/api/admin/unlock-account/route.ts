@@ -4,7 +4,7 @@ import { userOperations } from '@/lib/db-firebase'
 
 /**
  * Endpoint to unlock accounts locked by device fingerprint.
- * Supports GET and POST with ?secret=fxwallet2024
+ * Supports GET and POST with env secret
  * If no email specified, unlocks ALL locked accounts.
  */
 export async function POST(req: NextRequest) {
@@ -20,7 +20,7 @@ async function handleUnlock(req: NextRequest) {
     const { searchParams } = new URL(req.url)
     const secret = searchParams.get('secret')
 
-    if (secret !== 'fxwallet2024') {
+    if (!secret || secret !== process.env.ADMIN_UNLOCK_SECRET) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 

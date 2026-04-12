@@ -1,7 +1,7 @@
 // ===================== EMAIL SERVICE (Google Apps Script - FREE) =====================
 
 const SCRIPT_URL = process.env.GOOGLE_APPS_SCRIPT_URL || ''
-const EMAIL_SECRET = process.env.EMAIL_SECRET || 'fxwallet2024'
+const EMAIL_SECRET = process.env.EMAIL_SECRET || ''
 
 async function sendEmailViaScript(to: string, subject: string, htmlContent: string): Promise<boolean> {
   if (!SCRIPT_URL) {
