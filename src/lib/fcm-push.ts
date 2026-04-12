@@ -10,6 +10,7 @@
  */
 
 import { useAuthStore } from '@/lib/store'
+import { apiFetch } from '@/lib/api-client'
 
 let fcmRegistered = false
 let currentFcmToken: string | null = null
@@ -157,7 +158,7 @@ export async function registerFCMPushNotifications(): Promise<string> {
  */
 async function sendTokenToServer(userId: string, token: string): Promise<boolean> {
   try {
-    const res = await fetch('/api/fcm/register', {
+    const res = await apiFetch('/api/fcm/register', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -198,7 +199,7 @@ export async function unregisterFCM(): Promise<void> {
   try {
     const user = useAuthStore.getState().user
     if (user?.id) {
-      await fetch('/api/fcm/register', {
+      await apiFetch('/api/fcm/register', {
         method: 'DELETE',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ userId: user.id, fcmToken: currentFcmToken }),
