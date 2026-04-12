@@ -1,5 +1,5 @@
 import { initializeApp, cert, deleteApp, App, getApps } from 'firebase-admin/app'
-import { getFirestore, Firestore, FieldValue } from 'firebase-admin/firestore'
+import { getFirestore, Firestore } from 'firebase-admin/firestore'
 import { _fbk } from './firebase-key'
 
 let app: App
@@ -218,7 +218,7 @@ export async function generateAccountNumber(): Promise<number> {
     const data = doc.exists ? doc.data() : {}
 
     const currentValue = data.value || 1000
-    const freedNumbers: number[] = data.freedNumbers || []
+    const freedNumbers: number[] = (data.freedNumbers || []).map((n: any) => Number(n))
 
     let accountNumber: number
 
@@ -228,17 +228,11 @@ export async function generateAccountNumber(): Promise<number> {
       accountNumber = freedNumbers[0]
       // Remove the used number from the freed list
       const remaining = freedNumbers.slice(1)
-      transaction.set(ref, {
-        value: currentValue,
-        freedNumbers: remaining
-      }, { merge: true })
+      transaction.set(ref, { value: currentValue, freedNumbers: remaining })
     } else {
       // No freed numbers available, increment counter
       accountNumber = currentValue + 1
-      transaction.set(ref, {
-        value: accountNumber,
-        freedNumbers: []
-      }, { merge: true })
+      transaction.set(ref, { value: accountNumber, freedNumbers: [] })
     }
 
     return accountNumber
@@ -248,14 +242,29 @@ export async function generateAccountNumber(): Promise<number> {
 /**
  * Free an account number so it can be reused by the next new user.
  * Called when a user is deleted from the admin panel.
+ * Uses transaction for atomicity.
  */
 export async function freeAccountNumber(accountNumber: number): Promise<void> {
   const db = getDb()
   const ref = db.collection('counters').doc('accountNumber')
-  // Use set with merge to avoid errors if freedNumbers field doesn't exist
-  await ref.set({
-    freedNumbers: FieldValue.arrayUnion(accountNumber)
-  }, { merge: true })
+
+  await db.runTransaction(async (transaction) => {
+    const doc = await transaction.get(ref)
+    const data = doc.exists ? doc.data() : {}
+
+    const currentValue = data.value || 1000
+    const freedNumbers: number[] = (data.freedNumbers || []).map((n: any) => Number(n))
+
+    // Don't add duplicates
+    if (!freedNumbers.includes(accountNumber)) {
+      freedNumbers.push(accountNumber)
+    }
+
+    // Keep sorted for efficiency
+    freedNumbers.sort((a: number, b: number) => a - b)
+
+    transaction.set(ref, { value: currentValue, freedNumbers })
+  })
 }
 
 export function nowTimestamp() { return new Date().toISOString() }

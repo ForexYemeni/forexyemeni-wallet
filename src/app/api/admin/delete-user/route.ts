@@ -209,12 +209,7 @@ export async function POST(request: NextRequest) {
 
       // Free the account number for reuse
       if (userToDelete.accountNumber) {
-        try {
-          await freeAccountNumber(userToDelete.accountNumber)
-        } catch (err) {
-          console.error('[DELETE-USER] Failed to free account number:', err)
-          // Non-critical: continue deletion even if freeing fails
-        }
+        await freeAccountNumber(userToDelete.accountNumber)
       }
 
       // Finally delete the user
