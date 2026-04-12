@@ -166,7 +166,7 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    if (user.status !== 'active' && user.status !== 'registered' && !isAdmin) {
+    if (user.status !== 'active' && !isAdmin) {
       return NextResponse.json(
         { success: false, message: 'حسابك معطل. يرجى التواصل مع الدعم' },
         { status: 403 }
@@ -314,12 +314,6 @@ export async function POST(request: NextRequest) {
         userId: user.id,
         message: 'تم إرسال رمز المصادقة الثنائية إلى بريدك الإلكتروني',
       })
-    }
-
-    // Activate registered user on first login
-    if (user.status === 'registered') {
-      await userOperations.update({ id: user.id }, { status: 'active' })
-      user.status = 'active'
     }
 
     const token = crypto.randomUUID()

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { userOperations, otpCodeOperations } from '@/lib/db-firebase'
+import { otpCodeOperations } from '@/lib/db-firebase'
+import { getDb, checkAndApplyCustomFirebase } from '@/lib/firebase'
 
 export async function POST(request: NextRequest) {
   try {
@@ -11,6 +12,9 @@ export async function POST(request: NextRequest) {
         { status: 400 }
       )
     }
+
+    await checkAndApplyCustomFirebase()
+    const db = getDb()
 
     const otpRecord = await otpCodeOperations.findFirst({
       where: {
@@ -36,8 +40,16 @@ export async function POST(request: NextRequest) {
 
     await otpCodeOperations.update(otpRecord.id, { verified: true })
 
+    // Mark email as verified in pendingRegistrations (if exists) or users
     if (otpRecord.userId) {
-      await userOperations.update({ id: otpRecord.userId }, { emailVerified: true })
+      // Check pendingRegistrations first
+      const pendingDoc = await db.collection('pendingRegistrations').doc(otpRecord.userId).get()
+      if (pendingDoc.exists) {
+        await db.collection('pendingRegistrations').doc(otpRecord.userId).update({ emailVerified: true })
+      } else {
+        // Fallback: update in users collection
+        await db.collection('users').doc(otpRecord.userId).update({ emailVerified: true })
+      }
     }
 
     return NextResponse.json({

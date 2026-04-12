@@ -8,11 +8,12 @@ import { useAuthStore } from '@/lib/store'
 import { toast } from 'sonner'
 import { Loader2, Eye, EyeOff, ArrowRight, Gift, Mail, UserPlus, UserCheck, User, Lock, Check } from 'lucide-react'
 import FloatingLabelInput from '@/components/ui/FloatingLabelInput'
+import PinDots from '@/components/ui/PinDots'
 
 const REGISTER_STEPS = [
   { key: 'email', label: 'البريد الإلكتروني', icon: Mail },
   { key: 'otp', label: 'التحقق', icon: UserCheck },
-  { key: 'details', label: 'البيانات', icon: UserPlus },
+  { key: 'details', label: 'البيانات و PIN', icon: UserPlus },
 ]
 
 export default function RegisterForm() {
@@ -346,10 +347,17 @@ function CompleteRegistration({ email }: { email: string }) {
   const [fullName, setFullName] = useState('')
   const [password, setPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
+  const [pin, setPin] = useState('')
+  const [confirmPin, setConfirmPin] = useState('')
+  const [pinStep, setPinStep] = useState<'enter' | 'confirm'>('enter')
   const [referralCode, setReferralCode] = useState('')
   const [loading, setLoading] = useState(false)
   const [termsAccepted, setTermsAccepted] = useState(false)
   const { setAuth, setPendingRegistration } = useAuthStore()
+
+  const isPinValid = pin.length >= 4 && /^\d+$/.test(pin)
+  const isPinMatch = pin.length >= 4 && pin === confirmPin
+  const canSubmit = fullName && password.length >= 8 && termsAccepted && pin.length >= 4 && confirmPin.length >= 4 && pin === confirmPin
 
   // Pre-fill referral code from URL ?ref=CODE
   useEffect(() => {
@@ -372,13 +380,21 @@ function CompleteRegistration({ email }: { email: string }) {
       toast.error('كلمة المرور يجب أن تكون 8 أحرف على الأقل')
       return
     }
+    if (pin.length < 4 || !/^\d+$/.test(pin)) {
+      toast.error('رمز PIN مكون من 4 أرقام على الأقل')
+      return
+    }
+    if (pin !== confirmPin) {
+      toast.error('رمز PIN غير متطابق')
+      return
+    }
 
     setLoading(true)
     try {
       const res = await fetch('/api/auth/complete-registration', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, fullName, password }),
+        body: JSON.stringify({ email, fullName, password, pin }),
       })
       const data = await res.json()
 
@@ -484,6 +500,60 @@ function CompleteRegistration({ email }: { email: string }) {
         )}
       </div>
 
+      {/* PIN Setup */}
+      <div className="space-y-2">
+        <div className="flex items-center gap-1.5">
+          <div className="w-5 h-5 rounded-md bg-gold/10 flex items-center justify-center">
+            <Lock className="w-3.5 h-3.5 text-gold" />
+          </div>
+          <Label className="text-sm text-muted-foreground">
+            رمز PIN
+          </Label>
+          <span className="px-1.5 py-0.5 rounded-md bg-red-500/10 text-red-400 text-[10px] font-semibold">مطلوب</span>
+        </div>
+
+        {pinStep === 'enter' ? (
+          <div className="space-y-3">
+            <PinDots
+              value={pin}
+              onChange={(val) => {
+                setPin(val)
+                if (val.length >= 4) {
+                  setTimeout(() => setPinStep('confirm'), 300)
+                }
+              }}
+              isError={pin.length >= 4 && !/^\d+$/.test(pin)}
+            />
+            <p className="text-[11px] text-muted-foreground text-center">أدخل رمز PIN مكون من 4-6 أرقام</p>
+          </div>
+        ) : (
+          <div className="space-y-3">
+            <PinDots
+              value={confirmPin}
+              onChange={(val) => {
+                setConfirmPin(val)
+              }}
+              isError={confirmPin.length >= 4 && pin !== confirmPin}
+              isSuccess={confirmPin.length >= 4 && pin === confirmPin}
+            />
+            <p className="text-[11px] text-muted-foreground text-center">
+              {confirmPin.length >= 4 && pin === confirmPin
+                ? <span className="text-green-400">✓ متطابق</span>
+                : confirmPin.length >= 4 && pin !== confirmPin
+                  ? <span className="text-red-400">✗ غير متطابق</span>
+                  : 'أعد إدخال رمز PIN للتأكيد'}
+            </p>
+            <button
+              type="button"
+              onClick={() => { setPinStep('enter'); setConfirmPin('') }}
+              className="text-[11px] text-gold hover:underline block mx-auto"
+            >
+              تغيير رمز PIN
+            </button>
+          </div>
+        )}
+      </div>
+
       {/* Referral Code */}
       <div className="space-y-1.5">
         <div className="flex items-center gap-1.5">
@@ -523,7 +593,7 @@ function CompleteRegistration({ email }: { email: string }) {
 
       <Button
         type="submit"
-        disabled={loading || !termsAccepted}
+        disabled={loading || !canSubmit}
         className="w-full h-12 gold-gradient text-gray-900 font-bold text-base rounded-xl hover:opacity-90 transition-all gold-glow"
       >
         {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : 'إنشاء الحساب'}
