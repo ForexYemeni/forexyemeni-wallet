@@ -208,63 +208,58 @@ export function generateAffiliateCode(): string {
   return Array.from(b).map(x => x.toString(16).padStart(2, '0')).join('').toUpperCase()
 }
 
+/**
+ * Generate a new account number, reusing deleted numbers when possible.
+ * Scans the users collection directly for gaps (works even for accounts
+ * deleted before the freedNumbers tracking existed).
+ */
 export async function generateAccountNumber(): Promise<number> {
   const db = getDb()
   const ref = db.collection('counters').doc('accountNumber')
 
-  // Use transaction for atomicity to prevent duplicate numbers
   return db.runTransaction(async (transaction) => {
     const doc = await transaction.get(ref)
     const data = doc.exists ? doc.data() : {}
+    const maxValue = data.value || 1000
 
-    const currentValue = data.value || 1000
-    const freedNumbers: number[] = (data.freedNumbers || []).map((n: any) => Number(n))
+    // Get all used account numbers in one query
+    const usersSnap = await db.collection('users')
+      .where('accountNumber', '>=', 1001)
+      .where('accountNumber', '<=', maxValue)
+      .select('accountNumber')
+      .get()
 
-    let accountNumber: number
-
-    if (freedNumbers.length > 0) {
-      // Reuse the smallest freed account number
-      freedNumbers.sort((a: number, b: number) => a - b)
-      accountNumber = freedNumbers[0]
-      // Remove the used number from the freed list
-      const remaining = freedNumbers.slice(1)
-      transaction.set(ref, { value: currentValue, freedNumbers: remaining })
-    } else {
-      // No freed numbers available, increment counter
-      accountNumber = currentValue + 1
-      transaction.set(ref, { value: accountNumber, freedNumbers: [] })
+    // Build a set of used numbers
+    const usedNumbers = new Set<number>()
+    for (const uDoc of usersSnap.docs) {
+      const num = Number(uDoc.data().accountNumber)
+      if (num >= 1001) usedNumbers.add(num)
     }
 
-    return accountNumber
+    // Find the first gap
+    for (let n = 1001; n <= maxValue; n++) {
+      if (!usedNumbers.has(n)) {
+        // Found a gap — reuse this number
+        // Clean up freedNumbers since we scan directly now
+        transaction.set(ref, { value: maxValue, freedNumbers: [] })
+        return n
+      }
+    }
+
+    // No gaps found, increment counter
+    const newNumber = maxValue + 1
+    transaction.set(ref, { value: newNumber, freedNumbers: [] })
+    return newNumber
   })
 }
 
 /**
  * Free an account number so it can be reused by the next new user.
- * Called when a user is deleted from the admin panel.
- * Uses transaction for atomicity.
+ * Kept for compatibility — the actual gap detection happens in generateAccountNumber.
  */
-export async function freeAccountNumber(accountNumber: number): Promise<void> {
-  const db = getDb()
-  const ref = db.collection('counters').doc('accountNumber')
-
-  await db.runTransaction(async (transaction) => {
-    const doc = await transaction.get(ref)
-    const data = doc.exists ? doc.data() : {}
-
-    const currentValue = data.value || 1000
-    const freedNumbers: number[] = (data.freedNumbers || []).map((n: any) => Number(n))
-
-    // Don't add duplicates
-    if (!freedNumbers.includes(accountNumber)) {
-      freedNumbers.push(accountNumber)
-    }
-
-    // Keep sorted for efficiency
-    freedNumbers.sort((a: number, b: number) => a - b)
-
-    transaction.set(ref, { value: currentValue, freedNumbers })
-  })
+export async function freeAccountNumber(_accountNumber: number): Promise<void> {
+  // No-op: generateAccountNumber now scans users directly for gaps.
+  // This function is kept so existing delete-user code doesn't break.
 }
 
 export function nowTimestamp() { return new Date().toISOString() }
