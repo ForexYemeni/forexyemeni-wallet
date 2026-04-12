@@ -2,10 +2,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getDb, generateId, nowTimestamp } from '@/lib/firebase'
 import { requireAdmin } from '@/lib/auth-server'
 
-// GET - List all banners
+// GET - List all banners (public - accessible by all users for banner slider)
 export async function GET(request: NextRequest) {
-  const auth = await requireAdmin(request)
-  if (!auth.success) return NextResponse.json({ success: false, message: auth.error }, { status: auth.status })
   try {
     const db = getDb()
     const snapshot = await db

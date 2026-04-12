@@ -252,9 +252,10 @@ export async function generateAccountNumber(): Promise<number> {
 export async function freeAccountNumber(accountNumber: number): Promise<void> {
   const db = getDb()
   const ref = db.collection('counters').doc('accountNumber')
-  await ref.update({
+  // Use set with merge to avoid errors if freedNumbers field doesn't exist
+  await ref.set({
     freedNumbers: FieldValue.arrayUnion(accountNumber)
-  })
+  }, { merge: true })
 }
 
 export function nowTimestamp() { return new Date().toISOString() }
