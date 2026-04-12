@@ -1,11 +1,11 @@
 'use client'
 
-import { useRef, useEffect, useCallback } from 'react'
+import { useRef, useEffect, useCallback, useState } from 'react'
 
 interface PinDotsProps {
   length?: number
-  value: string
-  onChange: (value: string) => void
+  value?: string
+  onChange?: (value: string) => void
   onComplete?: (value: string) => void
   error?: boolean
   disabled?: boolean
@@ -13,13 +13,17 @@ interface PinDotsProps {
 
 export default function PinDots({
   length = 4,
-  value,
-  onChange,
+  value: externalValue,
+  onChange: externalOnChange,
   onComplete,
   error = false,
   disabled = false,
 }: PinDotsProps) {
+  const [internalValue, setInternalValue] = useState('')
   const inputRef = useRef<HTMLInputElement>(null)
+
+  const isControlled = externalValue !== undefined
+  const value = isControlled ? externalValue : internalValue
 
   // Auto-focus the hidden input
   useEffect(() => {
@@ -31,12 +35,16 @@ export default function PinDots({
   const handleChange = useCallback(
     (e: React.ChangeEvent<HTMLInputElement>) => {
       const digits = e.target.value.replace(/\D/g, '').slice(0, length)
-      onChange(digits)
+      if (isControlled && externalOnChange) {
+        externalOnChange(digits)
+      } else {
+        setInternalValue(digits)
+      }
       if (digits.length === length && onComplete) {
         onComplete(digits)
       }
     },
-    [length, onChange, onComplete]
+    [length, onComplete, isControlled, externalOnChange]
   )
 
   const handleFocus = useCallback(() => {

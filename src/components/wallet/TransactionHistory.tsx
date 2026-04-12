@@ -1,7 +1,8 @@
-import { apiFetch } from '@/lib/api-client'
 'use client'
 
-import { useState, useEffect } from 'react'
+import { apiFetch } from '@/lib/api-client'
+
+import { useState, useEffect, useMemo } from 'react'
 import { useAuthStore } from '@/lib/store'
 import { useOfflineStore } from '@/lib/offline-store'
 import { useOfflineMode } from '@/hooks/useOfflineMode'
@@ -14,8 +15,14 @@ import {
   Filter,
   WifiOff,
   Search,
+  RefreshCw,
+  Receipt,
+  ChevronDown,
+  FileText,
+  BadgeCheck,
+  XCircle,
+  HourglassIcon,
 } from 'lucide-react'
-import { Button } from '@/components/ui/button'
 import dynamic from 'next/dynamic'
 
 const ExportStatement = dynamic(() => import('@/components/transactions/ExportStatement'), { ssr: false })
@@ -71,6 +78,48 @@ function groupTransactions(transactions: Transaction[]): { group: string; items:
   return ordered
 }
 
+function extractStatus(description: string | null): { label: string; className: string } | null {
+  if (!description) return null
+  const lower = description.toLowerCase()
+  if (lower.includes('مكتمل') || lower.includes('ناجح') || lower.includes('موافق') || lower.includes('مؤكد')) {
+    return { label: 'مكتمل', className: 'status-confirmed' }
+  }
+  if (lower.includes('معلق') || lower.includes('قيد المراجعة') || lower.includes('بانتظار')) {
+    return { label: 'معلق', className: 'status-pending' }
+  }
+  if (lower.includes('مقبول') || lower.includes('approved')) {
+    return { label: 'مقبول', className: 'status-approved' }
+  }
+  if (lower.includes('مرفوض') || lower.includes('فشل') || lower.includes('rejected') || lower.includes('failed')) {
+    return { label: 'مرفوض', className: 'status-rejected' }
+  }
+  if (lower.includes('قيد المعالجة') || lower.includes('processing')) {
+    return { label: 'قيد المعالجة', className: 'status-processing' }
+  }
+  return null
+}
+
+function getTxBorderClass(type: string): string {
+  switch (type) {
+    case 'deposit': return 'border-l-2 border-l-green-500/30'
+    case 'withdrawal': return 'border-l-2 border-l-red-500/30'
+    case 'transfer': return 'border-l-2 border-l-blue-500/30'
+    case 'bonus': return 'border-l-2 border-l-gold/30'
+    default: return ''
+  }
+}
+
+function getStatusIcon(statusLabel: string) {
+  switch (statusLabel) {
+    case 'مكتمل': return <BadgeCheck className="w-3 h-3" />
+    case 'مقبول': return <BadgeCheck className="w-3 h-3" />
+    case 'معلق': return <HourglassIcon className="w-3 h-3" />
+    case 'قيد المعالجة': return <HourglassIcon className="w-3 h-3" />
+    case 'مرفوض': return <XCircle className="w-3 h-3" />
+    default: return null
+  }
+}
+
 export default function TransactionHistory() {
   const { user } = useAuthStore()
   const { cachedTransactions, setCachedTransactions, setCachedUser, setLastSyncTime } = useOfflineStore()
@@ -80,6 +129,7 @@ export default function TransactionHistory() {
   const [filter, setFilter] = useState<string>('all')
   const [search, setSearch] = useState('')
   const [usingOffline, setUsingOffline] = useState(false)
+  const [expandedTx, setExpandedTx] = useState<string | null>(null)
 
   useEffect(() => {
     if (user?.id) fetchTransactions()
@@ -130,6 +180,20 @@ export default function TransactionHistory() {
     }
   }
 
+  const stats = useMemo(() => {
+    const totalDeposits = transactions
+      .filter(tx => tx.amount > 0)
+      .reduce((sum, tx) => sum + tx.amount, 0)
+    const totalWithdrawals = transactions
+      .filter(tx => tx.amount < 0)
+      .reduce((sum, tx) => sum + Math.abs(tx.amount), 0)
+    return {
+      total: transactions.length,
+      deposits: totalDeposits,
+      withdrawals: totalWithdrawals,
+    }
+  }, [transactions])
+
   const filtered = transactions.filter(tx => {
     const matchType = filter === 'all' || tx.type === filter
     const matchSearch = !search.trim() ||
@@ -140,6 +204,34 @@ export default function TransactionHistory() {
   })
 
   const grouped = groupTransactions(filtered)
+
+  // Determine the empty state type
+  const getEmptyStateInfo = () => {
+    if (transactions.length === 0) {
+      return {
+        icon: Receipt,
+        title: 'لا توجد معاملات بعد',
+        description: 'ستظهر المعاملات هنا بمجرد إجراء أول عملية',
+        showAction: false,
+      }
+    }
+    if (search.trim()) {
+      return {
+        icon: Filter,
+        title: 'لا توجد معاملات تطابق البحث',
+        description: `لم يتم العثور على نتائج لـ "${search}"`,
+        showAction: true,
+      }
+    }
+    // Filtered but no search
+    const filterLabel = filters.find(f => f.key === filter)?.label ?? filter
+    return {
+      icon: Filter,
+      title: `لا توجد ${filterLabel} في هذه الفترة`,
+      description: 'حاول تغيير الفلتر أو البحث بكلمات أخرى',
+      showAction: true,
+    }
+  }
 
   const formatTime = (dateStr: string) => {
     return new Date(dateStr).toLocaleTimeString('ar-SA', {
@@ -197,6 +289,10 @@ export default function TransactionHistory() {
     { key: 'transfer', label: 'تحويلات' },
   ]
 
+  const toggleExpand = (txId: string) => {
+    setExpandedTx(prev => (prev === txId ? null : txId))
+  }
+
   return (
     <div className="space-y-6 animate-fade-in">
       {/* Offline Mode Indicator */}
@@ -218,6 +314,38 @@ export default function TransactionHistory() {
         </div>
       </div>
 
+      {/* Summary Stats Cards */}
+      {!loading && transactions.length > 0 && (
+        <div className="grid grid-cols-3 gap-3 animate-fade-in">
+          {/* Total Transactions */}
+          <div className="glass-card p-3 text-center">
+            <div className="flex items-center justify-center gap-1.5 mb-1">
+              <FileText className="w-3.5 h-3.5 text-gold" />
+            </div>
+            <p className="text-base font-bold text-foreground">{stats.total}</p>
+            <p className="text-[10px] text-muted-foreground mt-0.5">معاملة</p>
+          </div>
+
+          {/* Total Deposits */}
+          <div className="glass-card p-3 text-center">
+            <div className="flex items-center justify-center gap-1.5 mb-1">
+              <ArrowDownLeft className="w-3.5 h-3.5 text-green-400" />
+            </div>
+            <p className="text-base font-bold text-green-400">{stats.deposits.toFixed(2)}</p>
+            <p className="text-[10px] text-muted-foreground mt-0.5">إيداعات</p>
+          </div>
+
+          {/* Total Withdrawals */}
+          <div className="glass-card p-3 text-center">
+            <div className="flex items-center justify-center gap-1.5 mb-1">
+              <ArrowUpRight className="w-3.5 h-3.5 text-red-400" />
+            </div>
+            <p className="text-base font-bold text-red-400">{stats.withdrawals.toFixed(2)}</p>
+            <p className="text-[10px] text-muted-foreground mt-0.5">سحوبات</p>
+          </div>
+        </div>
+      )}
+
       {/* Search */}
       <div className="relative">
         <Search className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
@@ -238,25 +366,31 @@ export default function TransactionHistory() {
         )}
       </div>
 
+      {/* Pull-to-Refresh Visual Indicator */}
+      {!loading && transactions.length > 0 && (
+        <div className="text-xs text-muted-foreground flex items-center gap-1.5 justify-center">
+          <RefreshCw className="w-3 h-3" />
+          <span>اسحب للتحديث</span>
+        </div>
+      )}
+
       {/* Export Statement */}
       <ExportStatement />
 
       {/* Filters */}
-      <div className="flex gap-2 overflow-x-auto pb-2">
+      <div className="flex gap-2 overflow-x-auto pb-1" style={{ scrollbarWidth: 'none' }}>
         {filters.map((f) => (
-          <Button
+          <button
             key={f.key}
-            variant={filter === f.key ? 'default' : 'outline'}
-            size="sm"
             onClick={() => setFilter(f.key)}
-            className={
-              filter === f.key
-                ? 'gold-gradient text-gray-900 font-bold rounded-xl min-w-fit'
-                : 'glass-input text-muted-foreground rounded-xl min-w-fit hover:text-gold hover:border-gold/30'
-            }
+            className={`filter-pill ${filter === f.key ? 'active' : ''}`}
           >
-            {f.label}
-          </Button>
+            {f.label}{f.key !== 'all' && (
+              <span className={`mr-1 text-[10px] ${filter === f.key ? 'text-gray-900/60' : 'text-muted-foreground/40'}`}>
+                {transactions.filter(tx => tx.type === f.key).length}
+              </span>
+            )}
+          </button>
         ))}
       </div>
 
@@ -280,13 +414,29 @@ export default function TransactionHistory() {
         </div>
       ) : filtered.length === 0 ? (
         <div className="glass-card p-8 text-center empty-state-enhanced">
-          <div className="empty-state-icon">
-            <Filter className="w-12 h-12 text-gold/30 mx-auto mb-3" />
-          </div>
-          <p className="text-muted-foreground text-sm mb-1">لا توجد معاملات تطابق البحث</p>
-          <button onClick={() => { setSearch(''); setFilter('all') }} className="text-xs text-gold hover:text-gold-light transition-colors tap-effect">
-            مسح الفلاتر
-          </button>
+          {(() => {
+            const info = getEmptyStateInfo()
+            const EmptyIcon = info.icon
+            return (
+              <>
+                <div className="empty-state-icon">
+                  <EmptyIcon className="w-12 h-12 text-gold/30 mx-auto mb-3" />
+                </div>
+                <p className="text-muted-foreground text-sm mb-1">{info.title}</p>
+                {info.description && (
+                  <p className="text-xs text-muted-foreground/70 mb-2">{info.description}</p>
+                )}
+                {info.showAction && (
+                  <button
+                    onClick={() => { setSearch(''); setFilter('all') }}
+                    className="text-xs text-gold hover:text-gold-light transition-colors tap-effect"
+                  >
+                    مسح الفلاتر
+                  </button>
+                )}
+              </>
+            )
+          })()}
         </div>
       ) : (
         <div className="space-y-4">
@@ -299,35 +449,122 @@ export default function TransactionHistory() {
 
               {/* Transactions in this group */}
               <div className="space-y-2 stagger-list">
-                {items.map((tx, index) => (
-                  <div
-                    key={tx.id}
-                    className="glass-card glass-card-hover tx-card-enhanced p-4 space-y-2 cursor-pointer"
-                    style={{ animationDelay: `${index * 40}ms` }}
-                    title={formatFullDate(tx.createdAt)}
-                  >
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-3">
-                        <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${getTypeIconBg(tx.type)}`}>
-                          {getTypeIcon(tx.type)}
+                {items.map((tx, index) => {
+                  const status = extractStatus(tx.description)
+                  const isExpanded = expandedTx === tx.id
+                  const borderClass = getTxBorderClass(tx.type)
+
+                  return (
+                    <div
+                      key={tx.id}
+                      className={borderClass}
+                      style={{ animationDelay: `${index * 40}ms` }}
+                    >
+                      {/* Main Card */}
+                      <div
+                        className={`glass-card glass-card-hover tx-card-enhanced p-4 space-y-2 cursor-pointer tap-effect ${isExpanded ? 'rounded-b-none' : ''}`}
+                        title={formatFullDate(tx.createdAt)}
+                        onClick={() => toggleExpand(tx.id)}
+                      >
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-3">
+                            <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${getTypeIconBg(tx.type)}`}>
+                              {getTypeIcon(tx.type)}
+                            </div>
+                            <div>
+                              <div className="flex items-center gap-2">
+                                <p className="text-sm font-medium">{getTypeLabel(tx.type)}</p>
+                                {status && (
+                                  <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[9px] font-medium ${status.className}`}>
+                                    {getStatusIcon(status.label)}
+                                    {status.label}
+                                  </span>
+                                )}
+                              </div>
+                              <p className="text-xs text-muted-foreground">{formatTime(tx.createdAt)}</p>
+                            </div>
+                          </div>
+                          <div className="text-left flex items-center gap-1.5">
+                            <div>
+                              <span className={`text-sm font-bold ${tx.amount >= 0 ? 'tx-amount-positive' : 'tx-amount-negative'}`}>
+                                {tx.amount >= 0 ? '+' : ''}{Math.abs(tx.amount).toFixed(2)}
+                              </span>
+                              <div className="flex items-center gap-1">
+                                <p className="text-[10px] text-muted-foreground">USDT</p>
+                                {tx.balanceAfter != null && (
+                                  <p className="text-[9px] text-muted-foreground/60">(بعد: {tx.balanceAfter.toFixed(2)})</p>
+                                )}
+                              </div>
+                            </div>
+                            <ChevronDown className={`w-3.5 h-3.5 text-muted-foreground/40 transition-transform duration-200 ${isExpanded ? 'rotate-180' : ''}`} />
+                          </div>
                         </div>
-                        <div>
-                          <p className="text-sm font-medium">{getTypeLabel(tx.type)}</p>
-                          <p className="text-xs text-muted-foreground">{formatTime(tx.createdAt)}</p>
+                        {tx.description && (
+                          <p className="text-xs text-muted-foreground border-t border-white/5 pt-2 truncate">{tx.description}</p>
+                        )}
+                      </div>
+
+                      {/* Expanded Detail */}
+                      {isExpanded && (
+                        <div className="glass-card rounded-t-none p-4 animate-fade-in border-t-0 -mt-px">
+                          <div className="space-y-3">
+                            {/* Full Date/Time */}
+                            <div className="flex items-start gap-3">
+                              <Clock className="w-4 h-4 text-muted-foreground mt-0.5 shrink-0" />
+                              <div>
+                                <p className="text-[10px] text-muted-foreground mb-0.5">التاريخ والوقت</p>
+                                <p className="text-xs text-foreground/90">{formatFullDate(tx.createdAt)}</p>
+                              </div>
+                            </div>
+
+                            {/* Full Description */}
+                            {tx.description && (
+                              <div className="flex items-start gap-3">
+                                <FileText className="w-4 h-4 text-muted-foreground mt-0.5 shrink-0" />
+                                <div>
+                                  <p className="text-[10px] text-muted-foreground mb-0.5">الوصف</p>
+                                  <p className="text-xs text-foreground/90 leading-relaxed">{tx.description}</p>
+                                </div>
+                              </div>
+                            )}
+
+                            {/* Reference ID */}
+                            {tx.referenceId && (
+                              <div className="flex items-start gap-3">
+                                <Receipt className="w-4 h-4 text-muted-foreground mt-0.5 shrink-0" />
+                                <div>
+                                  <p className="text-[10px] text-muted-foreground mb-0.5">رقم المرجع</p>
+                                  <p className="text-xs text-foreground/90 font-mono">{tx.referenceId}</p>
+                                </div>
+                              </div>
+                            )}
+
+                            {/* Balance Before & After */}
+                            <div className="flex items-center gap-4 pt-2 border-t border-white/5">
+                              <div className="flex items-center gap-2">
+                                <div className="w-2 h-2 rounded-full bg-muted-foreground/30" />
+                                <div>
+                                  <p className="text-[9px] text-muted-foreground">قبل</p>
+                                  <p className="text-xs font-medium text-foreground/80">{tx.balanceBefore?.toFixed(2) ?? '—'} USDT</p>
+                                </div>
+                              </div>
+                              <div className="flex items-center gap-1 text-muted-foreground/30">
+                                <ChevronDown className="w-3 h-3" />
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <div className={`w-2 h-2 rounded-full ${tx.amount >= 0 ? 'bg-green-400/50' : 'bg-red-400/50'}`} />
+                                <div>
+                                  <p className="text-[9px] text-muted-foreground">بعد</p>
+                                  <p className="text-xs font-medium text-foreground/80">{tx.balanceAfter?.toFixed(2) ?? '—'} USDT</p>
+                                </div>
+                              </div>
+                            </div>
+                          </div>
                         </div>
-                      </div>
-                      <div className="text-left">
-                        <span className={`text-sm font-bold ${tx.amount >= 0 ? 'tx-amount-positive' : 'tx-amount-negative'}`}>
-                          {tx.amount >= 0 ? '+' : ''}{Math.abs(tx.amount).toFixed(2)}
-                        </span>
-                        <p className="text-[10px] text-muted-foreground">USDT</p>
-                      </div>
+                      )}
                     </div>
-                    {tx.description && (
-                      <p className="text-xs text-muted-foreground border-t border-white/5 pt-2 truncate">{tx.description}</p>
-                    )}
-                  </div>
-                ))}
+                  )
+                })}
               </div>
             </div>
           ))}

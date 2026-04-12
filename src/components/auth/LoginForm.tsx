@@ -2,11 +2,9 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
 import { useAuthStore } from '@/lib/store'
 import { toast } from 'sonner'
-import { Loader2, Eye, EyeOff, Wallet, Smartphone, ShieldAlert, Lock, X, TriangleAlert } from 'lucide-react'
+import { Loader2, Eye, EyeOff, Wallet, Smartphone, ShieldAlert, Lock, X, TriangleAlert, Mail } from 'lucide-react'
 import { generateDeviceFingerprint, getDeviceName } from '@/lib/device-fingerprint'
 import { playSuccessSound, playAlertSound, vibrate } from '@/lib/notification-sound'
 import TwoFactorVerify from '@/components/auth/TwoFactorVerify'
@@ -120,6 +118,16 @@ export default function LoginForm() {
   const isCritical = loginError && loginError.remaining !== null && loginError.remaining <= 1
   const isWarning = loginError && loginError.remaining !== null && loginError.remaining <= 3
 
+  // Password strength indicator
+  const getPasswordStrength = () => {
+    const len = password.length
+    if (len === 0) return { width: '0%', color: 'transparent', visible: false }
+    if (len <= 3) return { width: '20%', color: '#ef4444', visible: true }
+    if (len <= 7) return { width: '60%', color: '#f59e0b', visible: true }
+    return { width: '100%', color: '#10b981', visible: true }
+  }
+  const pwdStrength = getPasswordStrength()
+
   return (
     <>
       {/* ===== CENTERED LOGIN ERROR MODAL ===== */}
@@ -174,7 +182,7 @@ export default function LoginForm() {
                     ? 'bg-orange-500/15 shadow-lg shadow-orange-500/10'
                     : 'bg-amber-500/15 shadow-lg shadow-amber-500/10'
                 }`}
-                style={{ animation: 'shake 0.5s ease-in-out 0.3s' }}
+                style={{ animation: 'shakeError 0.5s ease-in-out 0.3s' }}
               >
                 {isLocked ? (
                   <Lock className="w-9 h-9 text-red-400" />
@@ -189,7 +197,7 @@ export default function LoginForm() {
                 className={`absolute inset-0 rounded-3xl ${
                   isLocked ? 'bg-red-500/10' : isWarning ? 'bg-orange-500/10' : 'bg-amber-500/10'
                 }`}
-                style={{ animation: 'ping 1.5s cubic-bezier(0, 0, 0.2, 1) infinite' }}
+                style={{ animation: 'successRipple 1.5s cubic-bezier(0, 0, 0.2, 1) infinite' }}
               />
             </div>
 
@@ -227,7 +235,7 @@ export default function LoginForm() {
                             : 'bg-white/10'
                         }`}
                         style={{
-                          animation: n <= loginError.remaining ? 'dotPop 0.3s ease-out' : 'none',
+                          animation: n <= loginError.remaining ? 'successRipple 0.3s ease-out' : 'none',
                           animationDelay: `${n * 0.05}s`,
                         }}
                       />
@@ -257,7 +265,7 @@ export default function LoginForm() {
                     <div
                       key={n}
                       className="w-3.5 h-3.5 rounded-full bg-red-500/40"
-                      style={{ animation: 'dotPop 0.3s ease-out', animationDelay: `${n * 0.05}s` }}
+                      style={{ animation: 'successRipple 0.3s ease-out', animationDelay: `${n * 0.05}s` }}
                     />
                   ))}
                 </div>
@@ -288,10 +296,85 @@ export default function LoginForm() {
       )}
 
       {/* Login Form */}
-      <div className="animate-slide-up w-full max-w-sm mx-auto space-y-6 p-6">
-        <div className="text-center space-y-3">
-          <div className="w-20 h-20 mx-auto rounded-2xl gold-gradient flex items-center justify-center gold-glow">
-            <Wallet className="w-10 h-10 text-gray-900" />
+      <div className="animate-slide-up w-full max-w-sm mx-auto space-y-6 p-6 relative">
+        {/* Floating Particles Background */}
+        <div className="login-particles">
+          <div className="login-particle" style={{ width: 6, height: 6, top: '10%', left: '15%', '--duration': '5s', '--delay': '0s', '--drift': '15px' } as React.CSSProperties} />
+          <div className="login-particle" style={{ width: 4, height: 4, top: '25%', left: '70%', '--duration': '7s', '--delay': '1s', '--drift': '-20px' } as React.CSSProperties} />
+          <div className="login-particle" style={{ width: 5, height: 5, top: '55%', left: '30%', '--duration': '6s', '--delay': '2s', '--drift': '25px' } as React.CSSProperties} />
+          <div className="login-particle" style={{ width: 3, height: 3, top: '70%', left: '80%', '--duration': '8s', '--delay': '0.5s', '--drift': '-15px' } as React.CSSProperties} />
+          <div className="login-particle" style={{ width: 5, height: 5, top: '40%', left: '55%', '--duration': '6.5s', '--delay': '3s', '--drift': '20px' } as React.CSSProperties} />
+          <div className="login-particle" style={{ width: 4, height: 4, top: '85%', left: '20%', '--duration': '7.5s', '--delay': '1.5s', '--drift': '-10px' } as React.CSSProperties} />
+        </div>
+        {/* ===== Enhanced Header with Animated Background ===== */}
+        <div className="text-center space-y-4 animate-fade-in">
+          {/* Logo area with animated background glow */}
+          <div className="relative flex justify-center">
+            {/* Subtle animated background glow */}
+            <div
+              className="absolute w-32 h-32 rounded-full opacity-40 animate-pulse-gold"
+              style={{
+                background: 'radial-gradient(circle, rgba(240, 185, 11, 0.15) 0%, transparent 70%)',
+                top: '50%',
+                left: '50%',
+                transform: 'translate(-50%, -50%)',
+              }}
+            />
+            {/* Decorative gold dots */}
+            <div
+              className="absolute w-2 h-2 rounded-full"
+              style={{
+                background: 'rgba(240, 185, 11, 0.5)',
+                top: '0px',
+                right: '12px',
+                animation: 'pulse-gold 2.5s ease-in-out infinite',
+                animationDelay: '0s',
+              }}
+            />
+            <div
+              className="absolute w-1.5 h-1.5 rounded-full"
+              style={{
+                background: 'rgba(240, 185, 11, 0.4)',
+                top: '8px',
+                right: '56px',
+                animation: 'pulse-gold 3s ease-in-out infinite',
+                animationDelay: '0.5s',
+              }}
+            />
+            <div
+              className="absolute w-1.5 h-1.5 rounded-full"
+              style={{
+                background: 'rgba(240, 185, 11, 0.4)',
+                bottom: '8px',
+                left: '12px',
+                animation: 'pulse-gold 2.8s ease-in-out infinite',
+                animationDelay: '1s',
+              }}
+            />
+            <div
+              className="absolute w-1 h-1 rounded-full"
+              style={{
+                background: 'rgba(240, 185, 11, 0.3)',
+                top: '24px',
+                left: '4px',
+                animation: 'pulse-gold 3.2s ease-in-out infinite',
+                animationDelay: '1.5s',
+              }}
+            />
+            <div
+              className="absolute w-1 h-1 rounded-full"
+              style={{
+                background: 'rgba(240, 185, 11, 0.3)',
+                bottom: '0px',
+                right: '36px',
+                animation: 'pulse-gold 2.6s ease-in-out infinite',
+                animationDelay: '0.8s',
+              }}
+            />
+            {/* Main logo */}
+            <div className="relative w-20 h-20 rounded-2xl gold-gradient flex items-center justify-center gold-glow animate-pulse-gold">
+              <Wallet className="w-10 h-10 text-gray-900" />
+            </div>
           </div>
           <div>
             <h1 className="text-2xl font-bold gold-text">فوركس يمني</h1>
@@ -300,43 +383,73 @@ export default function LoginForm() {
         </div>
 
         <form onSubmit={handleLogin} className="space-y-4">
-          <div className="space-y-2">
-            <Label className="text-sm text-muted-foreground">البريد الإلكتروني</Label>
-            <Input
+          {/* ===== Email Field - Floating Label ===== */}
+          <div className="float-label-group">
+            <input
               type="email"
-              placeholder="example@email.com"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              className="glass-input h-12 text-base"
+              className="float-label-input pl-12"
               dir="ltr"
+              placeholder=" "
+              autoComplete="email"
             />
-          </div>
-
-          <div className="space-y-2">
-            <Label className="text-sm text-muted-foreground">كلمة المرور</Label>
-            <div className="relative">
-              <Input
-                type={showPassword ? 'text' : 'password'}
-                placeholder="••••••••"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                className="glass-input h-12 text-base pl-10"
-                dir="ltr"
-              />
-              <button
-                type="button"
-                onClick={() => setShowPassword(!showPassword)}
-                className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-gold transition-colors"
-              >
-                {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-              </button>
+            <label className={`float-label ${email ? 'active' : ''}`}>
+              البريد الإلكتروني
+            </label>
+            <div className="float-label-icon">
+              <Mail className="w-[18px] h-[18px]" />
             </div>
           </div>
+
+          {/* ===== Password Field - Floating Label ===== */}
+          <div className="float-label-group">
+            <input
+              type={showPassword ? 'text' : 'password'}
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              className="float-label-input pl-12"
+              dir="ltr"
+              placeholder=" "
+              autoComplete="current-password"
+            />
+            <label className={`float-label ${password ? 'active' : ''}`}>
+              كلمة المرور
+            </label>
+            <div className="float-label-icon">
+              <Lock className="w-[18px] h-[18px]" />
+            </div>
+            {/* Show/Hide password button */}
+            <button
+              type="button"
+              onClick={() => setShowPassword(!showPassword)}
+              className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-gold transition-colors z-10"
+              tabIndex={-1}
+            >
+              {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+            </button>
+          </div>
+
+          {/* ===== Password Strength Indicator (visual only) ===== */}
+          {pwdStrength.visible && (
+            <div className="animate-fade-in flex items-center gap-2 px-1" style={{ animationDuration: '0.15s' }}>
+              <div className="flex-1 h-1 rounded-full bg-white/5 overflow-hidden">
+                <div
+                  className="h-full rounded-full transition-all duration-500 ease-out"
+                  style={{
+                    width: pwdStrength.width,
+                    background: pwdStrength.color,
+                    boxShadow: `0 0 8px ${pwdStrength.color}40`,
+                  }}
+                />
+              </div>
+            </div>
+          )}
 
           <Button
             type="submit"
             disabled={loading}
-            className="w-full h-12 gold-gradient text-gray-900 font-bold text-base rounded-xl hover:opacity-90 transition-all gold-glow"
+            className="w-full h-12 gold-gradient text-gray-900 font-bold text-base rounded-xl hover:opacity-90 transition-all gold-glow tap-effect"
           >
             {loading ? (
               <Loader2 className="w-5 h-5 animate-spin" />
@@ -346,16 +459,44 @@ export default function LoginForm() {
           </Button>
         </form>
 
-        {/* Security Notice */}
-        <div className="flex items-center gap-2 p-3 rounded-xl bg-white/5 border border-white/10 text-xs text-muted-foreground">
-          <Smartphone className="w-4 h-4 text-gold flex-shrink-0" />
-          <span>يتم التحقق من جهازك تلقائياً لحماية حسابك</span>
+        {/* ===== Security Notice - Glass Card ===== */}
+        <div className="glass-card p-3.5 flex items-center gap-3 animate-fade-in">
+          <div className="w-8 h-8 rounded-lg bg-gold/10 flex items-center justify-center flex-shrink-0">
+            <Lock className="w-4 h-4 text-gold" />
+          </div>
+          <div className="flex items-center gap-2 flex-1">
+            <Smartphone className="w-3.5 h-3.5 text-muted-foreground flex-shrink-0" />
+            <span className="text-xs text-muted-foreground leading-relaxed">
+              يتم التحقق من جهازك تلقائياً لحماية حسابك
+            </span>
+          </div>
         </div>
 
-        <div className="space-y-3 text-center">
+        {/* Biometric hint */}
+        <div className="flex items-center justify-center gap-2 py-1 animate-fade-in">
+          <div className="w-8 h-8 rounded-lg bg-white/5 flex items-center justify-center">
+            <Smartphone className="w-4 h-4 text-gold" />
+          </div>
+          <span className="text-[11px] text-muted-foreground/60">دعم تسجيل الدخول بالبصمة</span>
+        </div>
+
+        {/* ===== Links Section ===== */}
+        <div className="space-y-3 text-center animate-fade-in">
+          {/* Divider */}
+          <div className="relative">
+            <div className="absolute inset-0 flex items-center">
+              <div className="w-full border-t border-white/5" />
+            </div>
+            <div className="relative flex justify-center">
+              <span className="bg-transparent px-3 text-[10px] text-muted-foreground/50 uppercase tracking-widest">
+                أو
+              </span>
+            </div>
+          </div>
+
           <button
             onClick={() => setScreen('forgot-password')}
-            className="text-sm text-muted-foreground hover:text-gold transition-colors"
+            className="text-sm text-muted-foreground hover:text-gold transition-all duration-300 hover:drop-shadow-[0_0_8px_rgba(240,185,11,0.3)]"
           >
             نسيت كلمة المرور؟
           </button>
@@ -363,41 +504,14 @@ export default function LoginForm() {
             ليس لديك حساب؟{' '}
             <button
               onClick={() => setScreen('register')}
-              className="text-gold font-medium hover:text-gold-light transition-colors"
+              className="text-gold font-medium hover:text-gold-light transition-all duration-300 hover:drop-shadow-[0_0_8px_rgba(240,185,11,0.3)]"
             >
               إنشاء حساب جديد
             </button>
           </p>
         </div>
+        <p className="text-center text-[10px] text-muted-foreground/40 pt-2 pb-4">الإصدار 3.7.0</p>
       </div>
-
-      {/* CSS Animations */}
-      <style jsx global>{`
-        @keyframes fadeIn {
-          from { opacity: 0; }
-          to { opacity: 1; }
-        }
-        @keyframes scaleIn {
-          from { opacity: 0; transform: scale(0.85) translateY(10px); }
-          to { opacity: 1; transform: scale(1) translateY(0); }
-        }
-        @keyframes shake {
-          0%, 100% { transform: translateX(0); }
-          15% { transform: translateX(-8px) rotate(-2deg); }
-          30% { transform: translateX(8px) rotate(2deg); }
-          45% { transform: translateX(-6px) rotate(-1deg); }
-          60% { transform: translateX(6px) rotate(1deg); }
-          75% { transform: translateX(-3px); }
-          90% { transform: translateX(3px); }
-        }
-        @keyframes dotPop {
-          from { transform: scale(0); }
-          to { transform: scale(1); }
-        }
-        @keyframes ping {
-          75%, 100% { transform: scale(1.3); opacity: 0; }
-        }
-      `}</style>
     </>
   )
 }

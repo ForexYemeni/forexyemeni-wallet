@@ -1,7 +1,8 @@
-import { apiFetch } from '@/lib/api-client'
 'use client'
 
-import { useState, useEffect } from 'react'
+import { apiFetch } from '@/lib/api-client'
+
+import { useState, useEffect, useRef } from 'react'
 import { useAuthStore } from '@/lib/store'
 import { toast } from 'sonner'
 import {
@@ -23,6 +24,8 @@ import {
   ChevronLeft,
 } from 'lucide-react'
 import { triggerConfetti } from '@/components/ui/ConfettiEffect'
+import PinDots from '@/components/ui/PinDots'
+import SuccessResult from '@/components/ui/SuccessResult'
 
 type Step = 'input' | 'confirm' | 'pin' | 'success' | 'error'
 
@@ -33,6 +36,42 @@ interface ReceiverInfo {
   phone: string | null
   accountNumber: number | null
 }
+
+interface QuickContact {
+  name: string
+  account: string
+}
+
+const QUICK_CONTACTS: QuickContact[] = []
+
+function AnimatedAmount({ value }: { value: number }) {
+  const [display, setDisplay] = useState('0.00')
+  const prevValue = useRef(0)
+
+  useEffect(() => {
+    const start = prevValue.current
+    const end = value
+    const duration = 600
+    const startTime = Date.now()
+
+    const animate = () => {
+      const elapsed = Date.now() - startTime
+      const progress = Math.min(elapsed / duration, 1)
+      const eased = 1 - Math.pow(1 - progress, 3)
+      const current = start + (end - start) * eased
+      setDisplay(current.toFixed(2))
+      if (progress < 1) requestAnimationFrame(animate)
+    }
+    requestAnimationFrame(animate)
+    prevValue.current = value
+  }, [value])
+
+  return (
+    <p className="amount-display-lg amount-display-gold number-glow">{display}</p>
+  )
+}
+
+const QUICK_AMOUNTS = [50, 100, 500]
 
 const STEPS = [
   { key: 'input', label: 'البيانات', icon: ArrowRightLeft },
@@ -45,7 +84,6 @@ export default function TransferScreen() {
   const [step, setStep] = useState<Step>('input')
   const [receiver, setReceiver] = useState('')
   const [amount, setAmount] = useState('')
-  const [pin, setPin] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [result, setResult] = useState<{ senderBalance: number; receiverBalance: number } | null>(null)
@@ -136,11 +174,10 @@ export default function TransferScreen() {
 
   const handleConfirm = () => {
     setStep('pin')
-    setPin('')
   }
 
-  const handleTransfer = async () => {
-    if (!pin) {
+  const handleTransfer = async (pinValue: string) => {
+    if (!pinValue) {
       toast.error('يرجى إدخال رمز PIN')
       return
     }
@@ -156,7 +193,7 @@ export default function TransferScreen() {
           receiver: receiver.trim(),
           amount: transferAmount,
           token: useAuthStore.getState().token,
-          pin,
+          pin: pinValue,
         }),
       })
       const data = await res.json()
@@ -188,7 +225,6 @@ export default function TransferScreen() {
     setStep('input')
     setReceiver('')
     setAmount('')
-    setPin('')
     setError('')
     setResult(null)
     setReceiverInfo(null)
@@ -203,6 +239,14 @@ export default function TransferScreen() {
     }
   }
 
+  const handleQuickContactClick = (contact: QuickContact) => {
+    setReceiver(contact.account)
+  }
+
+  const handleQuickAmountClick = (value: number) => {
+    setAmount(String(value))
+  }
+
   // Get step index for progress bar
   const getStepIndex = () => {
     switch (step) {
@@ -211,6 +255,16 @@ export default function TransferScreen() {
       case 'pin': return 2
       default: return 0
     }
+  }
+
+  // Success message
+  const getSuccessMessage = () => {
+    const receiverName = receiverInfo?.fullName || receiverInfo?.email || ''
+    const parts = [`تم تحويل ${transferAmount.toFixed(2)} USDT إلى ${receiverName}`]
+    if (result) {
+      parts.push(`رصيدك الجديد: ${result.senderBalance.toFixed(2)} USDT`)
+    }
+    return parts.join('\n')
   }
 
   return (
@@ -297,80 +351,132 @@ export default function TransferScreen() {
 
       {/* ===== STEP 1: INPUT ===== */}
       {step === 'input' && (
-        <div className="glass-card p-5 space-y-5 animate-fade-in">
-          {/* Receiver input */}
-          <div className="float-label-group">
-            <input
-              type="text"
-              placeholder=" "
-              value={receiver}
-              onChange={(e) => setReceiver(e.target.value)}
-              className="float-label-input pl-12"
-              dir="ltr"
-              autoComplete="off"
-            />
-            <label className="float-label active">{getInputLabel()}</label>
-            <div className="float-label-icon">
-              <InputIcon className="w-5 h-5" />
+        <>
+          {/* Quick Transfers Section */}
+          <div className="space-y-3 animate-fade-in">
+            <div className="flex items-center gap-2">
+              <Send className="w-4 h-4 text-gold" />
+              <h3 className="text-sm font-bold text-foreground">تحويلات سريعة</h3>
             </div>
-            {inputType && (
-              <div className="float-validation-msg text-green-400 flex items-center gap-1">
-                <div className="w-1.5 h-1.5 rounded-full bg-green-400" />
-                {inputType === 'email' ? 'بريد إلكتروني صالح' : inputType === 'phone' ? 'رقم هاتف' : 'رقم حساب'}
+            {QUICK_CONTACTS.length > 0 ? (
+              <div className="flex gap-3 overflow-x-auto pb-2" style={{ scrollbarWidth: 'none' }}>
+                {QUICK_CONTACTS.map((contact) => (
+                  <button
+                    key={contact.account}
+                    onClick={() => handleQuickContactClick(contact)}
+                    className="glass-card card-hover flex-shrink-0 p-3 flex flex-col items-center gap-2 min-w-[80px] tap-effect"
+                  >
+                    <div className="w-10 h-10 rounded-full gold-gradient flex items-center justify-center text-gray-900 font-bold text-sm">
+                      {contact.name.charAt(0)}
+                    </div>
+                    <span className="text-[11px] font-medium text-foreground whitespace-nowrap">
+                      {contact.name}
+                    </span>
+                  </button>
+                ))}
+              </div>
+            ) : (
+              <div className="glass-card p-4 text-center animate-fade-in">
+                <div className="w-10 h-10 mx-auto rounded-xl bg-white/5 flex items-center justify-center mb-2">
+                  <User className="w-5 h-5 text-muted-foreground" />
+                </div>
+                <p className="text-xs text-muted-foreground">سيظهر هنا المستلمون المرسل إليهم سابقاً</p>
               </div>
             )}
           </div>
 
-          {/* Amount input */}
-          <div className="float-label-group">
-            <input
-              type="number"
-              placeholder=" "
-              value={amount}
-              onChange={(e) => setAmount(e.target.value)}
-              className="float-label-input pl-12 text-lg font-bold"
-              dir="ltr"
-              min="0"
-              step="0.01"
-            />
-            <label className="float-label active">المبلغ (USDT)</label>
-            <div className="float-label-icon">
-              <DollarSign className="w-5 h-5" />
+          <div className="glass-card p-5 space-y-5 animate-fade-in">
+            {/* Receiver input */}
+            <div className="float-label-group">
+              <input
+                type="text"
+                placeholder=" "
+                value={receiver}
+                onChange={(e) => setReceiver(e.target.value)}
+                className="float-label-input pl-12"
+                dir="ltr"
+                autoComplete="off"
+              />
+              <label className="float-label active">{getInputLabel()}</label>
+              <div className="float-label-icon">
+                <InputIcon className="w-5 h-5" />
+              </div>
+              {inputType && (
+                <div className="float-validation-msg text-green-400 flex items-center gap-1">
+                  <div className="w-1.5 h-1.5 rounded-full bg-green-400" />
+                  {inputType === 'email' ? 'بريد إلكتروني صالح' : inputType === 'phone' ? 'رقم هاتف' : 'رقم حساب'}
+                </div>
+              )}
             </div>
-          </div>
 
-          {/* Error display */}
-          {error && (
-            <div className="flex items-center gap-2 p-3 rounded-xl bg-red-500/10 border border-red-500/20 error-anim-shake">
-              <XCircle className="w-4 h-4 text-red-400 flex-shrink-0" />
-              <p className="text-sm text-red-400">{error}</p>
+            {/* Amount input */}
+            <div className="float-label-group">
+              <input
+                type="number"
+                placeholder=" "
+                value={amount}
+                onChange={(e) => setAmount(e.target.value)}
+                className="float-label-input pl-12 text-lg font-bold"
+                dir="ltr"
+                min="0"
+                step="0.01"
+              />
+              <label className="float-label active">المبلغ (USDT)</label>
+              <div className="float-label-icon">
+                <DollarSign className="w-5 h-5" />
+              </div>
             </div>
-          )}
 
-          <button
-            onClick={handleNext}
-            disabled={lookupLoading}
-            className="w-full h-12 gold-gradient text-gray-900 font-bold rounded-xl hover:opacity-90 transition-all gold-glow flex items-center justify-center gap-2 disabled:opacity-50 haptic-btn"
-          >
-            {lookupLoading ? (
-              <>
-                <Loader2 className="w-5 h-5 animate-spin" />
-                جاري البحث...
-              </>
-            ) : (
-              <>
-                متابعة
-                <ChevronLeft className="w-4 h-4" />
-              </>
+            {/* Quick Select Amount Buttons */}
+            <div className="flex gap-2">
+              {QUICK_AMOUNTS.map((preset) => (
+                <button
+                  key={preset}
+                  onClick={() => handleQuickAmountClick(preset)}
+                  className={`glass-input tap-effect px-4 py-2 rounded-full text-sm font-medium transition-all ${
+                    amount === String(preset)
+                      ? 'gold-gradient text-gray-900'
+                      : 'text-muted-foreground hover:text-foreground'
+                  }`}
+                >
+                  {preset}
+                </button>
+              ))}
+            </div>
+
+            {/* Error display */}
+            {error && (
+              <div className="flex items-center gap-2 p-3 rounded-xl bg-red-500/10 border border-red-500/20 error-anim-shake">
+                <XCircle className="w-4 h-4 text-red-400 flex-shrink-0" />
+                <p className="text-sm text-red-400">{error}</p>
+              </div>
             )}
-          </button>
 
-          <div className="info-banner-gold p-3">
-            <p className="text-xs text-muted-foreground leading-relaxed">
-              يمكنك التحويل عبر: <span className="text-foreground font-medium">البريد الإلكتروني</span> أو <span className="text-foreground font-medium">رقم الهاتف</span> أو <span className="text-foreground font-medium">رقم الحساب</span>
-            </p>
+            <button
+              onClick={handleNext}
+              disabled={lookupLoading}
+              className="w-full h-12 gold-gradient text-gray-900 font-bold rounded-xl hover:opacity-90 transition-all gold-glow flex items-center justify-center gap-2 disabled:opacity-50 haptic-btn"
+            >
+              {lookupLoading ? (
+                <>
+                  <Loader2 className="w-5 h-5 animate-spin" />
+                  جاري البحث...
+                </>
+              ) : (
+                <>
+                  متابعة
+                  <ChevronLeft className="w-4 h-4" />
+                </>
+              )}
+            </button>
+
+            <div className="info-banner-gold p-3">
+              <p className="text-xs text-muted-foreground leading-relaxed">
+                يمكنك التحويل عبر: <span className="text-foreground font-medium">البريد الإلكتروني</span> أو <span className="text-foreground font-medium">رقم الهاتف</span> أو <span className="text-foreground font-medium">رقم الحساب</span>
+              </p>
+            </div>
           </div>
-        </div>
+        </>
       )}
 
       {/* ===== STEP 2: CONFIRM ===== */}
@@ -384,7 +490,7 @@ export default function TransferScreen() {
             <h2 className="text-base font-bold text-green-400">تم العثور على المستلم</h2>
           </div>
 
-          {/* Transfer visualization */}
+          {/* Transfer visualization with enhanced arrow */}
           <div className="flex items-center justify-center gap-4 py-3">
             {/* Sender */}
             <div className="flex flex-col items-center gap-2">
@@ -393,10 +499,13 @@ export default function TransferScreen() {
               </div>
               <span className="text-[10px] text-muted-foreground">أنت</span>
             </div>
-            {/* Arrow */}
-            <div className="relative flex items-center justify-center w-16">
-              <div className="absolute w-12 h-0.5 bg-gradient-to-l from-gold/50 to-gold/20" />
-              <ArrowRightLeft className="w-5 h-5 text-gold transfer-arrow-anim relative z-10" />
+            {/* Arrow with pulsing gold glow */}
+            <div className="relative flex items-center justify-center w-20">
+              <div className="absolute w-14 h-0.5 bg-gradient-to-l from-gold/50 to-gold/20" />
+              <div className="relative z-10 flex items-center justify-center">
+                <div className="absolute w-9 h-9 rounded-full bg-gold/20 animate-pulse blur-sm" />
+                <ArrowRightLeft className="w-5 h-5 text-gold transfer-arrow-anim relative z-10" />
+              </div>
               <div className="transfer-dot-flow" />
             </div>
             {/* Receiver */}
@@ -439,7 +548,7 @@ export default function TransferScreen() {
           <div className="glass-card p-4 space-y-3">
             <div className="text-center py-2">
               <p className="text-[10px] text-muted-foreground uppercase tracking-wider mb-1">مبلغ التحويل</p>
-              <p className="amount-display-lg amount-display-gold">{transferAmount.toFixed(2)}</p>
+              <AnimatedAmount value={transferAmount} />
               <p className="text-xs text-muted-foreground mt-1">USDT</p>
             </div>
             <div className="space-y-2 pt-2 border-t border-white/5">
@@ -491,112 +600,56 @@ export default function TransferScreen() {
             </div>
           )}
 
-          {/* PIN Dots */}
-          <div className="flex justify-center gap-3">
-            {[0, 1, 2, 3, 4, 5].map((i) => (
-              <div key={i} className={`pin-dot ${pin.length > i ? 'filled' : ''}`} />
-            ))}
-          </div>
-
-          <input
-            type="password"
-            maxLength={6}
-            value={pin}
-            onChange={(e) => setPin(e.target.value.replace(/\D/g, '').slice(0, 6))}
-            className="w-full h-12 rounded-xl glass-input px-4 text-center text-lg tracking-[1em] opacity-0 absolute -z-10"
-            autoFocus
-            dir="ltr"
+          {/* PIN Dots — using PinDots component with auto-submit */}
+          <PinDots
+            length={6}
+            onComplete={handleTransfer}
+            disabled={loading}
           />
 
-          <div className="flex gap-3">
-            <button
-              onClick={handleBack}
-              disabled={loading}
-              className="flex-1 h-12 bg-white/5 border border-white/10 text-foreground font-medium rounded-xl hover:bg-white/10 transition-all haptic-btn"
-            >
-              رجوع
-            </button>
-            <button
-              onClick={handleTransfer}
-              disabled={loading || pin.length < 4}
-              className="flex-1 h-12 gold-gradient text-gray-900 font-bold rounded-xl hover:opacity-90 transition-all gold-glow flex items-center justify-center gap-2 disabled:opacity-50 haptic-btn"
-            >
-              {loading ? (
-                <Loader2 className="w-5 h-5 animate-spin" />
-              ) : (
-                <>
-                  <Send className="w-5 h-5" />
-                  إرسال
-                </>
-              )}
-            </button>
-          </div>
+          {/* Loading indicator */}
+          {loading && (
+            <div className="flex items-center justify-center gap-2">
+              <Loader2 className="w-4 h-4 animate-spin text-gold" />
+              <span className="text-sm text-muted-foreground">جاري التحويل...</span>
+            </div>
+          )}
+
+          <button
+            onClick={handleBack}
+            disabled={loading}
+            className="w-full h-12 bg-white/5 border border-white/10 text-foreground font-medium rounded-xl hover:bg-white/10 transition-all disabled:opacity-50 haptic-btn"
+          >
+            رجوع
+          </button>
         </div>
       )}
 
       {/* ===== SUCCESS ===== */}
       {step === 'success' && (
-        <div className="glass-card p-6 space-y-5 animate-fade-in">
-          {/* Success animation */}
-          <div className="relative flex items-center justify-center">
-            <div className="absolute w-20 h-20 rounded-full bg-green-500/10 success-anim-ring" />
-            <div className="w-20 h-20 rounded-full bg-green-500/10 flex items-center justify-center success-anim-bounce relative z-10">
-              <CheckCircle className="w-10 h-10 text-green-400" />
-            </div>
-          </div>
-
-          <div className="text-center space-y-2">
-            <h2 className="text-xl font-bold text-green-400">تم التحويل بنجاح!</h2>
-            <div>
-              <p className="amount-display-lg amount-display-gold">{transferAmount.toFixed(2)}</p>
-              <p className="text-sm text-muted-foreground">USDT</p>
-            </div>
-            {receiverInfo && (
-              <p className="text-sm text-muted-foreground">
-                إلى {receiverInfo.fullName || receiverInfo.email}
-                {receiverInfo.accountNumber && (
-                  <span className="text-gold font-mono mr-1">({receiverInfo.accountNumber})</span>
-                )}
-              </p>
-            )}
-          </div>
-
-          {result && (
-            <div className="p-4 rounded-xl bg-white/5 border border-white/10 space-y-2">
-              <div className="flex items-center justify-between">
-                <span className="text-sm text-muted-foreground">رصيدك الجديد</span>
-                <span className="text-sm font-bold gold-text">{result.senderBalance.toFixed(2)} USDT</span>
-              </div>
-            </div>
-          )}
-
-          <button
-            onClick={handleReset}
-            className="w-full h-12 gold-gradient text-gray-900 font-bold rounded-xl hover:opacity-90 transition-all haptic-btn"
-          >
-            تحويل آخر
-          </button>
+        <div className="glass-card p-5 animate-fade-in">
+          <SuccessResult
+            type="success"
+            title="تم التحويل بنجاح!"
+            message={getSuccessMessage()}
+            actionLabel="تحويل آخر"
+            onAction={handleReset}
+            secondaryLabel="العودة للرئيسية"
+            onSecondary={() => setScreen('dashboard')}
+          />
         </div>
       )}
 
       {/* ===== ERROR ===== */}
       {step === 'error' && (
-        <div className="glass-card p-6 space-y-5 animate-fade-in">
-          <div className="flex items-center justify-center">
-            <div className="w-20 h-20 rounded-full bg-red-500/10 flex items-center justify-center error-anim-shake">
-              <XCircle className="w-10 h-10 text-red-400" />
-            </div>
-          </div>
-          <div className="text-center space-y-2">
-            <h2 className="text-xl font-bold text-red-400">فشل التحويل</h2>
-            <p className="text-sm text-muted-foreground max-w-xs mx-auto">{error}</p>
-          </div>
-          <button
-            onClick={handleReset}
-            className="w-full h-12 gold-gradient text-gray-900 font-bold rounded-xl hover:opacity-90 transition-all haptic-btn"
-          >
-            إعادة المحاولة
-          </button>
+        <div className="glass-card p-5 animate-fade-in">
+          <SuccessResult
+            type="error"
+            title="فشل التحويل"
+            message={error || 'حدث خطأ غير متوقع'}
+            actionLabel="إعادة المحاولة"
+            onAction={handleReset}
+          />
         </div>
       )}
     </div>

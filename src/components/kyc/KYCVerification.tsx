@@ -1,8 +1,8 @@
-import { apiFetch } from '@/lib/api-client'
 'use client'
 
 import { useState } from 'react'
 import { useAuthStore } from '@/lib/store'
+import { apiFetch } from '@/lib/api-client'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import {
@@ -13,13 +13,18 @@ import {
   Loader2,
   Check,
   X,
-  Upload,
   ChevronLeft,
   CheckCircle2,
   FileText,
   BadgeCheck,
+  CheckCircle,
+  Sun,
+  Clock,
+  ChevronDown,
 } from 'lucide-react'
 import { compressImage } from '@/lib/image-compress'
+import EnhancedUploadZone from '@/components/ui/EnhancedUploadZone'
+import SuccessResult from '@/components/ui/SuccessResult'
 
 type KycStep = 'phone' | 'verify' | 'upload' | 'done'
 
@@ -29,8 +34,72 @@ const KYC_STEPS = [
   { key: 'upload', label: 'المستندات', icon: Camera },
 ]
 
+const COUNTRIES = [
+  { code: 'YE', dial: '967', flag: '🇾🇪' },
+  { code: 'SA', dial: '966', flag: '🇸🇦' },
+  { code: 'AE', dial: '971', flag: '🇦🇪' },
+  { code: 'EG', dial: '20', flag: '🇪🇬' },
+]
+
+const DOCUMENT_TIPS = [
+  { icon: CheckCircle, text: 'تأكد من وضوح نص البطاقة' },
+  { icon: Camera, text: 'الصورة الشخصية يجب أن تظهر الوجه بوضوح' },
+  { icon: Sun, text: 'ارفع صوراً بإضاءة جيدة' },
+]
+
+function KYCProgressRing({ status }: { status: string }) {
+  const config: Record<string, { percent: number; color: string }> = {
+    none: { percent: 0, color: '#EF4444' },
+    pending: { percent: 50, color: '#F59E0B' },
+    rejected: { percent: 33, color: '#EF4444' },
+    approved: { percent: 100, color: '#22C55E' },
+  }
+  const { percent, color } = config[status] || config.none
+  const radius = 18
+  const circumference = 2 * Math.PI * radius
+  const offset = circumference - (percent / 100) * circumference
+
+  return (
+    <svg width="48" height="48" viewBox="0 0 48 48" className="flex-shrink-0">
+      <circle
+        cx="24"
+        cy="24"
+        r={radius}
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="3"
+        className="text-white/10"
+      />
+      <circle
+        cx="24"
+        cy="24"
+        r={radius}
+        fill="none"
+        stroke={color}
+        strokeWidth="3"
+        strokeLinecap="round"
+        strokeDasharray={circumference}
+        strokeDashoffset={offset}
+        transform="rotate(-90 24 24)"
+        className="transition-all duration-700"
+      />
+      <text
+        x="24"
+        y="24"
+        textAnchor="middle"
+        dominantBaseline="central"
+        fill={color}
+        fontSize="11"
+        fontWeight="bold"
+      >
+        {percent}%
+      </text>
+    </svg>
+  )
+}
+
 export default function KYCVerification() {
-  const { user, updateUser } = useAuthStore()
+  const { user, updateUser, setScreen } = useAuthStore()
   const [step, setStep] = useState<KycStep>(
     user?.phoneVerified ? 'upload' : 'phone'
   )
@@ -42,8 +111,11 @@ export default function KYCVerification() {
   const [selfie, setSelfie] = useState<File | null>(null)
   const [idPreview, setIdPreview] = useState<string | null>(null)
   const [selfiePreview, setSelfiePreview] = useState<string | null>(null)
-  const [idDragOver, setIdDragOver] = useState(false)
-  const [selfieDragOver, setSelfieDragOver] = useState(false)
+  const [showCountryDropdown, setShowCountryDropdown] = useState(false)
+  const [uploadProgress, setUploadProgress] = useState<{[key: string]: number}>({})
+  const [uploadingFile, setUploadingFile] = useState<string | null>(null)
+
+  const selectedCountry = COUNTRIES.find(c => c.code === country) || COUNTRIES[0]
 
   const handleSubmitPhone = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -123,27 +195,51 @@ export default function KYCVerification() {
     const file = type === 'id_photo' ? idPhoto : selfie
     if (!file) return
 
+    setUploadingFile(type)
+    setUploadProgress(prev => ({ ...prev, [type]: 0 }))
     setLoading(true)
+
     try {
       const formData = new FormData()
       formData.append('userId', user?.id || '')
       formData.append('type', type)
       formData.append('file', file)
 
+      // Simulate progress for UX
+      const progressInterval = setInterval(() => {
+        setUploadProgress(prev => {
+          const current = prev[type] || 0
+          if (current >= 90) {
+            clearInterval(progressInterval)
+            return prev
+          }
+          return { ...prev, [type]: current + Math.random() * 15 }
+        })
+      }, 200)
+
       const res = await apiFetch('/api/kyc/upload', {
         method: 'POST',
         body: formData,
       })
+      clearInterval(progressInterval)
+
       const data = await res.json()
       if (data.success) {
+        setUploadProgress(prev => ({ ...prev, [type]: 100 }))
         toast.success('تم رفع الملف بنجاح')
+        setTimeout(() => {
+          setUploadProgress(prev => ({ ...prev, [type]: -1 }))
+        }, 500)
       } else {
         toast.error(data.message)
+        setUploadProgress(prev => ({ ...prev, [type]: -1 }))
       }
     } catch {
       toast.error('حدث خطأ في رفع الملف')
+      setUploadProgress(prev => ({ ...prev, [type]: -1 }))
     } finally {
       setLoading(false)
+      setUploadingFile(null)
     }
   }
 
@@ -177,23 +273,15 @@ export default function KYCVerification() {
     }
   }
 
-  // Handle drag events
-  const handleDragOver = (e: React.DragEvent, setDragOver: (v: boolean) => void) => {
-    e.preventDefault()
-    setDragOver(true)
+  const resetUploadState = () => {
+    setIdPhoto(null)
+    setSelfie(null)
+    setIdPreview(null)
+    setSelfiePreview(null)
   }
-  const handleDragLeave = (e: React.DragEvent, setDragOver: (v: boolean) => void) => {
-    e.preventDefault()
-    setDragOver(false)
-  }
-  const handleDrop = (e: React.DragEvent, type: 'id_photo' | 'selfie', setDragOver: (v: boolean) => void) => {
-    e.preventDefault()
-    setDragOver(false)
-    const file = e.dataTransfer.files?.[0]
-    if (file && file.type.startsWith('image/')) {
-      handleFileChange(type, file)
-    }
-  }
+
+  const kycStatus = user?.kycStatus || 'none'
+  const documentsCompleted = !!(user?.kycIdPhoto && user?.kycSelfie)
 
   return (
     <div className="space-y-5 animate-fade-in">
@@ -216,29 +304,32 @@ export default function KYCVerification() {
         </div>
       </div>
 
-      {/* Status Badge */}
-      <div className="flex items-center gap-2">
-        {user?.kycStatus === 'approved' ? (
-          <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-green-500/10 border border-green-500/20">
-            <BadgeCheck className="w-4 h-4 text-green-400" />
-            <span className="text-xs font-bold text-green-400">حساب موثق بالكامل</span>
-          </div>
-        ) : user?.kycStatus === 'pending' ? (
-          <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-yellow-500/10 border border-yellow-500/20">
-            <FileText className="w-4 h-4 text-yellow-400" />
-            <span className="text-xs font-bold text-yellow-400">قيد المراجعة</span>
-          </div>
-        ) : user?.kycStatus === 'rejected' ? (
-          <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-red-500/10 border border-red-500/20">
-            <X className="w-4 h-4 text-red-400" />
-            <span className="text-xs font-bold text-red-400">مرفوض — إعادة المحاولة</span>
-          </div>
-        ) : (
-          <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/5 border border-white/10">
-            <Shield className="w-4 h-4 text-muted-foreground" />
-            <span className="text-xs font-medium text-muted-foreground">غير مفعّل</span>
-          </div>
-        )}
+      {/* Status Badge with Progress Ring */}
+      <div className="flex items-center gap-3">
+        <KYCProgressRing status={kycStatus} />
+        <div>
+          {user?.kycStatus === 'approved' ? (
+            <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-green-500/10 border border-green-500/20">
+              <BadgeCheck className="w-4 h-4 text-green-400" />
+              <span className="text-xs font-bold text-green-400">حساب موثق بالكامل</span>
+            </div>
+          ) : user?.kycStatus === 'pending' ? (
+            <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-yellow-500/10 border border-yellow-500/20">
+              <FileText className="w-4 h-4 text-yellow-400" />
+              <span className="text-xs font-bold text-yellow-400">قيد المراجعة</span>
+            </div>
+          ) : user?.kycStatus === 'rejected' ? (
+            <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-red-500/10 border border-red-500/20">
+              <X className="w-4 h-4 text-red-400" />
+              <span className="text-xs font-bold text-red-400">مرفوض — إعادة المحاولة</span>
+            </div>
+          ) : (
+            <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/5 border border-white/10">
+              <Shield className="w-4 h-4 text-muted-foreground" />
+              <span className="text-xs font-medium text-muted-foreground">غير مفعّل</span>
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Step Progress Bar */}
@@ -284,14 +375,41 @@ export default function KYCVerification() {
               autoComplete="tel"
             />
             <label className="float-label active">رقم الهاتف</label>
-            <div className="absolute left-3 top-1/2 -translate-y-1/2 flex items-center gap-1 pointer-events-none">
-              <select
-                value={country}
-                onChange={(e) => setCountry(e.target.value)}
-                className="bg-transparent text-xs text-muted-foreground outline-none cursor-pointer"
-              >
-                <option value="YE">967+</option>
-              </select>
+            <div className="absolute left-3 top-1/2 -translate-y-1/2 z-20">
+              <div className="relative">
+                <button
+                  type="button"
+                  onClick={() => setShowCountryDropdown(!showCountryDropdown)}
+                  className="flex items-center gap-1.5 bg-white/5 border border-white/10 rounded-lg px-2.5 py-2 text-xs cursor-pointer hover:bg-white/10 transition-colors"
+                >
+                  <span className="text-sm">{selectedCountry.flag}</span>
+                  <span className="text-muted-foreground">{selectedCountry.dial}+</span>
+                  <ChevronDown className={`w-3 h-3 text-muted-foreground transition-transform ${showCountryDropdown ? 'rotate-180' : ''}`} />
+                </button>
+                {showCountryDropdown && (
+                  <>
+                    <div
+                      className="fixed inset-0 z-10"
+                      onClick={() => setShowCountryDropdown(false)}
+                    />
+                    <div className="absolute left-0 top-full mt-1 bg-[#1a1a2e] border border-white/10 rounded-xl shadow-xl z-20 overflow-hidden min-w-[140px] animate-fade-in">
+                      {COUNTRIES.map(c => (
+                        <button
+                          key={c.code}
+                          type="button"
+                          onClick={() => { setCountry(c.code); setShowCountryDropdown(false) }}
+                          className={`w-full flex items-center gap-2 px-3 py-2.5 text-xs hover:bg-white/10 transition-colors ${
+                            country === c.code ? 'bg-white/5 text-gold' : 'text-foreground'
+                          }`}
+                        >
+                          <span className="text-sm">{c.flag}</span>
+                          <span>{c.dial}+</span>
+                        </button>
+                      ))}
+                    </div>
+                  </>
+                )}
+              </div>
             </div>
           </div>
 
@@ -318,7 +436,13 @@ export default function KYCVerification() {
             </div>
           </div>
 
-          <div className="flex justify-center gap-2.5" dir="ltr">
+          {/* OTP Expiration Info Banner */}
+          <div className="info-banner-blue p-3 flex items-center gap-2">
+            <Clock className="w-4 h-4 text-blue-400 flex-shrink-0" />
+            <p className="text-xs text-muted-foreground">الرمز صالح لمدة 5 دقائق</p>
+          </div>
+
+          <div className="flex justify-center gap-3 py-2" dir="ltr">
             {otp.map((digit, index) => (
               <input
                 key={index}
@@ -347,9 +471,28 @@ export default function KYCVerification() {
       {/* ===== STEP 3: Upload Documents ===== */}
       {step === 'upload' && (
         <div className="space-y-4 animate-fade-in">
+          {/* Upload Info Banner */}
           <div className="info-banner-blue p-3 flex items-center gap-2">
             <FileText className="w-4 h-4 text-blue-400 flex-shrink-0" />
             <p className="text-xs text-muted-foreground">ارفع صورتين واضحتين لاستكمال عملية التحقق من الهوية</p>
+          </div>
+
+          {/* Document Tips Section */}
+          <div className="glass-card p-4 space-y-3">
+            <h3 className="text-sm font-bold flex items-center gap-2">
+              <Shield className="w-4 h-4 text-gold" />
+              نصائح لرفع المستندات
+            </h3>
+            <div className="space-y-2.5">
+              {DOCUMENT_TIPS.map((tip, i) => (
+                <div key={i} className="flex items-center gap-2.5">
+                  <div className="w-7 h-7 rounded-lg bg-gold/10 flex items-center justify-center flex-shrink-0">
+                    <tip.icon className="w-3.5 h-3.5 text-gold" />
+                  </div>
+                  <span className="text-xs text-muted-foreground leading-relaxed">{tip.text}</span>
+                </div>
+              ))}
+            </div>
           </div>
 
           {/* ID Photo */}
@@ -371,37 +514,31 @@ export default function KYCVerification() {
               )}
             </div>
 
-            {idPreview ? (
-              <div className="relative rounded-xl overflow-hidden border border-gold/20 animate-fade-in">
-                <img src={idPreview} alt="ID" className="w-full h-48 object-cover" />
-                <button
-                  onClick={() => { setIdPhoto(null); setIdPreview(null) }}
-                  className="absolute top-2 left-2 w-8 h-8 bg-black/60 backdrop-blur-sm rounded-full flex items-center justify-center hover:bg-red-500/80 transition-colors"
-                >
-                  <X className="w-4 h-4" />
-                </button>
-                <div className="absolute bottom-2 right-2 bg-green-500/90 px-2 py-1 rounded-lg flex items-center gap-1 text-xs text-white font-medium">
-                  <CheckCircle2 className="w-3 h-3" />
-                  تم الرفع
+            {!user?.kycIdPhoto && (
+              <EnhancedUploadZone
+                onFile={(file) => handleFileChange('id_photo', file)}
+                preview={idPreview}
+                onClear={() => { setIdPhoto(null); setIdPreview(null) }}
+                maxSize={5 * 1024 * 1024}
+                accept="image/*"
+                compact={false}
+              />
+            )}
+
+            {uploadProgress['id_photo'] !== undefined && uploadProgress['id_photo'] >= 0 && (
+              <div className="mt-2">
+                <div className="flex items-center justify-between mb-1">
+                  <span className="text-[10px] text-muted-foreground">
+                    {uploadProgress['id_photo'] >= 100 ? 'تم الرفع بنجاح' : uploadProgress['id_photo'] > 0 ? 'جاري الرفع...' : ''}
+                  </span>
+                  {uploadProgress['id_photo'] > 0 && (
+                    <span className="text-[10px] text-gold font-medium">{Math.round(uploadProgress['id_photo'])}%</span>
+                  )}
+                </div>
+                <div className="upload-progress-bar">
+                  <div className="upload-progress-fill" style={{ width: `${Math.min(uploadProgress['id_photo'], 100)}%` }} />
                 </div>
               </div>
-            ) : (
-              <label
-                className={`upload-zone h-32 ${idDragOver ? 'dragover' : 'upload-zone-hint'}`}
-                onDragOver={(e) => handleDragOver(e, setIdDragOver)}
-                onDragLeave={(e) => handleDragLeave(e, setIdDragOver)}
-                onDrop={(e) => handleDrop(e, 'id_photo', setIdDragOver)}
-              >
-                <Upload className="w-8 h-8 text-gold/50 mb-2 relative z-10" />
-                <span className="text-xs text-muted-foreground relative z-10">اضغط أو اسحب الصورة هنا</span>
-                <span className="text-[10px] text-muted-foreground/50 mt-1 relative z-10">JPG, PNG حتى 5MB</span>
-                <input
-                  type="file"
-                  accept="image/*"
-                  className="hidden"
-                  onChange={(e) => e.target.files?.[0] && handleFileChange('id_photo', e.target.files[0])}
-                />
-              </label>
             )}
 
             {idPhoto && !user?.kycIdPhoto && (
@@ -440,37 +577,31 @@ export default function KYCVerification() {
               )}
             </div>
 
-            {selfiePreview ? (
-              <div className="relative rounded-xl overflow-hidden border border-green-500/20 animate-fade-in">
-                <img src={selfiePreview} alt="Selfie" className="w-full h-48 object-cover" />
-                <button
-                  onClick={() => { setSelfie(null); setSelfiePreview(null) }}
-                  className="absolute top-2 left-2 w-8 h-8 bg-black/60 backdrop-blur-sm rounded-full flex items-center justify-center hover:bg-red-500/80 transition-colors"
-                >
-                  <X className="w-4 h-4" />
-                </button>
-                <div className="absolute bottom-2 right-2 bg-green-500/90 px-2 py-1 rounded-lg flex items-center gap-1 text-xs text-white font-medium">
-                  <CheckCircle2 className="w-3 h-3" />
-                  تم الرفع
+            {!user?.kycSelfie && (
+              <EnhancedUploadZone
+                onFile={(file) => handleFileChange('selfie', file)}
+                preview={selfiePreview}
+                onClear={() => { setSelfie(null); setSelfiePreview(null) }}
+                maxSize={5 * 1024 * 1024}
+                accept="image/*"
+                compact={false}
+              />
+            )}
+
+            {uploadProgress['selfie'] !== undefined && uploadProgress['selfie'] >= 0 && (
+              <div className="mt-2">
+                <div className="flex items-center justify-between mb-1">
+                  <span className="text-[10px] text-muted-foreground">
+                    {uploadProgress['selfie'] >= 100 ? 'تم الرفع بنجاح' : uploadProgress['selfie'] > 0 ? 'جاري الرفع...' : ''}
+                  </span>
+                  {uploadProgress['selfie'] > 0 && (
+                    <span className="text-[10px] text-gold font-medium">{Math.round(uploadProgress['selfie'])}%</span>
+                  )}
+                </div>
+                <div className="upload-progress-bar">
+                  <div className="upload-progress-fill" style={{ width: `${Math.min(uploadProgress['selfie'], 100)}%` }} />
                 </div>
               </div>
-            ) : (
-              <label
-                className={`upload-zone h-32 ${selfieDragOver ? 'dragover' : 'upload-zone-hint'}`}
-                onDragOver={(e) => handleDragOver(e, setSelfieDragOver)}
-                onDragLeave={(e) => handleDragLeave(e, setSelfieDragOver)}
-                onDrop={(e) => handleDrop(e, 'selfie', setSelfieDragOver)}
-              >
-                <Upload className="w-8 h-8 text-green-400/50 mb-2 relative z-10" />
-                <span className="text-xs text-muted-foreground relative z-10">اضغط أو اسحب الصورة هنا</span>
-                <span className="text-[10px] text-muted-foreground/50 mt-1 relative z-10">JPG, PNG حتى 5MB</span>
-                <input
-                  type="file"
-                  accept="image/*"
-                  className="hidden"
-                  onChange={(e) => e.target.files?.[0] && handleFileChange('selfie', e.target.files[0])}
-                />
-              </label>
             )}
 
             {selfie && !user?.kycSelfie && (
@@ -490,8 +621,20 @@ export default function KYCVerification() {
             )}
           </div>
 
-          {/* Done message */}
-          {(user?.kycIdPhoto || idPhoto) && (user?.kycSelfie || selfie) && (
+          {/* Verification Complete — SuccessResult */}
+          {documentsCompleted ? (
+            <div className="glass-card p-4">
+              <SuccessResult
+                type="success"
+                title="تم إرسال المستندات بنجاح"
+                message="سيتم مراجعة مستنداتك وإشعارك بالنتيجة عبر الإشعارات"
+                actionLabel="العودة للرئيسية"
+                onAction={() => setScreen('dashboard')}
+                secondaryLabel="رفع مستندات أخرى"
+                onSecondary={resetUploadState}
+              />
+            </div>
+          ) : (idPhoto || user?.kycIdPhoto) && (selfie || user?.kycSelfie) ? (
             <div className="glass-card p-4 text-center">
               <div className="w-10 h-10 mx-auto rounded-xl bg-green-500/10 flex items-center justify-center mb-2">
                 <CheckCircle2 className="w-5 h-5 text-green-400" />
@@ -500,7 +643,7 @@ export default function KYCVerification() {
                 تم إرسال مستنداتك للمراجعة. سيتم إشعارك بالنتيجة عبر الإشعارات.
               </p>
             </div>
-          )}
+          ) : null}
         </div>
       )}
     </div>
