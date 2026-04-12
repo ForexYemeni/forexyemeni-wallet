@@ -2,13 +2,17 @@ import { NextRequest, NextResponse } from 'next/server'
 import { userOperations, merchantApplicationOperations, merchantOperations, notificationOperations } from '@/lib/db-firebase'
 import { sendPushNotification } from '@/lib/push-notification'
 import { getDb } from '@/lib/firebase'
+import { authenticateRequest, verifyUserId } from '@/lib/auth-server'
 
 // GET: get merchant application status for user
 export async function GET(req: NextRequest) {
+  const auth = await authenticateRequest(req)
+  if (!auth.success) return NextResponse.json({ success: false, message: auth.error }, { status: auth.status })
+
   try {
     const userId = req.nextUrl.searchParams.get('userId')
-    if (!userId) {
-      return NextResponse.json({ success: false, message: 'معرف المستخدم مطلوب' }, { status: 400 })
+    if (!userId || !verifyUserId(auth, userId)) {
+      return NextResponse.json({ success: false, message: 'غير مصرح' }, { status: 403 })
     }
 
     // Check new merchant application system
@@ -99,11 +103,14 @@ export async function GET(req: NextRequest) {
 
 // POST: submit merchant verification application
 export async function POST(req: NextRequest) {
+  const auth = await authenticateRequest(req)
+  if (!auth.success) return NextResponse.json({ success: false, message: auth.error }, { status: auth.status })
+
   try {
     const { action, userId, idPhoto, selfiePhoto, addressProof } = await req.json()
 
-    if (!action || !userId) {
-      return NextResponse.json({ success: false, message: 'الإجراء ومعرف المستخدم مطلوبان' }, { status: 400 })
+    if (!action || !userId || !verifyUserId(auth, userId)) {
+      return NextResponse.json({ success: false, message: 'غير مصرح' }, { status: 403 })
     }
 
     if (action === 'apply') {

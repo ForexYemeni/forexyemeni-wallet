@@ -1,8 +1,11 @@
-import { NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
 import { userOperations } from '@/lib/db-firebase'
+import { requireAdmin } from '@/lib/auth-server'
 
 // GET - List all non-admin users for admin to pick for chat
-export async function GET() {
+export async function GET(request: NextRequest) {
+  const auth = await requireAdmin(request)
+  if (!auth.success) return NextResponse.json({ success: false, message: auth.error }, { status: auth.status })
   try {
     const users = await userOperations.findMany({ take: 500 })
     // Filter to non-admin users only

@@ -1,20 +1,19 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getDb } from '@/lib/firebase'
 import { userOperations } from '@/lib/db-firebase'
+import { authenticateRequest, verifyUserId } from '@/lib/auth-server'
 
 // List and remove FCM tokens (devices) for the logged-in user
 export async function POST(request: NextRequest) {
+  const auth = await authenticateRequest(request)
+  if (!auth.success) return NextResponse.json({ success: false, message: auth.error }, { status: auth.status })
+
   try {
-    const { userId, action, tokenId } = await request.json()
+    const body = await request.json()
+    const { userId, action, tokenId } = body
 
-    if (!userId) {
-      return NextResponse.json({ success: false, message: 'معرف المستخدم مطلوب' }, { status: 400 })
-    }
-
-    // Verify user exists
-    const user = await userOperations.findUnique({ id: userId })
-    if (!user) {
-      return NextResponse.json({ success: false, message: 'المستخدم غير موجود' }, { status: 404 })
+    if (!userId || !verifyUserId(auth, userId)) {
+      return NextResponse.json({ success: false, message: 'غير مصرح' }, { status: 403 })
     }
 
     const db = getDb()

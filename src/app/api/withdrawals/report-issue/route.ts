@@ -2,12 +2,21 @@ import { NextRequest, NextResponse } from 'next/server'
 import { userOperations } from '@/lib/db-firebase'
 import { sendPushNotification } from '@/lib/push-notification'
 import { getDb } from '@/lib/firebase'
+import { authenticateRequest, verifyUserId } from '@/lib/auth-server'
 
 export async function POST(request: NextRequest) {
-  try {
-    const { userId, withdrawalId, message } = await request.json()
+  const auth = await authenticateRequest(request)
+  if (!auth.success) return NextResponse.json({ success: false, message: auth.error }, { status: auth.status })
 
-    if (!userId || !withdrawalId || !message) {
+  try {
+    const body = await request.json()
+    const { userId, withdrawalId, message } = body
+
+    if (!userId || !verifyUserId(auth, userId)) {
+      return NextResponse.json({ success: false, message: 'غير مصرح' }, { status: 403 })
+    }
+
+    if (!withdrawalId || !message) {
       return NextResponse.json({ success: false, message: 'جميع الحقول مطلوبة' }, { status: 400 })
     }
 
@@ -15,7 +24,6 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ success: false, message: 'يرجى كتابة وصف مفصل للمشكلة (10 أحرف على الأقل)' }, { status: 400 })
     }
 
-    // Get user info
     const user = await userOperations.findUnique({ id: userId })
     if (!user) {
       return NextResponse.json({ success: false, message: 'المستخدم غير موجود' }, { status: 404 })
@@ -23,7 +31,6 @@ export async function POST(request: NextRequest) {
 
     const db = getDb()
 
-    // Save the report in Firestore
     const reportRef = db.collection('withdrawalReports').doc()
     await reportRef.set({
       userId,
@@ -35,7 +42,6 @@ export async function POST(request: NextRequest) {
       createdAt: new Date().toISOString(),
     })
 
-    // Send push notification to all admin users
     try {
       const adminDocs = await db.collection('users').where('role', '==', 'admin').limit(10).get()
       for (const adminDoc of adminDocs.docs) {

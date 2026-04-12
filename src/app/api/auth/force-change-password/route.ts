@@ -1,14 +1,26 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { userOperations } from '@/lib/db-firebase'
 import bcrypt from 'bcryptjs'
+import { authenticateRequest, verifyUserId } from '@/lib/auth-server'
 
 export async function POST(request: NextRequest) {
-  try {
-    const { userId, newPassword } = await request.json()
+  const auth = await authenticateRequest(request)
+  if (!auth.success) return NextResponse.json({ success: false, message: auth.error }, { status: auth.status })
 
-    if (!userId || !newPassword) {
+  try {
+    const body = await request.json()
+    const { userId, newPassword } = body
+
+    if (!userId || !verifyUserId(auth, userId)) {
       return NextResponse.json(
-        { success: false, message: 'معرف المستخدم وكلمة المرور الجديدة مطلوبان' },
+        { success: false, message: 'غير مصرح' },
+        { status: 403 }
+      )
+    }
+
+    if (!newPassword) {
+      return NextResponse.json(
+        { success: false, message: 'كلمة المرور الجديدة مطلوبة' },
         { status: 400 }
       )
     }

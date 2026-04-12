@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { userOperations, merchantOperations, merchantApplicationOperations, p2pListingOperations } from '@/lib/db-firebase'
+import { authenticateRequest } from '@/lib/auth-server'
 
-// GET: get active listings with filters
-// Supports ?merchantId=xxx to return ALL listings for a specific merchant (including paused)
+// GET: get active listings with filters (public - no auth needed)
 export async function GET(req: NextRequest) {
   try {
     const type = req.nextUrl.searchParams.get('type') || undefined
@@ -10,15 +10,13 @@ export async function GET(req: NextRequest) {
     const paymentMethod = req.nextUrl.searchParams.get('paymentMethod') || undefined
     const merchantId = req.nextUrl.searchParams.get('merchantId') || undefined
 
-    // If merchantId is provided, return ALL listings for that merchant (not just active)
+    // If merchantId is provided, return ALL listings for that merchant
     if (merchantId) {
       const listings = await p2pListingOperations.findByMerchant(merchantId)
-      // Apply optional filters in JS
       let filtered = listings
       if (type) filtered = filtered.filter(l => l.type === type)
       if (network) filtered = filtered.filter(l => l.network === network)
       if (paymentMethod) filtered = filtered.filter(l => l.paymentMethods.includes(paymentMethod))
-      // Enrich with merchant name
       const enriched = await Promise.all(filtered.map(async (l) => {
         let merchant: any = await merchantOperations.findUnique(l.merchantId)
         if (!merchant) {
@@ -38,12 +36,9 @@ export async function GET(req: NextRequest) {
 
     const listings = await p2pListingOperations.findActive({ type, network, paymentMethod })
 
-    // Attach merchant info (check both merchant systems)
     const enriched = await Promise.all(listings.map(async (l) => {
-      // Try old merchant system first
       let merchant: any = await merchantOperations.findUnique(l.merchantId)
       if (!merchant) {
-        // Try application system
         merchant = await merchantApplicationOperations.findById(l.merchantId)
       }
       const merchantUserId = merchant?.userId
@@ -64,9 +59,12 @@ export async function GET(req: NextRequest) {
 
 // POST: create new listing (merchant only)
 export async function POST(req: NextRequest) {
+  const auth = await authenticateRequest(req)
+  if (!auth.success) return NextResponse.json({ success: false, message: auth.error }, { status: auth.status })
+
   try {
-    const userId = req.headers.get('x-user-id')
-    if (!userId) return NextResponse.json({ success: false, message: 'غير مصرح' }, { status: 401 })
+    // Use authenticated user ID instead of client-provided header
+    const userId = auth.user.id
 
     const user = await userOperations.findUnique({ id: userId })
     if (!user) {
@@ -76,18 +74,15 @@ export async function POST(req: NextRequest) {
     // Check if user is an approved merchant (check multiple sources)
     let effectiveMerchantId = user.merchantId
 
-    // If no merchantId on user, check if there's an approved application
     if (!effectiveMerchantId) {
       const applications = await merchantApplicationOperations.findByUser(userId)
       const approvedApp = applications.find(a => a.status === 'approved')
       if (approvedApp) {
         effectiveMerchantId = approvedApp.id
-        // Also set it on the user document for future requests
         await userOperations.update({ id: userId }, { merchantId: approvedApp.id })
       }
     }
 
-    // Also check the old merchant system
     if (!effectiveMerchantId) {
       const oldMerchant = await merchantOperations.findApprovedByUser(userId)
       if (oldMerchant) {

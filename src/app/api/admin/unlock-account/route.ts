@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getDb } from '@/lib/firebase'
 import { userOperations } from '@/lib/db-firebase'
+import { requireAdmin } from '@/lib/auth-server'
 
 /**
  * Endpoint to unlock accounts locked by device fingerprint.
@@ -8,10 +9,14 @@ import { userOperations } from '@/lib/db-firebase'
  * If no email specified, unlocks ALL locked accounts.
  */
 export async function POST(req: NextRequest) {
+  const auth = await requireAdmin(req)
+  if (!auth.success) return NextResponse.json({ success: false, message: auth.error }, { status: auth.status })
   return handleUnlock(req)
 }
 
 export async function GET(req: NextRequest) {
+  const auth = await requireAdmin(req)
+  if (!auth.success) return NextResponse.json({ success: false, message: auth.error }, { status: auth.status })
   return handleUnlock(req)
 }
 

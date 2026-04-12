@@ -1,8 +1,11 @@
-import { NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
 import { getDb, nowTimestamp } from '@/lib/firebase'
+import { requireAdmin } from '@/lib/auth-server'
 
 // GET - Get current social links
-export async function GET() {
+export async function GET(request: NextRequest) {
+  const auth = await requireAdmin(request)
+  if (!auth.success) return NextResponse.json({ success: false, message: auth.error }, { status: auth.status })
   try {
     const db = getDb()
     const doc = await db.collection('systemSettings').doc('socialLinks').get()
@@ -31,7 +34,9 @@ export async function GET() {
 }
 
 // POST - Update social links (admin only)
-export async function POST(request: Request) {
+export async function POST(request: NextRequest) {
+  const auth = await requireAdmin(request)
+  if (!auth.success) return NextResponse.json({ success: false, message: auth.error }, { status: auth.status })
   try {
     const db = getDb()
     const body = await request.json()

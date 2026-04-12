@@ -1,14 +1,26 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { userOperations, otpCodeOperations } from '@/lib/db-firebase'
 import { sendPhoneVerificationEmail } from '@/lib/email'
+import { authenticateRequest, verifyUserId } from '@/lib/auth-server'
 
 export async function POST(request: NextRequest) {
-  try {
-    const { userId, phone, country } = await request.json()
+  const auth = await authenticateRequest(request)
+  if (!auth.success) return NextResponse.json({ success: false, message: auth.error }, { status: auth.status })
 
-    if (!userId || !phone) {
+  try {
+    const body = await request.json()
+    const { userId, phone, country } = body
+
+    if (!userId || !verifyUserId(auth, userId)) {
       return NextResponse.json(
-        { success: false, message: 'معرف المستخدم ورقم الهاتف مطلوبان' },
+        { success: false, message: 'غير مصرح' },
+        { status: 403 }
+      )
+    }
+
+    if (!phone) {
+      return NextResponse.json(
+        { success: false, message: 'رقم الهاتف مطلوب' },
         { status: 400 }
       )
     }
@@ -43,7 +55,6 @@ export async function POST(request: NextRequest) {
         ? `تم إرسال رمز التحقق إلى بريدك الإلكتروني ${user.email} للتحقق من رقم الهاتف` 
         : `تم إنشاء رمز التحقق - تحقق من بريدك ${user.email} (وضع التطوير)`,
       otpId: userId,
-      otp, // For testing only - remove in production
     })
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : 'حدث خطأ'

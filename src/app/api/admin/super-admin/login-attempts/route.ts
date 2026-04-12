@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { userOperations } from '@/lib/db-firebase'
 import { getDb, nowTimestamp } from '@/lib/firebase'
 import { logAudit } from '@/lib/audit-log'
+import { requireAdmin } from '@/lib/auth-server'
 
 // ===================== HELPER: Parse permissions =====================
 function parsePermissions(permissions: string | null | undefined): Record<string, boolean> | null {
@@ -33,6 +34,8 @@ async function verifySuperAdmin(adminId: string): Promise<{ authorized: boolean;
 
 // ===================== GET — Fetch login attempts with filters =====================
 export async function GET(request: NextRequest) {
+  const auth = await requireAdmin(request)
+  if (!auth.success) return NextResponse.json({ success: false, message: auth.error }, { status: auth.status })
   try {
     const { searchParams } = new URL(request.url)
     const adminId = searchParams.get('adminId')
@@ -135,6 +138,8 @@ export async function GET(request: NextRequest) {
 
 // ===================== POST — Clear old login attempts =====================
 export async function POST(request: NextRequest) {
+  const auth = await requireAdmin(request)
+  if (!auth.success) return NextResponse.json({ success: false, message: auth.error }, { status: auth.status })
   try {
     const body = await request.json()
     const { adminId, action, olderThanDays } = body

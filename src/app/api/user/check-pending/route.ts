@@ -1,14 +1,18 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { userOperations } from '@/lib/db-firebase'
+import { authenticateRequest, verifyUserId } from '@/lib/auth-server'
 
 // Lightweight endpoint: only returns pendingConfirmation field
-// Called every 20s by the client to detect new withdrawal confirmations
 export async function POST(request: NextRequest) {
-  try {
-    const { userId } = await request.json()
+  const auth = await authenticateRequest(request)
+  if (!auth.success) return NextResponse.json({ success: false, message: auth.error }, { status: auth.status })
 
-    if (!userId) {
-      return NextResponse.json({ success: false, message: 'معرف المستخدم مطلوب' }, { status: 400 })
+  try {
+    const body = await request.json()
+    const { userId } = body
+
+    if (!userId || !verifyUserId(auth, userId)) {
+      return NextResponse.json({ success: false, message: 'غير مصرح' }, { status: 403 })
     }
 
     const user = await userOperations.findUnique({ id: userId })

@@ -1,8 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { paymentMethodOperations } from '@/lib/db-firebase'
+import { requireAdmin } from '@/lib/auth-server'
 
 // GET all payment methods (admin)
-export async function GET() {
+export async function GET(request: NextRequest) {
+  const auth = await requireAdmin(request)
+  if (!auth.success) return NextResponse.json({ success: false, message: auth.error }, { status: auth.status })
   try {
     const methods = await paymentMethodOperations.findMany()
     return NextResponse.json({ success: true, methods })
@@ -14,6 +17,8 @@ export async function GET() {
 
 // POST create/update/delete payment method (admin)
 export async function POST(request: NextRequest) {
+  const auth = await requireAdmin(request)
+  if (!auth.success) return NextResponse.json({ success: false, message: auth.error }, { status: auth.status })
   try {
     const body = await request.json()
     const { action, id, ...data } = body

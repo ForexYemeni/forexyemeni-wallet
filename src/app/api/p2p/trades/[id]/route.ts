@@ -1,11 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { userOperations, p2pListingOperations, p2pTradeOperations, transactionOperations, notificationOperations } from '@/lib/db-firebase'
+import { authenticateRequest } from '@/lib/auth-server'
 
 // GET: get trade details
 export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const auth = await authenticateRequest(req)
+  if (!auth.success) return NextResponse.json({ success: false, message: auth.error }, { status: auth.status })
+
   try {
-    const userId = req.headers.get('x-user-id')
-    if (!userId) return NextResponse.json({ success: false, message: 'غير مصرح' }, { status: 401 })
+    const userId = auth.user.id // Use authenticated user ID
 
     const { id } = await params
     const trade = await p2pTradeOperations.findUnique(id)
@@ -37,9 +40,11 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
 
 // POST: trade actions
 export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const auth = await authenticateRequest(req)
+  if (!auth.success) return NextResponse.json({ success: false, message: auth.error }, { status: auth.status })
+
   try {
-    const userId = req.headers.get('x-user-id')
-    if (!userId) return NextResponse.json({ success: false, message: 'غير مصرح' }, { status: 401 })
+    const userId = auth.user.id // Use authenticated user ID
 
     const { id } = await params
     const { action, disputeReason, buyerPaymentRef } = await req.json()
@@ -60,11 +65,9 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
         return NextResponse.json({ success: false, message: 'رصيد غير كافي' }, { status: 400 })
       }
 
-      // Deduct from seller balance
       await userOperations.updateBalance(userId, seller.balance - trade.amount)
       await userOperations.updateFrozenBalance(userId, (seller.frozenBalance || 0) + trade.amount)
 
-      // Create transaction record
       await transactionOperations.create({
         userId,
         type: 'p2p_escrow',
@@ -114,7 +117,6 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       const seller = await userOperations.findUnique({ id: userId })
       if (!seller) return NextResponse.json({ success: false, message: 'البائع غير موجود' }, { status: 404 })
 
-      // Release escrow: deduct from seller frozen, add to buyer balance
       const newSellerFrozen = Math.max(0, (seller.frozenBalance || 0) - trade.amount)
       await userOperations.updateFrozenBalance(userId, newSellerFrozen)
 
@@ -122,7 +124,6 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       if (buyer) {
         await userOperations.incrementBalance(trade.buyerId, trade.amount)
 
-        // Create transaction for buyer
         await transactionOperations.create({
           userId: trade.buyerId,
           type: 'p2p_receive',
@@ -135,8 +136,6 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       }
 
       await p2pTradeOperations.updateStatus(id, 'released')
-
-      // Update listing stats
       await p2pListingOperations.incrementTrades(trade.listingId, true)
 
       await notificationOperations.create({
@@ -177,7 +176,6 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
         return NextResponse.json({ success: false, message: 'لا يمكن الإلغاء في هذه الحالة' }, { status: 400 })
       }
 
-      // If escrowed, return funds to seller
       if (trade.status === 'escrowed' && isSeller) {
         const seller = await userOperations.findUnique({ id: userId })
         if (seller) {

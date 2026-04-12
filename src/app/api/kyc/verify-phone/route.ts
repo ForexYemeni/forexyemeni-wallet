@@ -1,13 +1,22 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { userOperations, otpCodeOperations } from '@/lib/db-firebase'
+import { authenticateRequest, verifyUserId } from '@/lib/auth-server'
 
 export async function POST(request: NextRequest) {
-  try {
-    const { userId, code } = await request.json()
+  const auth = await authenticateRequest(request)
+  if (!auth.success) return NextResponse.json({ success: false, message: auth.error }, { status: auth.status })
 
-    if (!userId || !code) {
+  try {
+    const body = await request.json()
+    const { userId, code } = body
+
+    if (!userId || !verifyUserId(auth, userId)) {
+      return NextResponse.json({ success: false, message: 'غير مصرح' }, { status: 403 })
+    }
+
+    if (!code) {
       return NextResponse.json(
-        { success: false, message: 'معرف المستخدم ورمز التحقق مطلوبان' },
+        { success: false, message: 'رمز التحقق مطلوب' },
         { status: 400 }
       )
     }

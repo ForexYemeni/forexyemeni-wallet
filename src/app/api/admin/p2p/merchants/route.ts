@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { userOperations, merchantApplicationOperations, notificationOperations } from '@/lib/db-firebase'
 import { sendPushNotification } from '@/lib/push-notification'
+import { requireAdmin } from '@/lib/auth-server'
 
 // Helper: verify admin
 async function verifyAdmin(req: NextRequest) {
@@ -13,6 +14,8 @@ async function verifyAdmin(req: NextRequest) {
 
 // GET: list all merchant applications (pending first)
 export async function GET(req: NextRequest) {
+  const auth = await requireAdmin(req)
+  if (!auth.success) return NextResponse.json({ success: false, message: auth.error }, { status: auth.status })
   try {
     const admin = await verifyAdmin(req)
     if (!admin) {
@@ -61,6 +64,8 @@ export async function GET(req: NextRequest) {
 
 // POST: approve or reject merchant application
 export async function POST(req: NextRequest) {
+  const auth = await requireAdmin(req)
+  if (!auth.success) return NextResponse.json({ success: false, message: auth.error }, { status: auth.status })
   try {
     const admin = await verifyAdmin(req)
     if (!admin) {

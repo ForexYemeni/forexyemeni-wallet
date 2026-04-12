@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { userOperations, notificationOperations } from '@/lib/db-firebase'
 import { getDb, nowTimestamp, generateId } from '@/lib/firebase'
 import { logAudit } from '@/lib/audit-log'
+import { requireAdmin } from '@/lib/auth-server'
 
 // ===================== TYPES =====================
 interface AdminPermissions {
@@ -155,6 +156,8 @@ async function deleteOldDocuments(collection: string, dateField: string, olderTh
 
 // ===================== GET — Fetch all super admin settings + dashboard data =====================
 export async function GET(request: NextRequest) {
+  const auth = await requireAdmin(request)
+  if (!auth.success) return NextResponse.json({ success: false, message: auth.error }, { status: auth.status })
   try {
     const { searchParams } = new URL(request.url)
     const adminId = searchParams.get('adminId')
@@ -367,6 +370,8 @@ export async function GET(request: NextRequest) {
 
 // ===================== POST — Handle various super admin actions =====================
 export async function POST(request: NextRequest) {
+  const auth = await requireAdmin(request)
+  if (!auth.success) return NextResponse.json({ success: false, message: auth.error }, { status: auth.status })
   try {
     const body = await request.json()
     const { action, adminId } = body

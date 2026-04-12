@@ -1,11 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getDb } from '@/lib/firebase'
 import { userOperations } from '@/lib/db-firebase'
+import { requireAdmin } from '@/lib/auth-server'
 
 // POST /api/admin/devices - Manage user devices
 // Body: { adminId, targetUserId, action, fingerprint?, deviceName? }
 // actions: 'authorize' (add new device + remove old), 'remove_all', 'list'
 export async function POST(request: NextRequest) {
+  const auth = await requireAdmin(request)
+  if (!auth.success) return NextResponse.json({ success: false, message: auth.error }, { status: auth.status })
   try {
     const { adminId, targetUserId, action, fingerprint, deviceName } = await request.json()
 

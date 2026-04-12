@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getDb } from '@/lib/firebase'
+import { requireAdmin } from '@/lib/auth-server'
 
 // Helper to format a date as YYYY-MM-DD
 function formatDateKey(date: Date): string {
@@ -26,6 +27,8 @@ function getDateRange(from: Date, to: Date): string[] {
 
 // GET: Return financial report data
 export async function GET(request: NextRequest) {
+  const auth = await requireAdmin(request)
+  if (!auth.success) return NextResponse.json({ success: false, message: auth.error }, { status: auth.status })
   try {
     const { searchParams } = new URL(request.url)
     const adminId = searchParams.get('adminId')

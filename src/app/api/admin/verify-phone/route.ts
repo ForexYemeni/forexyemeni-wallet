@@ -1,8 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { userOperations } from '@/lib/db-firebase'
+import { requireAdmin } from '@/lib/auth-server'
 
 // POST - Verify admin phone number for account recovery
 export async function POST(request: NextRequest) {
+  const auth = await requireAdmin(request)
+  if (!auth.success) return NextResponse.json({ success: false, message: auth.error }, { status: auth.status })
   try {
     const body = await request.json()
     const { adminNumber } = body

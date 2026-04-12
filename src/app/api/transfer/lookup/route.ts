@@ -1,13 +1,21 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getDb } from '@/lib/firebase'
+import { authenticateRequest } from '@/lib/auth-server'
 
 export async function POST(request: NextRequest) {
-  try {
-    const { receiver, senderId } = await request.json()
+  const auth = await authenticateRequest(request)
+  if (!auth.success) return NextResponse.json({ success: false, message: auth.error }, { status: auth.status })
 
-    if (!receiver || !senderId) {
+  try {
+    const body = await request.json()
+    const { receiver, senderId } = body
+
+    if (!receiver) {
       return NextResponse.json({ success: false, message: 'البيانات مطلوبة' }, { status: 400 })
     }
+
+    // Use authenticated user ID, ignore client-provided senderId
+    const authenticatedUserId = auth.user.id
 
     const db = getDb()
     const receiverInput = receiver.trim()
@@ -68,7 +76,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Cannot transfer to yourself
-    if (found.id === senderId) {
+    if (found.id === authenticatedUserId) {
       return NextResponse.json({ success: false, message: 'لا يمكنك التحويل لنفسك' }, { status: 400 })
     }
 

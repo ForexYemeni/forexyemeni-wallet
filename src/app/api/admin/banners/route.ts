@@ -1,8 +1,11 @@
-import { NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
 import { getDb, generateId, nowTimestamp } from '@/lib/firebase'
+import { requireAdmin } from '@/lib/auth-server'
 
-// GET - List all banners (public endpoint - no auth needed)
-export async function GET() {
+// GET - List all banners
+export async function GET(request: NextRequest) {
+  const auth = await requireAdmin(request)
+  if (!auth.success) return NextResponse.json({ success: false, message: auth.error }, { status: auth.status })
   try {
     const db = getDb()
     const snapshot = await db
@@ -23,7 +26,9 @@ export async function GET() {
 }
 
 // POST - Create or update a banner (admin only)
-export async function POST(request: Request) {
+export async function POST(request: NextRequest) {
+  const auth = await requireAdmin(request)
+  if (!auth.success) return NextResponse.json({ success: false, message: auth.error }, { status: auth.status })
   try {
     const db = getDb()
     const body = await request.json()
@@ -109,7 +114,9 @@ export async function POST(request: Request) {
 }
 
 // DELETE - Delete a banner by ID (admin only)
-export async function DELETE(request: Request) {
+export async function DELETE(request: NextRequest) {
+  const auth = await requireAdmin(request)
+  if (!auth.success) return NextResponse.json({ success: false, message: auth.error }, { status: auth.status })
   try {
     const db = getDb()
     const { searchParams } = new URL(request.url)

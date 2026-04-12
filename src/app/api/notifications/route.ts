@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { notificationOperations } from '@/lib/db-firebase'
 import { sendPushNotification } from '@/lib/push-notification'
 import { getDb } from '@/lib/firebase'
+import { authenticateRequest, verifyUserId } from '@/lib/auth-server'
 
 // Simple in-memory cache for unread counts (TTL: 15s)
 // This prevents Firestore reads on every 30s poll
@@ -9,6 +10,9 @@ const unreadCountCache = new Map<string, { count: number; ts: number }>()
 const CACHE_TTL = 15000
 
 export async function GET(request: NextRequest) {
+  const auth = await authenticateRequest(request)
+  if (!auth.success) return NextResponse.json({ success: false, message: auth.error }, { status: auth.status })
+
   try {
     const { searchParams } = new URL(request.url)
     const userId = searchParams.get('userId')
@@ -16,11 +20,8 @@ export async function GET(request: NextRequest) {
     const countOnly = searchParams.get('countOnly')
     const includeUnread = searchParams.get('includeUnread')
 
-    if (!userId) {
-      return NextResponse.json(
-        { success: false, message: 'معرف المستخدم مطلوب' },
-        { status: 400 }
-      )
+    if (!userId || !verifyUserId(auth, userId)) {
+      return NextResponse.json({ success: false, message: 'غير مصرح' }, { status: 403 })
     }
 
     // Return unread count only (lightweight, for badge polling)
@@ -37,7 +38,6 @@ export async function GET(request: NextRequest) {
     }
 
     // Return notifications, optionally filtered by timestamp
-    // OPTIMIZED: Also includes unread count in same response (one API call instead of two)
     const notifications = await notificationOperations.findMany(userId, after || undefined)
 
     // Get unread count (from cache or fresh)
@@ -67,10 +67,18 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
-  try {
-    const { userId, title, message, type = 'info' } = await request.json()
+  const auth = await authenticateRequest(request)
+  if (!auth.success) return NextResponse.json({ success: false, message: auth.error }, { status: auth.status })
 
-    if (!userId || !title || !message) {
+  try {
+    const body = await request.json()
+    const { userId, title, message, type = 'info' } = body
+
+    if (!userId || !verifyUserId(auth, userId)) {
+      return NextResponse.json({ success: false, message: 'غير مصرح' }, { status: 403 })
+    }
+
+    if (!title || !message) {
       return NextResponse.json(
         { success: false, message: 'جميع الحقول مطلوب' },
         { status: 400 }
@@ -104,14 +112,15 @@ export async function POST(request: NextRequest) {
 }
 
 export async function PUT(request: NextRequest) {
-  try {
-    const { userId } = await request.json()
+  const auth = await authenticateRequest(request)
+  if (!auth.success) return NextResponse.json({ success: false, message: auth.error }, { status: auth.status })
 
-    if (!userId) {
-      return NextResponse.json(
-        { success: false, message: 'معرف المستخدم مطلوب' },
-        { status: 400 }
-      )
+  try {
+    const body = await request.json()
+    const { userId } = body
+
+    if (!userId || !verifyUserId(auth, userId)) {
+      return NextResponse.json({ success: false, message: 'غير مصرح' }, { status: 403 })
     }
 
     await notificationOperations.markAllRead(userId)

@@ -1,13 +1,21 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { withdrawalOperations } from '@/lib/db-firebase'
+import { authenticateRequest, verifyUserId } from '@/lib/auth-server'
 
 // User-facing endpoint: fetch withdrawal details by ID
-// Used by the confirmation dialog to display withdrawal info
 export async function POST(request: NextRequest) {
-  try {
-    const { userId, withdrawalId } = await request.json()
+  const auth = await authenticateRequest(request)
+  if (!auth.success) return NextResponse.json({ success: false, message: auth.error }, { status: auth.status })
 
-    if (!userId || !withdrawalId) {
+  try {
+    const body = await request.json()
+    const { userId, withdrawalId } = body
+
+    if (!userId || !verifyUserId(auth, userId)) {
+      return NextResponse.json({ success: false, message: 'غير مصرح' }, { status: 403 })
+    }
+
+    if (!withdrawalId) {
       return NextResponse.json({ success: false, message: 'جميع الحقول مطلوبة' }, { status: 400 })
     }
 
@@ -37,6 +45,7 @@ export async function POST(request: NextRequest) {
       },
     })
   } catch (error: unknown) {
-    return NextResponse.json({ success: false, message: 'حدث خطأ' }, { status: 500 })
+    const message = error instanceof Error ? error.message : 'حدث خطأ'
+    return NextResponse.json({ success: false, message }, { status: 500 })
   }
 }

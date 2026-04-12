@@ -2,9 +2,12 @@ import { NextRequest, NextResponse } from 'next/server'
 import { userOperations, otpCodeOperations } from '@/lib/db-firebase'
 import { getDb, nowTimestamp } from '@/lib/firebase'
 import bcrypt from 'bcryptjs'
+import { requireAdmin } from '@/lib/auth-server'
 
 // GET - admin settings (phone, email, hasPIN)
 export async function GET(request: NextRequest) {
+  const auth = await requireAdmin(request)
+  if (!auth.success) return NextResponse.json({ success: false, message: auth.error }, { status: auth.status })
   try {
     const { searchParams } = new URL(request.url)
     const userId = searchParams.get('userId')
@@ -39,6 +42,8 @@ export async function GET(request: NextRequest) {
 // POST - update admin settings
 // Actions: change_phone, change_email, change_password, set_pin, recover_with_email, recover_with_admin_number
 export async function POST(request: NextRequest) {
+  const auth = await requireAdmin(request)
+  if (!auth.success) return NextResponse.json({ success: false, message: auth.error }, { status: auth.status })
   try {
     const body = await request.json()
     const { action, userId } = body

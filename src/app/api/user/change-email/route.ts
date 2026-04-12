@@ -3,14 +3,22 @@ import { userOperations, otpCodeOperations } from '@/lib/db-firebase'
 import { sendChangeEmailCodeEmail } from '@/lib/email'
 import { getDb } from '@/lib/firebase'
 import bcrypt from 'bcryptjs'
+import { authenticateRequest, verifyUserId } from '@/lib/auth-server'
 
 // POST - change email (send code or verify code)
 export async function POST(request: NextRequest) {
+  const auth = await authenticateRequest(request)
+  if (!auth.success) return NextResponse.json({ success: false, message: auth.error }, { status: auth.status })
+
   try {
     const body = await request.json()
     const { action, userId, newEmail, code, token } = body
 
-    if (!userId || !action) {
+    if (!userId || !verifyUserId(auth, userId)) {
+      return NextResponse.json({ success: false, message: 'غير مصرح' }, { status: 403 })
+    }
+
+    if (!action) {
       return NextResponse.json({ success: false, message: 'بيانات غير مكتملة' }, { status: 400 })
     }
 

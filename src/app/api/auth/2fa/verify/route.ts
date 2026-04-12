@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { userOperations, otpCodeOperations } from '@/lib/db-firebase'
 import { send2FACodeEmail } from '@/lib/email'
 import bcrypt from 'bcryptjs'
+import { authenticateRequest } from '@/lib/auth-server'
 
 function generate6DigitCode(): string {
   return crypto.randomInt(100000, 1000000).toString()
@@ -41,12 +42,31 @@ function buildUserResponse(u: any) {
 }
 
 export async function POST(request: NextRequest) {
+  // NOTE: This endpoint is called DURING login (2FA step), so we need to
+  // verify the pending token instead of a full login token.
+  // The login flow creates a 'login_2fa_pending' OTP record with a token.
+  // We verify the user by matching the pending session token.
+
   try {
     const body = await request.json()
     const { userId, code, token, action } = body
 
     if (!userId || !token) {
       return NextResponse.json({ success: false, message: 'معرف المستخدم والرمز مطلوبان' }, { status: 400 })
+    }
+
+    // Verify the pending 2FA session belongs to this user
+    const pendingSession = await otpCodeOperations.findFirst({
+      where: { userId, type: 'login_2fa_pending', verified: false },
+    })
+
+    if (!pendingSession || pendingSession.code !== token) {
+      return NextResponse.json({ success: false, message: 'جلسة غير صالحة' }, { status: 401 })
+    }
+
+    // Check session expiry (5 minutes)
+    if (pendingSession.expiresAt && new Date(pendingSession.expiresAt) < new Date()) {
+      return NextResponse.json({ success: false, message: 'انتهت صلاحية الجلسة' }, { status: 401 })
     }
 
     const user = await userOperations.findUnique({ id: userId })
@@ -102,19 +122,10 @@ export async function POST(request: NextRequest) {
         backupCodes: updatedBackupCodes.length > 0 ? updatedBackupCodes : null,
       })
 
-      // Find the pending login session
-      const pendingSession = await otpCodeOperations.findFirst({
-        where: { userId: user.id, type: 'login_2fa_pending', verified: false },
-      })
-
-      if (!pendingSession) {
-        return NextResponse.json({ success: false, message: 'جلسة تسجيل الدخول منتهية الصلاحية' }, { status: 400 })
-      }
-
       // Mark pending session as verified
       await otpCodeOperations.update(pendingSession.id, { verified: true })
 
-      // Create the real login token
+      // Create the real login token (the pending session code becomes the login token)
       const loginToken = pendingSession.code
 
       return NextResponse.json({
@@ -135,15 +146,6 @@ export async function POST(request: NextRequest) {
 
     // Mark OTP as verified
     await otpCodeOperations.update(otp.id, { verified: true })
-
-    // Find the pending login session
-    const pendingSession = await otpCodeOperations.findFirst({
-      where: { userId: user.id, type: 'login_2fa_pending', verified: false },
-    })
-
-    if (!pendingSession) {
-      return NextResponse.json({ success: false, message: 'جلسة تسجيل الدخول منتهية الصلاحية' }, { status: 400 })
-    }
 
     // Mark pending session as verified
     await otpCodeOperations.update(pendingSession.id, { verified: true })

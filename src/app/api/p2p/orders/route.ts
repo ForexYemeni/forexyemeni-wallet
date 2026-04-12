@@ -5,8 +5,9 @@ import {
   p2pOrderOperations,
   notificationOperations,
 } from '@/lib/db-firebase'
+import { authenticateRequest, verifyUserId } from '@/lib/auth-server'
 
-// GET: list open (non-expired) P2P orders with optional filters
+// GET: list open (non-expired) P2P orders with optional filters (public)
 export async function GET(req: NextRequest) {
   try {
     const type = req.nextUrl.searchParams.get('type') || undefined
@@ -14,7 +15,6 @@ export async function GET(req: NextRequest) {
 
     const orders = await p2pOrderOperations.findOpen({ type, network })
 
-    // Attach merchant user info
     const enriched = await Promise.all(
       orders.map(async (order) => {
         const merchantUser = await userOperations.findUnique({ id: order.merchantId })
@@ -34,19 +34,28 @@ export async function GET(req: NextRequest) {
 
 // POST: create_order or my_orders
 export async function POST(req: NextRequest) {
+  const auth = await authenticateRequest(req)
+  if (!auth.success) return NextResponse.json({ success: false, message: auth.error }, { status: auth.status })
+
   try {
     const body = await req.json()
     const { action, userId } = body
 
-    if (!action || !userId) {
-      return NextResponse.json({ success: false, message: 'الإجراء ومعرف المستخدم مطلوبان' }, { status: 400 })
+    if (!action) {
+      return NextResponse.json({ success: false, message: 'الإجراء مطلوب' }, { status: 400 })
     }
+
+    // Use authenticated user ID for security
+    const authenticatedUserId = auth.user.id
 
     // ==================== CREATE ORDER ====================
     if (action === 'create_order') {
+      if (!userId || !verifyUserId(auth, userId)) {
+        return NextResponse.json({ success: false, message: 'غير مصرح' }, { status: 403 })
+      }
+
       const { type, network, amount, price, minAmount, maxAmount, paymentMethods, paymentDetails } = body
 
-      // Validate required fields
       if (!type || !network || !amount || !price || !minAmount || !maxAmount || !paymentMethods?.length || !paymentDetails) {
         return NextResponse.json(
           { success: false, message: 'جميع الحقول مطلوبة: نوع الطلب، الشبكة، الكمية، السعر، الحد الأدنى، الحد الأقصى، طرق الدفع، تفاصيل الدفع' },
@@ -62,13 +71,11 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ success: false, message: 'الشبكة يجب أن تكون TRC20 أو ERC20' }, { status: 400 })
       }
 
-      // Find user
       const user = await userOperations.findUnique({ id: userId })
       if (!user) {
         return NextResponse.json({ success: false, message: 'المستخدم غير موجود' }, { status: 404 })
       }
 
-      // Verify user is an approved merchant
       const approvedApp = (await merchantApplicationOperations.findByUser(userId)).find(
         (a) => a.status === 'approved'
       )
@@ -79,7 +86,6 @@ export async function POST(req: NextRequest) {
         )
       }
 
-      // Get commission settings from database
       const db = (await import('@/lib/firebase')).getDb()
       let commissionSettings: { p2pFeePercent?: number; adminCommissionPercent?: number } = {}
       try {
@@ -92,16 +98,13 @@ export async function POST(req: NextRequest) {
       const p2pFeePercent = commissionSettings.p2pFeePercent ?? 0.5
       const adminCommissionPercent = commissionSettings.adminCommissionPercent ?? 1
       
-      // Calculate fees
       const p2pFee = parseFloat((amount * (p2pFeePercent / 100)).toFixed(2))
       const adminCommission = parseFloat((amount * (adminCommissionPercent / 100)).toFixed(2))
       const escrowAmount = type === 'sell' ? amount : 0
       const totalAmount = amount - p2pFee
 
-      // Set expiration: 30 minutes from now
       const expiresAt = new Date(Date.now() + 30 * 60 * 1000).toISOString()
 
-      // Create order
       const order = await p2pOrderOperations.create({
         merchantId: userId,
         merchantName: user.fullName || user.email,
@@ -122,7 +125,7 @@ export async function POST(req: NextRequest) {
         expiresAt,
         p2pFeePercent,
         adminCommissionPercent,
-        adminCommission: 0, // Will be set when trade completes
+        adminCommission: 0,
       })
 
       await notificationOperations.create({
@@ -146,10 +149,9 @@ export async function POST(req: NextRequest) {
 
     // ==================== MY ORDERS ====================
     if (action === 'my_orders') {
-      const merchantOrders = await p2pOrderOperations.findMerchantOrders(userId)
-      const buyerOrders = await p2pOrderOperations.findBuyerOrders(userId)
+      const merchantOrders = await p2pOrderOperations.findMerchantOrders(authenticatedUserId)
+      const buyerOrders = await p2pOrderOperations.findBuyerOrders(authenticatedUserId)
 
-      // Merge and deduplicate
       const orderMap = new Map<string, any>()
       for (const o of [...merchantOrders, ...buyerOrders]) {
         if (!orderMap.has(o.id)) {

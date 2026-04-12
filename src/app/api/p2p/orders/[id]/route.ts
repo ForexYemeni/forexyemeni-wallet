@@ -6,6 +6,7 @@ import {
   transactionOperations,
   notificationOperations,
 } from '@/lib/db-firebase'
+import { authenticateRequest } from '@/lib/auth-server'
 
 // GET: get order details by ID
 export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -39,27 +40,32 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
 
 // POST: order actions (take_order, confirm_payment, release_funds, cancel_order, dispute)
 export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const auth = await authenticateRequest(req)
+  if (!auth.success) return NextResponse.json({ success: false, message: auth.error }, { status: auth.status })
+
   try {
     const { id } = await params
     const { action, userId, disputeReason } = await req.json()
 
-    if (!action || !userId) {
-      return NextResponse.json({ success: false, message: 'الإجراء ومعرف المستخدم مطلوبان' }, { status: 400 })
+    if (!action) {
+      return NextResponse.json({ success: false, message: 'الإجراء مطلوب' }, { status: 400 })
     }
+
+    // Use authenticated user ID for security
+    const authenticatedUserId = auth.user.id
 
     const order = await p2pOrderOperations.findById(id)
     if (!order) {
       return NextResponse.json({ success: false, message: 'الطلب غير موجود' }, { status: 404 })
     }
 
-    const user = await userOperations.findUnique({ id: userId })
+    const user = await userOperations.findUnique({ id: authenticatedUserId })
     if (!user) {
       return NextResponse.json({ success: false, message: 'المستخدم غير موجود' }, { status: 404 })
     }
 
     // ==================== TAKE ORDER ====================
     if (action === 'take_order') {
-      // Verify order is open and not expired
       if (order.status !== 'open') {
         return NextResponse.json({ success: false, message: 'هذا الطلب غير متاح حالياً' }, { status: 400 })
       }
@@ -70,14 +76,11 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
         return NextResponse.json({ success: false, message: 'انتهت صلاحية هذا الطلب' }, { status: 400 })
       }
 
-      // Verify user is not the merchant
-      if (order.merchantId === userId) {
+      if (order.merchantId === authenticatedUserId) {
         return NextResponse.json({ success: false, message: 'لا يمكنك أخذ طلبك الخاص' }, { status: 400 })
       }
 
-      // For 'sell' orders: buyer pays the merchant, so we need to escrow from buyer
       if (order.type === 'sell') {
-        // Buyer needs to have enough balance for escrow
         if (user.balance < order.escrowAmount) {
           return NextResponse.json(
             { success: false, message: `رصيد غير كافٍ. تحتاج ${order.escrowAmount} USDT في حسابك` },
@@ -85,15 +88,13 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
           )
         }
 
-        // Deduct from buyer balance and add to frozen balance
         const newBalance = user.balance - order.escrowAmount
         const newFrozen = (user.frozenBalance || 0) + order.escrowAmount
-        await userOperations.updateBalance(userId, newBalance)
-        await userOperations.updateFrozenBalance(userId, newFrozen)
+        await userOperations.updateBalance(authenticatedUserId, newBalance)
+        await userOperations.updateFrozenBalance(authenticatedUserId, newFrozen)
 
-        // Record transaction
         await transactionOperations.create({
-          userId,
+          userId: authenticatedUserId,
           type: 'p2p_escrow',
           amount: order.escrowAmount,
           balanceBefore: user.balance,
@@ -103,14 +104,12 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
         })
       }
 
-      // Update order status to in_progress
       const updatedOrder = await p2pOrderOperations.updateStatus(id, 'in_progress', {
-        buyerId: userId,
+        buyerId: authenticatedUserId,
         buyerName: user.fullName || user.email,
         buyerEmail: user.email,
       })
 
-      // Notify merchant
       await notificationOperations.create({
         userId: order.merchantId,
         title: 'تم أخذ طلبك',
@@ -119,9 +118,8 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
         read: false,
       })
 
-      // Notify buyer
       await notificationOperations.create({
-        userId,
+        userId: authenticatedUserId,
         title: 'تم أخذ الطلب بنجاح',
         message: `تم أخذ طلب ${order.type === 'sell' ? 'البيع' : 'الشراء'} بمبلغ ${order.amount} USDT. ${
           order.type === 'sell'
@@ -145,8 +143,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
         return NextResponse.json({ success: false, message: 'حالة الطلب غير صالحة لتأكيد الدفع' }, { status: 400 })
       }
 
-      // Verify user is the buyer
-      if (order.buyerId !== userId) {
+      if (order.buyerId !== authenticatedUserId) {
         return NextResponse.json({ success: false, message: 'فقط المشتري يمكنه تأكيد الدفع' }, { status: 403 })
       }
 
@@ -155,7 +152,6 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
         buyerConfirmedAt: new Date().toISOString(),
       })
 
-      // Notify merchant
       await notificationOperations.create({
         userId: order.merchantId,
         title: 'المشتري أكد الدفع',
@@ -177,21 +173,17 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
         return NextResponse.json({ success: false, message: 'حالة الطلب غير صالحة لتحرير الأموال' }, { status: 400 })
       }
 
-      // Verify user is the merchant/seller
-      if (order.merchantId !== userId) {
+      if (order.merchantId !== authenticatedUserId) {
         return NextResponse.json({ success: false, message: 'فقط التاجر يمكنه تحرير الأموال' }, { status: 403 })
       }
 
-      // For 'sell' orders: credit escrowAmount to buyer's balance
       if (order.type === 'sell' && order.buyerId) {
         const buyerUser = await userOperations.findUnique({ id: order.buyerId })
         if (buyerUser) {
-          // Release from buyer's frozen balance back to buyer's balance
           const newBuyerFrozen = Math.max(0, (buyerUser.frozenBalance || 0) - order.escrowAmount)
           await userOperations.updateFrozenBalance(order.buyerId, newBuyerFrozen)
           await userOperations.incrementBalance(order.buyerId, order.escrowAmount)
 
-          // Record transaction for buyer
           await transactionOperations.create({
             userId: order.buyerId,
             type: 'p2p_receive',
@@ -209,14 +201,12 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       })
 
       // === ADMIN COMMISSION ===
-      // Calculate and add admin commission from completed trade
       try {
         const adminCommissionPct = order.adminCommissionPercent || 1
         const tradeAmount = order.amount || order.escrowAmount || 0
         const adminCommissionAmount = parseFloat((tradeAmount * (adminCommissionPct / 100)).toFixed(2))
         
         if (adminCommissionAmount > 0) {
-          // Find admin user (role = 'admin')
           const adminSnap = await (await import('@/lib/firebase')).getDb()
             .collection('users').where('role', '==', 'admin').limit(1).get()
           
@@ -225,15 +215,12 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
             const adminData = adminDoc.data()
             const adminId = adminDoc.id
             
-            // Add commission to admin balance
             await userOperations.incrementBalance(adminId, adminCommissionAmount)
             
-            // Save commission amount on order
             await p2pOrderOperations.updateStatus(id, 'completed', {
               adminCommission: adminCommissionAmount,
             })
             
-            // Record transaction for admin
             await transactionOperations.create({
               userId: adminId,
               type: 'p2p_commission',
@@ -249,10 +236,8 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
         }
       } catch (commErr: any) {
         console.error('[P2P Commission] Failed to add admin commission:', commErr?.message)
-        // Non-fatal — the trade still completes successfully
       }
 
-      // Notify buyer
       if (order.buyerId) {
         await notificationOperations.create({
           userId: order.buyerId,
@@ -276,9 +261,8 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
         return NextResponse.json({ success: false, message: 'لا يمكن الإلغاء في هذه الحالة' }, { status: 400 })
       }
 
-      // Only allow merchant to cancel open orders, or buyer/merchant to cancel in_progress
-      const isMerchant = order.merchantId === userId
-      const isBuyer = order.buyerId === userId
+      const isMerchant = order.merchantId === authenticatedUserId
+      const isBuyer = order.buyerId === authenticatedUserId
 
       if (order.status === 'open' && !isMerchant) {
         return NextResponse.json({ success: false, message: 'فقط التاجر يمكنه إلغاء الطلب المفتوح' }, { status: 403 })
@@ -288,7 +272,6 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
         return NextResponse.json({ success: false, message: 'غير مصرح بإلغاء هذا الطلب' }, { status: 403 })
       }
 
-      // If in_progress and has buyer, refund buyer's frozen balance
       if (order.status === 'in_progress' && order.buyerId && order.type === 'sell') {
         const buyerUser = await userOperations.findUnique({ id: order.buyerId })
         if (buyerUser && (buyerUser.frozenBalance || 0) >= order.escrowAmount) {
@@ -310,7 +293,6 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
 
       const updatedOrder = await p2pOrderOperations.updateStatus(id, 'cancelled')
 
-      // Notify the other party
       const otherPartyId = isMerchant ? order.buyerId : order.merchantId
       if (otherPartyId) {
         await notificationOperations.create({
@@ -335,8 +317,8 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
         return NextResponse.json({ success: false, message: 'لا يمكن فتح نزاع إلا أثناء تنفيذ الطلب' }, { status: 400 })
       }
 
-      const isMerchant = order.merchantId === userId
-      const isBuyer = order.buyerId === userId
+      const isMerchant = order.merchantId === authenticatedUserId
+      const isBuyer = order.buyerId === authenticatedUserId
 
       if (!isMerchant && !isBuyer) {
         return NextResponse.json({ success: false, message: 'غير مصرح بفتح نزاع في هذا الطلب' }, { status: 403 })
@@ -346,19 +328,16 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
         return NextResponse.json({ success: false, message: 'سبب النزاع مطلوب' }, { status: 400 })
       }
 
-      // Create dispute record
       const dispute = await p2pDisputeOperations.create({
         orderId: id,
-        reporterId: userId,
+        reporterId: authenticatedUserId,
         reporterName: user.fullName || user.email,
         reporterType: isMerchant ? 'merchant' : 'buyer',
         reason: disputeReason,
       })
 
-      // Update order status to disputed
       const updatedOrder = await p2pOrderOperations.updateStatus(id, 'disputed')
 
-      // Notify both parties
       const otherPartyId = isMerchant ? order.buyerId : order.merchantId
       if (otherPartyId) {
         await notificationOperations.create({
@@ -371,7 +350,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       }
 
       await notificationOperations.create({
-        userId,
+        userId: authenticatedUserId,
         title: 'تم فتح النزاع بنجاح',
         message: 'تم فتح نزاع في طلبك. سيقوم فريق الإدارة بمراجعته والرد عليك قريباً.',
         type: 'p2p',

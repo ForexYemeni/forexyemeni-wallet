@@ -2,12 +2,21 @@ import { NextRequest, NextResponse } from 'next/server'
 import { userOperations, withdrawalOperations } from '@/lib/db-firebase'
 import { sendPushNotification } from '@/lib/push-notification'
 import bcrypt from 'bcryptjs'
+import { authenticateRequest, verifyUserId } from '@/lib/auth-server'
 
 export async function POST(request: NextRequest) {
-  try {
-    const { userId, withdrawalId, password } = await request.json()
+  const auth = await authenticateRequest(request)
+  if (!auth.success) return NextResponse.json({ success: false, message: auth.error }, { status: auth.status })
 
-    if (!userId || !withdrawalId || !password) {
+  try {
+    const body = await request.json()
+    const { userId, withdrawalId, password } = body
+
+    if (!userId || !verifyUserId(auth, userId)) {
+      return NextResponse.json({ success: false, message: 'غير مصرح' }, { status: 403 })
+    }
+
+    if (!withdrawalId || !password) {
       return NextResponse.json({ success: false, message: 'جميع الحقول مطلوبة' }, { status: 400 })
     }
 
@@ -56,7 +65,6 @@ export async function POST(request: NextRequest) {
       }
     } catch (notifyErr) {
       console.error('[confirm-receipt] Failed to send admin notification:', notifyErr)
-      // Don't fail the whole request
     }
 
     return NextResponse.json({ success: true, message: 'تم تأكيد الاستلام بنجاح' })

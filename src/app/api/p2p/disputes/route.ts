@@ -1,21 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { userOperations, p2pTradeOperations, p2pListingOperations, transactionOperations, notificationOperations } from '@/lib/db-firebase'
-
-// Helper: verify admin
-async function verifyAdmin(req: NextRequest) {
-  const userId = req.headers.get('x-user-id')
-  if (!userId) return null
-  const user = await userOperations.findUnique({ id: userId })
-  if (!user || user.role !== 'admin') return null
-  return user
-}
+import { requireAdmin } from '@/lib/auth-server'
 
 // GET: list open disputes
 export async function GET(req: NextRequest) {
-  try {
-    const admin = await verifyAdmin(req)
-    if (!admin) return NextResponse.json({ success: false, message: 'غير مصرح - مدير فقط' }, { status: 403 })
+  const auth = await requireAdmin(req)
+  if (!auth.success) return NextResponse.json({ success: false, message: auth.error }, { status: auth.status })
 
+  try {
     const trades = await p2pTradeOperations.findAllDisputed()
 
     const enriched = await Promise.all(trades.map(async (t) => {
@@ -36,10 +28,10 @@ export async function GET(req: NextRequest) {
 
 // POST: resolve dispute (release to buyer or refund to seller)
 export async function POST(req: NextRequest) {
-  try {
-    const admin = await verifyAdmin(req)
-    if (!admin) return NextResponse.json({ success: false, message: 'غير مصرح - مدير فقط' }, { status: 403 })
+  const auth = await requireAdmin(req)
+  if (!auth.success) return NextResponse.json({ success: false, message: auth.error }, { status: auth.status })
 
+  try {
     const { tradeId, resolution, note } = await req.json()
     if (!tradeId || !resolution) {
       return NextResponse.json({ success: false, message: 'بيانات مطلوبة' }, { status: 400 })
@@ -55,7 +47,6 @@ export async function POST(req: NextRequest) {
     const resolvedBy = resolution // 'buyer' or 'seller'
 
     if (resolvedBy === 'buyer') {
-      // Release funds to buyer
       const seller = await userOperations.findUnique({ id: trade.sellerId })
       if (seller && (seller.frozenBalance || 0) >= trade.amount) {
         const newFrozen = seller.frozenBalance - trade.amount
@@ -77,7 +68,6 @@ export async function POST(req: NextRequest) {
       await p2pTradeOperations.updateStatus(tradeId, 'released')
       await p2pListingOperations.incrementTrades(trade.listingId, true)
     } else {
-      // Refund to seller
       const seller = await userOperations.findUnique({ id: trade.sellerId })
       if (seller && (seller.frozenBalance || 0) >= trade.amount) {
         const newFrozen = seller.frozenBalance - trade.amount
@@ -88,7 +78,6 @@ export async function POST(req: NextRequest) {
       await p2pListingOperations.incrementTrades(trade.listingId, false)
     }
 
-    // Notify both parties
     await notificationOperations.create({
       userId: trade.buyerId,
       title: 'تم حل النزاع',

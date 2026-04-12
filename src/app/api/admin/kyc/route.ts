@@ -2,9 +2,12 @@ import { NextRequest, NextResponse } from 'next/server'
 import { userOperations, kycRecordOperations, notificationOperations } from '@/lib/db-firebase'
 import { sendPushNotification } from '@/lib/push-notification'
 import { sendUserKycApprovedEmail, sendUserKycRejectedEmail } from '@/lib/email'
+import { requireAdmin } from '@/lib/auth-server'
 
 // GET all KYC records (admin)
-export async function GET() {
+export async function GET(request: NextRequest) {
+  const auth = await requireAdmin(request)
+  if (!auth.success) return NextResponse.json({ success: false, message: auth.error }, { status: auth.status })
   try {
     const kycRecords = await kycRecordOperations.findMany()
 
@@ -17,6 +20,8 @@ export async function GET() {
 
 // POST update KYC status (admin)
 export async function POST(request: NextRequest) {
+  const auth = await requireAdmin(request)
+  if (!auth.success) return NextResponse.json({ success: false, message: auth.error }, { status: auth.status })
   try {
     const { recordId, status, adminNote, userId } = await request.json()
 

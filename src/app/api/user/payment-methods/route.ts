@@ -1,14 +1,20 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { userPaymentMethodOperations } from '@/lib/db-firebase'
+import { authenticateRequest, verifyUserId } from '@/lib/auth-server'
 
 // GET - Get user's payment methods
 export async function GET(request: NextRequest) {
+  const auth = await authenticateRequest(request)
+  if (!auth.success) return NextResponse.json({ success: false, message: auth.error }, { status: auth.status })
+
   try {
     const { searchParams } = new URL(request.url)
     const userId = searchParams.get('userId')
-    if (!userId) {
-      return NextResponse.json({ success: false, message: 'معرف المستخدم مطلوب' }, { status: 400 })
+
+    if (!userId || !verifyUserId(auth, userId)) {
+      return NextResponse.json({ success: false, message: 'غير مصرح' }, { status: 403 })
     }
+
     const methods = await userPaymentMethodOperations.findByUserId(userId)
     return NextResponse.json({ success: true, methods })
   } catch (error: unknown) {
@@ -19,12 +25,15 @@ export async function GET(request: NextRequest) {
 
 // POST - Create, update, delete user payment method
 export async function POST(request: NextRequest) {
+  const auth = await authenticateRequest(request)
+  if (!auth.success) return NextResponse.json({ success: false, message: auth.error }, { status: auth.status })
+
   try {
     const body = await request.json()
     const { action, id, userId, ...data } = body
 
-    if (!userId) {
-      return NextResponse.json({ success: false, message: 'معرف المستخدم مطلوب' }, { status: 400 })
+    if (!userId || !verifyUserId(auth, userId)) {
+      return NextResponse.json({ success: false, message: 'غير مصرح' }, { status: 403 })
     }
 
     if (action === 'delete') {

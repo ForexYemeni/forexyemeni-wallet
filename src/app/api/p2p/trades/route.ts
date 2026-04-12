@@ -1,15 +1,17 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { userOperations, merchantOperations, p2pListingOperations, p2pTradeOperations, notificationOperations } from '@/lib/db-firebase'
+import { authenticateRequest } from '@/lib/auth-server'
 
 // GET: get user's trades
 export async function GET(req: NextRequest) {
+  const auth = await authenticateRequest(req)
+  if (!auth.success) return NextResponse.json({ success: false, message: auth.error }, { status: auth.status })
+
   try {
-    const userId = req.headers.get('x-user-id')
-    if (!userId) return NextResponse.json({ success: false, message: 'غير مصرح' }, { status: 401 })
+    const userId = auth.user.id // Use authenticated user ID
 
     const trades = await p2pTradeOperations.findByUser(userId)
 
-    // Attach listing info
     const enriched = await Promise.all(trades.map(async (t) => {
       const listing = await p2pListingOperations.findUnique(t.listingId)
       const buyer = await userOperations.findUnique({ id: t.buyerId })
@@ -31,9 +33,11 @@ export async function GET(req: NextRequest) {
 
 // POST: create new trade
 export async function POST(req: NextRequest) {
+  const auth = await authenticateRequest(req)
+  if (!auth.success) return NextResponse.json({ success: false, message: auth.error }, { status: auth.status })
+
   try {
-    const userId = req.headers.get('x-user-id')
-    if (!userId) return NextResponse.json({ success: false, message: 'غير مصرح' }, { status: 401 })
+    const userId = auth.user.id // Use authenticated user ID
 
     const { listingId, amount, buyerPaymentMethod, buyerPaymentRef } = await req.json()
     if (!listingId || !amount || !buyerPaymentMethod) {
@@ -60,16 +64,13 @@ export async function POST(req: NextRequest) {
     let sellerId: string
 
     if (listing.type === 'sell') {
-      // Seller (merchant) is selling, user is buying
       buyerId = userId
       sellerId = merchant.userId
     } else {
-      // Buyer (merchant) is buying, user is selling
       sellerId = userId
       buyerId = merchant.userId
     }
 
-    // Can't trade with yourself
     if (buyerId === sellerId) {
       return NextResponse.json({ success: false, message: 'لا يمكنك التداول مع نفسك' }, { status: 400 })
     }
@@ -87,7 +88,6 @@ export async function POST(req: NextRequest) {
       escrowTxId: '',
     })
 
-    // Notify both parties
     await notificationOperations.create({
       userId: buyerId,
       title: 'صفقة P2P جديدة',

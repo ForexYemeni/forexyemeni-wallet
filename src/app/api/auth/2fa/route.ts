@@ -3,6 +3,7 @@ import { userOperations, otpCodeOperations } from '@/lib/db-firebase'
 import { send2FASetupEmail } from '@/lib/email'
 import bcrypt from 'bcryptjs'
 import crypto from 'crypto'
+import { authenticateRequest, verifyUserId } from '@/lib/auth-server'
 
 function generateBackupCode(): string {
   const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'
@@ -23,12 +24,15 @@ function generate6DigitCode(): string {
 
 // GET - Get 2FA status for a user
 export async function GET(request: NextRequest) {
+  const auth = await authenticateRequest(request)
+  if (!auth.success) return NextResponse.json({ success: false, message: auth.error }, { status: auth.status })
+
   try {
     const { searchParams } = new URL(request.url)
     const userId = searchParams.get('userId')
 
-    if (!userId) {
-      return NextResponse.json({ success: false, message: 'معرف المستخدم مطلوب' }, { status: 400 })
+    if (!userId || !verifyUserId(auth, userId)) {
+      return NextResponse.json({ success: false, message: 'غير مصرح' }, { status: 403 })
     }
 
     const user = await userOperations.findUnique({ id: userId })
@@ -49,12 +53,20 @@ export async function GET(request: NextRequest) {
 
 // POST - Enable/disable/verify_setup/regenerate_backup/admin_disable 2FA
 export async function POST(request: NextRequest) {
+  const auth = await authenticateRequest(request)
+  if (!auth.success) return NextResponse.json({ success: false, message: auth.error }, { status: auth.status })
+
   try {
     const body = await request.json()
     const { userId, action, token, password, code, targetUserId, adminToken } = body
 
     if (!userId || !action) {
       return NextResponse.json({ success: false, message: 'معرف المستخدم والإجراء مطلوبان' }, { status: 400 })
+    }
+
+    // Admin actions use their own auth, not userId match
+    if (action !== 'admin_disable' && !verifyUserId(auth, userId)) {
+      return NextResponse.json({ success: false, message: 'غير مصرح' }, { status: 403 })
     }
 
     const user = await userOperations.findUnique({ id: userId })
@@ -182,30 +194,8 @@ export async function POST(request: NextRequest) {
 
     // === ADMIN DISABLE 2FA ===
     if (action === 'admin_disable') {
-      if (!adminToken) {
-        return NextResponse.json({ success: false, message: 'رمز المصادقة مطلوب' }, { status: 400 })
-      }
-
-      // Verify caller is admin by finding their login OTP token
-      const adminOtp = await otpCodeOperations.findFirst({
-        where: { type: 'login', verified: false },
-      })
-
-      let adminUserId: string | null = null
-      if (adminOtp) {
-        // The adminToken should match the OTP code (which is the login token)
-        if (adminOtp.code === adminToken) {
-          adminUserId = adminOtp.userId || null
-        }
-      }
-
-      // If not found via OTP, check if userId in body is the admin themselves
-      if (!adminUserId) {
-        adminUserId = userId
-      }
-
-      const adminUser = adminUserId ? await userOperations.findUnique({ id: adminUserId }) : null
-      if (!adminUser || adminUser.role !== 'admin') {
+      // Verify the caller is an admin using server-side auth
+      if (auth.user.role !== 'admin') {
         return NextResponse.json({ success: false, message: 'صلاحية غير كافية' }, { status: 403 })
       }
 

@@ -2,9 +2,12 @@ import { NextRequest, NextResponse } from 'next/server'
 import { userOperations } from '@/lib/db-firebase'
 import { getDb } from '@/lib/firebase'
 import bcrypt from 'bcryptjs'
+import { requireAdmin } from '@/lib/auth-server'
 
 // POST - Bulk cleanup: delete all deposits, withdrawals, transactions, notifications, KYC records, OTP codes, and non-admin users
 export async function POST(request: NextRequest) {
+  const auth = await requireAdmin(request)
+  if (!auth.success) return NextResponse.json({ success: false, message: auth.error }, { status: auth.status })
   try {
     const body = await request.json()
     const { userId, password, confirmText } = body

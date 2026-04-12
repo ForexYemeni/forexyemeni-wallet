@@ -1,8 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getDb } from '@/lib/firebase'
+import { requireAdmin } from '@/lib/auth-server'
 
 // POST: Generate a summary report for a given period
 export async function POST(request: NextRequest) {
+  const auth = await requireAdmin(request)
+  if (!auth.success) return NextResponse.json({ success: false, message: auth.error }, { status: auth.status })
   try {
     const body = await request.json()
     const { adminId, period } = body as { adminId?: string; period?: string }

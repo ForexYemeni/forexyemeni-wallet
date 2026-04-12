@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getDb, generateId, nowTimestamp } from '@/lib/firebase'
+import { requireAdmin } from '@/lib/auth-server'
 
 // Valid action types for audit logging
 const VALID_ACTION_TYPES = [
@@ -20,6 +21,8 @@ const VALID_ACTION_TYPES = [
 
 // GET: Return audit log entries with optional filters
 export async function GET(request: NextRequest) {
+  const auth = await requireAdmin(request)
+  if (!auth.success) return NextResponse.json({ success: false, message: auth.error }, { status: auth.status })
   try {
     const { searchParams } = new URL(request.url)
     const adminId = searchParams.get('adminId')
@@ -95,6 +98,8 @@ export async function GET(request: NextRequest) {
 
 // POST: Create a new audit log entry
 export async function POST(request: NextRequest) {
+  const auth = await requireAdmin(request)
+  if (!auth.success) return NextResponse.json({ success: false, message: auth.error }, { status: auth.status })
   try {
     const body = await request.json()
     const { adminId, actionType, targetType, targetId, targetName, details, ipAddress } = body

@@ -3,6 +3,7 @@ import { userOperations, notificationOperations } from '@/lib/db-firebase'
 import { getDb, nowTimestamp, generateId } from '@/lib/firebase'
 import { logAudit } from '@/lib/audit-log'
 import { sendPushNotification } from '@/lib/push-notification'
+import { requireAdmin } from '@/lib/auth-server'
 
 // ===================== HELPER: Parse permissions =====================
 function parsePermissions(permissions: string | null | undefined): Record<string, boolean> | null {
@@ -34,6 +35,8 @@ async function verifySuperAdmin(adminId: string): Promise<{ authorized: boolean;
 
 // ===================== POST — Broadcast notifications to users =====================
 export async function POST(request: NextRequest) {
+  const auth = await requireAdmin(request)
+  if (!auth.success) return NextResponse.json({ success: false, message: auth.error }, { status: auth.status })
   try {
     const body = await request.json()
     const { adminId, title, message, type, target } = body

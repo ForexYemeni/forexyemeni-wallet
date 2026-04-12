@@ -1,13 +1,22 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getDb } from '@/lib/firebase'
+import { authenticateRequest, verifyUserId } from '@/lib/auth-server'
 
 // POST /api/fcm/register - Register FCM device token
 // Body: { userId, fcmToken, deviceName? }
 export async function POST(request: NextRequest) {
-  try {
-    const { userId, fcmToken, deviceName } = await request.json()
+  const auth = await authenticateRequest(request)
+  if (!auth.success) return NextResponse.json({ success: false, message: auth.error }, { status: auth.status })
 
-    if (!userId || !fcmToken) {
+  try {
+    const body = await request.json()
+    const { userId, fcmToken, deviceName } = body
+
+    if (!userId || !verifyUserId(auth, userId)) {
+      return NextResponse.json({ success: false, message: 'غير مصرح' }, { status: 403 })
+    }
+
+    if (!fcmToken) {
       return NextResponse.json({ success: false, message: 'البيانات مطلوبة' }, { status: 400 })
     }
 
@@ -74,10 +83,18 @@ export async function POST(request: NextRequest) {
 
 // DELETE /api/fcm/register - Remove FCM token (on logout)
 export async function DELETE(request: NextRequest) {
-  try {
-    const { userId, fcmToken } = await request.json()
+  const auth = await authenticateRequest(request)
+  if (!auth.success) return NextResponse.json({ success: false, message: auth.error }, { status: auth.status })
 
-    if (!userId || !fcmToken) {
+  try {
+    const body = await request.json()
+    const { userId, fcmToken } = body
+
+    if (!userId || !verifyUserId(auth, userId)) {
+      return NextResponse.json({ success: false, message: 'غير مصرح' }, { status: 403 })
+    }
+
+    if (!fcmToken) {
       return NextResponse.json({ success: false, message: 'البيانات مطلوبة' }, { status: 400 })
     }
 

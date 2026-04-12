@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getDb } from '@/lib/firebase'
+import { requireAdmin } from '@/lib/auth-server'
 
 const MAX_EXPORT_RECORDS = 1000
 
@@ -27,6 +28,8 @@ function dateForFilename(): string {
 
 // GET: Export data as CSV
 export async function GET(request: NextRequest) {
+  const auth = await requireAdmin(request)
+  if (!auth.success) return NextResponse.json({ success: false, message: auth.error }, { status: auth.status })
   try {
     const { searchParams } = new URL(request.url)
     const adminId = searchParams.get('adminId')

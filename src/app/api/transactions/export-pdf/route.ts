@@ -1,13 +1,21 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getDb } from '@/lib/firebase'
+import { authenticateRequest, verifyUserId } from '@/lib/auth-server'
 
 export async function POST(request: NextRequest) {
+  const auth = await authenticateRequest(request)
+  if (!auth.success) return NextResponse.json({ success: false, message: auth.error }, { status: auth.status })
+
   try {
     const body = await request.json()
     const { userId, startDate, endDate } = body
 
-    if (!userId || !startDate || !endDate) {
-      return NextResponse.json({ success: false, message: 'معرف المستخدم وتاريخ البداية والنهاية مطلوبان' }, { status: 400 })
+    if (!userId || !verifyUserId(auth, userId)) {
+      return NextResponse.json({ success: false, message: 'غير مصرح' }, { status: 403 })
+    }
+
+    if (!startDate || !endDate) {
+      return NextResponse.json({ success: false, message: 'تاريخ البداية والنهاية مطلوبان' }, { status: 400 })
     }
 
     const db = getDb()
@@ -184,7 +192,7 @@ export async function POST(request: NextRequest) {
 </head>
 <body>
   <div class="header">
-    <h1>💰 فوركس يمني</h1>
+    <h1>فوركس يمني</h1>
     <p>كشف حساب USDT TRC20</p>
   </div>
 
@@ -284,7 +292,7 @@ export async function POST(request: NextRequest) {
 
   <div class="no-print" style="text-align:center;padding:20px;margin-top:20px;">
     <button onclick="window.print()" style="padding:12px 40px;background:#d4af37;color:#111;font-size:16px;font-weight:700;border:none;border-radius:10px;cursor:pointer;">
-      📄 حفظ كـ PDF / طباعة
+      حفظ كـ PDF / طباعة
     </button>
     <p style="margin-top:10px;font-size:12px;color:#9ca3af;">اضغط على الزر أعلاه ثم اختر "Save as PDF" من نافذة الطباعة</p>
   </div>
