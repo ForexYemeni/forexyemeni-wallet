@@ -8,6 +8,9 @@ import BottomNav from './BottomNav'
 import Sidebar from './Sidebar'
 import SocialFloatingButton from './SocialFloatingButton'
 import OfflineBanner from '@/components/OfflineBanner'
+import { TopProgressBar } from '@/components/ui/AnimatedCounter'
+import { ConfettiEffect } from '@/components/ui/ConfettiEffect'
+import { InPageFeedback } from '@/components/ui/InPageFeedback'
 import { Bell, LogOut, Loader2 } from 'lucide-react'
 import {
   AlertDialog,
@@ -144,6 +147,11 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="min-h-screen bg-background">
+      {/* Global Effects */}
+      <TopProgressBar />
+      <ConfettiEffect />
+      <InPageFeedback />
+
       {/* Offline Banner */}
       <OfflineBanner />
 

@@ -502,3 +502,297 @@
 .animate-wiz-exit-left    { animation: wizExitLeft    0.3s ease-in  forwards; }
 .animate-wiz-enter-right  { animation: wizEnterRight  0.3s ease-out forwards; }
 .animate-wiz-exit-right   { animation: wizExitRight   0.3s ease-in  forwards; }
+
+/* ==================== 3D Wallet Card ==================== */
+.wallet-card-3d {
+  perspective: 1000px;
+  transform-style: preserve-3d;
+}
+
+.wallet-card-inner {
+  transform-style: preserve-3d;
+  transition: transform 0.15s ease-out;
+  will-change: transform;
+}
+
+.wallet-card-inner .card-shine {
+  position: absolute;
+  inset: 0;
+  border-radius: 20px;
+  background: radial-gradient(
+    circle at var(--shine-x, 50%) var(--shine-y, 50%),
+    rgba(255, 255, 255, 0.12) 0%,
+    rgba(255, 255, 255, 0.04) 30%,
+    transparent 70%
+  );
+  pointer-events: none;
+  z-index: 10;
+}
+
+.dark .wallet-card-bg {
+  background: linear-gradient(145deg, #1a1a2e 0%, #16213e 30%, #1a1a2e 60%, #0f0f1a 100%);
+  border: 1.5px solid rgba(240, 185, 11, 0.35);
+  box-shadow:
+    0 20px 60px -15px rgba(0, 0, 0, 0.6),
+    0 0 40px rgba(240, 185, 11, 0.08),
+    inset 0 1px 0 rgba(255, 255, 255, 0.05);
+}
+
+:root:not(.dark) .wallet-card-bg {
+  background: linear-gradient(145deg, #ffffff 0%, #f8f4e8 30%, #faf8f0 60%, #f5f0e0 100%);
+  border: 1.5px solid rgba(201, 154, 10, 0.3);
+  box-shadow:
+    0 20px 60px -15px rgba(0, 0, 0, 0.15),
+    0 0 40px rgba(201, 154, 10, 0.06),
+    inset 0 1px 0 rgba(255, 255, 255, 0.8);
+}
+
+.wallet-chip {
+  width: 42px;
+  height: 32px;
+  border-radius: 6px;
+  background: linear-gradient(135deg, #F0B90B 0%, #C99A0A 40%, #FCD535 70%, #C99A0A 100%);
+  position: relative;
+  overflow: hidden;
+}
+
+.wallet-chip::after {
+  content: '';
+  position: absolute;
+  inset: 3px;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  border-radius: 3px;
+}
+
+.wallet-chip::before {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: rgba(255, 255, 255, 0.2);
+}
+
+.wallet-contactless {
+  width: 22px;
+  height: 22px;
+  position: relative;
+}
+
+.wallet-contactless::before,
+.wallet-contactless::after {
+  content: '';
+  position: absolute;
+  border: 2px solid rgba(240, 185, 11, 0.5);
+  border-radius: 50%;
+  border-left-color: transparent;
+  border-bottom-color: transparent;
+  transform: rotate(-45deg);
+}
+
+.wallet-contactless::before {
+  width: 12px;
+  height: 12px;
+  bottom: 0;
+  right: 0;
+}
+
+.wallet-contactless::after {
+  width: 18px;
+  height: 18px;
+  bottom: 0;
+  right: 0;
+  opacity: 0.5;
+}
+
+/* ==================== Confetti Effect ==================== */
+@keyframes confettiFall {
+  0% { transform: translateY(-100vh) rotate(0deg); opacity: 1; }
+  100% { transform: translateY(100vh) rotate(720deg); opacity: 0; }
+}
+
+@keyframes confettiBurst {
+  0% { transform: translate(0, 0) rotate(0deg) scale(1); opacity: 1; }
+  100% { transform: translate(var(--tx, 0), var(--ty, 200px)) rotate(var(--tr, 360deg)) scale(0); opacity: 0; }
+}
+
+.confetti-piece {
+  position: fixed;
+  width: 8px;
+  height: 8px;
+  z-index: 9999;
+  pointer-events: none;
+  animation: confettiBurst var(--duration, 1.5s) cubic-bezier(0.25, 0.46, 0.45, 0.94) forwards;
+}
+
+.confetti-piece.rect {
+  border-radius: 1px;
+  width: 10px;
+  height: 6px;
+}
+
+.confetti-piece.circle {
+  border-radius: 50%;
+}
+
+/* ==================== Shake Animation (Error) ==================== */
+@keyframes shakeError {
+  0%, 100% { transform: translateX(0); }
+  10%, 30%, 50%, 70%, 90% { transform: translateX(-4px); }
+  20%, 40%, 60%, 80% { transform: translateX(4px); }
+}
+
+.animate-shake-error {
+  animation: shakeError 0.5s ease-in-out;
+}
+
+/* ==================== Glowing Star (New Balance) ==================== */
+@keyframes starGlow {
+  0%, 100% { filter: drop-shadow(0 0 3px rgba(240, 185, 11, 0.4)); transform: scale(1); }
+  50% { filter: drop-shadow(0 0 12px rgba(240, 185, 11, 0.8)); transform: scale(1.1); }
+}
+
+@keyframes starPulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+
+.glow-star {
+  animation: starGlow 1s ease-in-out infinite;
+}
+
+.glow-star-badge {
+  position: absolute;
+  top: -4px;
+  left: -4px;
+  width: 12px;
+  height: 12px;
+  background: #F0B90B;
+  border-radius: 50%;
+  animation: starPulse 0.8s ease-in-out infinite;
+  box-shadow: 0 0 10px rgba(240, 185, 11, 0.6);
+}
+
+/* ==================== Top Progress Bar ==================== */
+.top-progress-bar {
+  position: fixed;
+  top: 0;
+  left: 0;
+  height: 3px;
+  background: linear-gradient(90deg, #F0B90B, #FCD535, #F0B90B);
+  z-index: 9999;
+  transition: width 0.3s ease-out;
+  box-shadow: 0 0 10px rgba(240, 185, 11, 0.4);
+}
+
+.top-progress-bar.indeterminate {
+  width: 30% !important;
+  animation: indeterminate 1.5s ease-in-out infinite;
+}
+
+@keyframes indeterminate {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(400%); }
+}
+
+/* ==================== Success Ripple ==================== */
+@keyframes successRipple {
+  0% { transform: scale(0); opacity: 0.6; }
+  100% { transform: scale(4); opacity: 0; }
+}
+
+.success-ripple {
+  position: absolute;
+  border-radius: 50%;
+  background: rgba(16, 185, 129, 0.2);
+  animation: successRipple 0.8s ease-out forwards;
+  pointer-events: none;
+}
+
+/* ==================== Animated Number Glow ==================== */
+@keyframes numberGlow {
+  0%, 100% { text-shadow: 0 0 10px rgba(240, 185, 11, 0.0); }
+  50% { text-shadow: 0 0 20px rgba(240, 185, 11, 0.3); }
+}
+
+.number-glow {
+  animation: numberGlow 0.6s ease-out;
+}
+
+/* ==================== Stagger Children Animation ==================== */
+.stagger-children > * {
+  opacity: 0;
+  animation: fadeIn 0.4s ease-out forwards;
+}
+
+.stagger-children > *:nth-child(1) { animation-delay: 0ms; }
+.stagger-children > *:nth-child(2) { animation-delay: 60ms; }
+.stagger-children > *:nth-child(3) { animation-delay: 120ms; }
+.stagger-children > *:nth-child(4) { animation-delay: 180ms; }
+.stagger-children > *:nth-child(5) { animation-delay: 240ms; }
+.stagger-children > *:nth-child(6) { animation-delay: 300ms; }
+.stagger-children > *:nth-child(7) { animation-delay: 360ms; }
+.stagger-children > *:nth-child(8) { animation-delay: 420ms; }
+
+/* ==================== Quick Action Button Enhanced ==================== */
+.quick-action-btn {
+  position: relative;
+  overflow: hidden;
+  transition: all 0.2s ease;
+}
+
+.quick-action-btn::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(circle at center, currentColor 0%, transparent 70%);
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+
+.quick-action-btn:hover::before {
+  opacity: 0.06;
+}
+
+.quick-action-btn:active {
+  transform: scale(0.95);
+}
+
+.quick-action-btn .action-icon {
+  transition: transform 0.3s ease;
+}
+
+.quick-action-btn:hover .action-icon {
+  transform: translateY(-2px);
+}
+
+/* ==================== Transaction Item Slide ==================== */
+@keyframes txSlideIn {
+  from { opacity: 0; transform: translateX(20px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
+.tx-item-animate {
+  animation: txSlideIn 0.3s ease-out forwards;
+  opacity: 0;
+}
+
+/* ==================== Floating Particles Background ==================== */
+@keyframes floatParticle {
+  0%, 100% { transform: translateY(0) translateX(0); opacity: 0; }
+  10% { opacity: 1; }
+  90% { opacity: 1; }
+  100% { transform: translateY(-100px) translateX(var(--px, 20px)); opacity: 0; }
+}
+
+.particle {
+  position: absolute;
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: rgba(240, 185, 11, 0.3);
+  animation: floatParticle var(--pd, 4s) ease-in-out infinite;
+  animation-delay: var(--pdl, 0s);
+  pointer-events: none;
+}
