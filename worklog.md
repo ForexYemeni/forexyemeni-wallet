@@ -120,3 +120,22 @@ Stage Summary:
 - All text in Arabic
 - No external animation libraries used (CSS only)
 - Production-ready with proper TypeScript types
+---
+Task ID: account-number-recycle
+Agent: Main Agent
+Task: Implement account number recycling system - reuse deleted account numbers
+
+Work Log:
+- Analyzed current account numbering system (counter-based, never reuses)
+- Modified `generateAccountNumber()` in `src/lib/firebase.ts` to use Firestore transactions
+- Added freedNumbers array support to counter document
+- When assigning: checks freedNumbers first (uses smallest), then increments counter
+- Added `freeAccountNumber()` function to free numbers on deletion
+- Updated delete-user route to call freeAccountNumber before deleting user doc
+- Updated cleanup route to clear freedNumbers on reset
+- Used FieldValue.arrayUnion for atomic array operations
+
+Stage Summary:
+- Key files modified: src/lib/firebase.ts, src/app/api/admin/delete-user/route.ts, src/app/api/admin/cleanup/route.ts
+- Account numbers now recycle: deleted numbers go to freedNumbers, new users get lowest available
+- Transaction-based assignment prevents duplicate numbers in concurrent registrations

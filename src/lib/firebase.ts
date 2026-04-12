@@ -1,5 +1,5 @@
 import { initializeApp, cert, deleteApp, App, getApps } from 'firebase-admin/app'
-import { getFirestore, Firestore } from 'firebase-admin/firestore'
+import { getFirestore, Firestore, FieldValue } from 'firebase-admin/firestore'
 import { _fbk } from './firebase-key'
 
 let app: App
@@ -211,10 +211,50 @@ export function generateAffiliateCode(): string {
 export async function generateAccountNumber(): Promise<number> {
   const db = getDb()
   const ref = db.collection('counters').doc('accountNumber')
-  const doc = await ref.get()
-  const n = doc.exists ? (doc.data()?.value || 100000) + 1 : 100001
-  await ref.set({ value: n }, { merge: true })
-  return n
+
+  // Use transaction for atomicity to prevent duplicate numbers
+  return db.runTransaction(async (transaction) => {
+    const doc = await transaction.get(ref)
+    const data = doc.exists ? doc.data() : {}
+
+    const currentValue = data.value || 1000
+    const freedNumbers: number[] = data.freedNumbers || []
+
+    let accountNumber: number
+
+    if (freedNumbers.length > 0) {
+      // Reuse the smallest freed account number
+      freedNumbers.sort((a: number, b: number) => a - b)
+      accountNumber = freedNumbers[0]
+      // Remove the used number from the freed list
+      const remaining = freedNumbers.slice(1)
+      transaction.set(ref, {
+        value: currentValue,
+        freedNumbers: remaining
+      }, { merge: true })
+    } else {
+      // No freed numbers available, increment counter
+      accountNumber = currentValue + 1
+      transaction.set(ref, {
+        value: accountNumber,
+        freedNumbers: []
+      }, { merge: true })
+    }
+
+    return accountNumber
+  })
+}
+
+/**
+ * Free an account number so it can be reused by the next new user.
+ * Called when a user is deleted from the admin panel.
+ */
+export async function freeAccountNumber(accountNumber: number): Promise<void> {
+  const db = getDb()
+  const ref = db.collection('counters').doc('accountNumber')
+  await ref.update({
+    freedNumbers: FieldValue.arrayUnion(accountNumber)
+  })
 }
 
 export function nowTimestamp() { return new Date().toISOString() }

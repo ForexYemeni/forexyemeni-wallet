@@ -262,9 +262,9 @@ export async function POST(request: NextRequest) {
       const msg = e instanceof Error ? e.message : String(e)
     }
 
-    // 12. Reset account number counter to start from 1001
+    // 12. Reset account number counter to start from 1001 and clear freed numbers
     try {
-      await db.collection('counters').doc('accountNumber').set({ value: 1000 })
+      await db.collection('counters').doc('accountNumber').set({ value: 1000, freedNumbers: [] })
       results.accountCounterReset = true
     } catch (e: unknown) {
       results.accountCounterReset = false

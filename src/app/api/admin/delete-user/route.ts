@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getDb, generateId, nowTimestamp } from '@/lib/firebase'
+import { getDb, generateId, nowTimestamp, freeAccountNumber } from '@/lib/firebase'
 import { userOperations, otpCodeOperations } from '@/lib/db-firebase'
 import { sendVerificationEmail } from '@/lib/email'
 import { requireAdmin, verifyUserId } from '@/lib/auth-server'
@@ -205,6 +205,16 @@ export async function POST(request: NextRequest) {
         .get()
       for (const doc of userFcm.docs) {
         await doc.ref.delete()
+      }
+
+      // Free the account number for reuse
+      if (userToDelete.accountNumber) {
+        try {
+          await freeAccountNumber(userToDelete.accountNumber)
+        } catch (err) {
+          console.error('[DELETE-USER] Failed to free account number:', err)
+          // Non-critical: continue deletion even if freeing fails
+        }
       }
 
       // Finally delete the user
