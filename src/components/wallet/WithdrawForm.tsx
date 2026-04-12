@@ -1050,42 +1050,42 @@ export default function WithdrawForm() {
               )}
             </div>
 
-          {/* Footer - fixed at bottom */}
-          <div className="flex-shrink-0 p-4 pt-3 border-t border-white/5 bg-background flex gap-3">
-            {/* Back button */}
-            {addMethodStep !== 'category' && !editMethodData && (
-              <button onClick={handleWizardBack} className="h-12 px-5 bg-white/10 hover:bg-white/20 text-foreground font-medium rounded-xl transition-all flex items-center gap-2">
-                <ArrowRight className="w-4 h-4" />
-                رجوع
-              </button>
-            )}
+          {/* Footer */}
+          <div className="flex-shrink-0 px-5 pt-3 pb-4 border-t border-white/5 bg-background">
+            <div className="flex items-center gap-2">
+              {/* Back */}
+              {addMethodStep !== 'category' && !editMethodData && (
+                <button onClick={handleWizardBack} className="h-9 px-4 bg-white/10 hover:bg-white/20 text-foreground text-sm font-medium rounded-lg transition-all flex items-center gap-1.5">
+                  <ArrowRight className="w-3.5 h-3.5" />
+                  رجوع
+                </button>
+              )}
 
-            {/* Spacer */}
-            <div className="flex-1" />
+              <div className="flex-1" />
 
-            {/* Details step: Save button */}
-            {addMethodStep === 'details' ? (
-              <button onClick={handleSaveMethod} disabled={methodLoading} className="h-12 px-8 gold-gradient text-gray-900 font-bold rounded-xl hover:opacity-90 transition-all flex items-center gap-2">
-                {methodLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : editMethodData ? 'حفظ التعديلات' : 'حفظ طريقة السحب'}
-              </button>
-            ) : editMethodData ? null : (
-              /* Next step button */
-              <button onClick={handleWizardNext} disabled={!canGoNext()} className={`h-12 px-8 font-bold rounded-xl transition-all flex items-center gap-2 ${
-                canGoNext()
-                  ? 'gold-gradient text-gray-900 hover:opacity-90'
-                  : 'bg-white/5 text-muted-foreground cursor-not-allowed'
-              }`}>
-                التالي
-                <ChevronLeft className="w-4 h-4" />
-              </button>
-            )}
+              {/* Cancel */}
+              {(addMethodStep === 'details' || editMethodData) && (
+                <button onClick={resetMethodForm} className="h-9 px-4 bg-white/10 hover:bg-white/20 text-foreground text-sm font-medium rounded-lg transition-all">
+                  إلغاء
+                </button>
+              )}
 
-            {/* Cancel on details or edit */}
-            {(addMethodStep === 'details' || editMethodData) && (
-              <button onClick={resetMethodForm} className="h-12 px-5 bg-white/10 hover:bg-white/20 text-foreground font-medium rounded-xl transition-all">
-                إلغاء
-              </button>
-            )}
+              {/* Save / Next */}
+              {addMethodStep === 'details' ? (
+                <button onClick={handleSaveMethod} disabled={methodLoading} className="h-9 px-5 gold-gradient text-gray-900 text-sm font-bold rounded-lg hover:opacity-90 transition-all flex items-center gap-1.5">
+                  {methodLoading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : editMethodData ? 'حفظ التعديلات' : 'حفظ'}
+                </button>
+              ) : !editMethodData ? (
+                <button onClick={handleWizardNext} disabled={!canGoNext()} className={`h-9 px-5 text-sm font-bold rounded-lg transition-all flex items-center gap-1.5 ${
+                  canGoNext()
+                    ? 'gold-gradient text-gray-900 hover:opacity-90'
+                    : 'bg-white/5 text-muted-foreground cursor-not-allowed'
+                }`}>
+                  التالي
+                  <ChevronLeft className="w-3.5 h-3.5" />
+                </button>
+              ) : null}
+            </div>
           </div>
         </div>
       )}
