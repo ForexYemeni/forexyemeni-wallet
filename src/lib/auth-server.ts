@@ -83,13 +83,16 @@ async function verifyTokenInDb(token: string): Promise<AuthUser | null> {
     const db = getDb()
     
     // Find the token in otpCodes
-    const tokenSnap = await db.collection('otpCodes')
-      .where('code', '==', token)
-      .where('type', '==', 'login')
-      .where('verified', '==', true)
-      .limit(1)
-      .get()
+    // NOTE: We do NOT filter by 'verified' because login tokens are created
+    // with verified:false by otpCodeOperations.create — they are valid as-is.
+    // We check both 'login' (normal login) and 'login_2fa_pending' (after 2FA verification
+    // the pending session becomes the login token but keeps its original type).
+    const [loginSnap, twoFaSnap] = await Promise.all([
+      db.collection('otpCodes').where('code', '==', token).where('type', '==', 'login').limit(1).get(),
+      db.collection('otpCodes').where('code', '==', token).where('type', '==', 'login_2fa_pending').where('verified', '==', true).limit(1).get(),
+    ])
 
+    const tokenSnap = loginSnap.empty ? twoFaSnap : loginSnap
     if (tokenSnap.empty) return null
 
     const tokenDoc = tokenSnap.docs[0]
