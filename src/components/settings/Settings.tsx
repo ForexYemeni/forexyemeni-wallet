@@ -438,6 +438,77 @@ export default function SettingsPage() {
             <ChevronLeft className="w-4 h-4 text-muted-foreground" />
           </button>
 
+          {/* Push Notifications (FCM) - always visible */}
+          <div className="glass-card p-5 space-y-3">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-gold/10 flex items-center justify-center">
+                <Bell className="w-5 h-5 text-gold" />
+              </div>
+              <div>
+                <h3 className="text-sm font-bold">الإشعارات الفورية (FCM)</h3>
+                <p className="text-xs text-muted-foreground mt-0.5">تسجيل جهازك لاستقبال إشعارات الدفع</p>
+              </div>
+            </div>
+
+            <button
+              onClick={async () => {
+                try {
+                  toast.loading('جاري تسجيل جهاز الإشعارات...', { id: 'fcm-reg' })
+                  const { forceReregisterFCM, getFCMDebugInfo } = await import('@/lib/fcm-push')
+                  const result = await forceReregisterFCM()
+                  const info = getFCMDebugInfo()
+                  const w = window as any
+                  const capExists = !!w.Capacitor
+                  const capPlatform = w.Capacitor?.getPlatform?.() || '?'
+                  const capPlugins = capExists ? Object.keys(w.Capacitor.Plugins || {}) : []
+
+                  let diagnostic = `النتيجة: ${result}\n`
+                  diagnostic += `Capacitor: ${capExists ? '✅ ' + capPlatform : '❌ غير موجود'}\n`
+                  diagnostic += `الإضافات: ${capPlugins.length > 0 ? capPlugins.join(', ') : 'لا توجد'}\n`
+                  diagnostic += `الحالة: ${info.registered ? '✅ مسجّل' : '❌ غير مسجّل'}`
+
+                  toast.dismiss('fcm-reg')
+                  if (info.registered) {
+                    toast.success('تم تسجيل جهاز الإشعارات بنجاح ✅', { duration: 5000 })
+                  } else {
+                    toast.error(diagnostic, { duration: 10000 })
+                  }
+                } catch (e: any) {
+                  toast.dismiss('fcm-reg')
+                  toast.error('خطأ: ' + (e?.message || String(e)), { duration: 8000 })
+                }
+              }}
+              className="w-full flex items-center justify-between p-3 rounded-xl bg-gold/5 hover:bg-gold/10 transition-colors border border-gold/10"
+            >
+              <span className="text-sm font-medium">📱 تسجيل جهاز الإشعارات</span>
+              <span className="text-xs text-gold">اضغط للتسجيل</span>
+            </button>
+
+            <button
+              onClick={async () => {
+                try {
+                  const res = await apiFetch('/api/notifications/test', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ userId: user!.id }),
+                  })
+                  const data = await res.json()
+                  if (data.success) {
+                    toast.success('تم الإرسال إلى ' + (data.debug?.pushResult?.successCount || '?') + ' جهاز — راقب شريط الإشعارات', { duration: 5000 })
+                  } else {
+                    toast.error(data.message || 'فشل', { duration: 8000 })
+                  }
+                } catch {
+                  toast.error('حدث خطأ')
+                }
+              }}
+              className="w-full flex items-center justify-between p-3 rounded-xl bg-green-500/5 hover:bg-green-500/10 transition-colors border border-green-500/10"
+            >
+              <span className="text-sm font-medium">🔔 اختبار إرسال إشعار</span>
+              <span className="text-xs text-green-400">اختبار</span>
+            </button>
+          </div>
+
           {/* Sound settings */}
           <div className="glass-card p-5 space-y-4">
             <div className="flex items-center justify-between">
