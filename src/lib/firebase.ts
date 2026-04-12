@@ -30,6 +30,7 @@ export function initializeFirebase() {
     const serviceAccount = parseServiceAccount(_fbk)
     app = initializeApp({
       credential: cert(serviceAccount),
+      projectId: serviceAccount.project_id,
     })
   }
   if (!db) db = getFirestore(app)
@@ -62,6 +63,7 @@ export async function getDefaultDb(): Promise<Firestore> {
   const { getFirestore: getFs } = await import('firebase-admin/firestore')
   const tempApp = initApp({
     credential: firebaseCert(serviceAccount),
+    projectId: serviceAccount.project_id,
   }, `temp-${Date.now()}`)
   const tempDb = getFs(tempApp)
   return tempDb
@@ -149,6 +151,7 @@ export function reinitializeFirebase(serviceAccountKeyJson: string): { app: App;
   const serviceAccount = parseServiceAccount(serviceAccountKeyJson)
   app = initializeApp({
     credential: cert(serviceAccount),
+    projectId: serviceAccount.project_id,
   })
   db = getFirestore(app)
   return { app, db }
