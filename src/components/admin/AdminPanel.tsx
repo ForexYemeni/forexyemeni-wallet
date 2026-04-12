@@ -66,6 +66,7 @@ import {
   Hash,
   Smartphone,
   Database,
+  XCircle,
 } from 'lucide-react'
 
 // ===================== TYPES =====================
@@ -226,6 +227,8 @@ export default function AdminPanel() {
   const [loading, setLoading] = useState(true)
   const [searchQuery, setSearchQuery] = useState('')
   const [expandedUserId, setExpandedUserId] = useState<string | null>(null)
+  const [expandedDepositId, setExpandedDepositId] = useState<string | null>(null)
+  const [expandedWithdrawalId, setExpandedWithdrawalId] = useState<string | null>(null)
   const [roleDialogUser, setRoleDialogUser] = useState<AdminUser | null>(null)
   const [selectedPermissions, setSelectedPermissions] = useState<AdminPermission>(DEFAULT_PERMISSIONS)
   const [actionLoading, setActionLoading] = useState<string | null>(null)
@@ -1751,63 +1754,113 @@ export default function AdminPanel() {
               {deposits.length === 0 ? (
                 <div className="glass-card p-8 text-center text-muted-foreground text-sm">لا توجد إيداعات</div>
               ) : (
-                deposits.map((d) => (
-                  <div key={d.id} className="glass-card p-4 rounded-xl space-y-2">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <p className="text-sm font-medium">{d.user.fullName || d.user.email}</p>
-                        <p className="text-xs text-muted-foreground" dir="ltr">{d.txId || d.id.substring(0, 12)}</p>
+                deposits.map((d) => {
+                  const isTerminal = d.status === 'confirmed' || d.status === 'rejected'
+                  const isExpanded = !isTerminal || expandedDepositId === d.id
+                  return (
+                    <div key={d.id} className={`glass-card rounded-xl overflow-hidden transition-all duration-200 ${isTerminal && !isExpanded ? 'cursor-pointer hover:bg-white/[0.03]' : ''}`}
+                      onClick={() => isTerminal && setExpandedDepositId(expandedDepositId === d.id ? null : d.id)}
+                    >
+                      {/* Compact Header — always visible */}
+                      <div className={`flex items-center justify-between ${isExpanded ? 'p-4' : 'p-3'}`}>
+                        <div className="flex items-center gap-3">
+                          {!isTerminal && (
+                            <div className="w-9 h-9 rounded-lg bg-green-500/10 flex items-center justify-center flex-shrink-0">
+                              <ArrowDownLeft className="w-4 h-4 text-green-400" />
+                            </div>
+                          )}
+                          {isTerminal && (
+                            <div className={`w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0 ${d.status === 'confirmed' ? 'bg-green-500/10' : 'bg-red-500/10'}`}>
+                              {d.status === 'confirmed' ? <BadgeCheck className="w-4 h-4 text-green-400" /> : <XCircle className="w-4 h-4 text-red-400" />}
+                            </div>
+                          )}
+                          <div>
+                            <p className={`font-medium ${isExpanded ? 'text-sm' : 'text-xs'}`}>{d.user.fullName || d.user.email}</p>
+                            {!isExpanded && (
+                              <p className="text-[10px] text-muted-foreground">{formatDate(d.createdAt)}</p>
+                            )}
+                            {isExpanded && (
+                              <p className="text-xs text-muted-foreground" dir="ltr">{d.txId || d.id.substring(0, 12)}</p>
+                            )}
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <div className="text-left">
+                            <p className={`font-bold gold-text ${isExpanded ? 'text-sm' : 'text-xs'}`}>{(d.netAmount ?? d.amount ?? 0).toFixed(2)} USDT</p>
+                            {!isExpanded && (
+                              <span className={`text-[10px] px-1.5 py-0.5 rounded-md font-medium ${DEPOSIT_STATUS_MAP[d.status]?.color || ''}`}>
+                                {DEPOSIT_STATUS_MAP[d.status]?.label || d.status}
+                              </span>
+                            )}
+                            {isExpanded && (
+                              <span className={`text-xs px-2 py-0.5 rounded-md font-medium ${DEPOSIT_STATUS_MAP[d.status]?.color || ''}`}>
+                                {DEPOSIT_STATUS_MAP[d.status]?.label || d.status}
+                              </span>
+                            )}
+                          </div>
+                          {isTerminal && (
+                            <div className="flex-shrink-0 ml-1">
+                              {expandedDepositId === d.id ? <ChevronUp className="w-4 h-4 text-muted-foreground" /> : <ChevronDown className="w-4 h-4 text-muted-foreground" />}
+                            </div>
+                          )}
+                        </div>
                       </div>
-                      <div className="text-left">
-                        <p className="text-sm font-bold gold-text">{(d.netAmount ?? d.amount ?? 0).toFixed(2)} USDT</p>
-                        <span className={`text-xs px-2 py-0.5 rounded-md font-medium ${DEPOSIT_STATUS_MAP[d.status]?.color || ''}`}>
-                          {DEPOSIT_STATUS_MAP[d.status]?.label || d.status}
-                        </span>
-                      </div>
+
+                      {/* Expanded Details — only for terminal statuses when expanded */}
+                      {isExpanded && (
+                        <div className="space-y-2">
+                          {/* Fee breakdown */}
+                          {(d.fee ?? 0) > 0 && (
+                            <div className="px-4">
+                              <div className="p-2 rounded-lg bg-white/5 text-xs space-y-1">
+                                <div className="flex items-center justify-between">
+                                  <span className="text-muted-foreground">المبلغ المدفوع: <strong className="text-foreground">{(d.amount ?? 0).toFixed(2)} USDT</strong></span>
+                                </div>
+                                <div className="flex items-center justify-between">
+                                  <span className="text-muted-foreground">المبلغ الصافي للمستخدم: <strong className="text-green-400">{(d.netAmount ?? 0).toFixed(2)} USDT</strong></span>
+                                  <span className="text-muted-foreground">الرسوم → حساب الإدارة: <strong className="text-gold">{(d.fee ?? 0).toFixed(2)} USDT</strong></span>
+                                </div>
+                              </div>
+                            </div>
+                          )}
+                          {/* Screenshot */}
+                          {d.screenshot && (
+                            <div className="px-4 pb-2">
+                              <button
+                                onClick={(e) => { e.stopPropagation(); setPreviewImage(d.screenshot) }}
+                                className="rounded-xl overflow-hidden border border-white/10 block w-full"
+                              >
+                                <img src={d.screenshot} alt="إثبات الدفع" className="w-full h-32 object-cover" />
+                              </button>
+                            </div>
+                          )}
+                          {/* Date for expanded terminal */}
+                          {isTerminal && (
+                            <div className="px-4 pb-2 text-[10px] text-muted-foreground">{formatDate(d.createdAt)}</div>
+                          )}
+                          {/* Actions — only for active statuses */}
+                          {d.status === 'pending' && (
+                            <div className="flex gap-2 px-4 pb-3">
+                              <button onClick={(e) => { e.stopPropagation(); handleUpdateDeposit(d.id, 'reviewing') }} disabled={actionLoading === d.id} className="flex-1 flex items-center justify-center gap-1 text-xs py-2 rounded-lg bg-blue-500/10 text-blue-400 hover:bg-blue-500/20 transition-colors font-medium">
+                                <Eye className="w-3 h-3" /> مراجعة
+                              </button>
+                            </div>
+                          )}
+                          {d.status === 'reviewing' && (
+                            <div className="flex gap-2 px-4 pb-3">
+                              <button onClick={(e) => { e.stopPropagation(); setDepositConfirmDialog({ depositId: d.id, amount: d.amount, fee: d.fee || 0, netAmount: d.netAmount || d.amount, userEmail: d.user.email, userName: d.user.fullName || d.user.email }); setDepositConfirmPin('') }} disabled={actionLoading === d.id} className="flex-1 flex items-center justify-center gap-1 text-xs py-2 rounded-lg bg-green-500/10 text-green-400 hover:bg-green-500/20 transition-colors font-medium">
+                                <Check className="w-3 h-3" /> تأكيد
+                              </button>
+                              <button onClick={(e) => { e.stopPropagation(); setDepositRejectDialog({ depositId: d.id, amount: d.amount, userEmail: d.user.email }) }} disabled={actionLoading === d.id} className="flex-1 flex items-center justify-center gap-1 text-xs py-2 rounded-lg bg-red-500/10 text-red-400 hover:bg-red-500/20 transition-colors font-medium">
+                                <X className="w-3 h-3" /> رفض
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      )}
                     </div>
-                    {/* Fee breakdown */}
-                    {(d.fee ?? 0) > 0 && (
-                      <div className="p-2 rounded-lg bg-white/5 text-xs space-y-1">
-                        <div className="flex items-center justify-between">
-                          <span className="text-muted-foreground">المبلغ المدفوع: <strong className="text-foreground">{(d.amount ?? 0).toFixed(2)} USDT</strong></span>
-                        </div>
-                        <div className="flex items-center justify-between">
-                          <span className="text-muted-foreground">المبلغ الصافي للمستخدم: <strong className="text-green-400">{(d.netAmount ?? 0).toFixed(2)} USDT</strong></span>
-                          <span className="text-muted-foreground">الرسوم → حساب الإدارة: <strong className="text-gold">{(d.fee ?? 0).toFixed(2)} USDT</strong></span>
-                        </div>
-                      </div>
-                    )}
-                    {/* Screenshot */}
-                    {d.screenshot && (
-                      <div className="pt-1">
-                        <button
-                          onClick={() => setPreviewImage(d.screenshot)}
-                          className="rounded-xl overflow-hidden border border-white/10 block"
-                        >
-                          <img src={d.screenshot} alt="إثبات الدفع" className="w-full h-32 object-cover" />
-                        </button>
-                      </div>
-                    )}
-                    {/* Actions */}
-                    {d.status === 'pending' && (
-                      <div className="flex gap-2 pt-1">
-                        <button onClick={() => handleUpdateDeposit(d.id, 'reviewing')} disabled={actionLoading === d.id} className="flex-1 flex items-center justify-center gap-1 text-xs py-2 rounded-lg bg-blue-500/10 text-blue-400 hover:bg-blue-500/20 transition-colors font-medium">
-                          <Eye className="w-3 h-3" /> مراجعة
-                        </button>
-                      </div>
-                    )}
-                    {d.status === 'reviewing' && (
-                      <div className="flex gap-2 pt-1">
-                        <button onClick={() => { setDepositConfirmDialog({ depositId: d.id, amount: d.amount, fee: d.fee || 0, netAmount: d.netAmount || d.amount, userEmail: d.user.email, userName: d.user.fullName || d.user.email }); setDepositConfirmPin('') }} disabled={actionLoading === d.id} className="flex-1 flex items-center justify-center gap-1 text-xs py-2 rounded-lg bg-green-500/10 text-green-400 hover:bg-green-500/20 transition-colors font-medium">
-                          <Check className="w-3 h-3" /> تأكيد
-                        </button>
-                        <button onClick={() => setDepositRejectDialog({ depositId: d.id, amount: d.amount, userEmail: d.user.email })} disabled={actionLoading === d.id} className="flex-1 flex items-center justify-center gap-1 text-xs py-2 rounded-lg bg-red-500/10 text-red-400 hover:bg-red-500/20 transition-colors font-medium">
-                          <X className="w-3 h-3" /> رفض
-                        </button>
-                      </div>
-                    )}
-                  </div>
-                ))
+                  )
+                })
               )}
             </div>
           )}
@@ -1818,213 +1871,243 @@ export default function AdminPanel() {
               {withdrawals.length === 0 ? (
                 <div className="glass-card p-8 text-center text-muted-foreground text-sm">لا توجد سحوبات</div>
               ) : (
-                withdrawals.map((w) => (
-                  <div key={w.id} className="glass-card rounded-xl overflow-hidden">
-                    <div className="p-4 flex items-center justify-between border-b border-white/5">
-                      <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-xl bg-gold/10 flex items-center justify-center text-sm font-bold gold-text">
-                          {(w.user.fullName || w.user.email).charAt(0).toUpperCase()}
+                withdrawals.map((w) => {
+                  const isTerminal = w.status === 'processing' || w.status === 'completed' || w.status === 'rejected'
+                  const isExpanded = !isTerminal || expandedWithdrawalId === w.id
+                  return (
+                    <div key={w.id} className={`glass-card rounded-xl overflow-hidden transition-all duration-200 ${isTerminal && !isExpanded ? 'cursor-pointer hover:bg-white/[0.03]' : ''}`}
+                      onClick={() => isTerminal && setExpandedWithdrawalId(expandedWithdrawalId === w.id ? null : w.id)}
+                    >
+                      {/* Compact Header — always visible */}
+                      <div className={`flex items-center justify-between ${isExpanded ? 'p-4 border-b border-white/5' : 'p-3'}`}>
+                        <div className="flex items-center gap-3">
+                          <div className={`w-10 h-10 rounded-xl flex items-center justify-center text-sm font-bold flex-shrink-0 ${
+                            !isTerminal ? 'bg-gold/10 gold-text' :
+                            w.status === 'completed' ? 'bg-green-500/10 text-green-400' :
+                            w.status === 'rejected' ? 'bg-red-500/10 text-red-400' :
+                            'bg-blue-500/10 text-blue-400'
+                          }`}>
+                            {(w.user.fullName || w.user.email).charAt(0).toUpperCase()}
+                          </div>
+                          <div>
+                            <p className={`font-medium ${isExpanded ? 'text-sm' : 'text-xs'}`}>{w.user.fullName || 'بدون اسم'}</p>
+                            {!isExpanded && (
+                              <p className="text-[10px] text-muted-foreground">{formatDate(w.createdAt)}</p>
+                            )}
+                            {isExpanded && (
+                              <p className="text-xs text-muted-foreground" dir="ltr">{w.user.email}</p>
+                            )}
+                          </div>
                         </div>
-                        <div>
-                          <p className="text-sm font-medium">{w.user.fullName || 'بدون اسم'}</p>
-                          <p className="text-xs text-muted-foreground" dir="ltr">{w.user.email}</p>
-                        </div>
-                      </div>
-                      <div className="text-left">
-                        <p className="text-sm font-bold gold-text">{(w.amount ?? 0).toFixed(2)} USDT</p>
-                        {(w.fee ?? 0) > 0 && (
-                          <p className="text-[10px] text-muted-foreground">الصافي: {(w.netAmount ?? (w.amount - w.fee) ?? 0).toFixed(2)} USDT</p>
-                        )}
-                        <span className={`text-xs px-2 py-0.5 rounded-md font-medium ${WITHDRAWAL_STATUS_MAP[w.status]?.color || ''}`}>
-                          {WITHDRAWAL_STATUS_MAP[w.status]?.label || w.status}
-                        </span>
-                      </div>
-                    </div>
-
-                    <div className="p-4 space-y-2">
-                      <p className="text-xs text-muted-foreground font-medium mb-2">بيانات الساحب:</p>
-                      <div className="grid grid-cols-1 gap-1.5">
-                        {w.user.fullName && (
-                          <div className="flex items-center justify-between p-2 rounded-lg bg-white/5 group">
-                            <div className="flex items-center gap-2 min-w-0">
-                              <span className="text-[10px] text-muted-foreground flex-shrink-0">الاسم</span>
-                              <span className="text-xs font-medium truncate">{w.user.fullName}</span>
+                        <div className="flex items-center gap-2">
+                          <div className="text-left">
+                            <p className={`font-bold gold-text ${isExpanded ? 'text-sm' : 'text-xs'}`}>{(w.amount ?? 0).toFixed(2)} USDT</p>
+                            {!isExpanded && (w.fee ?? 0) > 0 && (
+                              <p className="text-[10px] text-muted-foreground">صافي: {(w.netAmount ?? (w.amount - w.fee) ?? 0).toFixed(2)}</p>
+                            )}
+                            {isExpanded && (w.fee ?? 0) > 0 && (
+                              <p className="text-[10px] text-muted-foreground">الصافي: {(w.netAmount ?? (w.amount - w.fee) ?? 0).toFixed(2)} USDT</p>
+                            )}
+                            <span className={`px-2 py-0.5 rounded-md font-medium ${isExpanded ? 'text-xs' : 'text-[10px]'} ${WITHDRAWAL_STATUS_MAP[w.status]?.color || ''}`}>
+                              {WITHDRAWAL_STATUS_MAP[w.status]?.label || w.status}
+                            </span>
+                          </div>
+                          {isTerminal && (
+                            <div className="flex-shrink-0 ml-1">
+                              {expandedWithdrawalId === w.id ? <ChevronUp className="w-4 h-4 text-muted-foreground" /> : <ChevronDown className="w-4 h-4 text-muted-foreground" />}
                             </div>
-                            <button onClick={() => copyField(`${w.id}-name`, w.user.fullName!)} className="text-muted-foreground hover:text-gold transition-colors flex-shrink-0">
-                              {copiedField === `${w.id}-name` ? <CheckIcon className="w-3.5 h-3.5 text-green-400" /> : <Copy className="w-3.5 h-3.5" />}
-                            </button>
-                          </div>
-                        )}
-                        {w.user.phone && (
-                          <div className="flex items-center justify-between p-2 rounded-lg bg-white/5 group">
-                            <div className="flex items-center gap-2 min-w-0">
-                              <span className="text-[10px] text-muted-foreground flex-shrink-0">الهاتف</span>
-                              <span className="text-xs font-medium truncate" dir="ltr">{w.user.phone}</span>
-                            </div>
-                            <button onClick={() => copyField(`${w.id}-phone`, w.user.phone!)} className="text-muted-foreground hover:text-gold transition-colors flex-shrink-0">
-                              {copiedField === `${w.id}-phone` ? <CheckIcon className="w-3.5 h-3.5 text-green-400" /> : <Copy className="w-3.5 h-3.5" />}
-                            </button>
-                          </div>
-                        )}
-                        <div className="flex items-center justify-between p-2 rounded-lg bg-white/5 group">
-                          <div className="flex items-center gap-2 min-w-0">
-                            <span className="text-[10px] text-muted-foreground flex-shrink-0">البريد</span>
-                            <span className="text-xs font-medium truncate" dir="ltr">{w.user.email}</span>
-                          </div>
-                          <button onClick={() => copyField(`${w.id}-email`, w.user.email)} className="text-muted-foreground hover:text-gold transition-colors flex-shrink-0">
-                            {copiedField === `${w.id}-email` ? <CheckIcon className="w-3.5 h-3.5 text-green-400" /> : <Copy className="w-3.5 h-3.5" />}
-                          </button>
+                          )}
                         </div>
                       </div>
 
-                      <div className="border-t border-white/5 pt-2 mt-2">
-                        <p className="text-xs text-muted-foreground font-medium mb-2">بيانات السحب:</p>
-                        <div className="grid grid-cols-1 gap-1.5">
-                          <div className="flex items-center justify-between p-2 rounded-lg bg-white/5">
-                            <div className="flex items-center gap-2 min-w-0">
-                              <span className="text-[10px] text-muted-foreground flex-shrink-0">الطريقة</span>
-                              <span className="text-xs font-medium truncate">
-                                {w.paymentMethodName
-                                  ? (w.network && !w.paymentMethodName.includes(w.network)
-                                    ? `${w.paymentMethodName} - ${w.network}`
-                                    : w.paymentMethodName)
-                                  : (w.method === 'crypto' || w.method === 'blockchain'
-                                    ? (w.network ? `عملات رقمية - ${w.network}` : 'عملات رقمية')
-                                    : w.method === 'bank_deposit' ? 'إيداع لمحفظة' :
-                                      w.method === 'atm_transfer' ? 'تحويل عبر صراف' :
-                                        w.method === 'bank_transfer' ? 'تحويل بنكي' : w.method)}
-                              </span>
-                            </div>
-                          </div>
-                          {/* toAddress - parsed structured display */}
-                          {(() => {
-                            const isCrypto = w.method === 'crypto' || w.method === 'blockchain'
-                            if (isCrypto) {
-                              return (
-                                <div className="flex items-center justify-between p-2 rounded-lg bg-white/5 group">
-                                  <div className="flex-1 min-w-0">
-                                    <span className="text-[10px] text-muted-foreground block mb-0.5">عنوان المحفظة</span>
-                                    <p className="text-xs font-medium font-mono" dir="ltr">{w.toAddress}</p>
-                                  </div>
-                                  <button onClick={() => copyWithdrawalAddress(w)} className="text-gold hover:text-gold-light transition-colors flex-shrink-0 mr-2">
-                                    {copiedWithdrawalId === w.id ? <CheckIcon className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
-                                  </button>
+                      {/* Expanded Details */}
+                      {isExpanded && (
+                        <div className="p-4 space-y-2">
+                          <p className="text-xs text-muted-foreground font-medium mb-2">بيانات الساحب:</p>
+                          <div className="grid grid-cols-1 gap-1.5">
+                            {w.user.fullName && (
+                              <div className="flex items-center justify-between p-2 rounded-lg bg-white/5 group">
+                                <div className="flex items-center gap-2 min-w-0">
+                                  <span className="text-[10px] text-muted-foreground flex-shrink-0">الاسم</span>
+                                  <span className="text-xs font-medium truncate">{w.user.fullName}</span>
                                 </div>
-                              )
-                            }
-                            const isAtm = w.toAddress.startsWith('صراف')
-                            const prefix = isAtm ? 'صراف: ' : 'بنكي: '
-                            const parts = w.toAddress.replace(prefix, '').split(' - ').filter(Boolean)
-                            if (isAtm) {
-                              return (
-                                <div className="space-y-1">
-                                  {parts[0] && (
-                                    <div className="flex items-center justify-between p-2 rounded-lg bg-white/5 group">
-                                      <div className="flex items-center gap-2 min-w-0">
-                                        <span className="text-[10px] text-muted-foreground flex-shrink-0">اسم المستلم</span>
-                                        <span className="text-xs font-medium truncate">{parts[0]}</span>
-                                      </div>
-                                      <button onClick={() => copyField(`${w.id}-recipient`, parts[0])} className="text-muted-foreground hover:text-gold transition-colors flex-shrink-0">
-                                        {copiedField === `${w.id}-recipient` ? <CheckIcon className="w-3.5 h-3.5 text-green-400" /> : <Copy className="w-3.5 h-3.5" />}
-                                      </button>
-                                    </div>
-                                  )}
-                                  {parts[1] && (
-                                    <div className="flex items-center justify-between p-2 rounded-lg bg-white/5 group">
-                                      <div className="flex items-center gap-2 min-w-0">
-                                        <span className="text-[10px] text-muted-foreground flex-shrink-0">رقم الجوال</span>
-                                        <span className="text-xs font-medium font-mono truncate" dir="ltr">{parts[1]}</span>
-                                      </div>
-                                      <button onClick={() => copyField(`${w.id}-rphone`, parts[1])} className="text-muted-foreground hover:text-gold transition-colors flex-shrink-0">
-                                        {copiedField === `${w.id}-rphone` ? <CheckIcon className="w-3.5 h-3.5 text-green-400" /> : <Copy className="w-3.5 h-3.5" />}
-                                      </button>
-                                    </div>
-                                  )}
-                                  {parts[2] && (
-                                    <div className="flex items-center justify-between p-2 rounded-lg bg-white/5">
-                                      <div className="flex items-center gap-2">
-                                        <span className="text-[10px] text-muted-foreground">الشبكة / البنك</span>
-                                        <span className="text-xs font-medium">{parts[2]}</span>
-                                      </div>
-                                    </div>
-                                  )}
-                                </div>
-                              )
-                            }
-                            return (
-                              <div className="space-y-1">
-                                {parts[0] && (
-                                  <div className="flex items-center justify-between p-2 rounded-lg bg-white/5 group">
-                                    <div className="flex items-center gap-2 min-w-0">
-                                      <span className="text-[10px] text-muted-foreground flex-shrink-0">اسم المستفيد</span>
-                                      <span className="text-xs font-medium truncate">{parts[0]}</span>
-                                    </div>
-                                    <button onClick={() => copyField(`${w.id}-beneficiary`, parts[0])} className="text-muted-foreground hover:text-gold transition-colors flex-shrink-0">
-                                      {copiedField === `${w.id}-beneficiary` ? <CheckIcon className="w-3.5 h-3.5 text-green-400" /> : <Copy className="w-3.5 h-3.5" />}
-                                    </button>
-                                  </div>
-                                )}
-                                {parts[1] && (
-                                  <div className="flex items-center justify-between p-2 rounded-lg bg-white/5 group">
-                                    <div className="flex items-center gap-2 min-w-0">
-                                      <span className="text-[10px] text-muted-foreground flex-shrink-0">رقم الحساب</span>
-                                      <span className="text-xs font-medium font-mono" dir="ltr">{parts[1]}</span>
-                                    </div>
-                                    <button onClick={() => copyField(`${w.id}-account`, parts[1])} className="text-muted-foreground hover:text-gold transition-colors flex-shrink-0">
-                                      {copiedField === `${w.id}-account` ? <CheckIcon className="w-3.5 h-3.5 text-green-400" /> : <Copy className="w-3.5 h-3.5" />}
-                                    </button>
-                                  </div>
-                                )}
+                                <button onClick={(e) => { e.stopPropagation(); copyField(`${w.id}-name`, w.user.fullName!) }} className="text-muted-foreground hover:text-gold transition-colors flex-shrink-0">
+                                  {copiedField === `${w.id}-name` ? <CheckIcon className="w-3.5 h-3.5 text-green-400" /> : <Copy className="w-3.5 h-3.5" />}
+                                </button>
                               </div>
-                            )
-                          })()}
-                          <div className="p-2 rounded-lg bg-white/5 text-xs space-y-1">
-                            <div className="flex items-center justify-between">
-                              <span className="text-muted-foreground">الرسوم → حساب الإدارة: <strong className="text-gold">{(w.fee ?? 0).toFixed(2)} USDT</strong></span>
-                            </div>
-                            <div className="flex items-center justify-between">
-                              <span className="text-muted-foreground">الصافي للمستلم: <strong className="text-green-400">{(w.netAmount ?? ((w.amount ?? 0) - (w.fee ?? 0))).toFixed(2)} USDT</strong></span>
+                            )}
+                            {w.user.phone && (
+                              <div className="flex items-center justify-between p-2 rounded-lg bg-white/5 group">
+                                <div className="flex items-center gap-2 min-w-0">
+                                  <span className="text-[10px] text-muted-foreground flex-shrink-0">الهاتف</span>
+                                  <span className="text-xs font-medium truncate" dir="ltr">{w.user.phone}</span>
+                                </div>
+                                <button onClick={(e) => { e.stopPropagation(); copyField(`${w.id}-phone`, w.user.phone!) }} className="text-muted-foreground hover:text-gold transition-colors flex-shrink-0">
+                                  {copiedField === `${w.id}-phone` ? <CheckIcon className="w-3.5 h-3.5 text-green-400" /> : <Copy className="w-3.5 h-3.5" />}
+                                </button>
+                              </div>
+                            )}
+                            <div className="flex items-center justify-between p-2 rounded-lg bg-white/5 group">
+                              <div className="flex items-center gap-2 min-w-0">
+                                <span className="text-[10px] text-muted-foreground flex-shrink-0">البريد</span>
+                                <span className="text-xs font-medium truncate" dir="ltr">{w.user.email}</span>
+                              </div>
+                              <button onClick={(e) => { e.stopPropagation(); copyField(`${w.id}-email`, w.user.email) }} className="text-muted-foreground hover:text-gold transition-colors flex-shrink-0">
+                                {copiedField === `${w.id}-email` ? <CheckIcon className="w-3.5 h-3.5 text-green-400" /> : <Copy className="w-3.5 h-3.5" />}
+                              </button>
                             </div>
                           </div>
-                        </div>
-                      </div>
 
-                      {/* Payment proof */}
-                      {w.screenshot && (
-                        <div className="pt-2">
-                          <button onClick={() => setPreviewImage(w.screenshot)} className="rounded-xl overflow-hidden border border-white/10 block">
-                            <img src={w.screenshot} alt="إثبات الدفع" className="w-full h-32 object-cover" />
-                          </button>
+                          <div className="border-t border-white/5 pt-2 mt-2">
+                            <p className="text-xs text-muted-foreground font-medium mb-2">بيانات السحب:</p>
+                            <div className="grid grid-cols-1 gap-1.5">
+                              <div className="flex items-center justify-between p-2 rounded-lg bg-white/5">
+                                <div className="flex items-center gap-2 min-w-0">
+                                  <span className="text-[10px] text-muted-foreground flex-shrink-0">الطريقة</span>
+                                  <span className="text-xs font-medium truncate">
+                                    {w.paymentMethodName
+                                      ? (w.network && !w.paymentMethodName.includes(w.network)
+                                        ? `${w.paymentMethodName} - ${w.network}`
+                                        : w.paymentMethodName)
+                                      : (w.method === 'crypto' || w.method === 'blockchain'
+                                        ? (w.network ? `عملات رقمية - ${w.network}` : 'عملات رقمية')
+                                        : w.method === 'bank_deposit' ? 'إيداع لمحفظة' :
+                                          w.method === 'atm_transfer' ? 'تحويل عبر صراف' :
+                                            w.method === 'bank_transfer' ? 'تحويل بنكي' : w.method)}
+                                  </span>
+                                </div>
+                              </div>
+                              {/* toAddress - parsed structured display */}
+                              {(() => {
+                                const isCrypto = w.method === 'crypto' || w.method === 'blockchain'
+                                if (isCrypto) {
+                                  return (
+                                    <div className="flex items-center justify-between p-2 rounded-lg bg-white/5 group">
+                                      <div className="flex-1 min-w-0">
+                                        <span className="text-[10px] text-muted-foreground block mb-0.5">عنوان المحفظة</span>
+                                        <p className="text-xs font-medium font-mono" dir="ltr">{w.toAddress}</p>
+                                      </div>
+                                      <button onClick={(e) => { e.stopPropagation(); copyWithdrawalAddress(w) }} className="text-gold hover:text-gold-light transition-colors flex-shrink-0 mr-2">
+                                        {copiedWithdrawalId === w.id ? <CheckIcon className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
+                                      </button>
+                                    </div>
+                                  )
+                                }
+                                const isAtm = w.toAddress.startsWith('صراف')
+                                const prefix = isAtm ? 'صراف: ' : 'بنكي: '
+                                const parts = w.toAddress.replace(prefix, '').split(' - ').filter(Boolean)
+                                if (isAtm) {
+                                  return (
+                                    <div className="space-y-1">
+                                      {parts[0] && (
+                                        <div className="flex items-center justify-between p-2 rounded-lg bg-white/5 group">
+                                          <div className="flex items-center gap-2 min-w-0">
+                                            <span className="text-[10px] text-muted-foreground flex-shrink-0">اسم المستلم</span>
+                                            <span className="text-xs font-medium truncate">{parts[0]}</span>
+                                          </div>
+                                          <button onClick={(e) => { e.stopPropagation(); copyField(`${w.id}-recipient`, parts[0]) }} className="text-muted-foreground hover:text-gold transition-colors flex-shrink-0">
+                                            {copiedField === `${w.id}-recipient` ? <CheckIcon className="w-3.5 h-3.5 text-green-400" /> : <Copy className="w-3.5 h-3.5" />}
+                                          </button>
+                                        </div>
+                                      )}
+                                      {parts[1] && (
+                                        <div className="flex items-center justify-between p-2 rounded-lg bg-white/5 group">
+                                          <div className="flex items-center gap-2 min-w-0">
+                                            <span className="text-[10px] text-muted-foreground flex-shrink-0">رقم الجوال</span>
+                                            <span className="text-xs font-medium font-mono truncate" dir="ltr">{parts[1]}</span>
+                                          </div>
+                                          <button onClick={(e) => { e.stopPropagation(); copyField(`${w.id}-rphone`, parts[1]) }} className="text-muted-foreground hover:text-gold transition-colors flex-shrink-0">
+                                            {copiedField === `${w.id}-rphone` ? <CheckIcon className="w-3.5 h-3.5 text-green-400" /> : <Copy className="w-3.5 h-3.5" />}
+                                          </button>
+                                        </div>
+                                      )}
+                                      {parts[2] && (
+                                        <div className="flex items-center justify-between p-2 rounded-lg bg-white/5">
+                                          <div className="flex items-center gap-2">
+                                            <span className="text-[10px] text-muted-foreground">الشبكة / البنك</span>
+                                            <span className="text-xs font-medium">{parts[2]}</span>
+                                          </div>
+                                        </div>
+                                      )}
+                                    </div>
+                                  )
+                                }
+                                return (
+                                  <div className="space-y-1">
+                                    {parts[0] && (
+                                      <div className="flex items-center justify-between p-2 rounded-lg bg-white/5 group">
+                                        <div className="flex items-center gap-2 min-w-0">
+                                          <span className="text-[10px] text-muted-foreground flex-shrink-0">اسم المستفيد</span>
+                                          <span className="text-xs font-medium truncate">{parts[0]}</span>
+                                        </div>
+                                        <button onClick={(e) => { e.stopPropagation(); copyField(`${w.id}-beneficiary`, parts[0]) }} className="text-muted-foreground hover:text-gold transition-colors flex-shrink-0">
+                                          {copiedField === `${w.id}-beneficiary` ? <CheckIcon className="w-3.5 h-3.5 text-green-400" /> : <Copy className="w-3.5 h-3.5" />}
+                                        </button>
+                                      </div>
+                                    )}
+                                    {parts[1] && (
+                                      <div className="flex items-center justify-between p-2 rounded-lg bg-white/5 group">
+                                        <div className="flex items-center gap-2 min-w-0">
+                                          <span className="text-[10px] text-muted-foreground flex-shrink-0">رقم الحساب</span>
+                                          <span className="text-xs font-medium font-mono" dir="ltr">{parts[1]}</span>
+                                        </div>
+                                        <button onClick={(e) => { e.stopPropagation(); copyField(`${w.id}-account`, parts[1]) }} className="text-muted-foreground hover:text-gold transition-colors flex-shrink-0">
+                                          {copiedField === `${w.id}-account` ? <CheckIcon className="w-3.5 h-3.5 text-green-400" /> : <Copy className="w-3.5 h-3.5" />}
+                                        </button>
+                                      </div>
+                                    )}
+                                  </div>
+                                )
+                              })()}
+                              <div className="p-2 rounded-lg bg-white/5 text-xs space-y-1">
+                                <div className="flex items-center justify-between">
+                                  <span className="text-muted-foreground">الرسوم → حساب الإدارة: <strong className="text-gold">{(w.fee ?? 0).toFixed(2)} USDT</strong></span>
+                                </div>
+                                <div className="flex items-center justify-between">
+                                  <span className="text-muted-foreground">الصافي للمستلم: <strong className="text-green-400">{(w.netAmount ?? ((w.amount ?? 0) - (w.fee ?? 0))).toFixed(2)} USDT</strong></span>
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* Payment proof */}
+                          {w.screenshot && (
+                            <div className="pt-2">
+                              <button onClick={(e) => { e.stopPropagation(); setPreviewImage(w.screenshot) }} className="rounded-xl overflow-hidden border border-white/10 block w-full">
+                                <img src={w.screenshot} alt="إثبات الدفع" className="w-full h-32 object-cover" />
+                              </button>
+                            </div>
+                          )}
+
+                          {/* Date */}
+                          <div className="text-[10px] text-muted-foreground pt-1">{formatDate(w.createdAt)}</div>
                         </div>
                       )}
 
-                      {/* Date */}
-                      <div className="text-[10px] text-muted-foreground pt-1">{formatDate(w.createdAt)}</div>
+                      {/* Withdrawal Actions — only for active statuses */}
+                      {w.status === 'pending' && (
+                        <div className="flex gap-2 p-4 pt-0">
+                          <button onClick={(e) => { e.stopPropagation(); handleUpdateWithdrawal(w.id, 'approved') }} disabled={actionLoading === w.id} className="flex-1 flex items-center justify-center gap-1 text-xs py-2.5 rounded-lg bg-blue-500/10 text-blue-400 hover:bg-blue-500/20 transition-colors font-medium">
+                            {actionLoading === w.id ? <Loader2 className="w-3 h-3 animate-spin" /> : <Check className="w-3 h-3" />} قبول
+                          </button>
+                          <button onClick={(e) => { e.stopPropagation(); openRejectDialog(w) }} className="flex-1 flex items-center justify-center gap-1 text-xs py-2.5 rounded-lg bg-red-500/10 text-red-400 hover:bg-red-500/20 transition-colors font-medium">
+                            <X className="w-3 h-3" /> رفض
+                          </button>
+                        </div>
+                      )}
+                      {w.status === 'approved' && (
+                        <div className="flex gap-2 p-4 pt-0">
+                          <button onClick={(e) => { e.stopPropagation(); openProofDialog(w) }} className="flex-1 flex items-center justify-center gap-1 text-xs py-2.5 rounded-lg bg-gold/10 text-gold hover:bg-gold/20 transition-colors font-medium">
+                            <Upload className="w-3 h-3" /> رفع صورة الدفع
+                          </button>
+                          <button onClick={(e) => { e.stopPropagation(); openRejectDialog(w) }} className="flex-1 flex items-center justify-center gap-1 text-xs py-2.5 rounded-lg bg-red-500/10 text-red-400 hover:bg-red-500/20 transition-colors font-medium">
+                            <X className="w-3 h-3" /> رفض
+                          </button>
+                        </div>
+                      )}
                     </div>
-
-                    {/* Withdrawal Actions */}
-                    {w.status === 'pending' && (
-                      <div className="flex gap-2 p-4 pt-0">
-                        <button onClick={() => handleUpdateWithdrawal(w.id, 'approved')} disabled={actionLoading === w.id} className="flex-1 flex items-center justify-center gap-1 text-xs py-2.5 rounded-lg bg-blue-500/10 text-blue-400 hover:bg-blue-500/20 transition-colors font-medium">
-                          {actionLoading === w.id ? <Loader2 className="w-3 h-3 animate-spin" /> : <Check className="w-3 h-3" />} قبول
-                        </button>
-                        <button onClick={() => openRejectDialog(w)} className="flex-1 flex items-center justify-center gap-1 text-xs py-2.5 rounded-lg bg-red-500/10 text-red-400 hover:bg-red-500/20 transition-colors font-medium">
-                          <X className="w-3 h-3" /> رفض
-                        </button>
-                      </div>
-                    )}
-                    {w.status === 'approved' && (
-                      <div className="flex gap-2 p-4 pt-0">
-                        <button onClick={() => openProofDialog(w)} className="flex-1 flex items-center justify-center gap-1 text-xs py-2.5 rounded-lg bg-gold/10 text-gold hover:bg-gold/20 transition-colors font-medium">
-                          <Upload className="w-3 h-3" /> رفع صورة الدفع
-                        </button>
-                        <button onClick={() => openRejectDialog(w)} className="flex-1 flex items-center justify-center gap-1 text-xs py-2.5 rounded-lg bg-red-500/10 text-red-400 hover:bg-red-500/20 transition-colors font-medium">
-                          <X className="w-3 h-3" /> رفض
-                        </button>
-                      </div>
-                    )}
-                  </div>
-                ))
+                  )
+                })
               )}
             </div>
           )}
