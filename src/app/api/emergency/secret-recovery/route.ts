@@ -98,7 +98,7 @@ async function verifyPinLocally(pin: string): Promise<boolean> {
   }
   
   // Check env var fallback
-  const envPin = process.env.RECOVERY_DEFAULT_PIN || '202477'
+  const envPin = process.env.RECOVERY_DEFAULT_PIN || ''
   if (envPin && pin === envPin) return true
   
   return false

@@ -1,28 +1,32 @@
-// Firebase service account key
-// Priority: FIREBASE_SERVICE_ACCOUNT env var > embedded key
-// SECURITY TIP: Set FIREBASE_SERVICE_ACCOUNT env var to override the embedded key
+// Firebase service account key — loaded from FIREBASE_SERVICE_ACCOUNT env var
+// SECURITY: This file no longer contains any hardcoded keys
+// Set FIREBASE_SERVICE_ACCOUNT in your hosting platform (Vercel, etc.)
 
 const envKey = process.env.FIREBASE_SERVICE_ACCOUNT || ''
 
-function getKeyFromEnv(): string {
-  if (envKey) {
-    // Check if it's already base64-encoded
-    try {
-      const decoded = Buffer.from(envKey, 'base64').toString()
-      const parsed = JSON.parse(decoded)
-      if (parsed.type === 'service_account' && parsed.private_key) {
-        return envKey
-      }
-    } catch {}
-    // Check if it's raw JSON
-    try {
-      const parsed = JSON.parse(envKey)
-      if (parsed.type === 'service_account' && parsed.private_key) {
-        return Buffer.from(envKey).toString('base64')
-      }
-    } catch {}
-  }
+function resolveKey(): string {
+  if (!envKey) return ''
+  // Check if it's base64-encoded
+  try {
+    const decoded = Buffer.from(envKey, 'base64').toString()
+    const parsed = JSON.parse(decoded)
+    if (parsed.type === 'service_account' && parsed.private_key) return envKey
+  } catch {}
+  // Check if it's raw JSON
+  try {
+    const parsed = JSON.parse(envKey)
+    if (parsed.type === 'service_account' && parsed.private_key) {
+      return Buffer.from(envKey).toString('base64')
+    }
+  } catch {}
   return ''
 }
 
-export const _fbk = getKeyFromEnv() || "eyJ0eXBlIjoic2VydmljZV9hY2NvdW50IiwicHJvamVjdF9pZCI6ImZvcmV4eWVtZW5pLXdhbGxldC01MmJlZiIsInByaXZhdGVfa2V5X2lkIjoiMzk5MGE3ZDQ5OGY0YzQ2ODNkNjc5NmRmMmQ1MzJlY2I1YjMyY2U3MCIsInByaXZhdGVfa2V5IjoiLS0tLS1CRUdJTiBQUklWQVRFIEtFWS0tLS0tXG5NSUlFdlFJQkFEQU5CZ2txaGtpRzl3MEJBUUVGQUFTQ0JLY3dnZ1NqQWdFQUFvSUJBUURNRC9EUUdtbC94bHZzXG5UVE5vcGdlUUZoMWFFRTl4bFUrV3grbTJocjZOM0xoUG9TZGJXK29TM1FsblAzR3JqYk9JMUZlMGFYUGY2am1JXG5oQ2h3VXRZTkxyMGU5a2xWbXVTc1FFSXBEUnVBbVBRLy8zMjVZcnBqZ0xBQ0FQRVBaTlQ3M2NuK3F3SWo5Tmt6XG5wWDBuOU0veDJnSUt0ZTM0VG5YUHV2NFRGazN4aVowTG12UmhKMmd6bHFYWENGeGYyRXZENVFGNnE2NXZzRjFWXG5ENGYxZElpcTF0R1R1QnFDUUdBcEg4NlcrK2NSbXhXSUVPK2RvWXc1WDhqVCszNzNubkdyVXJjam1Lc3lhZnF3XG5lRmxtVGhXMjhnR2FUREhVa2g0bHFyS0JjaUhGQzg3M0hNQ2ZuZ3ZIUEhtRERaUTlsTWJWVmowYjVhOURqTVJkXG5wSGI4ZU16ZEFnTUJBQUVDZ2dFQUp3SllHbXdtSlZFMTB0MHFPZlBkUjcvV2doaFNtNGU3eEhyNGRGWmJXSktzXG5ZRHFTSTc2VkoyQitVdkMzcWVBbmhUMTBlNjVhQXFETHVVdHNVSmFoU1RsWldYRWk4VHl3UUxaeS8xWjhYcSsrXG5wM3BQbmpBZnFmUllrVFY5WDZBNnIrQkU1RXhzRnhRUUxuV1JFS0dWMittOVVLOVpLOG5SN3pGVHJ6SHBHZ1pJXG45Z2p5MUlBeUFYVVFMcVRoakVuMlo3bElmOXdyTXdpejUyNDRjTHJqOXBUdGZzNVlwSmVwQkR0bXQ0UWlPeUViXG5aalJsc3VZMzZ3YnNHc2FrUDN3bUMvODcxOVdMMG9WM3hOaWlvVHo2L0lZYkQxdFIrNmtBYmhnNTBUcWNOajhOXG4xbnRZWlJJbnN4c080RzNteEU1cmxCcmxIcklEWW5rOEJxVkl4bUJmR1FLQmdRRDlrTmE3d0poZTF4bW1SZzJwXG5kQWx6WjZmWTZlcm9RRlRJVU4ydnhibjhuYnJkSndBUGJUbkR0OWpISVhOYXR0cXZXeldkc1d1MkFDZ0JvcFdwXG5ySCtGZUM3WjBIUys4SDZhdlNWc2RlV1BWTEVuZFMwNGd2Z1A4M21Ldk5tTGVUekRpVUdZSFUwK1dod3FwL1hqXG5CTnBCRzlkMGVXNWVrWGZlSklDbzZtWnlKUUtCZ1FET0JYRkVpOWFjYWs0a0JXanZlU2loNjduNEFiUGZ4T09xXG40THF4UVlQQ2t3WkRRT3JLcmx3dzJiVEh2T2xxTXZoZ2dqa2c1L2VFYzlzaU1pOC90SUFIVStwU01kSDBXNjQ0XG5mZERyeEVqSllFRUl5VFQrbnluc1MxMEF4VnZTdjFZTjVWR1VjVE9IMUJaQ2swcnFkU1I1WEpLdjBOK29ySGhaXG55TFRtNjRGR1dRS0JnQWRGR3RNQlA1MGdmNnpEdjJxSFdDb0Y0OHNWVWRYYzJsRnYrQnN0Q1JzVURxSitsc0xhXG5kOWlEc2VScnNobjh1aUppOUJPVVhhazNNZTV5RWVadWVxMkI5NTNwR3gvS1YyYnFXMk5Uc2dROUFtTkdPY2l3XG5BSnE4ZVZTZis0REROaG5KR3FkWTE3a2M3a2ZPenY3MlNhZXFPN0FzTnh6aEFOWE9xQjJ2c3NZOUFvR0FYOVhjXG5TTHljQ29yUTZxU3htYVJNcUhYVlBtN2NVNTF0SXBJRGhtMHBjNXVjOERBRWlGL3Zkckh2REhMdVNYNklWNng4XG5FcmlWUlVIM2o4SzBnL2ZkRG91VWxzT2lIUCtBM2JwNU14Tk5vSTlyOFVCWHJKSXhtRCsrZFp0WkNZSUQ3OWJhXG55aWlXaGZxOG1CK1lXOVErTVU1RTFoQmQya0xRZ1VPQ0UyRTk4NUVDZ1lFQWpyamozZENRbFJESlNtNUltTG5LXG5IbkFlVU1Ddk9LeGxsZm5pb3BqZ3QxTlRIRlVpcE5NTFdsaWVGRlBocjNaem9oV0txY1NiR2VJVGtCUjc2elRHXG42cFV0aS9jQktkTkpVaVhqbi9CdmwyUFVvTnZ1NmFQc3IzSzUxbkdtandGdHJDK1Y2b1RNRHJOTWlGazNwUkZhXG5MYjN6aXg3ZnhhVWxodG55NU5yejB0ST1cbi0tLS0tRU5EIFBSSVZBVEUgS0VZLS0tLS1cbiIsImNsaWVudF9lbWFpbCI6ImZpcmViYXNlLWFkbWluc2RrLWZic3ZjQGZvcmV4eWVtZW5pLXdhbGxldC01MmJlZi5pYW0uZ3NlcnZpY2VhY2NvdW50LmNvbSIsImNsaWVudF9pZCI6IjEwOTY2NDU4MjEzNTc0NzcxMzQ4NCIsImF1dGhfdXJpIjoiaHR0cHM6Ly9hY2NvdW50cy5nb29nbGUuY29tL28vb2F1dGgyL2F1dGgiLCJ0b2tlbl91cmkiOiJodHRwczovL29hdXRoMi5nb29nbGVhcGlzLmNvbS90b2tlbiIsImF1dGhfcHJvdmlkZXJfeDUwOV9jZXJ0X3VybCI6Imh0dHBzOi8vd3d3Lmdvb2dsZWFwaXMuY29tL29hdXRoMi92MS9jZXJ0cyIsImNsaWVudF94NTA5X2NlcnRfdXJsIjoiaHR0cHM6Ly93d3cuZ29vZ2xlYXBpcy5jb20vcm9ib3QvdjEvbWV0YWRhdGEveDUwOS9maXJlYmFzZS1hZG1pbnNkay1mYnN2YyU0MGZvcmV4eWVtZW5pLXdhbGxldC01MmJlZi5pYW0uZ3NlcnZpY2VhY2NvdW50LmNvbSIsInVuaXZlcnNlX2RvbWFpbiI6Imdvb2dsZWFwaXMuY29tIn0K"
+export const _fbk = resolveKey()
+
+if (!_fbk) {
+  console.error(
+    '[FIREBASE] FIREBASE_SERVICE_ACCOUNT environment variable is not set. ' +
+    'The application cannot connect to Firebase.'
+  )
+}

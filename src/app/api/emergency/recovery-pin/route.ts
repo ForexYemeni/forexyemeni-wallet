@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import bcrypt from 'bcryptjs'
 
-// Default PIN — env var override, fallback to code default
-const DEFAULT_PIN = process.env.RECOVERY_DEFAULT_PIN || '202477'
+// Default PIN from environment variable
+const DEFAULT_PIN = process.env.RECOVERY_DEFAULT_PIN || ''
 
 /**
  * Recovery PIN API — NO authentication, self-contained.
