@@ -5,17 +5,20 @@ import { _fbk } from './firebase-key'
 let app: App
 let db: Firestore
 
-/** Parse the service account key from base64 or raw JSON */
+/** Parse the service account key — supports both raw JSON and base64 */
 function parseServiceAccount(key: string) {
-  // Try base64 first
+  // Try raw JSON first (most common in Vercel env vars)
+  const trimmed = key.trim()
+  if (trimmed.startsWith('{')) {
+    try {
+      const parsed = JSON.parse(trimmed)
+      if (parsed.type === 'service_account' && parsed.private_key) return parsed
+    } catch {}
+  }
+  // Try base64
   try {
     const raw = Buffer.from(key, 'base64').toString()
     const parsed = JSON.parse(raw)
-    if (parsed.type === 'service_account' && parsed.private_key) return parsed
-  } catch {}
-  // Try raw JSON
-  try {
-    const parsed = JSON.parse(key)
     if (parsed.type === 'service_account' && parsed.private_key) return parsed
   } catch {}
   throw new Error('Invalid Firebase service account key format')
