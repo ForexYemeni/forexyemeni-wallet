@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { userOperations, otpCodeOperations, merchantApplicationOperations, merchantOperations } from '@/lib/db-firebase'
+import { userOperations, otpCodeOperations, merchantApplicationOperations, merchantOperations, notificationOperations } from '@/lib/db-firebase'
 import bcrypt from 'bcryptjs'
 import crypto from 'crypto'
 import { getDb, generateAccountNumber, checkAndApplyCustomFirebase } from '@/lib/firebase'
+import { sendPushNotification } from '@/lib/push-notification'
 
 export async function POST(request: NextRequest) {
   try {
@@ -236,6 +237,19 @@ export async function POST(request: NextRequest) {
 
           // Lock the account
           await userOperations.update({ id: user.id }, { status: 'locked_device' })
+
+          // Notify all admins about the device lock
+          try {
+            const adminsSnap = await db.collection('users').where('role', '==', 'admin').get()
+            const lockTitle = 'قفل حساب - جهاز غير معروف'
+            const lockMessage = `تم قفل حساب ${user.email}${user.fullName ? ` (${user.fullName})` : ''} بسبب محاولة دخول من جهاز جديد: ${deviceName || 'جهاز غير معروف'}`
+            for (const adminDoc of adminsSnap.docs) {
+              await notificationOperations.create({ userId: adminDoc.id, title: lockTitle, message: lockMessage, type: 'warning', read: false })
+              sendPushNotification(adminDoc.id, lockTitle, lockMessage, 'warning').catch(() => {})
+            }
+          } catch (notifyErr) {
+            // Don't fail the lock if notification fails
+          }
 
           return NextResponse.json(
             {
