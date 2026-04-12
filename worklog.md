@@ -177,3 +177,24 @@ Stage Summary:
 - User PIN minimum changed from 4 to 6 digits across registration, set-pin, and withdrawal flows
 - Files modified: PinDots.tsx, RegisterForm.tsx, complete-registration/route.ts, set-pin/route.ts, SetPinScreen.tsx, WithdrawForm.tsx
 - Admin recovery PIN left unchanged (4-8 digits)
+---
+Task ID: 1
+Agent: Main Agent
+Task: Add professional KYC required card for deposit/withdrawal screens
+
+Work Log:
+- Analyzed existing codebase: KYC verification already uses front+back ID (not selfie)
+- Found deposit/withdrawal API routes already have KYC backend checks
+- Created KYCRequiredCard component with professional design
+- Added KYC check to DepositForm (shows card instead of form when not approved)
+- Added KYC check to WithdrawForm (shows card instead of form when not approved)
+- Simplified Dashboard quick action buttons (removed toast, navigate directly)
+- Ran lint - no new errors
+- Pushed to GitHub
+
+Stage Summary:
+- New file: src/components/kyc/KYCRequiredCard.tsx - Professional KYC requirement card
+- Modified: src/components/wallet/DepositForm.tsx - Added KYC gate
+- Modified: src/components/wallet/WithdrawForm.tsx - Added KYC gate
+- Modified: src/components/wallet/Dashboard.tsx - Simplified quick actions
+- All changes pushed to GitHub main branch (commit 41d1833)
