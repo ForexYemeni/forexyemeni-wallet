@@ -88,37 +88,39 @@ export async function GET(request: NextRequest) {
     const depositsThisMonthAmount = depositsThisMonth.filter(d => d.status === 'confirmed').reduce((sum, d) => sum + (d.netAmount || d.amount || 0), 0)
 
     // ====== WITHDRAWAL STATS ======
-    const [pendingWithdrawalsSnap, approvedWithdrawalsSnap, processingWithdrawalsSnap, allWithdrawalsSnap] = await Promise.all([
+    const [pendingWithdrawalsSnap, approvedWithdrawalsSnap, processingWithdrawalsSnap, completedWithdrawalsSnap, allWithdrawalsSnap] = await Promise.all([
       db.collection('withdrawals').where('status', '==', 'pending').get(),
       db.collection('withdrawals').where('status', '==', 'approved').get(),
       db.collection('withdrawals').where('status', '==', 'processing').get(),
+      db.collection('withdrawals').where('status', '==', 'completed').get(),
       db.collection('withdrawals').get(),
     ])
 
     const withdrawalsPending = pendingWithdrawalsSnap.size
     const withdrawalsApproved = approvedWithdrawalsSnap.size
     const withdrawalsProcessing = processingWithdrawalsSnap.size
+    const withdrawalsCompleted = completedWithdrawalsSnap.size
     
     const allWithdrawals = allWithdrawalsSnap.docs.map(d => ({ id: d.id, ...d.data() }))
     const withdrawalsRejected = allWithdrawals.filter(w => w.status === 'rejected').length
 
     const totalWithdrawalsAmount = allWithdrawals
-      .filter(w => w.status === 'processing' || w.status === 'approved')
+      .filter(w => w.status === 'processing' || w.status === 'approved' || w.status === 'completed')
       .reduce((sum, w) => sum + (w.amount || 0), 0)
 
     const totalWithdrawalFees = allWithdrawals
-      .filter(w => w.status === 'processing' || w.status === 'approved')
+      .filter(w => w.status === 'processing' || w.status === 'approved' || w.status === 'completed')
       .reduce((sum, w) => sum + (w.fee || 0), 0)
 
     const withdrawalsToday = allWithdrawals.filter(w => w.createdAt && new Date(w.createdAt).toDateString() === todayStr)
-    const withdrawalsTodayAmount = withdrawalsToday.filter(w => w.status === 'processing' || w.status === 'approved').reduce((sum, w) => sum + (w.amount || 0), 0)
-    const withdrawalsTodayCount = withdrawalsToday.filter(w => w.status === 'processing' || w.status === 'approved').length
+    const withdrawalsTodayAmount = withdrawalsToday.filter(w => w.status === 'processing' || w.status === 'approved' || w.status === 'completed').reduce((sum, w) => sum + (w.amount || 0), 0)
+    const withdrawalsTodayCount = withdrawalsToday.filter(w => w.status === 'processing' || w.status === 'approved' || w.status === 'completed').length
 
     const withdrawalsThisWeek = allWithdrawals.filter(w => w.createdAt && new Date(w.createdAt) >= weekAgo)
-    const withdrawalsThisWeekAmount = withdrawalsThisWeek.filter(w => w.status === 'processing' || w.status === 'approved').reduce((sum, w) => sum + (w.amount || 0), 0)
+    const withdrawalsThisWeekAmount = withdrawalsThisWeek.filter(w => w.status === 'processing' || w.status === 'approved' || w.status === 'completed').reduce((sum, w) => sum + (w.amount || 0), 0)
 
     const withdrawalsThisMonth = allWithdrawals.filter(w => w.createdAt && new Date(w.createdAt) >= thisMonthStart)
-    const withdrawalsThisMonthAmount = withdrawalsThisMonth.filter(w => w.status === 'processing' || w.status === 'approved').reduce((sum, w) => sum + (w.amount || 0), 0)
+    const withdrawalsThisMonthAmount = withdrawalsThisMonth.filter(w => w.status === 'processing' || w.status === 'approved' || w.status === 'completed').reduce((sum, w) => sum + (w.amount || 0), 0)
 
     // ====== FEE INCOME STATS ======
     const totalFees = totalDepositFees + totalWithdrawalFees
@@ -175,7 +177,7 @@ export async function GET(request: NextRequest) {
       totalDepositsAmount, totalDepositFees,
       depositsTodayCount, depositsTodayAmount,
       depositsThisWeekAmount, depositsThisMonthAmount,
-      withdrawalsPending, withdrawalsApproved, withdrawalsProcessing, withdrawalsRejected,
+      withdrawalsPending, withdrawalsApproved, withdrawalsProcessing, withdrawalsCompleted, withdrawalsRejected,
       totalWithdrawalsAmount, totalWithdrawalFees,
       withdrawalsTodayCount, withdrawalsTodayAmount,
       withdrawalsThisWeekAmount, withdrawalsThisMonthAmount,

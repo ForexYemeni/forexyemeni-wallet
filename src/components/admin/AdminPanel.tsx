@@ -1112,7 +1112,8 @@ export default function AdminPanel() {
   const WITHDRAWAL_STATUS_MAP: Record<string, { label: string; color: string }> = {
     pending: { label: 'معلق', color: 'text-yellow-400 bg-yellow-500/10' },
     approved: { label: 'تم قبول السحب - قيد المراجعة', color: 'text-blue-400 bg-blue-500/10' },
-    processing: { label: 'تم السحب', color: 'text-green-400 bg-green-500/10' },
+    processing: { label: 'تم السحب - بانتظار التأكيد', color: 'text-blue-400 bg-blue-500/10' },
+    completed: { label: 'مكتمل', color: 'text-green-400 bg-green-500/10' },
     rejected: { label: 'مرفوض', color: 'text-red-400 bg-red-500/10' },
   }
 
@@ -1344,8 +1345,8 @@ export default function AdminPanel() {
                       <span className="block text-[10px] text-muted-foreground/70 mt-0.5">≈ {formatYER(convertUSDTtoYER(stats.totalWithdrawalsAmount))}</span>
                       <div className="flex gap-3 mt-2 text-[10px]">
                         <span className="text-yellow-400">معلق: {stats.withdrawalsPending}</span>
-                        <span className="text-blue-400">قيد التنفيذ: {stats.withdrawalsApproved}</span>
-                        <span className="text-green-400">مكتمل: {stats.withdrawalsProcessing}</span>
+                        <span className="text-blue-400">قيد التنفيذ: {stats.withdrawalsApproved + stats.withdrawalsProcessing}</span>
+                        <span className="text-green-400">مكتمل: {stats.withdrawalsCompleted || 0}</span>
                       </div>
                     </div>
 
@@ -1444,14 +1445,16 @@ export default function AdminPanel() {
                             <div className="text-left">
                               <p className="text-sm font-bold">{(item.amount || 0).toLocaleString()} USDT</p>
                               <span className={`text-[10px] px-2 py-0.5 rounded-full ${
-                                item.status === 'confirmed' || item.status === 'processing' ? 'bg-green-500/10 text-green-400' :
+                                item.status === 'confirmed' || item.status === 'completed' ? 'bg-green-500/10 text-green-400' :
+                                item.status === 'processing' ? 'bg-blue-500/10 text-blue-400' :
                                 item.status === 'approved' ? 'bg-blue-500/10 text-blue-400' :
                                 item.status === 'pending' ? 'bg-yellow-500/10 text-yellow-400' :
                                 item.status === 'reviewing' ? 'bg-blue-500/10 text-blue-400' :
                                 'bg-red-500/10 text-red-400'
                               }`}>
                                 {item.status === 'confirmed' ? 'مؤكد' :
-                                 item.status === 'processing' ? 'مكتمل' :
+                                 item.status === 'completed' ? 'مكتمل' :
+                                 item.status === 'processing' ? 'بانتظار التأكيد' :
                                  item.status === 'approved' ? 'مقبول' :
                                  item.status === 'pending' ? 'معلق' :
                                  item.status === 'reviewing' ? 'قيد المراجعة' : 'مرفوض'}
