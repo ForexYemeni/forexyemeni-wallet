@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { userOperations, otpCodeOperations } from '@/lib/db-firebase'
 import { sendVerificationEmail } from '@/lib/email'
 import { getDb } from '@/lib/firebase'
+import crypto from 'crypto'
 
 export async function POST(request: NextRequest) {
   try {

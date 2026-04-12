@@ -3,6 +3,7 @@ import { userOperations, otpCodeOperations } from '@/lib/db-firebase'
 import { send2FACodeEmail } from '@/lib/email'
 import bcrypt from 'bcryptjs'
 import { authenticateRequest } from '@/lib/auth-server'
+import crypto from 'crypto'
 
 function generate6DigitCode(): string {
   return crypto.randomInt(100000, 1000000).toString()

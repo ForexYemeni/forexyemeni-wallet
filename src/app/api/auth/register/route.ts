@@ -4,6 +4,7 @@ import { sendVerificationEmail } from '@/lib/email'
 import { getDb, generateAffiliateCode, generateAccountNumber, checkAndApplyCustomFirebase } from '@/lib/firebase'
 import { checkApiRateLimit } from '@/lib/rate-limit'
 import bcrypt from 'bcryptjs'
+import crypto from 'crypto'
 
 // Rate limit: max 5 registrations per IP per minute
 const registerAttempts = new Map<string, { count: number; resetAt: number }>()

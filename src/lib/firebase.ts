@@ -28,7 +28,6 @@ export function initializeFirebase() {
     const serviceAccount = parseServiceAccount(_fbk)
     app = initializeApp({
       credential: cert(serviceAccount),
-      databaseURL: `https://${serviceAccount.project_id}.firebaseio.com`
     })
   }
   if (!db) db = getFirestore(app)
@@ -63,6 +62,8 @@ export async function getDefaultDb(): Promise<Firestore> {
     credential: firebaseCert(serviceAccount),
   }, `default-temp-${Date.now()}`)
   const defaultDb = getFs(tempApp)
+  // Force Firestore to connect by doing a lightweight read
+  await defaultDb.collection('_ping').doc('init').get().catch(() => {})
   return defaultDb
 }
 
@@ -76,9 +77,10 @@ async function createTempCustomDb(serviceAccountKeyJson: string): Promise<{ temp
   const { getFirestore: getFs } = await import('firebase-admin/firestore')
   const tempApp = initApp({
     credential: firebaseCert(serviceAccount),
-    databaseURL: `https://${serviceAccount.project_id}.firebaseio.com`
   }, `custom-test-${Date.now()}`)
   const tempDb = getFs(tempApp)
+  // Force Firestore to connect
+  await tempDb.collection('_ping').doc('init').get().catch(() => {})
   return {
     tempDb,
     cleanup: async () => { try { await delApp(tempApp) } catch {} }
@@ -106,7 +108,7 @@ export async function checkAndApplyCustomFirebase(): Promise<{ active: boolean; 
     try {
       customDoc = await withTimeout(
         defaultDb.collection('systemSettings').doc('customFirebase').get(),
-        8000,
+        15000,
         'Read custom config from default DB'
       )
     } catch (err) {
@@ -158,8 +160,8 @@ export async function checkAndApplyCustomFirebase(): Promise<{ active: boolean; 
     let testPassed = false
     try {
       await withTimeout(
-        tempDb.collection('systemSettings').doc('testConnection').get(),
-        5000, // 5 second timeout — dead DBs won't hang us
+        tempDb.collection('users').limit(1).get(),
+        15000, // 15 second timeout — allow for cold starts
         'Test custom DB connection'
       )
       testPassed = true
@@ -172,17 +174,10 @@ export async function checkAndApplyCustomFirebase(): Promise<{ active: boolean; 
     }
 
     if (!testPassed) {
-      // Custom DB is dead — clean up the stale config and stay on default
-      console.warn(`[Firebase] Falling back to default database. Deleting stale config for ${serviceAccount.project_id}...`)
-      
-      try {
-        const cleanupDb = await getDefaultDb()
-        try { await cleanupDb.collection('systemSettings').doc('customFirebase').delete() } catch {}
-        try { await (cleanupDb as any).app?.delete?.() } catch {}
-      } catch {}
-      
-      checkedCustomFirebase = true // Stale config deleted — mark as checked
-      return { active: false, fallback: true }
+      // Custom DB is unreachable — do NOT delete config, allow retry on next request
+      console.warn(`[Firebase] Custom database ${serviceAccount.project_id} is UNREACHABLE. Will retry on next request.`)
+      // Don't set checkedCustomFirebase — allow retry
+      return { active: false, fallback: false }
     }
 
     // Step 3: Custom DB is confirmed working — now switch global state
@@ -249,7 +244,6 @@ export function reinitializeFirebase(serviceAccountKeyJson: string): { app: App;
   const serviceAccount = parseServiceAccount(serviceAccountKeyJson)
   app = initializeApp({
     credential: cert(serviceAccount),
-    databaseURL: `https://${serviceAccount.project_id}.firebaseio.com`
   })
   db = getFirestore(app)
   return { app, db }

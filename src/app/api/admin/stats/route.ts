@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getDb } from '@/lib/firebase'
+import { ensureDb } from '@/lib/firebase'
 import { requireAdmin, verifyUserId } from '@/lib/auth-server'
 
 // In-memory cache for admin stats (TTL: 30 seconds)
@@ -22,7 +22,7 @@ export async function GET(request: NextRequest) {
       }, { headers: { 'Cache-Control': 'no-cache, no-store, must-revalidate' } })
     }
 
-    const db = getDb()
+    const db = await ensureDb()
 
     // ====== USER STATS ======
     // OPTIMIZED: Use targeted queries instead of fetching ALL users

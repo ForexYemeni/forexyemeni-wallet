@@ -3,7 +3,7 @@
 // Tokens are UUIDs stored in Firestore 'otpCodes' collection (type: 'login')
 
 import { NextRequest, NextResponse } from 'next/server'
-import { getDb } from './firebase'
+import { ensureDb } from './firebase'
 
 interface AuthUser {
   id: string
@@ -80,7 +80,7 @@ function extractToken(request: NextRequest, body?: Record<string, unknown>): str
  */
 async function verifyTokenInDb(token: string): Promise<AuthUser | null> {
   try {
-    const db = getDb()
+    const db = await ensureDb()
     
     // Find the token in otpCodes
     const tokenSnap = await db.collection('otpCodes')
@@ -219,7 +219,7 @@ export async function getVerifiedUserId(request: NextRequest, body?: Record<stri
  */
 export async function invalidateToken(token: string): Promise<void> {
   try {
-    const db = getDb()
+    const db = await ensureDb()
     const snap = await db.collection('otpCodes')
       .where('code', '==', token)
       .where('type', '==', 'login')

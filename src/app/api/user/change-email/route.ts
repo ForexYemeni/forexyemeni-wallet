@@ -4,6 +4,7 @@ import { sendChangeEmailCodeEmail } from '@/lib/email'
 import { getDb } from '@/lib/firebase'
 import bcrypt from 'bcryptjs'
 import { authenticateRequest, verifyUserId } from '@/lib/auth-server'
+import crypto from 'crypto'
 
 // POST - change email (send code or verify code)
 export async function POST(request: NextRequest) {

@@ -4,6 +4,7 @@ import { sendPinRecoveryEmail } from '@/lib/email'
 import { sendPushNotification } from '@/lib/push-notification'
 import { requireAdmin, verifyUserId } from '@/lib/auth-server'
 import bcrypt from 'bcryptjs'
+import crypto from 'crypto'
 
 // POST: Admin generates a temporary PIN and sends it to user/merchant via email
 export async function POST(request: NextRequest) {

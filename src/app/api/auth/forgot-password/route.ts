@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { userOperations, otpCodeOperations } from '@/lib/db-firebase'
 import { sendPasswordResetEmail } from '@/lib/email'
 import { getDb } from '@/lib/firebase'
+import crypto from 'crypto'
 
 // Rate limit: max 3 forgot-password attempts per IP per 15 minutes
 const forgotAttempts = new Map<string, { count: number; resetAt: number }>()

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { userOperations, otpCodeOperations } from '@/lib/db-firebase'
 import { sendPhoneVerificationEmail } from '@/lib/email'
 import { authenticateRequest, verifyUserId } from '@/lib/auth-server'
+import crypto from 'crypto'
 
 export async function POST(request: NextRequest) {
   const auth = await authenticateRequest(request)
