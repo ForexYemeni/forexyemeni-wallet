@@ -78,10 +78,17 @@ function groupTransactions(transactions: Transaction[]): { group: string; items:
   return ordered
 }
 
-function extractStatus(description: string | null): { label: string; className: string } | null {
+function extractStatus(type: string, description: string | null): { label: string; className: string } | null {
   if (!description) return null
   const lower = description.toLowerCase()
-  if (lower.includes('مكتمل') || lower.includes('ناجح') || lower.includes('موافق') || lower.includes('مؤكد')) {
+
+  // Check negative status first (higher priority)
+  if (lower.includes('مرفوض') || lower.includes('فشل') || lower.includes('rejected') || lower.includes('failed')) {
+    return { label: 'مرفوض', className: 'status-rejected' }
+  }
+
+  // Check positive status
+  if (lower.includes('مكتمل') || lower.includes('ناجح') || lower.includes('موافق') || lower.includes('مؤكد') || lower.includes('تم')) {
     return { label: 'مكتمل', className: 'status-confirmed' }
   }
   if (lower.includes('معلق') || lower.includes('قيد المراجعة') || lower.includes('بانتظار')) {
@@ -90,12 +97,16 @@ function extractStatus(description: string | null): { label: string; className: 
   if (lower.includes('مقبول') || lower.includes('approved')) {
     return { label: 'مقبول', className: 'status-approved' }
   }
-  if (lower.includes('مرفوض') || lower.includes('فشل') || lower.includes('rejected') || lower.includes('failed')) {
-    return { label: 'مرفوض', className: 'status-rejected' }
-  }
   if (lower.includes('قيد المعالجة') || lower.includes('processing')) {
     return { label: 'قيد المعالجة', className: 'status-processing' }
   }
+
+  // IMPORTANT: Rejected withdrawals/deposits NEVER create transactions in the DB.
+  // So if a withdrawal or deposit transaction exists, it's guaranteed completed.
+  if (type === 'withdrawal' || type === 'deposit') {
+    return { label: 'مكتمل', className: 'status-confirmed' }
+  }
+
   return null
 }
 
@@ -450,7 +461,7 @@ export default function TransactionHistory() {
               {/* Transactions in this group */}
               <div className="space-y-2 stagger-list">
                 {items.map((tx, index) => {
-                  const status = extractStatus(tx.description)
+                  const status = extractStatus(tx.type, tx.description)
                   const isExpanded = expandedTx === tx.id
                   const borderClass = getTxBorderClass(tx.type)
 
