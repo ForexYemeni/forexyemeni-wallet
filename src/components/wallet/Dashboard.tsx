@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react'
 import { useAuthStore } from '@/lib/store'
 import { useOfflineStore } from '@/lib/offline-store'
 import { useOfflineMode } from '@/hooks/useOfflineMode'
-import { convertUSDTtoYER, formatYER, ExchangeRateBadge, BalanceCurrencySelector } from '@/lib/currency'
+import { convertUSDTtoYER, convertUSDTtoSAR, formatYER, formatSAR, formatUSDT, BalanceCurrencySelector, useExchangeRates } from '@/lib/currency'
 import { toast } from 'sonner'
 import BannerSlider from '@/components/BannerSlider'
 import {
@@ -19,6 +19,11 @@ import {
   Copy,
   Check as CheckIcon,
   WifiOff,
+  ArrowRightLeft,
+  Wallet,
+  BadgeDollarSign,
+  Landmark,
+  Coins,
 } from 'lucide-react'
 import dynamic from 'next/dynamic'
 
@@ -40,6 +45,7 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(true)
   const [copiedAccount, setCopiedAccount] = useState(false)
   const [usingOffline, setUsingOffline] = useState(false)
+  const rates = useExchangeRates()
 
   // Combined data fetch — single API call for both transactions + user data
   useEffect(() => {
@@ -65,12 +71,9 @@ export default function Dashboard() {
     }
   }, [isOffline, cachedTransactions])
 
-  // OPTIMIZED: Single function replaces duplicate fetchTransactions + fetchLatestUserData
-  // Both were calling the same /api/transactions endpoint — now only 1 API call
   const fetchDashboardData = async () => {
     if (!user?.id) return
 
-    // If offline, use cached data
     if (!navigator.onLine) {
       if (cachedTransactions.length > 0) {
         setTransactions(cachedTransactions.slice(0, 5))
@@ -88,7 +91,6 @@ export default function Dashboard() {
         setTransactions(txs)
         setUsingOffline(false)
 
-        // Save to offline cache
         setCachedTransactions(data.transactions || [])
         setCachedUser({
           balance: data.balance ?? user?.balance ?? 0,
@@ -100,7 +102,6 @@ export default function Dashboard() {
         })
         setLastSyncTime()
 
-        // Update user data from server
         const updates: Record<string, unknown> = {}
         let needsUpdate = false
         if (data.balance !== null && data.balance !== undefined && data.balance !== user?.balance) {
@@ -120,7 +121,6 @@ export default function Dashboard() {
         }
       }
     } catch {
-      // Network error — try to use cached data
       if (cachedTransactions.length > 0) {
         setTransactions(cachedTransactions.slice(0, 5))
         setUsingOffline(true)
@@ -144,7 +144,9 @@ export default function Dashboard() {
     switch (type) {
       case 'deposit': return <ArrowDownLeft className="w-4 h-4 text-green-400" />
       case 'withdrawal': return <ArrowUpRight className="w-4 h-4 text-red-400" />
+      case 'transfer': return <Send className="w-4 h-4 text-blue-400" />
       case 'bonus': return <TrendingUp className="w-4 h-4 text-gold" />
+      case 'fee_income': return <BadgeDollarSign className="w-4 h-4 text-amber-400" />
       default: return <Clock className="w-4 h-4 text-muted-foreground" />
     }
   }
@@ -155,12 +157,18 @@ export default function Dashboard() {
       case 'withdrawal': return 'سحب'
       case 'transfer': return 'تحويل'
       case 'bonus': return 'مكافأة'
+      case 'fee_income': return 'رسوم'
       default: return type
     }
   }
 
+  // Balance converted to different currencies
+  const balance = user?.balance ?? 0
+  const balanceInYER = convertUSDTtoYER(balance, rates.usdToYer)
+  const balanceInSAR = convertUSDTtoSAR(balance, rates.usdToSar)
+
   return (
-    <div className="space-y-6 animate-fade-in">
+    <div className="space-y-5 animate-fade-in pb-24">
       {/* Offline Mode Indicator */}
       {usingOffline && (
         <div className="flex items-center gap-2 p-3 rounded-xl bg-amber-500/10 border border-amber-500/20 text-xs text-amber-400">
@@ -169,50 +177,52 @@ export default function Dashboard() {
         </div>
       )}
 
-      {/* Banner Slider */}
-      <BannerSlider />
-
-      {/* Exchange Rates Badge */}
-      <ExchangeRateBadge className="justify-center flex-wrap" />
-
-      {/* Balance Card */}
-      <div className="glass-card gold-border gold-glow p-6 relative overflow-hidden">
-        <div className="absolute top-0 left-0 w-32 h-32 bg-gold/5 rounded-full -translate-x-8 -translate-y-8" />
-        <div className="absolute bottom-0 right-0 w-24 h-24 bg-gold/5 rounded-full translate-x-6 translate-y-6" />
+      {/* Welcome + Balance Card */}
+      <div className="glass-card gold-border gold-glow p-5 relative overflow-hidden rounded-2xl">
+        {/* Decorative circles */}
+        <div className="absolute top-0 left-0 w-36 h-36 bg-gold/5 rounded-full -translate-x-10 -translate-y-10" />
+        <div className="absolute bottom-0 right-0 w-28 h-28 bg-gold/5 rounded-full translate-x-8 translate-y-8" />
+        <div className="absolute top-1/2 right-1/3 w-16 h-16 bg-gold/3 rounded-full" />
 
         <div className="relative space-y-4">
+          {/* Header */}
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <DollarSign className="w-5 h-5 text-gold" />
-              <span className="text-muted-foreground text-sm">رصيدك الحالي</span>
+              <div className="w-9 h-9 rounded-xl bg-gold/10 flex items-center justify-center">
+                <Wallet className="w-5 h-5 text-gold" />
+              </div>
+              <div>
+                <p className="text-xs text-muted-foreground">مرحباً، {user?.fullName || 'مستخدم'}</p>
+                <span className="text-[10px] text-muted-foreground bg-white/5 px-2 py-0.5 rounded-md">USDT TRC20</span>
+              </div>
             </div>
-            <span className="text-xs text-muted-foreground bg-white/5 px-2 py-1 rounded-md">USDT TRC20</span>
           </div>
 
+          {/* Balance */}
           <BalanceCurrencySelector
-            balance={user?.balance ?? 0}
+            balance={balance}
             frozenBalance={user?.frozenBalance ?? 0}
           />
 
           {/* Quick Actions */}
-          <div className="grid grid-cols-3 gap-3 pt-2">
+          <div className="grid grid-cols-3 gap-2.5 pt-1">
             <button
               onClick={() => setScreen('deposit')}
-              className="flex items-center justify-center gap-2 h-12 rounded-xl bg-green-500/10 border border-green-500/20 text-green-400 hover:bg-green-500/20 transition-all text-sm font-medium"
+              className="flex items-center justify-center gap-1.5 h-11 rounded-xl bg-green-500/10 border border-green-500/20 text-green-400 hover:bg-green-500/20 transition-all text-sm font-medium"
             >
               <ArrowDownLeft className="w-4 h-4" />
               إيداع
             </button>
             <button
               onClick={() => setScreen('withdraw')}
-              className="flex items-center justify-center gap-2 h-12 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400 hover:bg-red-500/20 transition-all text-sm font-medium"
+              className="flex items-center justify-center gap-1.5 h-11 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400 hover:bg-red-500/20 transition-all text-sm font-medium"
             >
               <ArrowUpRight className="w-4 h-4" />
               سحب
             </button>
             <button
               onClick={() => setScreen('transfer')}
-              className="flex items-center justify-center gap-2 h-12 rounded-xl bg-blue-500/10 border border-blue-500/20 text-blue-400 hover:bg-blue-500/20 transition-all text-sm font-medium"
+              className="flex items-center justify-center gap-1.5 h-11 rounded-xl bg-blue-500/10 border border-blue-500/20 text-blue-400 hover:bg-blue-500/20 transition-all text-sm font-medium"
             >
               <Send className="w-4 h-4" />
               تحويل
@@ -220,6 +230,98 @@ export default function Dashboard() {
           </div>
         </div>
       </div>
+
+      {/* ==================== Exchange Rate Cards ==================== */}
+      <div className="space-y-3">
+        <div className="flex items-center justify-between">
+          <h2 className="text-base font-bold flex items-center gap-2">
+            <ArrowRightLeft className="w-4 h-4 text-gold" />
+            أسعار الصرف
+          </h2>
+        </div>
+
+        <div className="grid grid-cols-3 gap-2.5">
+          {/* USD Dollar Card */}
+          <div className="glass-card p-3.5 rounded-xl space-y-3 relative overflow-hidden group hover:border-gold/30 transition-all">
+            <div className="absolute top-0 left-0 w-16 h-16 bg-emerald-500/5 rounded-full -translate-x-4 -translate-y-4 group-hover:scale-125 transition-transform" />
+            <div className="relative">
+              <div className="w-10 h-10 rounded-xl bg-emerald-500/10 flex items-center justify-center mb-2">
+                <DollarSign className="w-5 h-5 text-emerald-400" />
+              </div>
+              <p className="text-[10px] text-muted-foreground font-medium">الدولار</p>
+              <p className="text-sm font-bold text-emerald-400 mt-0.5" dir="ltr">USDT</p>
+            </div>
+            <div className="relative border-t border-white/5 pt-2.5">
+              <p className="text-[10px] text-muted-foreground">رصيدك</p>
+              <p className="text-sm font-bold text-foreground" dir="ltr">
+                {balance.toFixed(2)}
+              </p>
+            </div>
+          </div>
+
+          {/* YER Yemeni Card */}
+          <div className="glass-card p-3.5 rounded-xl space-y-3 relative overflow-hidden group hover:border-gold/30 transition-all">
+            <div className="absolute top-0 left-0 w-16 h-16 bg-blue-500/5 rounded-full -translate-x-4 -translate-y-4 group-hover:scale-125 transition-transform" />
+            <div className="relative">
+              <div className="w-10 h-10 rounded-xl bg-blue-500/10 flex items-center justify-center mb-2">
+                <Landmark className="w-5 h-5 text-blue-400" />
+              </div>
+              <p className="text-[10px] text-muted-foreground font-medium">ريال يمني</p>
+              <p className="text-sm font-bold text-blue-400 mt-0.5" dir="ltr">ر.ي</p>
+            </div>
+            <div className="relative border-t border-white/5 pt-2.5">
+              <p className="text-[10px] text-muted-foreground">رصيدك</p>
+              <p className="text-sm font-bold text-foreground" dir="ltr">
+                {balanceInYER.toLocaleString()}
+              </p>
+            </div>
+          </div>
+
+          {/* SAR Saudi Card */}
+          <div className="glass-card p-3.5 rounded-xl space-y-3 relative overflow-hidden group hover:border-gold/30 transition-all">
+            <div className="absolute top-0 left-0 w-16 h-16 bg-purple-500/5 rounded-full -translate-x-4 -translate-y-4 group-hover:scale-125 transition-transform" />
+            <div className="relative">
+              <div className="w-10 h-10 rounded-xl bg-purple-500/10 flex items-center justify-center mb-2">
+                <Coins className="w-5 h-5 text-purple-400" />
+              </div>
+              <p className="text-[10px] text-muted-foreground font-medium">ريال سعودي</p>
+              <p className="text-sm font-bold text-purple-400 mt-0.5" dir="ltr">ر.س</p>
+            </div>
+            <div className="relative border-t border-white/5 pt-2.5">
+              <p className="text-[10px] text-muted-foreground">رصيدك</p>
+              <p className="text-sm font-bold text-foreground" dir="ltr">
+                {balanceInSAR.toFixed(2)}
+              </p>
+            </div>
+          </div>
+        </div>
+
+        {/* Rates Info Bar */}
+        <div className="glass-card p-3 rounded-xl">
+          <div className="flex items-center justify-between text-[11px]">
+            <div className="flex items-center gap-1.5">
+              <span className="text-muted-foreground">1 USDT</span>
+              <ArrowRightLeft className="w-3 h-3 text-gold" />
+              <span className="font-bold text-blue-400">{rates.usdToYer.toLocaleString()} ر.ي</span>
+            </div>
+            <div className="w-px h-3.5 bg-white/10" />
+            <div className="flex items-center gap-1.5">
+              <span className="text-muted-foreground">1 USDT</span>
+              <ArrowRightLeft className="w-3 h-3 text-gold" />
+              <span className="font-bold text-purple-400">{rates.usdToSar} ر.س</span>
+            </div>
+            <div className="w-px h-3.5 bg-white/10" />
+            <div className="flex items-center gap-1.5">
+              <span className="text-muted-foreground">1 ر.س</span>
+              <ArrowRightLeft className="w-3 h-3 text-gold" />
+              <span className="font-bold text-amber-400">{rates.sarToYer.toLocaleString()} ر.ي</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Banner Slider */}
+      <BannerSlider />
 
       {/* Promo Code */}
       <PromoRedeem />
@@ -267,7 +369,7 @@ export default function Dashboard() {
       {user?.kycStatus !== 'approved' && (
         <button
           onClick={() => setScreen('kyc')}
-          className="w-full glass-card p-4 flex items-center justify-between hover:border-gold/30 transition-all"
+          className="w-full glass-card p-4 flex items-center justify-between hover:border-gold/30 transition-all rounded-xl"
         >
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-xl bg-gold/10 flex items-center justify-center">
@@ -305,7 +407,7 @@ export default function Dashboard() {
             ))}
           </div>
         ) : transactions.length === 0 ? (
-          <div className="glass-card p-8 text-center">
+          <div className="glass-card p-8 text-center rounded-xl">
             <Clock className="w-10 h-10 text-muted-foreground/30 mx-auto mb-3" />
             <p className="text-muted-foreground text-sm">لا توجد معاملات بعد</p>
           </div>
