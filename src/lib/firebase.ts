@@ -4,7 +4,6 @@ import { _fbk } from './firebase-key'
 
 let app: App
 let db: Firestore
-let checkedCustomFirebase = false
 
 /** Parse the service account key from base64 or raw JSON */
 function parseServiceAccount(key: string) {
@@ -50,26 +49,26 @@ function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise
 }
 
 /**
- * Get a temporary Firestore connection to the DEFAULT database.
- * Always creates a fresh connection using the embedded key, regardless of current state.
+ * Get a temporary Firestore connection using the service account key.
+ * Used by admin panel to test/save custom configs.
  */
 export async function getDefaultDb(): Promise<Firestore> {
   if (!_fbk) throw new Error('FIREBASE_SERVICE_ACCOUNT environment variable is not configured')
   const serviceAccount = parseServiceAccount(_fbk)
-  const { initializeApp: initApp, cert: firebaseCert } = await import('firebase-admin/app')
+  const { initializeApp: initApp, cert: firebaseCert, deleteApp: delApp } = await import('firebase-admin/app')
   const { getFirestore: getFs } = await import('firebase-admin/firestore')
   const tempApp = initApp({
     credential: firebaseCert(serviceAccount),
-  }, `default-temp-${Date.now()}`)
-  const defaultDb = getFs(tempApp)
-  return defaultDb
+  }, `temp-${Date.now()}`)
+  const tempDb = getFs(tempApp)
+  return tempDb
 }
 
 /**
  * Create a temporary Firestore connection using a custom service account key.
- * Used to TEST the connection before switching the global app.
+ * Used by admin panel to test a custom Firebase connection before switching.
  */
-async function createTempCustomDb(serviceAccountKeyJson: string): Promise<{ tempDb: Firestore; cleanup: () => Promise<void> }> {
+export async function createTempCustomDb(serviceAccountKeyJson: string): Promise<{ tempDb: Firestore; cleanup: () => Promise<void> }> {
   const serviceAccount = JSON.parse(serviceAccountKeyJson)
   const { initializeApp: initApp, cert: firebaseCert, deleteApp: delApp } = await import('firebase-admin/app')
   const { getFirestore: getFs } = await import('firebase-admin/firestore')
@@ -84,115 +83,22 @@ async function createTempCustomDb(serviceAccountKeyJson: string): Promise<{ temp
 }
 
 /**
- * Check if a custom Firebase config is saved in the DEFAULT database and reinitialize with it.
- * Called once on first API request after server startup.
- * 
- * SAFETY GUARANTEES:
- * 1. Tests the custom DB with a SEPARATE temporary app — never touches global state until confirmed working
- * 2. Has a 5-second timeout on the test — dead DBs won't hang the app
- * 3. The `checkedCustomFirebase` flag is only set AFTER successful switch — if anything fails, it resets
- * 4. On failure, automatically deletes the stale config from default DB so it won't be retried
+ * DISABLED: Automatic custom Firebase switching is not compatible with Vercel serverless.
+ * Different server instances can't share global state, causing tokens created in one
+ * database to be unreadable from another instance.
+ *
+ * Database selection is now handled EXCLUSIVELY via the FIREBASE_SERVICE_ACCOUNT env var.
+ * The admin panel's explicit "Save" action still works for manual switching.
  */
 export async function checkAndApplyCustomFirebase(): Promise<{ active: boolean; fallback: boolean; projectId?: string }> {
-  if (checkedCustomFirebase) return { active: false, fallback: false }
-
-  try {
-    // Step 1: Read config from DEFAULT database (always accessible)
-    const defaultDb = await getDefaultDb()
-    
-    let customDoc
-    try {
-      customDoc = await withTimeout(
-        defaultDb.collection('systemSettings').doc('customFirebase').get(),
-        8000,
-        'Read custom config from default DB'
-      )
-    } catch (err) {
-      console.error('[Firebase] Cannot read config from default DB:', err)
-      try { await (defaultDb as any).app?.delete?.() } catch {}
-      // Default DB itself might be having issues — don't set flag, allow retry
-      return { active: false, fallback: false }
-    }
-
-    if (!customDoc.exists) {
-      try { await (defaultDb as any).app?.delete?.() } catch {}
-      checkedCustomFirebase = true // No custom config — mark as checked
-      return { active: false, fallback: false }
-    }
-
-    const data = customDoc.data()
-    if (!data?.encodedKey) {
-      try { await (defaultDb as any).app?.delete?.() } catch {}
-      checkedCustomFirebase = true // No valid config — mark as checked
-      return { active: false, fallback: false }
-    }
-
-    // Clean up default DB temp connection
-    try { await (defaultDb as any).app?.delete?.() } catch {}
-
-    const serviceAccountKeyJson = Buffer.from(data.encodedKey, 'base64').toString()
-    
-    // Validate JSON structure
-    let serviceAccount: any
-    try {
-      serviceAccount = JSON.parse(serviceAccountKeyJson)
-      if (!serviceAccount.project_id || !serviceAccount.private_key) {
-        throw new Error('Missing project_id or private_key')
-      }
-    } catch (parseErr) {
-      console.warn('[Firebase] Invalid custom config found, deleting...')
-      const cleanupDb = await getDefaultDb()
-      try { await cleanupDb.collection('systemSettings').doc('customFirebase').delete() } catch {}
-      try { await (cleanupDb as any).app?.delete?.() } catch {}
-      checkedCustomFirebase = true // Bad config deleted — mark as checked
-      return { active: false, fallback: true }
-    }
-
-    // Step 2: TEST the custom database with a SEPARATE temporary connection
-    // DO NOT touch the global app/db yet!
-    console.log(`[Firebase] Testing custom database: ${serviceAccount.project_id}...`)
-    const { tempDb, cleanup: cleanupTempDb } = await createTempCustomDb(serviceAccountKeyJson)
-    
-    let testPassed = false
-    try {
-      await withTimeout(
-        tempDb.collection('users').limit(1).get(),
-        8000,
-        'Test custom DB connection'
-      )
-      testPassed = true
-      console.log(`[Firebase] Custom database ${serviceAccount.project_id} is reachable!`)
-    } catch (testErr) {
-      console.error(`[Firebase] Custom database ${serviceAccount.project_id} is UNREACHABLE:`, testErr instanceof Error ? testErr.message : testErr)
-      testPassed = false
-    } finally {
-      await cleanupTempDb()
-    }
-
-    if (!testPassed) {
-      // Custom DB is unreachable — do NOT delete config, allow retry on next request
-      console.warn(`[Firebase] Custom database ${serviceAccount.project_id} is UNREACHABLE. Will retry on next request.`)
-      // Don't set checkedCustomFirebase — allow retry
-      return { active: false, fallback: false }
-    }
-
-    // Step 3: Custom DB is confirmed working — now switch global state
-    reinitializeFirebase(serviceAccountKeyJson)
-    checkedCustomFirebase = true // Successfully switched — mark as checked
-    
-    console.log(`[Firebase] Auto-switched to custom project: ${serviceAccount.project_id}`)
-    return { active: true, fallback: false, projectId: serviceAccount.project_id }
-
-  } catch (error) {
-    console.error('[Firebase] Failed to check/apply custom config:', error)
-    // Don't set checkedCustomFirebase — allow retry on next request
-    return { active: false, fallback: false }
-  }
+  // No-op: database is configured via FIREBASE_SERVICE_ACCOUNT env var only.
+  // This prevents inconsistent DB state across serverless instances.
+  return { active: false, fallback: false }
 }
 
 /**
- * Save custom Firebase config to the DEFAULT database.
- * Always uses a fresh connection to ensure config is saved in the right place.
+ * Save custom Firebase config to the database.
+ * Used by admin panel when explicitly saving a custom config.
  */
 export async function saveCustomConfigToDefaultDb(encodedKey: string, projectId: string): Promise<void> {
   const defaultDb = await getDefaultDb()
@@ -208,8 +114,8 @@ export async function saveCustomConfigToDefaultDb(encodedKey: string, projectId:
 }
 
 /**
- * Delete custom Firebase config from the DEFAULT database.
- * Always uses a fresh connection to ensure config is deleted from the right place.
+ * Delete custom Firebase config from the database.
+ * Used by admin panel when reverting to default config.
  */
 export async function deleteCustomConfigFromDefaultDb(): Promise<void> {
   const defaultDb = await getDefaultDb()
@@ -221,15 +127,15 @@ export async function deleteCustomConfigFromDefaultDb(): Promise<void> {
 }
 
 /**
- * Ensure custom Firebase is loaded before returning DB.
- * Call this at the start of API routes that need the correct database.
+ * Ensure DB is ready. Since we disabled automatic switching,
+ * this simply returns the DB initialized from the env var.
  */
 export async function getDbWithCustomCheck(): Promise<Firestore> {
-  await checkAndApplyCustomFirebase()
   return getDb()
 }
 
-// Reinitialize Firebase with a custom service account key
+// Reinitialize Firebase with a custom service account key.
+// Used by admin panel when explicitly switching databases.
 export function reinitializeFirebase(serviceAccountKeyJson: string): { app: App; db: Firestore } {
   if (app) {
     try { deleteApp(app) } catch { /* ignore */ }
@@ -245,15 +151,13 @@ export function reinitializeFirebase(serviceAccountKeyJson: string): { app: App;
   return { app, db }
 }
 
-// Reset Firebase to the default embedded key
+// Reset Firebase to the env var configuration.
 export function resetFirebaseToDefault(): { app: App; db: Firestore } {
   if (app) {
     try { deleteApp(app) } catch { /* ignore */ }
   }
   app = undefined as any
   db = undefined as any
-  // Reset the check flag so it re-checks on next startup
-  checkedCustomFirebase = false
   return initializeFirebase()
 }
 
@@ -270,17 +174,10 @@ export function getDb(): Firestore {
 }
 
 /**
- * Async version of getDb that ensures custom Firebase is checked.
- * Use this in API routes instead of getDb() for guaranteed correct database.
- * The check only runs once per server lifecycle, so performance impact is minimal.
+ * Async version of getDb. Returns the same DB as getDb() since
+ * automatic custom switching is disabled.
  */
 export async function ensureDb(): Promise<Firestore> {
-  try {
-    await withTimeout(checkAndApplyCustomFirebase(), 10000, 'ensureDb custom check')
-  } catch {
-    // If custom check fails or times out, use the initialized DB
-    console.warn('[Firebase] ensureDb: custom check failed, using current DB')
-  }
   return getDb()
 }
 
