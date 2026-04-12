@@ -103,22 +103,22 @@ export async function GET(request: NextRequest) {
     const withdrawalsRejected = allWithdrawals.filter(w => w.status === 'rejected').length
 
     const totalWithdrawalsAmount = allWithdrawals
-      .filter(w => w.status === 'processing')
+      .filter(w => w.status === 'processing' || w.status === 'approved')
       .reduce((sum, w) => sum + (w.amount || 0), 0)
 
     const totalWithdrawalFees = allWithdrawals
-      .filter(w => w.status === 'processing')
+      .filter(w => w.status === 'processing' || w.status === 'approved')
       .reduce((sum, w) => sum + (w.fee || 0), 0)
 
     const withdrawalsToday = allWithdrawals.filter(w => w.createdAt && new Date(w.createdAt).toDateString() === todayStr)
-    const withdrawalsTodayAmount = withdrawalsToday.filter(w => w.status === 'processing').reduce((sum, w) => sum + (w.amount || 0), 0)
-    const withdrawalsTodayCount = withdrawalsToday.length
+    const withdrawalsTodayAmount = withdrawalsToday.filter(w => w.status === 'processing' || w.status === 'approved').reduce((sum, w) => sum + (w.amount || 0), 0)
+    const withdrawalsTodayCount = withdrawalsToday.filter(w => w.status === 'processing' || w.status === 'approved').length
 
     const withdrawalsThisWeek = allWithdrawals.filter(w => w.createdAt && new Date(w.createdAt) >= weekAgo)
-    const withdrawalsThisWeekAmount = withdrawalsThisWeek.filter(w => w.status === 'processing').reduce((sum, w) => sum + (w.amount || 0), 0)
+    const withdrawalsThisWeekAmount = withdrawalsThisWeek.filter(w => w.status === 'processing' || w.status === 'approved').reduce((sum, w) => sum + (w.amount || 0), 0)
 
     const withdrawalsThisMonth = allWithdrawals.filter(w => w.createdAt && new Date(w.createdAt) >= thisMonthStart)
-    const withdrawalsThisMonthAmount = withdrawalsThisMonth.filter(w => w.status === 'processing').reduce((sum, w) => sum + (w.amount || 0), 0)
+    const withdrawalsThisMonthAmount = withdrawalsThisMonth.filter(w => w.status === 'processing' || w.status === 'approved').reduce((sum, w) => sum + (w.amount || 0), 0)
 
     // ====== FEE INCOME STATS ======
     const totalFees = totalDepositFees + totalWithdrawalFees

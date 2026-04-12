@@ -1344,6 +1344,7 @@ export default function AdminPanel() {
                       <span className="block text-[10px] text-muted-foreground/70 mt-0.5">≈ {formatYER(convertUSDTtoYER(stats.totalWithdrawalsAmount))}</span>
                       <div className="flex gap-3 mt-2 text-[10px]">
                         <span className="text-yellow-400">معلق: {stats.withdrawalsPending}</span>
+                        <span className="text-blue-400">قيد التنفيذ: {stats.withdrawalsApproved}</span>
                         <span className="text-green-400">مكتمل: {stats.withdrawalsProcessing}</span>
                       </div>
                     </div>
@@ -1444,12 +1445,16 @@ export default function AdminPanel() {
                               <p className="text-sm font-bold">{(item.amount || 0).toLocaleString()} USDT</p>
                               <span className={`text-[10px] px-2 py-0.5 rounded-full ${
                                 item.status === 'confirmed' || item.status === 'processing' ? 'bg-green-500/10 text-green-400' :
+                                item.status === 'approved' ? 'bg-blue-500/10 text-blue-400' :
                                 item.status === 'pending' ? 'bg-yellow-500/10 text-yellow-400' :
+                                item.status === 'reviewing' ? 'bg-blue-500/10 text-blue-400' :
                                 'bg-red-500/10 text-red-400'
                               }`}>
                                 {item.status === 'confirmed' ? 'مؤكد' :
                                  item.status === 'processing' ? 'مكتمل' :
-                                 item.status === 'pending' ? 'معلق' : 'مرفوض'}
+                                 item.status === 'approved' ? 'مقبول' :
+                                 item.status === 'pending' ? 'معلق' :
+                                 item.status === 'reviewing' ? 'قيد المراجعة' : 'مرفوض'}
                               </span>
                             </div>
                           </div>
