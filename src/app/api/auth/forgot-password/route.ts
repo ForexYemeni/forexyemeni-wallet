@@ -3,8 +3,34 @@ import { userOperations, otpCodeOperations } from '@/lib/db-firebase'
 import { sendPasswordResetEmail } from '@/lib/email'
 import { getDb } from '@/lib/firebase'
 
+// Rate limit: max 3 forgot-password attempts per IP per 15 minutes
+const forgotAttempts = new Map<string, { count: number; resetAt: number }>()
+const FORGOT_MAX = 3
+const FORGOT_WINDOW = 15 * 60 * 1000
+
+function checkForgotRateLimit(ip: string): boolean {
+  const now = Date.now()
+  let entry = forgotAttempts.get(ip)
+  if (!entry || now > entry.resetAt) {
+    forgotAttempts.set(ip, { count: 1, resetAt: now + FORGOT_WINDOW })
+    return true
+  }
+  if (entry.count >= FORGOT_MAX) return false
+  entry.count++
+  return true
+}
+
 export async function POST(request: NextRequest) {
   try {
+    // Rate limiting
+    const clientIp = request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || 'unknown'
+    if (!checkForgotRateLimit(clientIp)) {
+      return NextResponse.json(
+        { success: false, message: 'عدد المحاولات كثير. انتظر 15 دقيقة ثم حاول مرة أخرى.' },
+        { status: 429 }
+      )
+    }
+
     const { email } = await request.json()
 
     if (!email) {

@@ -1,9 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getDb, reinitializeFirebase, resetFirebaseToDefault, getCurrentProjectId, nowTimestamp, generateId, generateAffiliateCode, saveCustomConfigToDefaultDb, deleteCustomConfigFromDefaultDb, checkAndApplyCustomFirebase } from '@/lib/firebase'
+import { requireAdmin, verifyUserId } from '@/lib/auth-server'
 import bcrypt from 'bcryptjs'
 
-// GET - get current Firebase connection status (NO admin verification needed)
-export async function GET() {
+// GET - get current Firebase connection status
+export async function GET(request: NextRequest) {
+  // AUTH CHECK — must be first
+  const auth = await requireAdmin(request)
+  if (!auth.success) return NextResponse.json({ success: false, message: auth.error }, { status: auth.status })
+
   try {
     await checkAndApplyCustomFirebase()
     const db = getDb()
@@ -47,8 +52,11 @@ export async function GET() {
 }
 
 // POST - test / setup / save / revert Firebase config
-// Admin info comes from the client-side user object (already authenticated via session)
 export async function POST(request: NextRequest) {
+  // AUTH CHECK — must be first
+  const auth = await requireAdmin(request)
+  if (!auth.success) return NextResponse.json({ success: false, message: auth.error }, { status: auth.status })
+
   try {
     const body = await request.json()
     const { action, serviceAccountKey, adminPassword, adminEmail, adminName, adminPhone, adminCountry } = body

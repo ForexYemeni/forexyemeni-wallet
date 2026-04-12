@@ -26,15 +26,17 @@ export default function RegisterForm() {
 
     setLoading(true)
     try {
+      // Generate a random temporary password (will be replaced in step 3)
+      const tempPassword = crypto.randomUUID().slice(0, 16) + '!Xy'
       const res = await fetch('/api/auth/register', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, fullName: '', password: 'temppass123' }),
+        body: JSON.stringify({ email, fullName: '', password: tempPassword }),
       })
       const data = await res.json()
 
       if (data.success) {
-        setPendingRegistration({ email, fullName: '', password: 'temppass123' })
+        setPendingRegistration({ email, fullName: '', password: tempPassword })
         setStep('otp')
         toast.success(data.message)
       } else {

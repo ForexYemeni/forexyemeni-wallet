@@ -9,9 +9,14 @@ import {
   sendMerchantDepositConfirmedEmail,
   sendMerchantDepositRejectedEmail,
 } from '@/lib/email'
+import { requireAdmin, verifyUserId } from '@/lib/auth-server'
 
 // GET all deposits (admin)
 export async function GET(request: NextRequest) {
+  // AUTH CHECK — must be first
+  const auth = await requireAdmin(request)
+  if (!auth.success) return NextResponse.json({ success: false, message: auth.error }, { status: auth.status })
+
   try {
     const { searchParams } = new URL(request.url)
     const status = searchParams.get('status')
@@ -27,6 +32,10 @@ export async function GET(request: NextRequest) {
 
 // POST update deposit status (admin)
 export async function POST(request: NextRequest) {
+  // AUTH CHECK — must be first
+  const auth = await requireAdmin(request)
+  if (!auth.success) return NextResponse.json({ success: false, message: auth.error }, { status: auth.status })
+
   try {
     const { depositId, status, adminNote } = await request.json()
 

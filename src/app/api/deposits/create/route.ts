@@ -3,15 +3,23 @@ import { userOperations, depositOperations, notificationOperations } from '@/lib
 import { sendPushNotification } from '@/lib/push-notification'
 import { getDb } from '@/lib/firebase'
 import { sendAdminNewDepositEmail } from '@/lib/email'
+import { authenticateRequest, verifyUserId } from '@/lib/auth-server'
 
 // GET - Check if user has a pending deposit
 export async function GET(request: NextRequest) {
+  const auth = await authenticateRequest(request)
+  if (!auth.success) return NextResponse.json({ success: false, message: auth.error }, { status: auth.status })
+
   try {
     const { searchParams } = new URL(request.url)
     const userId = searchParams.get('userId')
 
     if (!userId) {
       return NextResponse.json({ success: false, message: 'معرف المستخدم مطلوب' }, { status: 400 })
+    }
+
+    if (!verifyUserId(auth, userId)) {
+      return NextResponse.json({ success: false, message: 'غير مصرح' }, { status: 403 })
     }
 
     const db = getDb()
@@ -37,8 +45,16 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
+  const auth = await authenticateRequest(request)
+  if (!auth.success) return NextResponse.json({ success: false, message: auth.error }, { status: auth.status })
+
   try {
-    const { userId, amount, localAmount, currency = 'USDT', method = 'blockchain', txId, screenshot, network, paymentMethodId } = await request.json()
+    const body = await request.json()
+    const { userId, amount, localAmount, currency = 'USDT', method = 'blockchain', txId, screenshot, network, paymentMethodId } = body
+
+    if (!userId || !verifyUserId(auth, userId)) {
+      return NextResponse.json({ success: false, message: 'غير مصرح' }, { status: 403 })
+    }
 
     if (!userId || !amount) {
       return NextResponse.json(

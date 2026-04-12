@@ -2,10 +2,15 @@ import { NextRequest, NextResponse } from 'next/server'
 import { userOperations, notificationOperations } from '@/lib/db-firebase'
 import { sendPinRecoveryEmail } from '@/lib/email'
 import { sendPushNotification } from '@/lib/push-notification'
+import { requireAdmin, verifyUserId } from '@/lib/auth-server'
 import bcrypt from 'bcryptjs'
 
 // POST: Admin generates a temporary PIN and sends it to user/merchant via email
 export async function POST(request: NextRequest) {
+  // AUTH CHECK — must be first
+  const auth = await requireAdmin(request)
+  if (!auth.success) return NextResponse.json({ success: false, message: auth.error }, { status: auth.status })
+
   try {
     const { userId } = await request.json()
 

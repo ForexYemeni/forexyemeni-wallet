@@ -1,12 +1,21 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getDb, initializeFirebase } from '@/lib/firebase'
 import { getMessaging } from 'firebase-admin/messaging'
+import { authenticateRequest, verifyUserId } from '@/lib/auth-server'
 
 // POST /api/fcm/send - Send FCM push notification to a user
 // Body: { userId, title, message, type?, data? }
 export async function POST(request: NextRequest) {
+  const auth = await authenticateRequest(request)
+  if (!auth.success) return NextResponse.json({ success: false, message: auth.error }, { status: auth.status })
+
   try {
-    const { userId, title, message, type = 'info', data = {} } = await request.json()
+    const body = await request.json()
+    const { userId, title, message, type = 'info', data = {} } = body
+
+    if (!userId || !verifyUserId(auth, userId)) {
+      return NextResponse.json({ success: false, message: 'غير مصرح' }, { status: 403 })
+    }
 
     if (!userId || !title || !message) {
       return NextResponse.json({ success: false, message: 'البيانات مطلوبة' }, { status: 400 })

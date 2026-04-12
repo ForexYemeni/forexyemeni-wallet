@@ -2,12 +2,21 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getDb, generateId, nowTimestamp } from '@/lib/firebase'
 import { notificationOperations } from '@/lib/db-firebase'
 import { sendPushNotification } from '@/lib/push-notification'
+import { authenticateRequest, verifyUserId } from '@/lib/auth-server'
 import bcrypt from 'bcryptjs'
 
 export async function POST(request: NextRequest) {
+  const auth = await authenticateRequest(request)
+  if (!auth.success) return NextResponse.json({ success: false, message: auth.error }, { status: auth.status })
+
   try {
     const body = await request.json()
-    const { senderId, receiver, amount, token, pin } = body
+    const { senderId, receiver, amount, pin } = body
+
+    // Verify the authenticated user matches the senderId
+    if (!senderId || !verifyUserId(auth, senderId)) {
+      return NextResponse.json({ success: false, message: 'غير مصرح' }, { status: 403 })
+    }
 
     if (!senderId || !receiver || !amount || !pin) {
       return NextResponse.json({ success: false, message: 'جميع الحقول مطلوبة' }, { status: 400 })

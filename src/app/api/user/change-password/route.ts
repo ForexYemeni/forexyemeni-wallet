@@ -1,11 +1,20 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { userOperations } from '@/lib/db-firebase'
+import { authenticateRequest, verifyUserId } from '@/lib/auth-server'
 import bcrypt from 'bcryptjs'
 
 // POST - change user password (requires current password)
 export async function POST(request: NextRequest) {
+  const auth = await authenticateRequest(request)
+  if (!auth.success) return NextResponse.json({ success: false, message: auth.error }, { status: auth.status })
+
   try {
-    const { userId, currentPassword, newPassword } = await request.json()
+    const body = await request.json()
+    const { userId, currentPassword, newPassword } = body
+
+    if (!userId || !verifyUserId(auth, userId)) {
+      return NextResponse.json({ success: false, message: 'غير مصرح' }, { status: 403 })
+    }
 
     if (!userId || !currentPassword || !newPassword) {
       return NextResponse.json({ success: false, message: 'جميع الحقول مطلوبة' }, { status: 400 })

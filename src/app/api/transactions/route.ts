@@ -1,8 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { transactionOperations, userOperations } from '@/lib/db-firebase'
 import { generateAccountNumber } from '@/lib/firebase'
+import { authenticateRequest, verifyUserId } from '@/lib/auth-server'
 
 export async function GET(request: NextRequest) {
+  const auth = await authenticateRequest(request)
+  if (!auth.success) return NextResponse.json({ success: false, message: auth.error }, { status: auth.status })
+
   try {
     const { searchParams } = new URL(request.url)
     const userId = searchParams.get('userId')
@@ -12,6 +16,10 @@ export async function GET(request: NextRequest) {
         { success: false, message: 'معرف المستخدم مطلوب' },
         { status: 400 }
       )
+    }
+
+    if (!verifyUserId(auth, userId)) {
+      return NextResponse.json({ success: false, message: 'غير مصرح' }, { status: 403 })
     }
 
     const transactions = await transactionOperations.findMany(userId)

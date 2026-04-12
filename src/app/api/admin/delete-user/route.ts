@@ -2,11 +2,16 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getDb, generateId, nowTimestamp } from '@/lib/firebase'
 import { userOperations, otpCodeOperations } from '@/lib/db-firebase'
 import { sendVerificationEmail } from '@/lib/email'
+import { requireAdmin, verifyUserId } from '@/lib/auth-server'
 import bcrypt from 'bcryptjs'
 import crypto from 'crypto'
 
 // POST - Delete user with email OTP + password verification
 export async function POST(request: NextRequest) {
+  // AUTH CHECK — must be first
+  const auth = await requireAdmin(request)
+  if (!auth.success) return NextResponse.json({ success: false, message: auth.error }, { status: auth.status })
+
   try {
     const { adminId, userId, step, otp, password } = await request.json()
 

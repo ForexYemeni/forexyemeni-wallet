@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getDb } from '@/lib/firebase'
+import { requireAdmin, verifyUserId } from '@/lib/auth-server'
 
 // In-memory cache for admin stats (TTL: 30 seconds)
 // Admin stats is the MOST expensive API call — reads entire collections
@@ -7,7 +8,11 @@ import { getDb } from '@/lib/firebase'
 let statsCache: { data: any; ts: number } | null = null
 const STATS_CACHE_TTL = 30000
 
-export async function GET() {
+export async function GET(request: NextRequest) {
+  // AUTH CHECK — must be first
+  const auth = await requireAdmin(request)
+  if (!auth.success) return NextResponse.json({ success: false, message: auth.error }, { status: auth.status })
+
   try {
     // Return cached stats if fresh (< 30s old)
     if (statsCache && Date.now() - statsCache.ts < STATS_CACHE_TTL) {

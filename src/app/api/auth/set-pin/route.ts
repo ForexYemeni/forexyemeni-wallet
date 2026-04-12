@@ -1,10 +1,19 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { userOperations, notificationOperations } from '@/lib/db-firebase'
+import { authenticateRequest, verifyUserId } from '@/lib/auth-server'
 import bcrypt from 'bcryptjs'
 
 export async function POST(request: NextRequest) {
+  const auth = await authenticateRequest(request)
+  if (!auth.success) return NextResponse.json({ success: false, message: auth.error }, { status: auth.status })
+
   try {
-    const { userId, pin } = await request.json()
+    const body = await request.json()
+    const { userId, pin } = body
+
+    if (!userId || !verifyUserId(auth, userId)) {
+      return NextResponse.json({ success: false, message: 'غير مصرح' }, { status: 403 })
+    }
 
     if (!userId || !pin) {
       return NextResponse.json({ success: false, message: 'البيانات مطلوبة' }, { status: 400 })

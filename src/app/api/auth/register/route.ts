@@ -2,10 +2,37 @@ import { NextRequest, NextResponse } from 'next/server'
 import { userOperations, otpCodeOperations } from '@/lib/db-firebase'
 import { sendVerificationEmail } from '@/lib/email'
 import { getDb, generateAffiliateCode, generateAccountNumber, checkAndApplyCustomFirebase } from '@/lib/firebase'
+import { checkApiRateLimit } from '@/lib/rate-limit'
 import bcrypt from 'bcryptjs'
+
+// Rate limit: max 5 registrations per IP per minute
+const registerAttempts = new Map<string, { count: number; resetAt: number }>()
+const REGISTER_MAX = 5
+const REGISTER_WINDOW = 60 * 1000
+
+function checkRegisterRateLimit(ip: string): boolean {
+  const now = Date.now()
+  let entry = registerAttempts.get(ip)
+  if (!entry || now > entry.resetAt) {
+    registerAttempts.set(ip, { count: 1, resetAt: now + REGISTER_WINDOW })
+    return true
+  }
+  if (entry.count >= REGISTER_MAX) return false
+  entry.count++
+  return true
+}
 
 export async function POST(request: NextRequest) {
   try {
+    // Rate limiting
+    const clientIp = request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || 'unknown'
+    if (!checkRegisterRateLimit(clientIp)) {
+      return NextResponse.json(
+        { success: false, message: 'عدد محاولات التسجيل كثير. انتظر دقيقة ثم حاول مرة أخرى.' },
+        { status: 429 }
+      )
+    }
+
     // Ensure custom Firebase is loaded before any DB operations
     await checkAndApplyCustomFirebase()
 

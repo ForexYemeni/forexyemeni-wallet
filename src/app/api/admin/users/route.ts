@@ -3,9 +3,14 @@ import { userOperations, notificationOperations } from '@/lib/db-firebase'
 import { getDb } from '@/lib/firebase'
 import { sendPushNotification } from '@/lib/push-notification'
 import { logAudit } from '@/lib/audit-log'
+import { requireAdmin, verifyUserId } from '@/lib/auth-server'
 
 // GET all users (admin) — excludes admin accounts from the list
-export async function GET() {
+export async function GET(request: NextRequest) {
+  // AUTH CHECK — must be first
+  const auth = await requireAdmin(request)
+  if (!auth.success) return NextResponse.json({ success: false, message: auth.error }, { status: auth.status })
+
   try {
     const users = await userOperations.findMany({
       take: 200,
@@ -23,6 +28,10 @@ export async function GET() {
 
 // POST update user (admin)
 export async function POST(request: NextRequest) {
+  // AUTH CHECK — must be first
+  const auth = await requireAdmin(request)
+  if (!auth.success) return NextResponse.json({ success: false, message: auth.error }, { status: auth.status })
+
   try {
     const { userId, status, role, balance, balanceAdjustment, kycStatus, notes, permissions, merchantId, approvePinReset, rejectPinReset, removeMerchant, resetUserPin, adminId } = await request.json()
 
