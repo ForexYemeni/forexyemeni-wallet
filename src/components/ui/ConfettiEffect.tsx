@@ -90,3 +90,12 @@ export function useConfetti() {
     trigger: confetti?.trigger ?? (() => {}),
   }
 }
+
+/**
+ * Standalone function to trigger confetti from anywhere.
+ * Can be imported directly: import { triggerConfetti } from '@/components/ui/ConfettiEffect'
+ */
+export function triggerConfetti(originX?: number, originY?: number, count?: number) {
+  const confetti = (typeof window !== 'undefined') ? (window as any).__confetti : null
+  confetti?.trigger(originX, originY, count)
+}
