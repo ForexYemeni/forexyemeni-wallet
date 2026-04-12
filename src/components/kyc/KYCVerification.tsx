@@ -42,9 +42,9 @@ const COUNTRIES = [
 ]
 
 const DOCUMENT_TIPS = [
-  { icon: CheckCircle, text: 'تأكد من وضوح نص البطاقة' },
-  { icon: Camera, text: 'الصورة الشخصية يجب أن تظهر الوجه بوضوح' },
-  { icon: Sun, text: 'ارفع صوراً بإضاءة جيدة' },
+  { icon: CheckCircle, text: 'تأكد من وضوح نص البطاقة الأمامية والخلفية' },
+  { icon: Camera, text: 'يجب رفع الوجه الأمامي والخلفي للبطاقة' },
+  { icon: Sun, text: 'ارفع صوراً بإضاءة جيدة وخالية من الظل' },
 ]
 
 function KYCProgressRing({ status }: { status: string }) {
@@ -108,9 +108,9 @@ export default function KYCVerification() {
   const [loading, setLoading] = useState(false)
   const [otp, setOtp] = useState(['', '', '', '', '', ''])
   const [idPhoto, setIdPhoto] = useState<File | null>(null)
-  const [selfie, setSelfie] = useState<File | null>(null)
+  const [idBack, setIdBack] = useState<File | null>(null)
   const [idPreview, setIdPreview] = useState<string | null>(null)
-  const [selfiePreview, setSelfiePreview] = useState<string | null>(null)
+  const [idBackPreview, setIdBackPreview] = useState<string | null>(null)
   const [showCountryDropdown, setShowCountryDropdown] = useState(false)
   const [uploadProgress, setUploadProgress] = useState<{[key: string]: number}>({})
   const [uploadingFile, setUploadingFile] = useState<string | null>(null)
@@ -176,7 +176,7 @@ export default function KYCVerification() {
     }
   }
 
-  const handleFileChange = async (type: 'id_photo' | 'selfie', file: File) => {
+  const handleFileChange = async (type: 'id_photo' | 'id_back', file: File) => {
     const compressed = await compressImage(file)
     if (type === 'id_photo') {
       setIdPhoto(compressed)
@@ -184,15 +184,15 @@ export default function KYCVerification() {
       reader.onload = (e) => setIdPreview(e.target?.result as string)
       reader.readAsDataURL(compressed)
     } else {
-      setSelfie(compressed)
+      setIdBack(compressed)
       const reader = new FileReader()
-      reader.onload = (e) => setSelfiePreview(e.target?.result as string)
+      reader.onload = (e) => setIdBackPreview(e.target?.result as string)
       reader.readAsDataURL(compressed)
     }
   }
 
-  const handleUpload = async (type: 'id_photo' | 'selfie') => {
-    const file = type === 'id_photo' ? idPhoto : selfie
+  const handleUpload = async (type: 'id_photo' | 'id_back') => {
+    const file = type === 'id_photo' ? idPhoto : idBack
     if (!file) return
 
     setUploadingFile(type)
@@ -275,9 +275,9 @@ export default function KYCVerification() {
 
   const resetUploadState = () => {
     setIdPhoto(null)
-    setSelfie(null)
+    setIdBack(null)
     setIdPreview(null)
-    setSelfiePreview(null)
+    setIdBackPreview(null)
   }
 
   const kycStatus = user?.kycStatus || 'none'
@@ -558,19 +558,19 @@ export default function KYCVerification() {
             )}
           </div>
 
-          {/* Selfie */}
+          {/* ID Back Photo */}
           <div className="glass-card p-5 space-y-3 section-card green-accent">
             <div className="flex items-center justify-between pr-2">
               <div className="flex items-center gap-2">
                 <div className="w-9 h-9 rounded-xl bg-green-500/10 flex items-center justify-center">
-                  <UserCheck className="w-4 h-4 text-green-400" />
+                  <FileText className="w-4 h-4 text-green-400" />
                 </div>
                 <div>
-                  <h3 className="text-sm font-bold">صورة شخصية (سيلفي)</h3>
-                  <p className="text-[10px] text-muted-foreground">صورة واضحة لوجهك مع البطاقة</p>
+                  <h3 className="text-sm font-bold">ظهر بطاقة الهوية</h3>
+                  <p className="text-[10px] text-muted-foreground">صورة واضحة للوجه الخلفي للبطاقة</p>
                 </div>
               </div>
-              {selfie && (
+              {idBack && (
                 <span className="flex items-center gap-1 text-xs text-green-400 bg-green-500/10 px-2 py-1 rounded-full">
                   <Check className="w-3 h-3" /> جاهز
                 </span>
@@ -579,44 +579,44 @@ export default function KYCVerification() {
 
             {!user?.kycSelfie && (
               <EnhancedUploadZone
-                onFile={(file) => handleFileChange('selfie', file)}
-                preview={selfiePreview}
-                onClear={() => { setSelfie(null); setSelfiePreview(null) }}
+                onFile={(file) => handleFileChange('id_back', file)}
+                preview={idBackPreview}
+                onClear={() => { setIdBack(null); setIdBackPreview(null) }}
                 maxSize={5 * 1024 * 1024}
                 accept="image/*"
                 compact={false}
               />
             )}
 
-            {uploadProgress['selfie'] !== undefined && uploadProgress['selfie'] >= 0 && (
+            {uploadProgress['id_back'] !== undefined && uploadProgress['id_back'] >= 0 && (
               <div className="mt-2">
                 <div className="flex items-center justify-between mb-1">
                   <span className="text-[10px] text-muted-foreground">
-                    {uploadProgress['selfie'] >= 100 ? 'تم الرفع بنجاح' : uploadProgress['selfie'] > 0 ? 'جاري الرفع...' : ''}
+                    {uploadProgress['id_back'] >= 100 ? 'تم الرفع بنجاح' : uploadProgress['id_back'] > 0 ? 'جاري الرفع...' : ''}
                   </span>
-                  {uploadProgress['selfie'] > 0 && (
-                    <span className="text-[10px] text-gold font-medium">{Math.round(uploadProgress['selfie'])}%</span>
+                  {uploadProgress['id_back'] > 0 && (
+                    <span className="text-[10px] text-gold font-medium">{Math.round(uploadProgress['id_back'])}%</span>
                   )}
                 </div>
                 <div className="upload-progress-bar">
-                  <div className="upload-progress-fill" style={{ width: `${Math.min(uploadProgress['selfie'], 100)}%` }} />
+                  <div className="upload-progress-fill" style={{ width: `${Math.min(uploadProgress['id_back'], 100)}%` }} />
                 </div>
               </div>
             )}
 
-            {selfie && !user?.kycSelfie && (
+            {idBack && !user?.kycSelfie && (
               <Button
-                onClick={() => handleUpload('selfie')}
+                onClick={() => handleUpload('id_back')}
                 disabled={loading}
                 className="w-full h-11 gold-gradient text-gray-900 font-bold text-sm rounded-xl hover:opacity-90 haptic-btn"
               >
-                {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : 'رفع الصورة الشخصية'}
+                {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : 'رفع ظهر الهوية'}
               </Button>
             )}
             {user?.kycSelfie && (
               <div className="flex items-center gap-2 p-2.5 rounded-lg bg-green-500/5 text-green-400">
                 <CheckCircle2 className="w-4 h-4" />
-                <span className="text-xs font-medium">تم رفع الصورة الشخصية مسبقاً</span>
+                <span className="text-xs font-medium">تم رفع ظهر الهوية مسبقاً</span>
               </div>
             )}
           </div>
@@ -634,7 +634,7 @@ export default function KYCVerification() {
                 onSecondary={resetUploadState}
               />
             </div>
-          ) : (idPhoto || user?.kycIdPhoto) && (selfie || user?.kycSelfie) ? (
+          ) : (idPhoto || user?.kycIdPhoto) && (idBack || user?.kycSelfie) ? (
             <div className="glass-card p-4 text-center">
               <div className="w-10 h-10 mx-auto rounded-xl bg-green-500/10 flex items-center justify-center mb-2">
                 <CheckCircle2 className="w-5 h-5 text-green-400" />

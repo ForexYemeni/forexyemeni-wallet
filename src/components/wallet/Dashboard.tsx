@@ -277,22 +277,34 @@ export default function Dashboard() {
       {/* ========== QUICK ACTION BUTTONS ========== */}
       <div className="grid grid-cols-4 gap-3">
         {[
-          { icon: ArrowDownLeft, label: 'إيداع', screen: 'deposit', color: 'text-green-400', bg: 'bg-green-500/10', border: 'border-green-500/20', glow: 'hover:shadow-green-500/20' },
-          { icon: ArrowUpRight, label: 'سحب', screen: 'withdraw', color: 'text-red-400', bg: 'bg-red-500/10', border: 'border-red-500/20', glow: 'hover:shadow-red-500/20' },
-          { icon: Send, label: 'تحويل', screen: 'transfer', color: 'text-blue-400', bg: 'bg-blue-500/10', border: 'border-blue-500/20', glow: 'hover:shadow-blue-500/20' },
-          { icon: Users, label: 'P2P', screen: 'p2p', color: 'text-purple-400', bg: 'bg-purple-500/10', border: 'border-purple-500/20', glow: 'hover:shadow-purple-500/20' },
-        ].map((action) => (
-          <button
-            key={action.screen}
-            onClick={() => setScreen(action.screen)}
-            className={`quick-action-btn glass-card p-3 rounded-2xl flex flex-col items-center gap-2 ${action.bg} ${action.border} border hover:shadow-lg ${action.glow} transition-all duration-300`}
-          >
-            <div className={`action-icon w-10 h-10 rounded-xl ${action.bg} flex items-center justify-center`}>
-              <action.icon className={`w-5 h-5 ${action.color}`} />
-            </div>
-            <span className="text-[11px] font-semibold">{action.label}</span>
-          </button>
-        ))}
+          { icon: ArrowDownLeft, label: 'إيداع', screen: 'deposit', color: 'text-green-400', bg: 'bg-green-500/10', border: 'border-green-500/20', glow: 'hover:shadow-green-500/20', requiresKyc: true },
+          { icon: ArrowUpRight, label: 'سحب', screen: 'withdraw', color: 'text-red-400', bg: 'bg-red-500/10', border: 'border-red-500/20', glow: 'hover:shadow-red-500/20', requiresKyc: true },
+          { icon: Send, label: 'تحويل', screen: 'transfer', color: 'text-blue-400', bg: 'bg-blue-500/10', border: 'border-blue-500/20', glow: 'hover:shadow-blue-500/20', requiresKyc: false },
+          { icon: Users, label: 'P2P', screen: 'p2p', color: 'text-purple-400', bg: 'bg-purple-500/10', border: 'border-purple-500/20', glow: 'hover:shadow-purple-500/20', requiresKyc: false },
+        ].map((action) => {
+          const kycBlocked = action.requiresKyc && user?.kycStatus !== 'approved'
+          return (
+            <button
+              key={action.screen}
+              onClick={() => {
+                if (kycBlocked) {
+                  toast.error('يجب توثيق الهوية أولاً قبل القيام بهذه العملية', { description: 'يرجى إكمال التحقق من الهوية من صفحة الإعدادات', duration: 4000 })
+                  return
+                }
+                setScreen(action.screen)
+              }}
+              className={`quick-action-btn glass-card p-3 rounded-2xl flex flex-col items-center gap-2 ${kycBlocked ? 'opacity-50' : ''} ${action.bg} ${action.border} border hover:shadow-lg ${action.glow} transition-all duration-300`}
+            >
+              <div className={`action-icon w-10 h-10 rounded-xl ${action.bg} flex items-center justify-center`}>
+                <action.icon className={`w-5 h-5 ${kycBlocked ? 'text-muted-foreground' : action.color}`} />
+              </div>
+              <span className={`text-[11px] font-semibold ${kycBlocked ? 'text-muted-foreground' : ''}`}>{action.label}</span>
+              {kycBlocked && (
+                <Shield className="w-3 h-3 text-amber-400 absolute top-1 right-1" />
+              )}
+            </button>
+          )
+        })}
       </div>
 
       {/* ========== EXCHANGE RATE CARDS ========== */}
@@ -509,13 +521,21 @@ export default function Dashboard() {
               </div>
             </div>
             <p className="text-muted-foreground text-sm mb-1">لا توجد معاملات بعد</p>
-            <p className="text-muted-foreground/60 text-xs mb-4">ابدأ بأول إيداع لتفعيل محفظتك</p>
+            <p className="text-muted-foreground/60 text-xs mb-4">
+              {user?.kycStatus === 'approved' ? 'ابدأ بأول إيداع لتفعيل محفظتك' : 'وثّق هويتك أولاً لبدء استخدام المحفظة'}
+            </p>
             <button
-              onClick={() => setScreen('deposit')}
+              onClick={() => {
+                if (user?.kycStatus !== 'approved') {
+                  toast.error('يجب توثيق الهوية أولاً', { description: 'يرجى إكمال التحقق من الهوية', duration: 4000 })
+                  return
+                }
+                setScreen('deposit')
+              }}
               className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl gold-gradient text-gray-900 text-sm font-bold hover:opacity-90 transition-opacity tap-effect"
             >
               <ArrowDownLeft className="w-4 h-4" />
-              ابدأ الإيداع
+              {user?.kycStatus === 'approved' ? 'ابدأ الإيداع' : 'توثيق الهوية'}
             </button>
           </div>
         ) : (

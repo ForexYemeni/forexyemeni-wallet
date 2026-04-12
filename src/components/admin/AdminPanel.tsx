@@ -2324,7 +2324,7 @@ export default function AdminPanel() {
                       const allApproved = records.every(r => r.status === 'approved')
                       const allRejected = records.every(r => r.status === 'rejected')
                       const idPhoto = records.find(r => r.type === 'id_photo')
-                      const selfie = records.find(r => r.type === 'selfie')
+                      const idBack = records.find(r => r.type === 'id_back')
 
                       return (
                         <button
@@ -2349,7 +2349,7 @@ export default function AdminPanel() {
                               {userInfo?.phone && <p className="text-[10px] text-muted-foreground">{userInfo.phone}</p>}
                               <span className="text-[10px] text-muted-foreground">{records.length} مستند</span>
                               {idPhoto && <span className="text-[10px] text-muted-foreground">| 🪪 هوية: {idPhoto.status === 'approved' ? '✓' : idPhoto.status === 'rejected' ? '✗' : '⏳'}</span>}
-                              {selfie && <span className="text-[10px] text-muted-foreground">| 🧑 صورة: {selfie.status === 'approved' ? '✓' : selfie.status === 'rejected' ? '✗' : '⏳'}</span>}
+                              {idBack && <span className="text-[10px] text-muted-foreground">| 🪪 ظهر: {idBack.status === 'approved' ? '✓' : idBack.status === 'rejected' ? '✗' : '⏳'}</span>}
                             </div>
                           </div>
 
@@ -2375,7 +2375,7 @@ export default function AdminPanel() {
                 {detailUser && (() => {
                   const [uid, { user: userInfo, records }] = detailUser
                   const idPhoto = records.find(r => r.type === 'id_photo')
-                  const selfie = records.find(r => r.type === 'selfie')
+                  const idBack = records.find(r => r.type === 'id_back')
                   const hasPending = records.some(r => r.status === 'pending')
                   const allApproved = records.every(r => r.status === 'approved')
                   const allRejected = records.every(r => r.status === 'rejected')
@@ -2480,24 +2480,24 @@ export default function AdminPanel() {
                             <div className="space-y-2">
                               <div className="flex items-center justify-between">
                                 <div className="flex items-center gap-1.5">
-                                  <UserCheck className="w-3.5 h-3.5 text-muted-foreground" />
-                                  <span className="text-xs font-medium">صورة شخصية</span>
+                                  <FileText className="w-3.5 h-3.5 text-muted-foreground" />
+                                  <span className="text-xs font-medium">ظهر الهوية</span>
                                 </div>
-                                {selfie && (
+                                {idBack && (
                                   <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold ${
-                                    selfie.status === 'approved' ? 'bg-green-500/10 text-green-400' :
-                                    selfie.status === 'rejected' ? 'bg-red-500/10 text-red-400' :
+                                    idBack.status === 'approved' ? 'bg-green-500/10 text-green-400' :
+                                    idBack.status === 'rejected' ? 'bg-red-500/10 text-red-400' :
                                     'bg-amber-500/10 text-amber-400'
                                   }`}>
-                                    {selfie.status === 'approved' ? '✓ مقبول' : selfie.status === 'rejected' ? '✗ مرفوض' : '⏳ معلق'}
+                                    {idBack.status === 'approved' ? '✓ مقبول' : idBack.status === 'rejected' ? '✗ مرفوض' : '⏳ معلق'}
                                   </span>
                                 )}
                               </div>
-                              {selfie ? (
-                                <div className="rounded-2xl overflow-hidden border border-white/10 bg-white/5 relative group cursor-pointer aspect-[3/4]" onClick={() => window.open(selfie.fileUrl, '_blank')}>
+                              {idBack ? (
+                                <div className="rounded-2xl overflow-hidden border border-white/10 bg-white/5 relative group cursor-pointer aspect-[3/4]" onClick={() => window.open(idBack.fileUrl, '_blank')}>
                                   <img
-                                    src={selfie.fileUrl || ''}
-                                    alt="صورة شخصية"
+                                    src={idBack.fileUrl || ''}
+                                    alt="ظهر بطاقة الهوية"
                                     className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                                     onError={(e) => {
                                       (e.target as HTMLImageElement).style.display = 'none'

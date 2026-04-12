@@ -79,6 +79,14 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    // KYC verification required for withdrawals
+    if (user.kycStatus !== 'approved') {
+      return NextResponse.json(
+        { success: false, message: 'يجب توثيق الهوية أولاً قبل السحب. يرجى إكمال التحقق من الهوية.', needsKyc: true },
+        { status: 403 }
+      )
+    }
+
     // PIN verification required for withdrawals
     if (!user.pinHash) {
       return NextResponse.json(

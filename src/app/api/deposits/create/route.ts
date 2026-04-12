@@ -85,6 +85,14 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    // KYC verification required for deposits
+    if (user.kycStatus !== 'approved') {
+      return NextResponse.json(
+        { success: false, message: 'يجب توثيق الهوية أولاً قبل الإيداع. يرجى إكمال التحقق من الهوية.', needsKyc: true },
+        { status: 403 }
+      )
+    }
+
     // Check for existing pending deposit
     const db = getDb()
     const pendingDeposits = await db.collection('deposits')
