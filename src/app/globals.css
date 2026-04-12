@@ -825,28 +825,14 @@
 /* Sidebar active item glow */
 .sidebar-item-active {
   position: relative;
-  background: linear-gradient(90deg, transparent 0%, rgba(240, 185, 11, 0.08) 100%);
 }
 
 .dark .sidebar-item-active {
-  background: linear-gradient(90deg, transparent 0%, rgba(240, 185, 11, 0.06) 100%);
+  background: rgba(240, 185, 11, 0.06);
 }
 
 :root:not(.dark) .sidebar-item-active {
-  background: linear-gradient(90deg, transparent 0%, rgba(201, 154, 10, 0.06) 100%);
-}
-
-.sidebar-item-active::before {
-  content: '';
-  position: absolute;
-  right: 0;
-  top: 50%;
-  transform: translateY(-50%);
-  width: 3px;
-  height: 24px;
-  background: linear-gradient(180deg, #F0B90B, #FCD535);
-  border-radius: 0 4px 4px 0;
-  box-shadow: 0 0 8px rgba(240, 185, 11, 0.4);
+  background: rgba(201, 154, 10, 0.06);
 }
 
 /* Sidebar hover effect */
@@ -915,101 +901,96 @@
 }
 
 /* ==================== Phase 2: Background Effects ==================== */
-/* Subtle noise texture overlay */
-.dark body::before {
-  content: '';
-  position: fixed;
-  inset: 0;
-  z-index: 0;
-  opacity: 0.015;
-  pointer-events: none;
-  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)'/%3E%3C/svg%3E");
-  background-size: 256px 256px;
-}
-
-:root:not(.dark) body::before {
-  content: '';
-  position: fixed;
-  inset: 0;
-  z-index: 0;
-  opacity: 0.02;
-  pointer-events: none;
-  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)'/%3E%3C/svg%3E");
-  background-size: 256px 256px;
-}
-
-/* Ensure all content above noise */
-body > * {
-  position: relative;
-  z-index: 1;
-}
-
-/* Ambient background glow blobs */
-.dark .ambient-glow {
+/* Ambient background glow blobs — z-index: 0, renders before content via DOM order */
+.ambient-glow {
   position: fixed;
   border-radius: 50%;
-  filter: blur(100px);
   pointer-events: none;
   z-index: 0;
 }
 
-.ambient-glow-1 {
-  width: 400px;
-  height: 400px;
-  background: rgba(240, 185, 11, 0.04);
-  top: -100px;
-  right: -100px;
-  animation: ambientFloat1 20s ease-in-out infinite;
-}
-
-.ambient-glow-2 {
-  width: 350px;
-  height: 350px;
-  background: rgba(99, 102, 241, 0.03);
-  bottom: -50px;
-  left: -80px;
-  animation: ambientFloat2 25s ease-in-out infinite;
-}
-
-.ambient-glow-3 {
+.dark .ambient-glow-1 {
   width: 300px;
   height: 300px;
-  background: rgba(16, 185, 129, 0.02);
+  background: radial-gradient(circle, rgba(240, 185, 11, 0.06) 0%, transparent 70%);
+  top: -80px;
+  right: -80px;
+  animation: ambientFloat1 25s ease-in-out infinite;
+}
+
+.dark .ambient-glow-2 {
+  width: 250px;
+  height: 250px;
+  background: radial-gradient(circle, rgba(99, 102, 241, 0.04) 0%, transparent 70%);
+  bottom: -40px;
+  left: -60px;
+  animation: ambientFloat2 30s ease-in-out infinite;
+}
+
+.dark .ambient-glow-3 {
+  width: 200px;
+  height: 200px;
+  background: radial-gradient(circle, rgba(16, 185, 129, 0.03) 0%, transparent 70%);
   top: 50%;
   left: 40%;
-  animation: ambientFloat3 18s ease-in-out infinite;
+  animation: ambientFloat3 22s ease-in-out infinite;
+}
+
+:root:not(.dark) .ambient-glow-1 {
+  width: 300px;
+  height: 300px;
+  background: radial-gradient(circle, rgba(201, 154, 10, 0.05) 0%, transparent 70%);
+  top: -80px;
+  right: -80px;
+  animation: ambientFloat1 25s ease-in-out infinite;
+}
+
+:root:not(.dark) .ambient-glow-2 {
+  width: 250px;
+  height: 250px;
+  background: radial-gradient(circle, rgba(99, 102, 241, 0.03) 0%, transparent 70%);
+  bottom: -40px;
+  left: -60px;
+  animation: ambientFloat2 30s ease-in-out infinite;
+}
+
+:root:not(.dark) .ambient-glow-3 {
+  width: 200px;
+  height: 200px;
+  background: radial-gradient(circle, rgba(16, 185, 129, 0.025) 0%, transparent 70%);
+  top: 50%;
+  left: 40%;
+  animation: ambientFloat3 22s ease-in-out infinite;
 }
 
 @keyframes ambientFloat1 {
-  0%, 100% { transform: translate(0, 0) scale(1); }
-  33% { transform: translate(-30px, 40px) scale(1.1); }
-  66% { transform: translate(20px, -20px) scale(0.95); }
+  0%, 100% { transform: translate(0, 0); }
+  50% { transform: translate(-20px, 30px); }
 }
 
 @keyframes ambientFloat2 {
-  0%, 100% { transform: translate(0, 0) scale(1); }
-  33% { transform: translate(40px, -30px) scale(1.05); }
-  66% { transform: translate(-20px, 20px) scale(0.9); }
+  0%, 100% { transform: translate(0, 0); }
+  50% { transform: translate(30px, -20px); }
 }
 
 @keyframes ambientFloat3 {
-  0%, 100% { transform: translate(0, 0) scale(1); }
-  50% { transform: translate(-40px, -40px) scale(1.15); }
+  0%, 100% { transform: translate(0, 0); }
+  50% { transform: translate(-30px, -30px); }
 }
 
-/* Grid pattern overlay (very subtle) */
-.dark .grid-pattern {
+/* Grid pattern overlay (very subtle) — z-index: 0, renders before content via DOM order */
+.grid-pattern {
   position: fixed;
   inset: 0;
   z-index: 0;
   pointer-events: none;
-  opacity: 0.02;
+  opacity: 0.015;
   background-image:
     linear-gradient(rgba(240, 185, 11, 0.3) 1px, transparent 1px),
     linear-gradient(90deg, rgba(240, 185, 11, 0.3) 1px, transparent 1px);
   background-size: 60px 60px;
-  mask-image: radial-gradient(ellipse at 50% 0%, black 0%, transparent 70%);
-  -webkit-mask-image: radial-gradient(ellipse at 50% 0%, black 0%, transparent 70%);
+  mask-image: radial-gradient(ellipse at 50% 0%, black 0%, transparent 60%);
+  -webkit-mask-image: radial-gradient(ellipse at 50% 0%, black 0%, transparent 60%);
 }
 
 /* ==================== Phase 2: Enhanced Theme Colors ==================== */

@@ -148,11 +148,13 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="min-h-screen bg-background">
-      {/* Global Effects */}
+      {/* Background atmosphere (z-index: 0, painted below content) */}
+      <BackgroundEffects />
+
+      {/* Global Effects (z-index: 9998+) */}
       <TopProgressBar />
       <ConfettiEffect />
       <InPageFeedback />
-      <BackgroundEffects />
 
       {/* Offline Banner */}
       <OfflineBanner />
@@ -163,7 +165,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
       {/* Main Content */}
       <main
         ref={mainRef}
-        className="md:mr-64 min-h-screen pb-24 md:pb-6"
+        className="md:mr-64 min-h-screen pb-24 md:pb-6 relative z-[1]"
         onTouchStart={onTouchStart}
         onTouchMove={onTouchMove}
         onTouchEnd={onTouchEnd}

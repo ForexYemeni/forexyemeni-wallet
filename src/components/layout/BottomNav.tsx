@@ -149,7 +149,8 @@ export default function BottomNav() {
     (!isAdmin && !isMerchant && activeKey === 'more')
 
   return (
-    <nav className="fixed bottom-0 left-0 right-0 z-50 md:hidden">
+    <>
+      <nav className="fixed bottom-0 left-0 right-0 z-50 md:hidden">
       <div className="mx-3 mb-3">
         <div
           ref={navBarRef}
@@ -235,47 +236,49 @@ export default function BottomNav() {
         </div>
       </div>
 
-      {/* Extra Items Popup Menu */}
-      {showMore && !isAdmin && (
-        <div
-          ref={moreRef}
-          className="fixed bottom-20 left-3 right-3 z-50 glass-more-menu rounded-2xl p-2 animate-scale-in overflow-hidden"
-          dir="rtl"
-        >
-          {/* Header with gradient line */}
-          <div className="relative">
-            <div className="absolute top-0 left-0 right-0 h-0.5 bg-gradient-to-l from-gold via-gold-light to-emerald-400" />
-            <div className="flex items-center gap-2 px-3 py-2.5 mb-1">
-              <ChevronUp className="w-4 h-4 text-gold" />
-              <span className="text-xs font-bold gold-text">{isMerchant ? 'قائمة التاجر' : 'القائمة الكاملة'}</span>
-            </div>
-          </div>
-          <div className="space-y-0.5">
-            {extraItems.map((item, index) => {
-              const isActive = currentScreen === item.key
-              return (
-                <button
-                  key={item.key}
-                  onClick={() => handleScreenClick(item.key)}
-                  className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm transition-all duration-200 ${
-                    isActive
-                      ? 'sidebar-item-active text-gold font-medium'
-                      : 'text-muted-foreground hover:text-foreground sidebar-item-hover'
-                  }`}
-                  style={{ animationDelay: `${index * 30}ms` }}
-                >
-                  <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${
-                    isActive ? 'bg-gold/10' : 'bg-white/5'
-                  }`}>
-                    <item.icon className={`w-4 h-4 ${isActive ? 'text-gold' : ''}`} />
-                  </div>
-                  <span className="font-medium">{item.label}</span>
-                </button>
-              )
-            })}
+    </nav>
+
+    {/* Extra Items Popup Menu — rendered OUTSIDE <nav> to avoid stacking context issues */}
+    {showMore && !isAdmin && (
+      <div
+        ref={moreRef}
+        className="fixed bottom-20 left-3 right-3 z-[60] glass-more-menu rounded-2xl p-2 animate-scale-in overflow-hidden"
+        dir="rtl"
+      >
+        {/* Header with gradient line */}
+        <div className="relative">
+          <div className="absolute top-0 left-0 right-0 h-0.5 bg-gradient-to-l from-gold via-gold-light to-emerald-400" />
+          <div className="flex items-center gap-2 px-3 py-2.5 mb-1">
+            <ChevronUp className="w-4 h-4 text-gold" />
+            <span className="text-xs font-bold gold-text">{isMerchant ? 'قائمة التاجر' : 'القائمة الكاملة'}</span>
           </div>
         </div>
-      )}
-    </nav>
+        <div className="space-y-0.5">
+          {extraItems.map((item, index) => {
+            const isActive = currentScreen === item.key
+            return (
+              <button
+                key={item.key}
+                onClick={() => handleScreenClick(item.key)}
+                className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm transition-all duration-200 ${
+                  isActive
+                    ? 'sidebar-item-active text-gold font-medium'
+                    : 'text-muted-foreground hover:text-foreground sidebar-item-hover'
+                }`}
+                style={{ animationDelay: `${index * 30}ms` }}
+              >
+                <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${
+                  isActive ? 'bg-gold/10' : 'bg-white/5'
+                }`}>
+                  <item.icon className={`w-4 h-4 ${isActive ? 'text-gold' : ''}`} />
+                </div>
+                <span className="font-medium">{item.label}</span>
+              </button>
+            )
+          })}
+        </div>
+      </div>
+    )}
+    </>
   )
 }
