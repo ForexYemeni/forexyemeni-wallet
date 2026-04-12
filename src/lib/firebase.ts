@@ -62,8 +62,6 @@ export async function getDefaultDb(): Promise<Firestore> {
     credential: firebaseCert(serviceAccount),
   }, `default-temp-${Date.now()}`)
   const defaultDb = getFs(tempApp)
-  // Force Firestore to connect by doing a lightweight read
-  await defaultDb.collection('_ping').doc('init').get().catch(() => {})
   return defaultDb
 }
 
@@ -79,8 +77,6 @@ async function createTempCustomDb(serviceAccountKeyJson: string): Promise<{ temp
     credential: firebaseCert(serviceAccount),
   }, `custom-test-${Date.now()}`)
   const tempDb = getFs(tempApp)
-  // Force Firestore to connect
-  await tempDb.collection('_ping').doc('init').get().catch(() => {})
   return {
     tempDb,
     cleanup: async () => { try { await delApp(tempApp) } catch {} }
@@ -108,7 +104,7 @@ export async function checkAndApplyCustomFirebase(): Promise<{ active: boolean; 
     try {
       customDoc = await withTimeout(
         defaultDb.collection('systemSettings').doc('customFirebase').get(),
-        15000,
+        8000,
         'Read custom config from default DB'
       )
     } catch (err) {
@@ -161,7 +157,7 @@ export async function checkAndApplyCustomFirebase(): Promise<{ active: boolean; 
     try {
       await withTimeout(
         tempDb.collection('users').limit(1).get(),
-        15000, // 15 second timeout — allow for cold starts
+        8000,
         'Test custom DB connection'
       )
       testPassed = true
@@ -279,7 +275,12 @@ export function getDb(): Firestore {
  * The check only runs once per server lifecycle, so performance impact is minimal.
  */
 export async function ensureDb(): Promise<Firestore> {
-  await checkAndApplyCustomFirebase()
+  try {
+    await withTimeout(checkAndApplyCustomFirebase(), 10000, 'ensureDb custom check')
+  } catch {
+    // If custom check fails or times out, use the initialized DB
+    console.warn('[Firebase] ensureDb: custom check failed, using current DB')
+  }
   return getDb()
 }
 
