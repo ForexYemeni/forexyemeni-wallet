@@ -67,6 +67,7 @@ import {
   Smartphone,
   Database,
   XCircle,
+  FileText,
 } from 'lucide-react'
 
 // ===================== TYPES =====================
