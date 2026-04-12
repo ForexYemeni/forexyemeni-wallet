@@ -28,6 +28,7 @@ import {
   Bitcoin,
   Landmark,
 } from 'lucide-react'
+import KYCRequiredCard from '@/components/kyc/KYCRequiredCard'
 import PinDots from '@/components/ui/PinDots'
 import SuccessResult from '@/components/ui/SuccessResult'
 
@@ -413,6 +414,11 @@ export default function WithdrawForm() {
     if (user && user.balance > 0) {
       setAmount(user.balance.toFixed(2))
     }
+  }
+
+  // KYC check — show required card instead of withdrawal form
+  if (user?.kycStatus !== 'approved') {
+    return <KYCRequiredCard type="withdraw" />
   }
 
   return (

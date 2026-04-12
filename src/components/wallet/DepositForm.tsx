@@ -25,6 +25,7 @@ import {
   Smartphone,
   Bitcoin,
 } from 'lucide-react'
+import KYCRequiredCard from '@/components/kyc/KYCRequiredCard'
 import StepProgress from '@/components/ui/StepProgress'
 import EnhancedUploadZone from '@/components/ui/EnhancedUploadZone'
 import SuccessResult from '@/components/ui/SuccessResult'
@@ -432,6 +433,11 @@ export default function DepositForm() {
   const currentCategoryInfo = getCategoryInfo()
   const currentCurrencyInfo = getCurrencyInfo()
   const currencyOptionsWithRates = getCurrencyOptionsWithRates()
+
+  // KYC check — show required card instead of deposit form
+  if (user?.kycStatus !== 'approved') {
+    return <KYCRequiredCard type="deposit" />
+  }
 
   return (
     <div className="space-y-6 animate-fade-in pb-24">
