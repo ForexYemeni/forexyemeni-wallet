@@ -139,3 +139,22 @@ Stage Summary:
 - Key files modified: src/lib/firebase.ts, src/app/api/admin/delete-user/route.ts, src/app/api/admin/cleanup/route.ts
 - Account numbers now recycle: deleted numbers go to freedNumbers, new users get lowest available
 - Transaction-based assignment prevents duplicate numbers in concurrent registrations
+---
+Task ID: banner-upload-gallery
+Agent: Main Agent
+Task: Replace banner image URL input with gallery upload (EnhancedUploadZone)
+
+Work Log:
+- Analyzed current BannerManager.tsx - used plain text input for imageUrl
+- Found existing EnhancedUploadZone component and image-compress.ts utilities
+- Replaced text input with EnhancedUploadZone component
+- Added compressImage (1920px max, 0.85 quality) + fileToBase64 pipeline
+- Added uploading state with spinner during image processing
+- Added handleClearImage for removing selected image
+- Updated validation messages from "رابط الصورة مطلوب" to "صورة البانر مطلوبة"
+- Set max file size to 5MB for banner images
+
+Stage Summary:
+- File modified: src/components/admin/BannerManager.tsx
+- Banner images now uploaded from gallery, compressed, and stored as base64
+- No server changes needed - base64 string stored in existing imageUrl field

@@ -8,6 +8,8 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { Loader2, Plus, Trash2, ImageOff, ChevronUp, ChevronDown, Eye, EyeOff, X, Save, Image as ImageIcon } from 'lucide-react'
+import EnhancedUploadZone from '@/components/ui/EnhancedUploadZone'
+import { compressImage, fileToBase64 } from '@/lib/image-compress'
 
 interface Banner {
   id: string
@@ -35,6 +37,7 @@ export default function BannerManager() {
   const [actionLoading, setActionLoading] = useState<string | null>(null)
   const [showForm, setShowForm] = useState(false)
   const [form, setForm] = useState(EMPTY_FORM)
+  const [uploading, setUploading] = useState(false)
 
   const fetchBanners = async () => {
     try {
@@ -60,10 +63,31 @@ export default function BannerManager() {
     setShowForm(true)
   }
 
+  const handleImageUpload = async (file: File) => {
+    setUploading(true)
+    try {
+      const compressed = await compressImage(file, { maxSize: 1920, quality: 0.85 })
+      const base64 = await fileToBase64(compressed)
+      setForm(prev => ({ ...prev, imageUrl: base64 }))
+    } catch {
+      toast.error('فشل في معالجة الصورة')
+    } finally {
+      setUploading(false)
+    }
+  }
+
+  const handleClearImage = () => {
+    setForm(prev => ({ ...prev, imageUrl: '' }))
+  }
+
   const handleCreateBanner = async () => {
     if (!user?.id) return
-    if (!form.title.trim() || !form.imageUrl.trim()) {
-      toast.error('العنوان ورابط الصورة مطلوبان')
+    if (!form.title.trim()) {
+      toast.error('عنوان البانر مطلوب')
+      return
+    }
+    if (!form.imageUrl.trim()) {
+      toast.error('صورة البانر مطلوبة')
       return
     }
 
@@ -271,29 +295,24 @@ export default function BannerManager() {
             </div>
 
             <div className="space-y-1.5">
-              <Label className="text-xs">رابط الصورة *</Label>
-              <Input
-                value={form.imageUrl}
-                onChange={(e) => setForm(prev => ({ ...prev, imageUrl: e.target.value }))}
-                placeholder="https://example.com/banner.jpg"
-                className="glass-input text-sm"
-                dir="ltr"
-              />
-            </div>
-
-            {/* Image Preview */}
-            {form.imageUrl && (
-              <div className="relative rounded-xl overflow-hidden h-32 bg-white/5">
-                <img
-                  src={form.imageUrl}
-                  alt="معاينة"
-                  className="w-full h-full object-cover"
-                  onError={(e) => {
-                    (e.target as HTMLImageElement).style.display = 'none'
-                  }}
+              <Label className="text-xs">صورة البانر *</Label>
+              {uploading ? (
+                <div className="upload-zone flex items-center justify-center">
+                  <Loader2 className="w-6 h-6 text-gold animate-spin" />
+                </div>
+              ) : (
+                <EnhancedUploadZone
+                  onFile={handleImageUpload}
+                  accept="image/*"
+                  maxSize={5 * 1024 * 1024}
+                  preview={form.imageUrl || null}
+                  onClear={handleClearImage}
+                  label="اضغط لاختيار صورة"
+                  hint="JPG, PNG - حد أقصى 5 ميغابايت"
+                  required
                 />
-              </div>
-            )}
+              )}
+            </div>
 
             <div className="space-y-1.5">
               <Label className="text-xs">الرابط (اختياري)</Label>
