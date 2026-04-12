@@ -33,7 +33,11 @@ export function initializeFirebase() {
       projectId: serviceAccount.project_id,
     })
   }
-  if (!db) db = getFirestore(app)
+  if (!db) {
+    db = getFirestore(app, {
+      preferRest: true,
+    })
+  }
   return { app, db }
 }
 
@@ -65,7 +69,7 @@ export async function getDefaultDb(): Promise<Firestore> {
     credential: firebaseCert(serviceAccount),
     projectId: serviceAccount.project_id,
   }, `temp-${Date.now()}`)
-  const tempDb = getFs(tempApp)
+  const tempDb = getFs(tempApp, { preferRest: true })
   return tempDb
 }
 
@@ -79,8 +83,9 @@ export async function createTempCustomDb(serviceAccountKeyJson: string): Promise
   const { getFirestore: getFs } = await import('firebase-admin/firestore')
   const tempApp = initApp({
     credential: firebaseCert(serviceAccount),
+    projectId: serviceAccount.project_id,
   }, `custom-test-${Date.now()}`)
-  const tempDb = getFs(tempApp)
+  const tempDb = getFs(tempApp, { preferRest: true })
   return {
     tempDb,
     cleanup: async () => { try { await delApp(tempApp) } catch {} }
@@ -153,7 +158,7 @@ export function reinitializeFirebase(serviceAccountKeyJson: string): { app: App;
     credential: cert(serviceAccount),
     projectId: serviceAccount.project_id,
   })
-  db = getFirestore(app)
+  db = getFirestore(app, { preferRest: true })
   return { app, db }
 }
 
