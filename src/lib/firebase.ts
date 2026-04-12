@@ -28,6 +28,10 @@ export function initializeFirebase() {
   if (!app) {
     if (!_fbk) throw new Error('FIREBASE_SERVICE_ACCOUNT environment variable is not configured')
     const serviceAccount = parseServiceAccount(_fbk)
+    
+    // Ensure project ID is available as env var (required by some Firebase internals)
+    process.env.GOOGLE_CLOUD_PROJECT = serviceAccount.project_id
+    
     app = initializeApp({
       credential: cert(serviceAccount),
       projectId: serviceAccount.project_id,
