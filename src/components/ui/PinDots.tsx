@@ -70,7 +70,7 @@ export default function PinDots({
 
       {/* Visible dots */}
       <div
-        className={`flex items-center ${compact ? 'gap-2' : 'gap-3'} ${error ? 'animate-shake-error' : ''}}
+        className={'flex items-center ' + (compact ? 'gap-2' : 'gap-3') + (error ? ' animate-shake-error' : '')}
         onClick={handleFocus}
         role="button"
         tabIndex={0}
@@ -81,9 +81,12 @@ export default function PinDots({
         {Array.from({ length }, (_, i) => (
           <div
             key={i}
-            className={`pin-dot ${compact ? 'pin-dot-compact' : ''} ${i < value.length ? 'filled' : ''} ${
-              error ? '!border-red-500/50' : ''
-            }`}
+            className={[
+              'pin-dot',
+              compact ? 'pin-dot-compact' : '',
+              i < value.length ? 'filled' : '',
+              error ? '!border-red-500/50' : '',
+            ].filter(Boolean).join(' ')}
           />
         ))}
       </div>
