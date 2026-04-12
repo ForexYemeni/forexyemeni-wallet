@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -354,6 +354,8 @@ function CompleteRegistration({ email }: { email: string }) {
   const [loading, setLoading] = useState(false)
   const [termsAccepted, setTermsAccepted] = useState(false)
   const { setAuth, setPendingRegistration } = useAuthStore()
+  const formRef = useRef<HTMLFormElement>(null)
+  const pinSectionRef = useRef<HTMLDivElement>(null)
 
   const isPinValid = pin.length >= 4 && /^\d+$/.test(pin)
   const isPinMatch = pin.length >= 4 && pin === confirmPin
@@ -369,6 +371,20 @@ function CompleteRegistration({ email }: { email: string }) {
       }
     } catch {}
   }, [])
+
+  // Auto-scroll to PIN section when password is entered
+  useEffect(() => {
+    if (password.length >= 8 && pinSectionRef.current) {
+      pinSectionRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    }
+  }, [password.length >= 8])
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    // Prevent form submission on Enter key
+    if (e.key === 'Enter') {
+      e.preventDefault()
+    }
+  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -443,7 +459,8 @@ function CompleteRegistration({ email }: { email: string }) {
   const strength = getStrengthLevel()
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-4 animate-fade-in">
+    <div className="max-h-[calc(100vh-280px)] overflow-y-auto space-y-4 animate-fade-in pb-2" style={{ scrollbarWidth: 'thin' }}>
+    <form ref={formRef} onSubmit={handleSubmit} onKeyDown={handleKeyDown} className="space-y-4">
       {/* Full Name */}
       <FloatingLabelInput
         label="الاسم الكامل"
@@ -501,7 +518,7 @@ function CompleteRegistration({ email }: { email: string }) {
       </div>
 
       {/* PIN Setup */}
-      <div className="space-y-2">
+      <div ref={pinSectionRef} className="space-y-2">
         <div className="flex items-center gap-1.5">
           <div className="w-5 h-5 rounded-md bg-gold/10 flex items-center justify-center">
             <Lock className="w-3.5 h-3.5 text-gold" />
@@ -599,5 +616,6 @@ function CompleteRegistration({ email }: { email: string }) {
         {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : 'إنشاء الحساب'}
       </Button>
     </form>
+    </div>
   )
 }
