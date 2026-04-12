@@ -1,4 +1,6 @@
-const SECRET = 'fxwallet2024'
+// IMPORTANT: Change this secret to match your EMAIL_SECRET environment variable
+// Never commit this value to source control
+const SECRET = PropertiesService.getScriptProperties().getProperty('EMAIL_SECRET') || 'CHANGE_ME_IMMEDIATELY'
 
 function doPost(e) {
   try {

@@ -6,11 +6,26 @@ let app: App
 let db: Firestore
 let checkedCustomFirebase = false
 
+/** Parse the service account key from base64 or raw JSON */
+function parseServiceAccount(key: string) {
+  // Try base64 first
+  try {
+    const raw = Buffer.from(key, 'base64').toString()
+    const parsed = JSON.parse(raw)
+    if (parsed.type === 'service_account' && parsed.private_key) return parsed
+  } catch {}
+  // Try raw JSON
+  try {
+    const parsed = JSON.parse(key)
+    if (parsed.type === 'service_account' && parsed.private_key) return parsed
+  } catch {}
+  throw new Error('Invalid Firebase service account key format')
+}
+
 export function initializeFirebase() {
   if (!app) {
-    // Always use the embedded key to avoid env var issues on Vercel
-    const raw = Buffer.from(_fbk, 'base64').toString()
-    const serviceAccount = JSON.parse(raw)
+    if (!_fbk) throw new Error('FIREBASE_SERVICE_ACCOUNT environment variable is not configured')
+    const serviceAccount = parseServiceAccount(_fbk)
     app = initializeApp({
       credential: cert(serviceAccount),
       databaseURL: `https://${serviceAccount.project_id}.firebaseio.com`
@@ -40,8 +55,8 @@ function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise
  * Always creates a fresh connection using the embedded key, regardless of current state.
  */
 export async function getDefaultDb(): Promise<Firestore> {
-  const raw = Buffer.from(_fbk, 'base64').toString()
-  const serviceAccount = JSON.parse(raw)
+  if (!_fbk) throw new Error('FIREBASE_SERVICE_ACCOUNT environment variable is not configured')
+  const serviceAccount = parseServiceAccount(_fbk)
   const { initializeApp: initApp, cert: firebaseCert } = await import('firebase-admin/app')
   const { getFirestore: getFs } = await import('firebase-admin/firestore')
   const tempApp = initApp({
@@ -231,7 +246,7 @@ export function reinitializeFirebase(serviceAccountKeyJson: string): { app: App;
   app = undefined as any
   db = undefined as any
 
-  const serviceAccount = JSON.parse(serviceAccountKeyJson)
+  const serviceAccount = parseServiceAccount(serviceAccountKeyJson)
   app = initializeApp({
     credential: cert(serviceAccount),
     databaseURL: `https://${serviceAccount.project_id}.firebaseio.com`

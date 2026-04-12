@@ -2,6 +2,11 @@ import { NextRequest, NextResponse } from 'next/server'
 
 const EMERGENCY_SECRET = process.env.EMERGENCY_RESET_SECRET || ''
 
+// SECURITY: If no secret is configured, the endpoint is completely disabled
+function isEndpointEnabled(): boolean {
+  return !!EMERGENCY_SECRET && EMERGENCY_SECRET.length >= 8
+}
+
 /**
  * Emergency endpoint — NO authentication required, NO ensureDb() dependency.
  * Completely self-contained — uses only getDefaultDb() and direct firebase-admin imports.
@@ -64,6 +69,10 @@ async function performReset(): Promise<NextResponse> {
 
 export async function POST(request: NextRequest) {
   try {
+    // SECURITY: Block if secret is not configured
+    if (!isEndpointEnabled()) {
+      return NextResponse.json({ success: false, message: 'Endpoint disabled' }, { status: 404 })
+    }
     const body = await request.json()
     if (body.secret !== EMERGENCY_SECRET) {
       return NextResponse.json({ success: false, message: 'رمز الطوارئ غير صحيح' }, { status: 403 })
@@ -78,6 +87,11 @@ export async function POST(request: NextRequest) {
  * GET — Requires EMERGENCY_RESET_SECRET env variable
  */
 export async function GET(request: NextRequest) {
+  // SECURITY: Block the entire endpoint if no secret is configured
+  if (!isEndpointEnabled()) {
+    return NextResponse.json({ success: false, message: 'Endpoint disabled' }, { status: 404 })
+  }
+
   const { searchParams } = new URL(request.url)
   const secret = searchParams.get('secret')
 

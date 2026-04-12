@@ -56,8 +56,7 @@ export async function POST(request: NextRequest) {
       if (emailSent) {
         return NextResponse.json({ success: true, message: 'تم إرسال رمز التحقق إلى بريدك الإلكتروني' })
       } else {
-        // For debugging: return the OTP if email fails
-        return NextResponse.json({ success: true, message: 'تم إنشاء رمز التحقق', debugOtp: otpCode })
+        return NextResponse.json({ success: false, message: 'فشل إرسال رمز التحقق. تأكد من أن البريد الإلكتروني صحيح وحاول مرة أخرى.' }, { status: 500 })
       }
     }
 
