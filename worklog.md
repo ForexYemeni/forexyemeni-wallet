@@ -130,3 +130,25 @@
 - إضافة قسم حقول "بيانات التحويل البنكي" (recipientName, recipientPhone, network)
 - تحديث TYPE_LABELS ليشمل bank_transfer
 
+
+---
+Task ID: 1
+Agent: Main Agent
+Task: P0 Security Fixes — Move secrets to env vars, protect endpoints, remove debug routes
+
+Work Log:
+- Modified firebase-key.ts: Removed hardcoded base64 Firebase key, now reads from FIREBASE_SERVICE_ACCOUNT env var
+- Modified firebase.ts: Added parseServiceAccount() utility for base64/raw JSON format support, throws error if env var not set
+- Deleted /api/fcm/debug/route.ts: Unauthenticated debug endpoint that exposed FCM tokens, env vars, and could send test notifications
+- Modified /api/admin/delete-user/route.ts: Removed debugOtp leak that returned OTP code in API response when email failed
+- Modified /api/emergency/recovery-pin/route.ts: Replaced hardcoded DEFAULT_PIN='202477' with RECOVERY_DEFAULT_PIN env var
+- Modified GOOGLE_APPS_SCRIPT_CODE.gs: Now reads secret from Script Properties instead of hardcoded 'fxwallet2024'
+- Modified /api/emergency/reset-db/route.ts: Added fail-closed behavior — returns 404 if EMERGENCY_RESET_SECRET not configured
+- Rewrote /api/emergency/secret-recovery/route.ts: Added PIN verification gate with session tokens, rate limiting (5 attempts/min), 10-min session expiry
+- Deleted download/CREDENTIALS.txt: Contained plaintext admin credentials
+- Updated .env.example with all new environment variables documented
+
+Stage Summary:
+- All 10 P0 security fixes implemented and pushed to GitHub (commit 8696c5f)
+- No compilation errors in modified files
+- User needs to: set FIREBASE_SERVICE_ACCOUNT env var on Vercel, update Google Apps Script EMAIL_SECRET property, optionally set RECOVERY_DEFAULT_PIN
