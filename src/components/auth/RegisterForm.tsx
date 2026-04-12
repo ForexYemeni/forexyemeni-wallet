@@ -532,6 +532,7 @@ function CompleteRegistration({ email }: { email: string }) {
         {pinStep === 'enter' ? (
           <div className="space-y-3">
             <PinDots
+              compact
               value={pin}
               onChange={(val) => {
                 setPin(val)
@@ -546,6 +547,7 @@ function CompleteRegistration({ email }: { email: string }) {
         ) : (
           <div className="space-y-3">
             <PinDots
+              compact
               value={confirmPin}
               onChange={(val) => {
                 setConfirmPin(val)

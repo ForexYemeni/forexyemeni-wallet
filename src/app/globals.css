@@ -1585,6 +1585,18 @@
   box-shadow: 0 0 6px rgba(201, 154, 10, 0.3);
 }
 
+/* Compact PIN dots for registration form */
+.pin-dot.pin-dot-compact {
+  width: 38px;
+  height: 38px;
+  border-radius: 10px;
+}
+
+.pin-dot.pin-dot-compact.filled::after {
+  width: 10px;
+  height: 10px;
+}
+
 /* ==================== Phase 4: Success Result Animation ==================== */
 @keyframes successBounceIn {
   0% { transform: scale(0); opacity: 0; }

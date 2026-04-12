@@ -9,6 +9,7 @@ interface PinDotsProps {
   onComplete?: (value: string) => void
   error?: boolean
   disabled?: boolean
+  compact?: boolean
 }
 
 export default function PinDots({
@@ -18,6 +19,7 @@ export default function PinDots({
   onComplete,
   error = false,
   disabled = false,
+  compact = false,
 }: PinDotsProps) {
   const [internalValue, setInternalValue] = useState('')
   const inputRef = useRef<HTMLInputElement>(null)
@@ -68,7 +70,7 @@ export default function PinDots({
 
       {/* Visible dots */}
       <div
-        className={`flex items-center gap-3 ${error ? 'animate-shake-error' : ''}`}
+        className={`flex items-center ${compact ? 'gap-2' : 'gap-3'} ${error ? 'animate-shake-error' : ''}}
         onClick={handleFocus}
         role="button"
         tabIndex={0}
@@ -79,7 +81,7 @@ export default function PinDots({
         {Array.from({ length }, (_, i) => (
           <div
             key={i}
-            className={`pin-dot ${i < value.length ? 'filled' : ''} ${
+            className={`pin-dot ${compact ? 'pin-dot-compact' : ''} ${i < value.length ? 'filled' : ''} ${
               error ? '!border-red-500/50' : ''
             }`}
           />
