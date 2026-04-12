@@ -6,7 +6,6 @@ import {
   HelpCircle,
   Search,
   ChevronDown,
-  ChevronUp,
   Loader2,
   MessageCircle,
   X,
@@ -58,9 +57,7 @@ export default function HelpCenter() {
     try {
       const res = await fetch('/api/faq')
       const data = await res.json()
-      if (data.success) {
-        setFaqs(data.items || [])
-      }
+      if (data.success) setFaqs(data.items || [])
     } catch {
       // silently fail
     } finally {
@@ -88,7 +85,7 @@ export default function HelpCenter() {
       <div className="flex items-center gap-3">
         <button
           onClick={() => setScreen('dashboard')}
-          className="w-10 h-10 rounded-xl bg-white/5 flex items-center justify-center hover:bg-white/10 transition-colors"
+          className="w-10 h-10 rounded-xl bg-white/5 flex items-center justify-center hover:bg-white/10 transition-colors tap-effect"
         >
           <ArrowLeft className="w-5 h-5" />
         </button>
@@ -97,7 +94,7 @@ export default function HelpCenter() {
             <HelpCircle className="w-5 h-5 text-gray-900" />
           </div>
           <div>
-            <h1 className="text-xl font-bold">مركز المساعدة</h1>
+            <h1 className="text-xl font-bold gold-text">مركز المساعدة</h1>
             <p className="text-sm text-muted-foreground">الأسئلة الشائعة والمساعدة</p>
           </div>
         </div>
@@ -128,8 +125,8 @@ export default function HelpCenter() {
         {CATEGORIES.map((cat) => (
           <button
             key={cat.key}
-            onClick={() => setActiveCategory(cat.key)}
-            className={`px-3 py-2 rounded-xl text-xs transition-all whitespace-nowrap flex-shrink-0 ${
+            onClick={() => { setActiveCategory(cat.key); setExpandedId(null) }}
+            className={`px-3 py-2 rounded-xl text-xs transition-all whitespace-nowrap flex-shrink-0 tap-effect ${
               activeCategory === cat.key
                 ? 'bg-gold/10 text-gold border border-gold/20 font-medium'
                 : 'bg-white/5 text-muted-foreground hover:text-foreground hover:bg-white/10 border border-transparent'
@@ -142,65 +139,81 @@ export default function HelpCenter() {
 
       {/* FAQ List */}
       {loading ? (
-        <div className="space-y-3">
+        <div className="space-y-3 stagger-list">
           {[...Array(5)].map((_, i) => (
-            <div key={i} className="glass-card p-4 shimmer h-16 rounded-xl" />
+            <div
+              key={i}
+              className="glass-card p-4 flex items-center gap-4"
+              style={{ animationDelay: `${i * 60}ms` }}
+            >
+              <div className="skeleton-circle w-8 h-8 shrink-0" />
+              <div className="flex-1 space-y-2">
+                <div className="skeleton-line w-2/3" />
+                <div className="skeleton-line w-full h-3" />
+              </div>
+            </div>
           ))}
         </div>
       ) : filteredFaqs.length === 0 ? (
-        <div className="glass-card p-8 text-center space-y-3">
-          <HelpCircle className="w-10 h-10 text-muted-foreground/30 mx-auto" />
+        <div className="glass-card p-8 text-center empty-state-enhanced space-y-3">
+          <div className="empty-state-icon">
+            <HelpCircle className="w-10 h-10 text-gold/20 mx-auto" />
+          </div>
           <p className="text-muted-foreground text-sm">
             {search ? 'لا توجد نتائج لبحثك' : 'لا توجد أسئلة شائعة حالياً'}
           </p>
+          {search && (
+            <button onClick={() => setSearch('')} className="text-xs text-gold hover:text-gold-light transition-colors tap-effect">
+              مسح البحث
+            </button>
+          )}
         </div>
       ) : (
         <div className="space-y-2">
           <p className="text-xs text-muted-foreground">{filteredFaqs.length} سؤال</p>
-          {filteredFaqs.map((faq) => {
-            const isExpanded = expandedId === faq.id
-            return (
-              <div
-                key={faq.id}
-                className={`glass-card rounded-xl overflow-hidden transition-all ${
-                  isExpanded ? 'border-gold/20' : ''
-                }`}
-              >
-                <button
-                  onClick={() => toggleExpand(faq.id)}
-                  className="w-full flex items-center justify-between p-4 text-right hover:bg-white/5 transition-colors"
+          <div className="space-y-2 stagger-list">
+            {filteredFaqs.map((faq, index) => {
+              const isExpanded = expandedId === faq.id
+              return (
+                <div
+                  key={faq.id}
+                  className={`glass-card rounded-xl overflow-hidden transition-all ${
+                    isExpanded ? 'border-gold/20' : 'hover:border-gold/10'
+                  }`}
+                  style={{ animationDelay: `${index * 40}ms` }}
                 >
-                  <div className="flex items-center gap-3 flex-1">
-                    {faq.category && (
-                      <span className="text-[10px] px-2 py-0.5 rounded-md bg-gold/10 text-gold whitespace-nowrap">
-                        {CATEGORY_LABELS[faq.category] || faq.category}
-                      </span>
-                    )}
-                    <span className="text-sm font-medium">{faq.question}</span>
-                  </div>
-                  {isExpanded ? (
-                    <ChevronUp className="w-4 h-4 text-gold flex-shrink-0 mr-2" />
-                  ) : (
-                    <ChevronDown className="w-4 h-4 text-muted-foreground flex-shrink-0 mr-2" />
-                  )}
-                </button>
-                {isExpanded && (
-                  <div className="px-4 pb-4 border-t border-white/5 pt-3">
+                  <button
+                    onClick={() => toggleExpand(faq.id)}
+                    className="w-full flex items-center justify-between p-4 text-right hover:bg-white/[0.02] transition-colors"
+                  >
+                    <div className="flex items-center gap-3 flex-1">
+                      {faq.category && (
+                        <span className="text-[10px] px-2 py-0.5 rounded-md bg-gold/10 text-gold whitespace-nowrap">
+                          {CATEGORY_LABELS[faq.category] || faq.category}
+                        </span>
+                      )}
+                      <span className="text-sm font-medium">{faq.question}</span>
+                    </div>
+                    <ChevronDown className={`w-4 h-4 flex-shrink-0 mr-2 accordion-chevron ${
+                      isExpanded ? 'rotated text-gold' : 'text-muted-foreground'
+                    }`} />
+                  </button>
+                  <div className={`accordion-content px-4 mx-4 border-t border-white/5 ${isExpanded ? 'expanded' : ''}`}>
                     <p className="text-sm text-muted-foreground leading-relaxed whitespace-pre-wrap">
                       {faq.answer}
                     </p>
                   </div>
-                )}
-              </div>
-            )
-          })}
+                </div>
+              )
+            })}
+          </div>
         </div>
       )}
 
       {/* Contact Support */}
       <div className="glass-card p-5 rounded-xl space-y-3 text-center">
-        <div className="w-12 h-12 mx-auto rounded-xl bg-blue-500/10 flex items-center justify-center">
-          <MessageCircle className="w-6 h-6 text-blue-400" />
+        <div className="w-12 h-12 mx-auto rounded-xl bg-gold/10 flex items-center justify-center">
+          <MessageCircle className="w-6 h-6 text-gold" />
         </div>
         <div>
           <p className="text-sm font-bold">لم تجد إجابتك؟</p>
@@ -208,7 +221,7 @@ export default function HelpCenter() {
         </div>
         <button
           onClick={() => setScreen('chat')}
-          className="h-10 px-6 bg-blue-500/10 border border-blue-500/20 text-blue-400 font-medium rounded-xl hover:bg-blue-500/20 transition-all text-sm flex items-center gap-2 mx-auto"
+          className="h-10 px-6 bg-gold/10 border border-gold/20 text-gold font-medium rounded-xl hover:bg-gold/20 transition-all text-sm flex items-center gap-2 mx-auto tap-effect"
         >
           <MessageCircle className="w-4 h-4" />
           تواصل مع الدعم

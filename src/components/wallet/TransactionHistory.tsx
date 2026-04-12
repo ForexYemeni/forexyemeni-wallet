@@ -9,9 +9,11 @@ import {
   ArrowDownLeft,
   ArrowUpRight,
   TrendingUp,
+  Repeat,
   Clock,
   Filter,
   WifiOff,
+  Search,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import dynamic from 'next/dynamic'
@@ -29,6 +31,46 @@ interface Transaction {
   createdAt: string
 }
 
+function getTimeGroup(dateStr: string): string {
+  const now = new Date()
+  const date = new Date(dateStr)
+  const diffMs = now.getTime() - date.getTime()
+  const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24))
+
+  if (diffDays === 0) return 'اليوم'
+  if (diffDays === 1) return 'أمس'
+  if (diffDays < 7) return `منذ ${diffDays} أيام`
+  if (diffDays < 30) {
+    const weeks = Math.floor(diffDays / 7)
+    return `منذ ${weeks} ${weeks === 1 ? 'أسبوع' : 'أسابيع'}`
+  }
+  if (diffDays < 365) {
+    const months = Math.floor(diffDays / 30)
+    return `منذ ${months} ${months === 1 ? 'شهر' : 'أشهر'}`
+  }
+  return 'أقدم'
+}
+
+function groupTransactions(transactions: Transaction[]): { group: string; items: Transaction[] }[] {
+  const groups: Record<string, Transaction[]> = {}
+  for (const tx of transactions) {
+    const group = getTimeGroup(tx.createdAt)
+    if (!groups[group]) groups[group] = []
+    groups[group].push(tx)
+  }
+  // Preserve insertion order
+  const seen = new Set<string>()
+  const ordered: { group: string; items: Transaction[] }[] = []
+  for (const tx of transactions) {
+    const group = getTimeGroup(tx.createdAt)
+    if (!seen.has(group)) {
+      seen.add(group)
+      ordered.push({ group, items: groups[group] })
+    }
+  }
+  return ordered
+}
+
 export default function TransactionHistory() {
   const { user } = useAuthStore()
   const { cachedTransactions, setCachedTransactions, setCachedUser, setLastSyncTime } = useOfflineStore()
@@ -36,13 +78,13 @@ export default function TransactionHistory() {
   const [transactions, setTransactions] = useState<Transaction[]>([])
   const [loading, setLoading] = useState(true)
   const [filter, setFilter] = useState<string>('all')
+  const [search, setSearch] = useState('')
   const [usingOffline, setUsingOffline] = useState(false)
 
   useEffect(() => {
     if (user?.id) fetchTransactions()
   }, [user?.id])
 
-  // Load offline cache when going offline
   useEffect(() => {
     if (isOffline && cachedTransactions.length > 0) {
       setTransactions(cachedTransactions as Transaction[])
@@ -53,8 +95,6 @@ export default function TransactionHistory() {
 
   const fetchTransactions = async () => {
     if (!user?.id) return
-
-    // If offline, use cached data
     if (!navigator.onLine) {
       if (cachedTransactions.length > 0) {
         setTransactions(cachedTransactions as Transaction[])
@@ -63,14 +103,12 @@ export default function TransactionHistory() {
       setLoading(false)
       return
     }
-
     try {
       const res = await apiFetch(`/api/transactions?userId=${user.id}`)
       const data = await res.json()
       if (data.success) {
         setTransactions(data.transactions)
         setUsingOffline(false)
-        // Save to offline cache
         setCachedTransactions(data.transactions || [])
         setCachedUser({
           balance: user?.balance ?? 0,
@@ -83,7 +121,6 @@ export default function TransactionHistory() {
         setLastSyncTime()
       }
     } catch {
-      // Network error — try cached data
       if (cachedTransactions.length > 0) {
         setTransactions(cachedTransactions as Transaction[])
         setUsingOffline(true)
@@ -93,14 +130,28 @@ export default function TransactionHistory() {
     }
   }
 
-  const filtered = filter === 'all'
-    ? transactions
-    : transactions.filter(tx => tx.type === filter)
+  const filtered = transactions.filter(tx => {
+    const matchType = filter === 'all' || tx.type === filter
+    const matchSearch = !search.trim() ||
+      (tx.description || '').toLowerCase().includes(search.toLowerCase()) ||
+      tx.referenceId?.toLowerCase().includes(search.toLowerCase()) ||
+      tx.type.toLowerCase().includes(search.toLowerCase())
+    return matchType && matchSearch
+  })
 
-  const formatDate = (dateStr: string) => {
+  const grouped = groupTransactions(filtered)
+
+  const formatTime = (dateStr: string) => {
+    return new Date(dateStr).toLocaleTimeString('ar-SA', {
+      hour: '2-digit',
+      minute: '2-digit',
+    })
+  }
+
+  const formatFullDate = (dateStr: string) => {
     return new Date(dateStr).toLocaleDateString('ar-SA', {
       year: 'numeric',
-      month: 'long',
+      month: 'short',
       day: 'numeric',
       hour: '2-digit',
       minute: '2-digit',
@@ -112,7 +163,18 @@ export default function TransactionHistory() {
       case 'deposit': return <ArrowDownLeft className="w-4 h-4 text-green-400" />
       case 'withdrawal': return <ArrowUpRight className="w-4 h-4 text-red-400" />
       case 'bonus': return <TrendingUp className="w-4 h-4 text-gold" />
+      case 'transfer': return <Repeat className="w-4 h-4 text-blue-400" />
       default: return <Clock className="w-4 h-4 text-muted-foreground" />
+    }
+  }
+
+  const getTypeIconBg = (type: string) => {
+    switch (type) {
+      case 'deposit': return 'bg-green-500/10'
+      case 'withdrawal': return 'bg-red-500/10'
+      case 'bonus': return 'bg-gold/10'
+      case 'transfer': return 'bg-blue-500/10'
+      default: return 'bg-white/5'
     }
   }
 
@@ -122,6 +184,7 @@ export default function TransactionHistory() {
       case 'withdrawal': return 'سحب'
       case 'transfer': return 'تحويل'
       case 'bonus': return 'مكافأة'
+      case 'p2p': return 'P2P'
       default: return type
     }
   }
@@ -131,6 +194,7 @@ export default function TransactionHistory() {
     { key: 'deposit', label: 'إيداعات' },
     { key: 'withdrawal', label: 'سحوبات' },
     { key: 'bonus', label: 'مكافآت' },
+    { key: 'transfer', label: 'تحويلات' },
   ]
 
   return (
@@ -143,6 +207,7 @@ export default function TransactionHistory() {
         </div>
       )}
 
+      {/* Header */}
       <div className="flex items-center gap-3">
         <div className="w-10 h-10 rounded-xl bg-gold/10 flex items-center justify-center">
           <Clock className="w-5 h-5 text-gold" />
@@ -151,6 +216,26 @@ export default function TransactionHistory() {
           <h1 className="text-xl font-bold">سجل المعاملات</h1>
           <p className="text-sm text-muted-foreground">{transactions.length} معاملة</p>
         </div>
+      </div>
+
+      {/* Search */}
+      <div className="relative">
+        <Search className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+        <input
+          type="text"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          placeholder="ابحث في المعاملات..."
+          className="w-full h-11 pr-10 pl-4 rounded-xl glass-input text-sm text-foreground placeholder:text-muted-foreground"
+        />
+        {search && (
+          <button
+            onClick={() => setSearch('')}
+            className="absolute left-3 top-1/2 -translate-y-1/2 text-xs text-muted-foreground hover:text-foreground"
+          >
+            مسح
+          </button>
+        )}
       </div>
 
       {/* Export Statement */}
@@ -177,40 +262,73 @@ export default function TransactionHistory() {
 
       {/* Transactions List */}
       {loading ? (
-        <div className="space-y-3">
+        <div className="space-y-3 stagger-list">
           {[...Array(5)].map((_, i) => (
-            <div key={i} className="glass-card p-4 shimmer h-20 rounded-xl" />
+            <div
+              key={i}
+              className="glass-card p-4 flex items-center gap-4"
+              style={{ animationDelay: `${i * 60}ms` }}
+            >
+              <div className="skeleton-circle w-10 h-10 shrink-0" />
+              <div className="flex-1 space-y-2">
+                <div className="skeleton-line w-2/3" />
+                <div className="skeleton-line w-1/3 h-3" />
+              </div>
+              <div className="skeleton-line w-20" />
+            </div>
           ))}
         </div>
       ) : filtered.length === 0 ? (
-        <div className="glass-card p-8 text-center">
+        <div className="glass-card p-8 text-center empty-state-enhanced">
           <div className="empty-state-icon">
             <Filter className="w-12 h-12 text-gold/30 mx-auto mb-3" />
           </div>
           <p className="text-muted-foreground text-sm mb-1">لا توجد معاملات تطابق البحث</p>
-          <button onClick={() => setSearch('')} className="text-xs text-gold hover:text-gold-light transition-colors tap-effect">مسح البحث</button>
+          <button onClick={() => { setSearch(''); setFilter('all') }} className="text-xs text-gold hover:text-gold-light transition-colors tap-effect">
+            مسح الفلاتر
+          </button>
         </div>
       ) : (
-        <div className="space-y-2">
-          {filtered.map((tx) => (
-            <div key={tx.id} className="glass-card glass-card-hover p-4 rounded-xl space-y-3">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${tx.amount >= 0 ? 'bg-green-500/10' : 'bg-red-500/10'}`}>
-                    {getTypeIcon(tx.type)}
-                  </div>
-                  <div>
-                    <p className="text-sm font-medium">{getTypeLabel(tx.type)}</p>
-                    <p className="text-xs text-muted-foreground">{formatDate(tx.createdAt)}</p>
-                  </div>
-                </div>
-                <span className={`text-sm font-bold ${tx.amount >= 0 ? 'text-green-400' : 'text-red-400'}`}>
-                  {tx.amount >= 0 ? '+' : ''}{Math.abs(tx.amount).toFixed(2)} USDT
-                </span>
+        <div className="space-y-4">
+          {grouped.map(({ group, items }) => (
+            <div key={group}>
+              {/* Time group header */}
+              <div className="time-group-header px-1">
+                <p className="text-xs font-bold gold-text">{group}</p>
               </div>
-              {tx.description && (
-                <p className="text-xs text-muted-foreground border-t border-white/5 pt-2">{tx.description}</p>
-              )}
+
+              {/* Transactions in this group */}
+              <div className="space-y-2 stagger-list">
+                {items.map((tx, index) => (
+                  <div
+                    key={tx.id}
+                    className="glass-card glass-card-hover tx-card-enhanced p-4 space-y-2 cursor-pointer"
+                    style={{ animationDelay: `${index * 40}ms` }}
+                    title={formatFullDate(tx.createdAt)}
+                  >
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${getTypeIconBg(tx.type)}`}>
+                          {getTypeIcon(tx.type)}
+                        </div>
+                        <div>
+                          <p className="text-sm font-medium">{getTypeLabel(tx.type)}</p>
+                          <p className="text-xs text-muted-foreground">{formatTime(tx.createdAt)}</p>
+                        </div>
+                      </div>
+                      <div className="text-left">
+                        <span className={`text-sm font-bold ${tx.amount >= 0 ? 'tx-amount-positive' : 'tx-amount-negative'}`}>
+                          {tx.amount >= 0 ? '+' : ''}{Math.abs(tx.amount).toFixed(2)}
+                        </span>
+                        <p className="text-[10px] text-muted-foreground">USDT</p>
+                      </div>
+                    </div>
+                    {tx.description && (
+                      <p className="text-xs text-muted-foreground border-t border-white/5 pt-2 truncate">{tx.description}</p>
+                    )}
+                  </div>
+                ))}
+              </div>
             </div>
           ))}
         </div>

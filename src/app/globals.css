@@ -1134,3 +1134,208 @@
   border: 1px solid rgba(201, 154, 10, 0.12);
   box-shadow: 0 -8px 40px rgba(0, 0, 0, 0.08), 0 0 1px rgba(201, 154, 10, 0.2);
 }
+
+/* ==================== Phase 3: Enhanced Screen Transitions ==================== */
+/* Direction-aware transitions: forward = push left, back = push right */
+@keyframes pageEnterForward {
+  from { opacity: 0; transform: translateX(40px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+
+@keyframes pageExitForward {
+  from { opacity: 1; transform: translateX(0); }
+  to   { opacity: 0; transform: translateX(-40px); }
+}
+
+@keyframes pageEnterBack {
+  from { opacity: 0; transform: translateX(-40px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+
+@keyframes pageExitBack {
+  from { opacity: 1; transform: translateX(0); }
+  to   { opacity: 0; transform: translateX(40px); }
+}
+
+.page-enter-forward {
+  animation: pageEnterForward 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94) forwards;
+}
+
+.page-enter-back {
+  animation: pageEnterBack 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94) forwards;
+}
+
+/* ==================== Phase 3: Notification Card Types ==================== */
+.notif-card {
+  transition: all 0.25s ease;
+  position: relative;
+  overflow: hidden;
+}
+
+.notif-card::before {
+  content: '';
+  position: absolute;
+  right: 0;
+  top: 0;
+  bottom: 0;
+  width: 3px;
+  border-radius: 0 3px 3px 0;
+  transition: all 0.25s ease;
+}
+
+.notif-card.unread {
+  background: rgba(240, 185, 11, 0.03);
+  border-color: rgba(240, 185, 11, 0.15);
+}
+
+.notif-card.unread::before {
+  background: linear-gradient(180deg, #F0B90B, #FCD535);
+}
+
+.notif-card.type-success::before { background: #10b981; }
+.notif-card.type-warning::before { background: #f59e0b; }
+.notif-card.type-error::before   { background: #ef4444; }
+.notif-card.type-info::before    { background: #6366f1; }
+
+.notif-card:hover {
+  transform: translateY(-1px);
+}
+
+.notif-card.unread:hover {
+  border-color: rgba(240, 185, 11, 0.25);
+  box-shadow: 0 4px 20px rgba(240, 185, 11, 0.05);
+}
+
+/* ==================== Phase 3: Time Group Header ==================== */
+.time-group-header {
+  position: relative;
+  padding-bottom: 8px;
+  margin-bottom: 8px;
+}
+
+.time-group-header::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: linear-gradient(90deg, rgba(240, 185, 11, 0.2) 0%, transparent 100%);
+}
+
+/* ==================== Phase 3: Smooth Accordion Expand ==================== */
+.accordion-content {
+  overflow: hidden;
+  max-height: 0;
+  opacity: 0;
+  transition: max-height 0.35s cubic-bezier(0.4, 0, 0.2, 1),
+              opacity 0.25s ease,
+              padding 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+  padding-top: 0;
+  padding-bottom: 0;
+}
+
+.accordion-content.expanded {
+  max-height: 500px;
+  opacity: 1;
+  padding-top: 12px;
+  padding-bottom: 16px;
+}
+
+/* Accordion chevron rotation */
+.accordion-chevron {
+  transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.accordion-chevron.rotated {
+  transform: rotate(180deg);
+}
+
+/* ==================== Phase 3: Enhanced Transaction Card ==================== */
+.tx-card-enhanced {
+  position: relative;
+  overflow: hidden;
+  transition: all 0.25s ease;
+}
+
+.tx-card-enhanced::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 16px;
+  background: radial-gradient(circle at var(--tap-x, 50%) var(--tap-y, 50%), rgba(240, 185, 11, 0.06) 0%, transparent 60%);
+  opacity: 0;
+  transition: opacity 0.3s ease;
+  pointer-events: none;
+}
+
+.tx-card-enhanced:hover::after {
+  opacity: 1;
+}
+
+.tx-card-enhanced:active {
+  transform: scale(0.98);
+}
+
+/* Transaction amount color with subtle glow */
+.tx-amount-positive {
+  color: #10b981;
+  text-shadow: 0 0 8px rgba(16, 185, 129, 0.15);
+}
+
+.tx-amount-negative {
+  color: #ef4444;
+  text-shadow: 0 0 8px rgba(239, 68, 68, 0.15);
+}
+
+/* ==================== Phase 3: Enhanced Empty State ==================== */
+.empty-state-enhanced {
+  position: relative;
+  overflow: hidden;
+}
+
+.empty-state-enhanced::before {
+  content: '';
+  position: absolute;
+  top: -20%;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 200px;
+  height: 200px;
+  background: radial-gradient(circle, rgba(240, 185, 11, 0.04) 0%, transparent 70%);
+  border-radius: 50%;
+  pointer-events: none;
+}
+
+/* ==================== Phase 3: Notification Read Transition ==================== */
+@keyframes fadeToRead {
+  from {
+    background: rgba(240, 185, 11, 0.03);
+    border-color: rgba(240, 185, 11, 0.15);
+  }
+  to {
+    background: transparent;
+    border-color: rgba(240, 185, 11, 0.1);
+  }
+}
+
+.notif-mark-read {
+  animation: fadeToRead 0.4s ease forwards;
+}
+
+/* ==================== Phase 3: Stagger List Items (unlimited) ==================== */
+.stagger-list > * {
+  opacity: 0;
+  animation: fadeIn 0.35s ease-out forwards;
+}
+
+/* ==================== Phase 3: Scroll Reveal ==================== */
+@keyframes scrollRevealUp {
+  from { opacity: 0; transform: translateY(16px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.scroll-reveal {
+  opacity: 0;
+  animation: scrollRevealUp 0.4s ease-out forwards;
+}
