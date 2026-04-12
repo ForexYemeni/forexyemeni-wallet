@@ -163,27 +163,27 @@ export default function SettingsPage() {
   ]
 
   return (
-    <div className="space-y-6 animate-fade-in">
+    <div className="space-y-5 animate-fade-in">
       <div className="flex items-center gap-3">
-        <div className="w-10 h-10 rounded-xl bg-gold/10 flex items-center justify-center">
+        <div className="w-10 h-10 rounded-xl bg-gold/10 flex items-center justify-center gold-glow">
           <Settings className="w-5 h-5 text-gold" />
         </div>
         <div>
-          <h1 className="text-xl font-bold">الإعدادات</h1>
-          <p className="text-sm text-muted-foreground">إدارة حسابك وتفضيلاتك</p>
+          <h1 className="text-lg font-bold">الإعدادات</h1>
+          <p className="text-xs text-muted-foreground">إدارة حسابك وتفضيلاتك</p>
         </div>
       </div>
 
       {/* Tabs */}
-      <div className="grid grid-cols-4 gap-2">
+      <div className="flex gap-2 overflow-x-auto pb-1">
         {tabs.map((tab) => (
           <button
             key={tab.key}
             onClick={() => setActiveTab(tab.key as typeof activeTab)}
-            className={`flex flex-col items-center gap-1 p-3 rounded-xl text-xs transition-all ${
+            className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-medium whitespace-nowrap transition-all haptic-btn ${
               activeTab === tab.key
-                ? 'bg-gold/10 text-gold border border-gold/20'
-                : 'text-muted-foreground hover:text-foreground hover:bg-white/5'
+                ? 'bg-gold/10 text-gold border border-gold/25 shadow-[0_0_12px_rgba(240,185,11,0.12)]'
+                : 'text-muted-foreground hover:text-foreground hover:bg-white/5 border border-transparent'
             }`}
           >
             <tab.icon className="w-4 h-4" />
@@ -192,23 +192,56 @@ export default function SettingsPage() {
         ))}
       </div>
 
+      {/* Profile Card — always visible at top */}
+      <div className="glass-card profile-card p-5 space-y-4">
+        <div className="relative flex items-center gap-4 pt-2">
+          <div className="relative z-10 w-16 h-16 rounded-2xl gold-gradient flex items-center justify-center text-gray-900 font-bold text-xl shadow-lg shadow-gold/20">
+            {(user?.fullName || user?.email || 'م').charAt(0).toUpperCase()}
+          </div>
+          <div className="relative z-10 flex-1 min-w-0">
+            <p className="text-base font-bold truncate">{user?.fullName || 'مستخدم'}</p>
+            <p className="text-xs text-muted-foreground truncate" dir="ltr">{user?.email}</p>
+            <div className="flex items-center gap-2 mt-1.5 flex-wrap">
+              {user?.kycStatus === 'approved' && (
+                <span className="text-[10px] px-2 py-0.5 rounded-full bg-green-500/15 text-green-400 font-medium border border-green-500/20">متحقق</span>
+              )}
+              {user?.kycStatus !== 'approved' && user?.kycStatus !== 'none' && (
+                <span className="text-[10px] px-2 py-0.5 rounded-full bg-yellow-500/15 text-yellow-400 font-medium border border-yellow-500/20">بانتظار المراجعة</span>
+              )}
+              {user?.accountNumber && (
+                <span className="text-[10px] px-2 py-0.5 rounded-full bg-blue-500/15 text-blue-400 font-medium border border-blue-500/20 font-mono" dir="ltr">#{user.accountNumber}</span>
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
+
       {/* Profile Tab */}
       {activeTab === 'profile' && !showChangeEmail && (
-        <div className="glass-card p-5 space-y-4 animate-fade-in">
-          <h3 className="text-sm font-bold">المعلومات الشخصية</h3>
-          <form onSubmit={handleUpdateProfile} className="space-y-4">
-            <div className="space-y-2">
-              <Label className="text-sm text-muted-foreground">الاسم الكامل</Label>
-              <Input
+        <div className="space-y-3 animate-fade-in">
+          <form onSubmit={handleUpdateProfile} className="glass-card p-5 space-y-4">
+            <div className="flex items-center gap-2 mb-1">
+              <User className="w-4 h-4 text-gold" />
+              <h3 className="text-sm font-bold">المعلومات الشخصية</h3>
+            </div>
+            <div className="float-label-group">
+              <input
                 value={fullName}
                 onChange={(e) => setFullName(e.target.value)}
-                className="glass-input h-12 text-base"
-                placeholder="أدخل اسمك الكامل"
+                className="float-label-input"
+                placeholder=" "
               />
+              <label className="float-label">الاسم الكامل</label>
             </div>
-            <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <Label className="text-sm text-muted-foreground">البريد الإلكتروني</Label>
+            <div className="float-label-group">
+              <input
+                value={user?.email || ''}
+                disabled
+                className="float-label-input pl-12 opacity-60"
+                dir="ltr"
+              />
+              <label className="float-label active">البريد الإلكتروني</label>
+              <div className="absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none">
                 <button
                   type="button"
                   onClick={() => setShowChangeEmail(true)}
@@ -217,73 +250,61 @@ export default function SettingsPage() {
                   تغيير
                 </button>
               </div>
-              <Input
-                value={user?.email || ''}
-                disabled
-                className="glass-input h-12 text-base opacity-60"
-                dir="ltr"
-              />
             </div>
-            <div className="space-y-2">
-              <Label className="text-sm text-muted-foreground">رقم الهاتف</Label>
-              <Input
+            <div className="float-label-group">
+              <input
                 value={user?.phone ? `+967 ${user.phone}` : 'غير محدد'}
                 disabled
-                className="glass-input h-12 text-base opacity-60"
+                className="float-label-input opacity-60"
                 dir="ltr"
               />
+              <label className="float-label active">رقم الهاتف</label>
             </div>
             {user?.accountNumber && (
-              <div className="space-y-2">
-                <Label className="text-sm text-muted-foreground">رقم الحساب</Label>
-                <div className="flex items-center gap-2">
-                  <Input
-                    value={String(user.accountNumber)}
-                    disabled
-                    className="glass-input h-12 text-base opacity-60 font-mono font-bold"
-                    dir="ltr"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => {
-                      navigator.clipboard.writeText(String(user.accountNumber!))
-                      setCopiedAccount(true)
-                      toast.success('تم نسخ رقم الحساب')
-                      setTimeout(() => setCopiedAccount(false), 2000)
-                    }}
-                    className="w-12 h-12 rounded-xl bg-gold/10 flex items-center justify-center hover:bg-gold/20 transition-colors flex-shrink-0"
-                  >
-                    {copiedAccount ? (
-                      <CheckIcon className="w-4 h-4 text-green-400" />
-                    ) : (
-                      <Copy className="w-4 h-4 text-gold" />
-                    )}
-                  </button>
-                </div>
+              <div className="float-label-group">
+                <input
+                  value={String(user.accountNumber)}
+                  disabled
+                  className="float-label-input pl-12 opacity-60 font-mono font-bold"
+                  dir="ltr"
+                />
+                <label className="float-label active">رقم الحساب</label>
+                <button
+                  type="button"
+                  onClick={() => {
+                    navigator.clipboard.writeText(String(user.accountNumber!))
+                    setCopiedAccount(true)
+                    toast.success('تم نسخ رقم الحساب')
+                    setTimeout(() => setCopiedAccount(false), 2000)
+                  }}
+                  className="absolute left-3 top-1/2 -translate-y-1/2"
+                >
+                  {copiedAccount ? <CheckIcon className="w-4 h-4 text-green-400" /> : <Copy className="w-4 h-4 text-gold" />}
+                </button>
               </div>
             )}
             <Button
               type="submit"
               disabled={loading}
-              className="w-full h-11 gold-gradient text-gray-900 font-bold rounded-xl hover:opacity-90"
+              className="w-full h-11 gold-gradient text-gray-900 font-bold rounded-xl hover:opacity-90 gold-glow haptic-btn"
             >
               {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : 'حفظ التغييرات'}
             </Button>
           </form>
 
-          {/* Change Email Button */}
-          <div className="pt-3 border-t border-white/5">
+          {/* Quick Actions */}
+          <div className="space-y-2">
             <button
               onClick={() => setShowChangeEmail(true)}
-              className="w-full flex items-center justify-between p-4 rounded-xl bg-white/5 hover:bg-white/10 transition-colors"
+              className="w-full glass-card p-4 rounded-xl flex items-center justify-between section-card gold-accent hover:bg-white/[0.03] transition-all haptic-btn"
             >
-              <div className="flex items-center gap-3">
+              <div className="flex items-center gap-3 pr-3">
                 <div className="w-10 h-10 rounded-xl bg-gold/10 flex items-center justify-center">
                   <Mail className="w-5 h-5 text-gold" />
                 </div>
                 <div className="text-right">
                   <p className="text-sm font-bold">تغيير البريد الإلكتروني</p>
-                  <p className="text-xs text-muted-foreground">تحديث البريد الإلكتروني المرتبط بحسابك</p>
+                  <p className="text-[11px] text-muted-foreground">تحديث البريد الإلكتروني</p>
                 </div>
               </div>
               <ChevronLeft className="w-4 h-4 text-muted-foreground" />
@@ -298,51 +319,53 @@ export default function SettingsPage() {
 
       {/* Password Tab */}
       {activeTab === 'password' && (
-        <div className="glass-card p-5 space-y-4">
-          <h3 className="text-sm font-bold">تغيير كلمة المرور</h3>
+        <div className="glass-card p-5 space-y-4 animate-fade-in">
+          <div className="flex items-center gap-2 mb-1">
+            <Lock className="w-4 h-4 text-gold" />
+            <h3 className="text-sm font-bold">تغيير كلمة المرور</h3>
+          </div>
           <form onSubmit={handleChangePassword} className="space-y-4">
-            <div className="space-y-2">
-              <Label className="text-sm text-muted-foreground">كلمة المرور الحالية</Label>
-              <div className="relative">
-                <Input
-                  type={showCurrentPassword ? 'text' : 'password'}
-                  value={currentPassword}
-                  onChange={(e) => setCurrentPassword(e.target.value)}
-                  className="glass-input h-12 text-base pl-10"
-                  dir="ltr"
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowCurrentPassword(!showCurrentPassword)}
-                  className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-gold"
-                >
-                  {showCurrentPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                </button>
-              </div>
+            <div className="float-label-group">
+              <input
+                type={showCurrentPassword ? 'text' : 'password'}
+                value={currentPassword}
+                onChange={(e) => setCurrentPassword(e.target.value)}
+                className="float-label-input pl-12"
+                dir="ltr"
+              />
+              <label className="float-label active">كلمة المرور الحالية</label>
+              <button
+                type="button"
+                onClick={() => setShowCurrentPassword(!showCurrentPassword)}
+                className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-gold transition-colors"
+              >
+                {showCurrentPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+              </button>
             </div>
-            <div className="space-y-2">
-              <Label className="text-sm text-muted-foreground">كلمة المرور الجديدة</Label>
-              <div className="relative">
-                <Input
-                  type={showNewPassword ? 'text' : 'password'}
-                  value={newPassword}
-                  onChange={(e) => setNewPassword(e.target.value)}
-                  className="glass-input h-12 text-base pl-10"
-                  dir="ltr"
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowNewPassword(!showNewPassword)}
-                  className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-gold"
-                >
-                  {showNewPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                </button>
-              </div>
+            <div className="float-label-group">
+              <input
+                type={showNewPassword ? 'text' : 'password'}
+                value={newPassword}
+                onChange={(e) => setNewPassword(e.target.value)}
+                className="float-label-input pl-12"
+                dir="ltr"
+              />
+              <label className="float-label active">كلمة المرور الجديدة</label>
+              <button
+                type="button"
+                onClick={() => setShowNewPassword(!showNewPassword)}
+                className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-gold transition-colors"
+              >
+                {showNewPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+              </button>
+            </div>
+            <div className="info-banner-gold p-3">
+              <p className="text-xs text-muted-foreground">يجب أن تكون كلمة المرور الجديدة 8 أحرف على الأقل وتمزيج أحرف كبيرة وصغيرة وأرقام</p>
             </div>
             <Button
               type="submit"
               disabled={loading}
-              className="w-full h-11 gold-gradient text-gray-900 font-bold rounded-xl hover:opacity-90"
+              className="w-full h-11 gold-gradient text-gray-900 font-bold rounded-xl hover:opacity-90 gold-glow haptic-btn"
             >
               {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : 'تغيير كلمة المرور'}
             </Button>
@@ -352,15 +375,18 @@ export default function SettingsPage() {
 
       {/* Security Tab */}
       {activeTab === 'security' && !show2FASettings && (
-        <div className="glass-card p-5 space-y-4 animate-fade-in">
-          <h3 className="text-sm font-bold">الأمان والحماية</h3>
+        <div className="space-y-3 animate-fade-in">
+          <div className="flex items-center gap-2 mb-1">
+            <Shield className="w-4 h-4 text-gold" />
+            <h3 className="text-sm font-bold">الأمان والحماية</h3>
+          </div>
 
           {/* 2FA Status Card */}
           <button
             onClick={() => setShow2FASettings(true)}
-            className="w-full flex items-center justify-between p-4 rounded-xl bg-white/5 hover:bg-white/10 transition-colors"
+            className="w-full glass-card p-4 rounded-xl flex items-center justify-between section-card green-accent hover:bg-white/[0.03] transition-all haptic-btn"
           >
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-3 pr-3">
               <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${
                 user?.twoFactorEnabled ? 'bg-green-500/10' : 'bg-white/5'
               }`}>
@@ -370,19 +396,21 @@ export default function SettingsPage() {
                   <Shield className="w-5 h-5 text-muted-foreground" />
                 )}
               </div>
-              <div className="text-right">
+              <div className="flex-1 text-right">
                 <p className="text-sm font-bold">المصادقة الثنائية</p>
-                <p className="text-xs text-muted-foreground">
-                  {user?.twoFactorEnabled ? 'مفعلة - حسابك محمي' : 'غير مفعلة - قم بتفعيلها للحماية'}
+                <p className="text-[11px] text-muted-foreground">
+                  {user?.twoFactorEnabled ? 'مفعلة — حسابك محمي' : 'غير مفعلة — قم بتفعيلها للحماية'}
                 </p>
               </div>
             </div>
             <ChevronLeft className="w-4 h-4 text-muted-foreground" />
           </button>
 
-          <p className="text-xs text-muted-foreground leading-relaxed">
-            المصادقة الثنائية تضيف طبقة حماية إضافية لحسابك. عند تفعيلها، سيتم إرسال رمز تحقق إلى بريدك الإلكتروني في كل مرة تسجل الدخول.
-          </p>
+          <div className="info-banner-blue p-3">
+            <p className="text-xs text-muted-foreground leading-relaxed">
+              المصادقة الثنائية تضيف طبقة حماية إضافية لحسابك. عند تفعيلها، سيتم إرسال رمز تحقق إلى بريدك الإلكتروني في كل مرة تسجل الدخول.
+            </p>
+          </div>
         </div>
       )}
 
@@ -392,18 +420,23 @@ export default function SettingsPage() {
 
       {/* Notifications Tab */}
       {activeTab === 'notifications' && (
-        <div className="space-y-4 animate-fade-in">
+        <div className="space-y-3 animate-fain-in">
           {/* View notifications */}
-          <div className="glass-card p-5 space-y-4">
-            <h3 className="text-sm font-bold">الإشعارات</h3>
-            <button
-              onClick={() => setScreen('notifications')}
-              className="w-full flex items-center justify-between p-3 rounded-xl bg-white/5 hover:bg-white/10 transition-colors"
-            >
-              <span className="text-sm">عرض جميع الإشعارات</span>
-              <ChevronLeft className="w-4 h-4 text-muted-foreground" />
-            </button>
-          </div>
+          <button
+            onClick={() => setScreen('notifications')}
+            className="w-full glass-card p-4 flex items-center justify-between rounded-xl section-card blue-accent hover:bg-white/[0.03] transition-all haptic-btn"
+          >
+            <div className="flex items-center gap-3 pr-3">
+              <div className="w-10 h-10 rounded-xl bg-blue-500/10 flex items-center justify-center">
+                <Bell className="w-5 h-5 text-blue-400" />
+              </div>
+              <div className="flex-1 text-right">
+                <p className="text-sm font-bold">عرض جميع الإشعارات</p>
+                <p className="text-[11px] text-muted-foreground">آخر التحديثات والتنبيهات</p>
+              </div>
+            </div>
+            <ChevronLeft className="w-4 h-4 text-muted-foreground" />
+          </button>
 
           {/* Sound settings */}
           <div className="glass-card p-5 space-y-4">
@@ -553,30 +586,48 @@ export default function SettingsPage() {
 
       {/* About Tab */}
       {activeTab === 'about' && (
-        <div className="glass-card p-5 space-y-4">
-          <h3 className="text-sm font-bold">حول التطبيق</h3>
-          <div className="space-y-3 text-sm">
-            <div className="flex justify-between">
-              <span className="text-muted-foreground">التطبيق</span>
-              <span className="font-medium gold-text cursor-pointer select-none" onClick={handleDevTap}>فوركس يمني</span>
+        <div className="glass-card p-5 space-y-4 animate-fade-in">
+          <div className="flex items-center gap-2 mb-1">
+            <Settings className="w-4 h-4 text-gold" />
+            <h3 className="text-sm font-bold">حول التطبيق</h3>
+          </div>
+          <div className="space-y-0">
+            <div className="flex items-center justify-between p-3 rounded-xl bg-white/[0.02] hover:bg-white/5 transition-colors">
+              <div className="flex items-center gap-3">
+                <div className="w-9 h-9 rounded-lg bg-gold/10 flex items-center justify-center">
+                  <span className="text-gold font-bold text-xs">FY</span>
+                </div>
+                <span className="text-sm">التطبيق</span>
+              </div>
+              <span className="font-bold gold-text cursor-pointer select-none" onClick={handleDevTap}>فوركس يمني</span>
             </div>
-            <div className="flex justify-between">
-              <span className="text-muted-foreground">الإصدار</span>
-              <span>3.6.2</span>
+            <div className="flex items-center justify-between p-3 rounded-xl bg-white/[0.02] hover:bg-white/5 transition-colors">
+              <div className="flex items-center gap-3">
+                <div className="w-9 h-9 rounded-lg bg-blue-500/10 flex items-center justify-center">
+                  <Hash className="w-4 h-4 text-blue-400" />
+                </div>
+                <span className="text-sm text-muted-foreground">الإصدار</span>
+              </div>
+              <span className="text-sm font-medium">v3.7.0</span>
             </div>
-            <div className="flex justify-between">
-              <span className="text-muted-foreground">الشبكة</span>
-              <span>USDT TRC20</span>
+            <div className="flex items-center justify-between p-3 rounded-xl bg-white/[0.02] hover:bg-white/5 transition-colors">
+              <div className="flex items-center gap-3">
+                <div className="w-9 h-9 rounded-lg bg-green-500/10 flex items-center justify-center">
+                  <span className="text-green-400 font-bold text-xs">USDT</span>
+                </div>
+                <span className="text-sm text-muted-foreground">الشبكة</span>
+              </div>
+              <span className="text-sm font-medium">TRC20</span>
             </div>
           </div>
         </div>
       )}
 
-      {/* Logout with Confirmation Dialog */}
+      {/* Logout */}
       <AlertDialog open={logoutDialogOpen} onOpenChange={setLogoutDialogOpen}>
         <AlertDialogTrigger asChild>
           <button
-            className="w-full flex items-center justify-center gap-2 p-4 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400 hover:bg-red-500/20 transition-all"
+            className="w-full flex items-center justify-center gap-2 p-4 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400 hover:bg-red-500/20 transition-all haptic-btn"
           >
             <LogOut className="w-5 h-5" />
             <span className="font-medium">تسجيل الخروج</span>
@@ -597,7 +648,7 @@ export default function SettingsPage() {
           <AlertDialogFooter className="flex gap-3 sm:gap-0">
             <AlertDialogAction
               onClick={handleLogout}
-              className="flex-1 h-11 bg-red-500 hover:bg-red-600 text-white font-bold rounded-xl transition-all"
+              className="flex-1 h-11 bg-red-500 hover:bg-red-600 text-white font-bold rounded-xl transition-all haptic-btn"
             >
               نعم، خروج
             </AlertDialogAction>

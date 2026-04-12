@@ -5,8 +5,6 @@ import { useState } from 'react'
 import { useAuthStore } from '@/lib/store'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
 import {
   Shield,
   Phone,
@@ -16,12 +14,24 @@ import {
   Check,
   X,
   Upload,
+  ChevronLeft,
+  CheckCircle2,
+  FileText,
+  BadgeCheck,
 } from 'lucide-react'
 import { compressImage } from '@/lib/image-compress'
 
+type KycStep = 'phone' | 'verify' | 'upload' | 'done'
+
+const KYC_STEPS = [
+  { key: 'phone', label: 'الهاتف', icon: Phone },
+  { key: 'verify', label: 'التحقق', icon: UserCheck },
+  { key: 'upload', label: 'المستندات', icon: Camera },
+]
+
 export default function KYCVerification() {
   const { user, updateUser } = useAuthStore()
-  const [step, setStep] = useState<'phone' | 'verify' | 'upload' | 'done'>(
+  const [step, setStep] = useState<KycStep>(
     user?.phoneVerified ? 'upload' : 'phone'
   )
   const [phone, setPhone] = useState(user?.phone || '')
@@ -32,6 +42,8 @@ export default function KYCVerification() {
   const [selfie, setSelfie] = useState<File | null>(null)
   const [idPreview, setIdPreview] = useState<string | null>(null)
   const [selfiePreview, setSelfiePreview] = useState<string | null>(null)
+  const [idDragOver, setIdDragOver] = useState(false)
+  const [selfieDragOver, setSelfieDragOver] = useState(false)
 
   const handleSubmitPhone = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -155,84 +167,158 @@ export default function KYCVerification() {
     }
   }
 
+  const getStepIndex = () => {
+    switch (step) {
+      case 'phone': return 0
+      case 'verify': return 1
+      case 'upload': return 2
+      case 'done': return 3
+      default: return 0
+    }
+  }
+
+  // Handle drag events
+  const handleDragOver = (e: React.DragEvent, setDragOver: (v: boolean) => void) => {
+    e.preventDefault()
+    setDragOver(true)
+  }
+  const handleDragLeave = (e: React.DragEvent, setDragOver: (v: boolean) => void) => {
+    e.preventDefault()
+    setDragOver(false)
+  }
+  const handleDrop = (e: React.DragEvent, type: 'id_photo' | 'selfie', setDragOver: (v: boolean) => void) => {
+    e.preventDefault()
+    setDragOver(false)
+    const file = e.dataTransfer.files?.[0]
+    if (file && file.type.startsWith('image/')) {
+      handleFileChange(type, file)
+    }
+  }
+
   return (
-    <div className="space-y-6 animate-fade-in">
+    <div className="space-y-5 animate-fade-in">
+      {/* Header */}
       <div className="flex items-center gap-3">
-        <div className="w-10 h-10 rounded-xl bg-gold/10 flex items-center justify-center">
-          <Shield className="w-5 h-5 text-gold" />
-        </div>
-        <div>
-          <h1 className="text-xl font-bold">التحقق من الهوية (KYC)</h1>
-          <p className="text-sm text-muted-foreground">
-            الحالة الحالية: {user?.kycStatus === 'none' ? 'لم يبدأ' : user?.kycStatus === 'pending' ? 'قيد المراجعة' : user?.kycStatus === 'approved' ? 'مقبول' : user?.kycStatus === 'rejected' ? 'مرفوض' : user?.kycStatus}
-          </p>
-        </div>
-      </div>
-
-      {/* Steps Progress */}
-      <div className="flex items-center justify-center gap-4">
-        {[
-          { key: 'phone', label: 'الهاتف', icon: Phone },
-          { key: 'verify', label: 'التحقق', icon: UserCheck },
-          { key: 'upload', label: 'المستندات', icon: Camera },
-        ].map((s, i) => (
-          <div key={s.key} className="flex items-center gap-2">
-            <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold ${
-              step === s.key || (s.key === 'phone' && step === 'verify') || (s.key !== 'phone' && (step === 'upload' || step === 'done'))
-                ? 'gold-gradient text-gray-900'
-                : 'bg-white/5 text-muted-foreground'
-            }`}>
-              <s.icon className="w-4 h-4" />
-            </div>
-            {i < 2 && (
-              <div className={`w-8 h-0.5 ${i === 0 && step !== 'phone' ? 'bg-gold/50' : 'bg-white/10'}`} />
-            )}
+        <button
+          onClick={() => setStep(step === 'verify' ? 'phone' : step === 'upload' ? 'verify' : 'phone')}
+          className="w-10 h-10 rounded-xl bg-white/5 flex items-center justify-center hover:bg-white/10 transition-colors haptic-btn"
+        >
+          <ChevronLeft className="w-5 h-5" />
+        </button>
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-xl bg-gold/10 flex items-center justify-center gold-glow">
+            <Shield className="w-5 h-5 text-gold" />
           </div>
-        ))}
+          <div>
+            <h1 className="text-lg font-bold">التحقق من الهوية</h1>
+            <p className="text-xs text-muted-foreground">خطوات بسيطة لتفعيل حسابك بالكامل</p>
+          </div>
+        </div>
       </div>
 
-      {/* Step: Phone */}
+      {/* Status Badge */}
+      <div className="flex items-center gap-2">
+        {user?.kycStatus === 'approved' ? (
+          <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-green-500/10 border border-green-500/20">
+            <BadgeCheck className="w-4 h-4 text-green-400" />
+            <span className="text-xs font-bold text-green-400">حساب موثق بالكامل</span>
+          </div>
+        ) : user?.kycStatus === 'pending' ? (
+          <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-yellow-500/10 border border-yellow-500/20">
+            <FileText className="w-4 h-4 text-yellow-400" />
+            <span className="text-xs font-bold text-yellow-400">قيد المراجعة</span>
+          </div>
+        ) : user?.kycStatus === 'rejected' ? (
+          <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-red-500/10 border border-red-500/20">
+            <X className="w-4 h-4 text-red-400" />
+            <span className="text-xs font-bold text-red-400">مرفوض — إعادة المحاولة</span>
+          </div>
+        ) : (
+          <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/5 border border-white/10">
+            <Shield className="w-4 h-4 text-muted-foreground" />
+            <span className="text-xs font-medium text-muted-foreground">غير مفعّل</span>
+          </div>
+        )}
+      </div>
+
+      {/* Step Progress Bar */}
+      <div className="step-progress-bar">
+        {KYC_STEPS.map((s, i) => {
+          const currentIdx = getStepIndex()
+          const isCompleted = i < currentIdx || step === 'done'
+          const isActive = i === currentIdx
+          return (
+            <div key={s.key} className="flex items-center">
+              <div className="step-progress-item">
+                <div className={`step-progress-circle ${isCompleted ? 'completed' : isActive ? 'active' : 'upcoming'}`}>
+                  {isCompleted ? <Check className="w-4 h-4" /> : <s.icon className="w-4 h-4" />}
+                </div>
+                <span className={`step-progress-label ${isCompleted ? 'completed' : isActive ? 'active' : 'upcoming'}`}>
+                  {s.label}
+                </span>
+              </div>
+              {i < KYC_STEPS.length - 1 && (
+                <div className={`step-progress-connector ${isCompleted ? 'filled' : isActive ? 'current' : ''}`} />
+              )}
+            </div>
+          )
+        })}
+      </div>
+
+      {/* ===== STEP 1: Phone ===== */}
       {step === 'phone' && (
-        <form onSubmit={handleSubmitPhone} className="glass-card p-5 space-y-4">
-          <div className="space-y-2">
-            <Label className="text-sm text-muted-foreground">رقم الهاتف</Label>
-            <div className="flex gap-2">
+        <form onSubmit={handleSubmitPhone} className="glass-card p-5 space-y-4 animate-fade-in">
+          <div className="info-banner-gold p-3 flex items-center gap-2">
+            <Phone className="w-4 h-4 text-gold flex-shrink-0" />
+            <p className="text-xs text-muted-foreground">سيتم إرسال رمز التحقق إلى بريدك الإلكتروني للتأكد من هويتك</p>
+          </div>
+
+          <div className="float-label-group">
+            <input
+              type="text"
+              placeholder=" "
+              value={phone}
+              onChange={(e) => setPhone(e.target.value)}
+              className="float-label-input pl-24"
+              dir="ltr"
+              autoComplete="tel"
+            />
+            <label className="float-label active">رقم الهاتف</label>
+            <div className="absolute left-3 top-1/2 -translate-y-1/2 flex items-center gap-1 pointer-events-none">
               <select
                 value={country}
                 onChange={(e) => setCountry(e.target.value)}
-                className="glass-input h-12 w-20 text-sm text-center"
+                className="bg-transparent text-xs text-muted-foreground outline-none cursor-pointer"
               >
                 <option value="YE">967+</option>
               </select>
-              <Input
-                placeholder="771234567"
-                value={phone}
-                onChange={(e) => setPhone(e.target.value)}
-                className="glass-input h-12 text-base flex-1"
-                dir="ltr"
-              />
             </div>
-            <p className="text-xs text-muted-foreground">سيتم إرسال رمز التحقق إلى بريدك الإلكتروني</p>
           </div>
 
           <Button
             type="submit"
             disabled={loading}
-            className="w-full h-12 gold-gradient text-gray-900 font-bold text-base rounded-xl hover:opacity-90 transition-all gold-glow"
+            className="w-full h-12 gold-gradient text-gray-900 font-bold text-base rounded-xl hover:opacity-90 transition-all gold-glow haptic-btn"
           >
             {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : 'إرسال رمز التحقق'}
           </Button>
         </form>
       )}
 
-      {/* Step: Verify OTP */}
+      {/* ===== STEP 2: Verify OTP ===== */}
       {step === 'verify' && (
-        <div className="glass-card p-5 space-y-4">
-          <div className="text-center space-y-2">
-            <p className="text-sm text-muted-foreground">أدخل رمز التحقق المرسل إلى بريدك الإلكتروني</p>
+        <div className="glass-card p-5 space-y-5 animate-fade-in">
+          <div className="text-center space-y-3">
+            <div className="w-16 h-16 mx-auto rounded-2xl bg-gold/10 flex items-center justify-center gold-glow">
+              <UserCheck className="w-8 h-8 text-gold" />
+            </div>
+            <div>
+              <h2 className="text-base font-bold">أدخل رمز التحقق</h2>
+              <p className="text-sm text-muted-foreground mt-1">تم إرسال الرمز إلى بريدك الإلكتروني</p>
+            </div>
           </div>
 
-          <div className="flex justify-center gap-2" dir="ltr">
+          <div className="flex justify-center gap-2.5" dir="ltr">
             {otp.map((digit, index) => (
               <input
                 key={index}
@@ -251,42 +337,64 @@ export default function KYCVerification() {
           <Button
             onClick={handleVerifyPhone}
             disabled={loading || otp.some(d => !d)}
-            className="w-full h-12 gold-gradient text-gray-900 font-bold text-base rounded-xl hover:opacity-90 transition-all gold-glow"
+            className="w-full h-12 gold-gradient text-gray-900 font-bold text-base rounded-xl hover:opacity-90 transition-all gold-glow haptic-btn"
           >
             {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : 'تحقق من الرقم'}
           </Button>
         </div>
       )}
 
-      {/* Step: Upload Documents */}
+      {/* ===== STEP 3: Upload Documents ===== */}
       {step === 'upload' && (
-        <div className="space-y-4">
+        <div className="space-y-4 animate-fade-in">
+          <div className="info-banner-blue p-3 flex items-center gap-2">
+            <FileText className="w-4 h-4 text-blue-400 flex-shrink-0" />
+            <p className="text-xs text-muted-foreground">ارفع صورتين واضحتين لاستكمال عملية التحقق من الهوية</p>
+          </div>
+
           {/* ID Photo */}
-          <div className="glass-card p-5 space-y-3">
-            <div className="flex items-center justify-between">
+          <div className="glass-card p-5 space-y-3 section-card gold-accent">
+            <div className="flex items-center justify-between pr-2">
               <div className="flex items-center gap-2">
-                <Camera className="w-4 h-4 text-gold" />
-                <h3 className="text-sm font-bold">صورة بطاقة الهوية</h3>
+                <div className="w-9 h-9 rounded-xl bg-gold/10 flex items-center justify-center">
+                  <Camera className="w-4 h-4 text-gold" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-bold">صورة بطاقة الهوية</h3>
+                  <p className="text-[10px] text-muted-foreground">JPG أو PNG — واضحة ومقروءة</p>
+                </div>
               </div>
               {idPhoto && (
-                <span className="flex items-center gap-1 text-xs text-green-400"><Check className="w-3 h-3" /> تم الرفع</span>
+                <span className="flex items-center gap-1 text-xs text-green-400 bg-green-500/10 px-2 py-1 rounded-full">
+                  <Check className="w-3 h-3" /> جاهز
+                </span>
               )}
             </div>
 
             {idPreview ? (
-              <div className="relative rounded-xl overflow-hidden border border-gold/20">
+              <div className="relative rounded-xl overflow-hidden border border-gold/20 animate-fade-in">
                 <img src={idPreview} alt="ID" className="w-full h-48 object-cover" />
                 <button
                   onClick={() => { setIdPhoto(null); setIdPreview(null) }}
-                  className="absolute top-2 left-2 w-8 h-8 bg-red-500/80 rounded-full flex items-center justify-center"
+                  className="absolute top-2 left-2 w-8 h-8 bg-black/60 backdrop-blur-sm rounded-full flex items-center justify-center hover:bg-red-500/80 transition-colors"
                 >
                   <X className="w-4 h-4" />
                 </button>
+                <div className="absolute bottom-2 right-2 bg-green-500/90 px-2 py-1 rounded-lg flex items-center gap-1 text-xs text-white font-medium">
+                  <CheckCircle2 className="w-3 h-3" />
+                  تم الرفع
+                </div>
               </div>
             ) : (
-              <label className="flex flex-col items-center justify-center h-32 rounded-xl border-2 border-dashed border-white/10 hover:border-gold/30 transition-colors cursor-pointer">
-                <Upload className="w-8 h-8 text-muted-foreground/50 mb-2" />
-                <span className="text-xs text-muted-foreground">اضغط لاختيار الصورة</span>
+              <label
+                className={`upload-zone h-32 ${idDragOver ? 'dragover' : 'upload-zone-hint'}`}
+                onDragOver={(e) => handleDragOver(e, setIdDragOver)}
+                onDragLeave={(e) => handleDragLeave(e, setIdDragOver)}
+                onDrop={(e) => handleDrop(e, 'id_photo', setIdDragOver)}
+              >
+                <Upload className="w-8 h-8 text-gold/50 mb-2 relative z-10" />
+                <span className="text-xs text-muted-foreground relative z-10">اضغط أو اسحب الصورة هنا</span>
+                <span className="text-[10px] text-muted-foreground/50 mt-1 relative z-10">JPG, PNG حتى 5MB</span>
                 <input
                   type="file"
                   accept="image/*"
@@ -296,54 +404,66 @@ export default function KYCVerification() {
               </label>
             )}
 
-            {!idPhoto && (
-              <Button
-                disabled
-                className="w-full h-10 gold-gradient text-gray-900 font-bold text-sm rounded-xl opacity-50"
-              >
-                ارفع أولاً
-              </Button>
-            )}
             {idPhoto && !user?.kycIdPhoto && (
               <Button
                 onClick={() => handleUpload('id_photo')}
                 disabled={loading}
-                className="w-full h-10 gold-gradient text-gray-900 font-bold text-sm rounded-xl hover:opacity-90"
+                className="w-full h-11 gold-gradient text-gray-900 font-bold text-sm rounded-xl hover:opacity-90 haptic-btn"
               >
                 {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : 'رفع صورة الهوية'}
               </Button>
             )}
             {user?.kycIdPhoto && (
-              <p className="text-xs text-green-400 text-center">تم رفع صورة الهوية مسبقاً</p>
+              <div className="flex items-center gap-2 p-2.5 rounded-lg bg-green-500/5 text-green-400">
+                <CheckCircle2 className="w-4 h-4" />
+                <span className="text-xs font-medium">تم رفع صورة الهوية مسبقاً</span>
+              </div>
             )}
           </div>
 
           {/* Selfie */}
-          <div className="glass-card p-5 space-y-3">
-            <div className="flex items-center justify-between">
+          <div className="glass-card p-5 space-y-3 section-card green-accent">
+            <div className="flex items-center justify-between pr-2">
               <div className="flex items-center gap-2">
-                <UserCheck className="w-4 h-4 text-gold" />
-                <h3 className="text-sm font-bold">صورة شخصية (سيلفي)</h3>
+                <div className="w-9 h-9 rounded-xl bg-green-500/10 flex items-center justify-center">
+                  <UserCheck className="w-4 h-4 text-green-400" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-bold">صورة شخصية (سيلفي)</h3>
+                  <p className="text-[10px] text-muted-foreground">صورة واضحة لوجهك مع البطاقة</p>
+                </div>
               </div>
               {selfie && (
-                <span className="flex items-center gap-1 text-xs text-green-400"><Check className="w-3 h-3" /> تم الرفع</span>
+                <span className="flex items-center gap-1 text-xs text-green-400 bg-green-500/10 px-2 py-1 rounded-full">
+                  <Check className="w-3 h-3" /> جاهز
+                </span>
               )}
             </div>
 
             {selfiePreview ? (
-              <div className="relative rounded-xl overflow-hidden border border-gold/20">
+              <div className="relative rounded-xl overflow-hidden border border-green-500/20 animate-fade-in">
                 <img src={selfiePreview} alt="Selfie" className="w-full h-48 object-cover" />
                 <button
                   onClick={() => { setSelfie(null); setSelfiePreview(null) }}
-                  className="absolute top-2 left-2 w-8 h-8 bg-red-500/80 rounded-full flex items-center justify-center"
+                  className="absolute top-2 left-2 w-8 h-8 bg-black/60 backdrop-blur-sm rounded-full flex items-center justify-center hover:bg-red-500/80 transition-colors"
                 >
                   <X className="w-4 h-4" />
                 </button>
+                <div className="absolute bottom-2 right-2 bg-green-500/90 px-2 py-1 rounded-lg flex items-center gap-1 text-xs text-white font-medium">
+                  <CheckCircle2 className="w-3 h-3" />
+                  تم الرفع
+                </div>
               </div>
             ) : (
-              <label className="flex flex-col items-center justify-center h-32 rounded-xl border-2 border-dashed border-white/10 hover:border-gold/30 transition-colors cursor-pointer">
-                <Upload className="w-8 h-8 text-muted-foreground/50 mb-2" />
-                <span className="text-xs text-muted-foreground">اضغط لاختيار الصورة</span>
+              <label
+                className={`upload-zone h-32 ${selfieDragOver ? 'dragover' : 'upload-zone-hint'}`}
+                onDragOver={(e) => handleDragOver(e, setSelfieDragOver)}
+                onDragLeave={(e) => handleDragLeave(e, setSelfieDragOver)}
+                onDrop={(e) => handleDrop(e, 'selfie', setSelfieDragOver)}
+              >
+                <Upload className="w-8 h-8 text-green-400/50 mb-2 relative z-10" />
+                <span className="text-xs text-muted-foreground relative z-10">اضغط أو اسحب الصورة هنا</span>
+                <span className="text-[10px] text-muted-foreground/50 mt-1 relative z-10">JPG, PNG حتى 5MB</span>
                 <input
                   type="file"
                   accept="image/*"
@@ -353,30 +473,29 @@ export default function KYCVerification() {
               </label>
             )}
 
-            {!selfie && (
-              <Button
-                disabled
-                className="w-full h-10 gold-gradient text-gray-900 font-bold text-sm rounded-xl opacity-50"
-              >
-                ارفع أولاً
-              </Button>
-            )}
             {selfie && !user?.kycSelfie && (
               <Button
                 onClick={() => handleUpload('selfie')}
                 disabled={loading}
-                className="w-full h-10 gold-gradient text-gray-900 font-bold text-sm rounded-xl hover:opacity-90"
+                className="w-full h-11 gold-gradient text-gray-900 font-bold text-sm rounded-xl hover:opacity-90 haptic-btn"
               >
                 {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : 'رفع الصورة الشخصية'}
               </Button>
             )}
             {user?.kycSelfie && (
-              <p className="text-xs text-green-400 text-center">تم رفع الصورة الشخصية مسبقاً</p>
+              <div className="flex items-center gap-2 p-2.5 rounded-lg bg-green-500/5 text-green-400">
+                <CheckCircle2 className="w-4 h-4" />
+                <span className="text-xs font-medium">تم رفع الصورة الشخصية مسبقاً</span>
+              </div>
             )}
           </div>
 
+          {/* Done message */}
           {(user?.kycIdPhoto || idPhoto) && (user?.kycSelfie || selfie) && (
             <div className="glass-card p-4 text-center">
+              <div className="w-10 h-10 mx-auto rounded-xl bg-green-500/10 flex items-center justify-center mb-2">
+                <CheckCircle2 className="w-5 h-5 text-green-400" />
+              </div>
               <p className="text-sm text-muted-foreground">
                 تم إرسال مستنداتك للمراجعة. سيتم إشعارك بالنتيجة عبر الإشعارات.
               </p>

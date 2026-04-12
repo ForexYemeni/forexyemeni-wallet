@@ -1339,3 +1339,524 @@
   opacity: 0;
   animation: scrollRevealUp 0.4s ease-out forwards;
 }
+
+/* ==================== Phase 4: Premium Form Inputs ==================== */
+.float-label-group {
+  position: relative;
+}
+
+.float-label-input {
+  width: 100%;
+  height: 56px;
+  padding: 20px 16px 8px 16px;
+  border-radius: 14px;
+  font-size: 15px;
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  background: rgba(255, 255, 255, 0.04);
+  border: 1.5px solid rgba(240, 185, 11, 0.12);
+  color: var(--foreground);
+  outline: none;
+}
+
+.float-label-input:focus {
+  background: rgba(255, 255, 255, 0.06);
+  border-color: rgba(240, 185, 11, 0.5);
+  box-shadow: 0 0 0 3px rgba(240, 185, 11, 0.08), 0 0 20px rgba(240, 185, 11, 0.06);
+}
+
+:root:not(.dark) .float-label-input {
+  background: rgba(0, 0, 0, 0.02);
+  border-color: rgba(201, 154, 10, 0.15);
+}
+
+:root:not(.dark) .float-label-input:focus {
+  background: rgba(255, 255, 255, 0.9);
+  border-color: rgba(201, 154, 10, 0.5);
+  box-shadow: 0 0 0 3px rgba(201, 154, 10, 0.08);
+}
+
+.float-label {
+  position: absolute;
+  right: 16px;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 14px;
+  color: #8a8a9a;
+  pointer-events: none;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  transform-origin: right center;
+  background: transparent;
+  padding: 0 4px;
+}
+
+.float-label.active {
+  top: 10px;
+  transform: translateY(0);
+  font-size: 10px;
+  color: #F0B90B;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+
+:root:not(.dark) .float-label.active {
+  color: #92700c;
+}
+
+.float-label-icon {
+  position: absolute;
+  left: 14px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: #8a8a9a;
+  transition: color 0.2s;
+  pointer-events: none;
+}
+
+.float-label-input:focus ~ .float-label-icon {
+  color: #F0B90B;
+}
+
+:root:not(.dark) .float-label-input:focus ~ .float-label-icon {
+  color: #C99A0A;
+}
+
+/* Validation states */
+.float-label-group.error .float-label-input {
+  border-color: rgba(239, 68, 68, 0.5);
+  box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.06);
+}
+
+.float-label-group.error .float-label {
+  color: #ef4444;
+}
+
+.float-label-group.success .float-label-input {
+  border-color: rgba(16, 185, 129, 0.4);
+}
+
+.float-label-group.success .float-label {
+  color: #10b981;
+}
+
+/* Validation message */
+.float-validation-msg {
+  font-size: 11px;
+  margin-top: 6px;
+  padding-right: 16px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  animation: fadeIn 0.2s ease-out;
+}
+
+/* ==================== Phase 4: Step Progress Bar ==================== */
+.step-progress-bar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0;
+  padding: 0 8px;
+}
+
+.step-progress-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  position: relative;
+  z-index: 1;
+}
+
+.step-progress-circle {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  font-weight: 700;
+  transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+  position: relative;
+}
+
+.step-progress-circle.active {
+  background: linear-gradient(135deg, #F0B90B, #FCD535);
+  color: #0a0a0f;
+  box-shadow: 0 0 20px rgba(240, 185, 11, 0.3), 0 4px 12px rgba(240, 185, 11, 0.2);
+}
+
+.step-progress-circle.completed {
+  background: linear-gradient(135deg, #10b981, #34d399);
+  color: white;
+  box-shadow: 0 0 12px rgba(16, 185, 129, 0.25);
+}
+
+.step-progress-circle.upcoming {
+  background: rgba(255, 255, 255, 0.05);
+  border: 2px solid rgba(255, 255, 255, 0.1);
+  color: #8a8a9a;
+}
+
+:root:not(.dark) .step-progress-circle.upcoming {
+  background: rgba(0, 0, 0, 0.03);
+  border-color: rgba(0, 0, 0, 0.1);
+}
+
+.step-progress-label {
+  font-size: 10px;
+  margin-top: 6px;
+  font-weight: 600;
+  transition: color 0.3s;
+  white-space: nowrap;
+}
+
+.step-progress-label.active { color: #F0B90B; }
+.step-progress-label.completed { color: #10b981; }
+.step-progress-label.upcoming { color: #8a8a9a; }
+
+:root:not(.dark) .step-progress-label.active { color: #C99A0A; }
+
+.step-progress-connector {
+  width: 40px;
+  height: 3px;
+  border-radius: 3px;
+  background: rgba(255, 255, 255, 0.06);
+  transition: background 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+  margin: 0 4px;
+  align-self: center;
+  margin-bottom: 22px;
+}
+
+.step-progress-connector.filled {
+  background: linear-gradient(90deg, #10b981, #34d399);
+  box-shadow: 0 0 8px rgba(16, 185, 129, 0.2);
+}
+
+.step-progress-connector.current {
+  background: linear-gradient(90deg, #10b981, #F0B90B);
+  box-shadow: 0 0 8px rgba(240, 185, 11, 0.2);
+}
+
+/* ==================== Phase 4: Animated PIN Dots ==================== */
+@keyframes pinDotPulse {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.15); }
+}
+
+.pin-dot {
+  width: 48px;
+  height: 48px;
+  border-radius: 14px;
+  border: 2px solid rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.03);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+:root:not(.dark) .pin-dot {
+  border-color: rgba(0, 0, 0, 0.1);
+  background: rgba(0, 0, 0, 0.02);
+}
+
+.pin-dot.filled {
+  border-color: rgba(240, 185, 11, 0.5);
+  background: rgba(240, 185, 11, 0.08);
+  animation: pinDotPulse 0.3s ease-out;
+}
+
+.pin-dot.filled::after {
+  content: '';
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #F0B90B, #FCD535);
+  box-shadow: 0 0 8px rgba(240, 185, 11, 0.4);
+}
+
+:root:not(.dark) .pin-dot.filled {
+  border-color: rgba(201, 154, 10, 0.4);
+  background: rgba(201, 154, 10, 0.06);
+}
+
+:root:not(.dark) .pin-dot.filled::after {
+  background: linear-gradient(135deg, #C99A0A, #b08c0a);
+  box-shadow: 0 0 6px rgba(201, 154, 10, 0.3);
+}
+
+/* ==================== Phase 4: Success Result Animation ==================== */
+@keyframes successBounceIn {
+  0% { transform: scale(0); opacity: 0; }
+  50% { transform: scale(1.15); }
+  70% { transform: scale(0.95); }
+  100% { transform: scale(1); opacity: 1; }
+}
+
+@keyframes successRing {
+  0% { transform: scale(0.5); opacity: 0.6; }
+  100% { transform: scale(2); opacity: 0; }
+}
+
+@keyframes errorShake {
+  0%, 100% { transform: translateX(0); }
+  10%, 50%, 70%, 90% { transform: translateX(-6px); }
+  30%, 60% { transform: translateX(6px); }
+}
+
+.success-anim-bounce {
+  animation: successBounceIn 0.6s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+}
+
+.success-anim-ring {
+  animation: successRing 0.8s ease-out forwards;
+}
+
+.error-anim-shake {
+  animation: errorShake 0.5s ease-in-out;
+}
+
+/* ==================== Phase 4: Upload Zone Enhanced ==================== */
+.upload-zone {
+  position: relative;
+  border: 2px dashed rgba(255, 255, 255, 0.1);
+  border-radius: 16px;
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  background: rgba(255, 255, 255, 0.02);
+  overflow: hidden;
+}
+
+:root:not(.dark) .upload-zone {
+  border-color: rgba(0, 0, 0, 0.1);
+  background: rgba(0, 0, 0, 0.01);
+}
+
+.upload-zone::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 14px;
+  background: radial-gradient(circle at center, rgba(240, 185, 11, 0.04) 0%, transparent 70%);
+  opacity: 0;
+  transition: opacity 0.3s;
+}
+
+.upload-zone:hover {
+  border-color: rgba(240, 185, 11, 0.3);
+  background: rgba(240, 185, 11, 0.03);
+}
+
+.upload-zone:hover::before {
+  opacity: 1;
+}
+
+:root:not(.dark) .upload-zone:hover {
+  border-color: rgba(201, 154, 10, 0.3);
+  background: rgba(201, 154, 10, 0.02);
+}
+
+.upload-zone.dragover {
+  border-color: rgba(240, 185, 11, 0.5);
+  background: rgba(240, 185, 11, 0.06);
+  transform: scale(1.01);
+  box-shadow: 0 0 30px rgba(240, 185, 11, 0.1);
+}
+
+/* Upload zone pulse border */
+@keyframes uploadPulse {
+  0%, 100% { border-color: rgba(240, 185, 11, 0.2); }
+  50% { border-color: rgba(240, 185, 11, 0.5); }
+}
+
+.upload-zone-hint {
+  animation: uploadPulse 2s ease-in-out infinite;
+}
+
+/* ==================== Phase 4: Profile Card Enhanced ==================== */
+.profile-card {
+  position: relative;
+  overflow: hidden;
+}
+
+.profile-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 80px;
+  background: linear-gradient(135deg, rgba(240, 185, 11, 0.08) 0%, rgba(16, 185, 129, 0.04) 50%, rgba(99, 102, 241, 0.04) 100%);
+  border-radius: 16px 16px 0 0;
+}
+
+.profile-card::after {
+  content: '';
+  position: absolute;
+  top: 80px;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: linear-gradient(90deg, transparent 0%, rgba(240, 185, 11, 0.15) 50%, transparent 100%);
+}
+
+:root:not(.dark) .profile-card::before {
+  background: linear-gradient(135deg, rgba(201, 154, 10, 0.06) 0%, rgba(16, 185, 129, 0.03) 50%, rgba(99, 102, 241, 0.03) 100%);
+}
+
+/* ==================== Phase 4: Section Card with Icon ==================== */
+.section-card {
+  position: relative;
+  overflow: hidden;
+  transition: all 0.25s ease;
+}
+
+.section-card::before {
+  content: '';
+  position: absolute;
+  right: 0;
+  top: 0;
+  bottom: 0;
+  width: 3px;
+  border-radius: 0 3px 3px 0;
+  transition: all 0.25s ease;
+}
+
+.section-card.gold-accent::before {
+  background: linear-gradient(180deg, #F0B90B, #FCD535);
+  box-shadow: 0 0 8px rgba(240, 185, 11, 0.2);
+}
+
+.section-card.green-accent::before {
+  background: linear-gradient(180deg, #10b981, #34d399);
+  box-shadow: 0 0 8px rgba(16, 185, 129, 0.2);
+}
+
+.section-card.blue-accent::before {
+  background: linear-gradient(180deg, #6366f1, #818cf8);
+  box-shadow: 0 0 8px rgba(99, 102, 241, 0.2);
+}
+
+.section-card.red-accent::before {
+  background: linear-gradient(180deg, #ef4444, #f87171);
+  box-shadow: 0 0 8px rgba(239, 68, 68, 0.2);
+}
+
+.section-card:hover {
+  transform: translateX(-2px);
+  border-color: rgba(240, 185, 11, 0.2);
+}
+
+/* ==================== Phase 4: Transfer Arrow Animation ==================== */
+@keyframes transferArrowMove {
+  0% { transform: translateX(0); }
+  30% { transform: translateX(6px); }
+  60% { transform: translateX(6px); }
+  100% { transform: translateX(0); }
+}
+
+@keyframes transferDotFlow {
+  0% { opacity: 0; transform: translateX(-4px); }
+  30% { opacity: 1; transform: translateX(0); }
+  70% { opacity: 1; transform: translateX(6px); }
+  100% { opacity: 0; transform: translateX(10px); }
+}
+
+.transfer-arrow-anim {
+  animation: transferArrowMove 2s ease-in-out infinite;
+}
+
+.transfer-dot-flow {
+  position: absolute;
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: #F0B90B;
+  animation: transferDotFlow 2s ease-in-out infinite;
+  box-shadow: 0 0 6px rgba(240, 185, 11, 0.5);
+}
+
+/* ==================== Phase 4: Info Banner Gradient ==================== */
+.info-banner-gold {
+  background: linear-gradient(135deg, rgba(240, 185, 11, 0.06) 0%, rgba(240, 185, 11, 0.02) 100%);
+  border: 1px solid rgba(240, 185, 11, 0.12);
+  border-radius: 14px;
+}
+
+:root:not(.dark) .info-banner-gold {
+  background: linear-gradient(135deg, rgba(201, 154, 10, 0.05) 0%, rgba(201, 154, 10, 0.01) 100%);
+  border-color: rgba(201, 154, 10, 0.12);
+}
+
+.info-banner-blue {
+  background: linear-gradient(135deg, rgba(99, 102, 241, 0.06) 0%, rgba(99, 102, 241, 0.02) 100%);
+  border: 1px solid rgba(99, 102, 241, 0.12);
+  border-radius: 14px;
+}
+
+:root:not(.dark) .info-banner-blue {
+  background: linear-gradient(135deg, rgba(99, 102, 241, 0.05) 0%, rgba(99, 102, 241, 0.01) 100%);
+}
+
+/* ==================== Phase 4: Amount Display Large ==================== */
+.amount-display-lg {
+  font-size: 2.5rem;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  line-height: 1.1;
+}
+
+.amount-display-gold {
+  background: linear-gradient(135deg, #F0B90B 0%, #FCD535 50%, #F0B90B 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+:root:not(.dark) .amount-display-gold {
+  background: linear-gradient(135deg, #92700c 0%, #C99A0A 50%, #92700c 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* ==================== Phase 4: Haptic Feedback Simulation ==================== */
+@keyframes hapticTap {
+  0% { transform: scale(1); }
+  30% { transform: scale(0.97); }
+  60% { transform: scale(1.01); }
+  100% { transform: scale(1); }
+}
+
+.haptic-btn {
+  transition: transform 0.15s ease;
+}
+
+.haptic-btn:active {
+  animation: hapticTap 0.3s ease;
+}
+
+/* ==================== Phase 4: Scroll Indicator (Translucent) ==================== */
+.scroll-indicator {
+  position: fixed;
+  top: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 40px;
+  height: 3px;
+  background: rgba(240, 185, 11, 0.3);
+  border-radius: 3px;
+  z-index: 100;
+  opacity: 0;
+  transition: opacity 0.3s;
+  pointer-events: none;
+}
+
+.scroll-indicator.visible {
+  opacity: 1;
+}
