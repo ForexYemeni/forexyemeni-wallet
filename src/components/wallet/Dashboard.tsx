@@ -388,13 +388,15 @@ export default function Dashboard() {
         </div>
       </div>
 
+      {/* ========== BANNER ========== */}
+      <BannerSlider />
+
       {/* ========== BALANCE CHART ========== */}
       <div className="glass-card p-4 rounded-2xl">
         <BalanceChart />
       </div>
 
-      {/* ========== BANNER + PROMO ========== */}
-      <BannerSlider />
+      {/* ========== PROMO ========== */}
       <PromoRedeem />
 
       {/* ========== KYC STATUS + ACCOUNT NUMBER ROW ========== */}
