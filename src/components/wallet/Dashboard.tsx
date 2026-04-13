@@ -1,7 +1,7 @@
 'use client'
 
 import { apiFetch } from '@/lib/api-client'
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo, useCallback } from 'react'
 import { useAuthStore } from '@/lib/store'
 import { useOfflineStore } from '@/lib/offline-store'
 import { useOfflineMode } from '@/hooks/useOfflineMode'
@@ -80,23 +80,7 @@ export default function Dashboard() {
   }, [user?.kycStatus, user?.phoneVerified])
 
   // Combined data fetch
-  useEffect(() => {
-    if (user?.id) fetchDashboardData()
-  }, [user?.id])
-
-  useEffect(() => {
-    if (user?.id && user?.currentScreen === 'dashboard') fetchDashboardData()
-  }, [user?.currentScreen])
-
-  useEffect(() => {
-    if (isOffline && cachedTransactions.length > 0) {
-      setTransactions(cachedTransactions.slice(0, 5))
-      setUsingOffline(true)
-      setLoading(false)
-    }
-  }, [isOffline, cachedTransactions])
-
-  const fetchDashboardData = async () => {
+  const fetchDashboardData = useCallback(async () => {
     if (!user?.id) return
     if (!navigator.onLine) {
       if (cachedTransactions.length > 0) {
@@ -160,7 +144,43 @@ export default function Dashboard() {
       setLoading(false)
       try { (window as any).__topProgressBar?.complete() } catch {}
     }
-  }
+  }, [user?.id, user?.balance, user?.frozenBalance, user?.accountNumber, user?.kycStatus, user?.fullName, user?.email, cachedTransactions, setCachedTransactions, setCachedUser, setLastSyncTime])
+
+  useEffect(() => {
+    if (user?.id) fetchDashboardData()
+  }, [user?.id, fetchDashboardData])
+
+  // Listen for real-time data changes from useRealtimeSync
+  useEffect(() => {
+    const handleDataChanged = (e: Event) => {
+      const detail = (e as CustomEvent).detail
+      if (!detail) return
+
+      // Re-fetch dashboard data when relevant fields change
+      const { changes } = detail
+      if (changes && (
+        changes.includes('balance') ||
+        changes.includes('frozenBalance') ||
+        changes.includes('kycStatus') ||
+        changes.includes('accountNumber')
+      )) {
+        fetchDashboardData()
+      }
+    }
+
+    window.addEventListener('app-data-changed', handleDataChanged)
+    return () => window.removeEventListener('app-data-changed', handleDataChanged)
+  }, [fetchDashboardData])
+
+  useEffect(() => {
+    if (isOffline && cachedTransactions.length > 0) {
+      setTransactions(cachedTransactions.slice(0, 5))
+      setUsingOffline(true)
+      setLoading(false)
+    }
+  }, [isOffline, cachedTransactions])
+
+
 
   const formatDate = (dateStr: string) => {
     const date = new Date(dateStr)

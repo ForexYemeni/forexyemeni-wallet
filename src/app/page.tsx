@@ -157,7 +157,7 @@ export default function Home() {
   const [reportMessage, setReportMessage] = useState('')
   const [reportSending, setReportSending] = useState(false)
 
-  // Real-time sync — polls user data every 10s for instant updates
+  // Real-time sync — polls user data every 5s for instant updates
   // (KYC approval, balance changes, status updates, etc.)
   useRealtimeSync()
 
@@ -165,6 +165,16 @@ export default function Home() {
   const [mounted, setMounted] = useState(false)
   // Error state
   const [error, setError] = useState<Error | null>(null)
+
+  // Force immediate sync when user switches screens (e.g., navigating to deposit/withdraw)
+  useEffect(() => {
+    if (isAuthenticated && currentScreen) {
+      // Trigger immediate data sync on screen change
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new Event('force-sync'))
+      }
+    }
+  }, [currentScreen, isAuthenticated])
 
   useEffect(() => {
     setMounted(true)
