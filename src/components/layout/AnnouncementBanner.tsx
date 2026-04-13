@@ -12,36 +12,13 @@ interface Announcement {
   expiresAt?: unknown
 }
 
-const typeConfig = {
-  info: {
-    bg: 'bg-blue-500/10',
-    border: 'border-blue-500/20',
-    text: 'text-blue-400',
-    icon: Info,
-    badge: 'bg-blue-500/20 text-blue-400',
-  },
-  warning: {
-    bg: 'bg-yellow-500/10',
-    border: 'border-yellow-500/20',
-    text: 'text-yellow-400',
-    icon: AlertTriangle,
-    badge: 'bg-yellow-500/20 text-yellow-400',
-  },
-  urgent: {
-    bg: 'bg-red-500/10',
-    border: 'border-red-500/20',
-    text: 'text-red-400',
-    icon: AlertCircle,
-    badge: 'bg-red-500/20 text-red-400',
-  },
-}
-
 export default function AnnouncementBanner() {
   const [announcements, setAnnouncements] = useState<Announcement[]>([])
   const [dismissedIds, setDismissedIds] = useState<Set<string>>(new Set())
   const [currentIndex, setCurrentIndex] = useState(0)
-  const scrollRef = useRef<HTMLDivElement>(null)
-  const timerRef = useRef<NodeJS.Timeout | null>(null)
+  const [fade, setFade] = useState(true)
+  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null)
+  const fadeRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   // Fetch announcements
   useEffect(() => {
@@ -53,176 +30,102 @@ export default function AnnouncementBanner() {
           setAnnouncements(data.announcements)
         }
       } catch {
-        // silent fail
+        // silent
       }
     }
     fetchAnnouncements()
   }, [])
 
-  // Filter visible (not dismissed) announcements
-  const visibleAnnouncements = announcements.filter(
-    (a) => !dismissedIds.has(a.id)
-  )
+  // Filter visible
+  const visible = announcements.filter((a) => !dismissedIds.has(a.id))
+  const total = visible.length
 
-  // Auto-scroll timer
-  const startAutoScroll = useCallback(() => {
+  // Slide to index with fade animation
+  const slideTo = useCallback((index: number) => {
+    setFade(false)
+    fadeRef.current = setTimeout(() => {
+      setCurrentIndex(index % (total || 1))
+      setFade(true)
+    }, 200)
+  }, [total])
+
+  // Auto-scroll
+  useEffect(() => {
     if (timerRef.current) clearInterval(timerRef.current)
-
-    if (visibleAnnouncements.length <= 1) return
+    if (total <= 1) return
 
     timerRef.current = setInterval(() => {
-      setCurrentIndex((prev) => {
-        const next = (prev + 1) % visibleAnnouncements.length
-        return next
-      })
+      slideTo((currentIndex + 1) % total)
     }, 5000)
-  }, [visibleAnnouncements.length])
 
-  useEffect(() => {
-    if (visibleAnnouncements.length > 1) {
-      startAutoScroll()
-    }
     return () => {
       if (timerRef.current) clearInterval(timerRef.current)
+      if (fadeRef.current) clearTimeout(fadeRef.current)
     }
-  }, [visibleAnnouncements.length, startAutoScroll])
+  }, [total, currentIndex, slideTo])
 
-  // Reset index when visible list changes
+  // Clamp index when items dismissed
   useEffect(() => {
-    if (currentIndex >= visibleAnnouncements.length) {
+    if (total > 0 && currentIndex >= total) {
+      if (fadeRef.current) clearTimeout(fadeRef.current)
+      // eslint-disable-next-line react-hooks/exhaustive-deps
       setCurrentIndex(0)
+      setFade(true)
     }
-  }, [visibleAnnouncements.length, currentIndex])
-
-  // Scroll to current card
-  useEffect(() => {
-    if (scrollRef.current && visibleAnnouncements.length > 0) {
-      const cardWidth = scrollRef.current.scrollWidth / visibleAnnouncements.length
-      scrollRef.current.scrollTo({
-        left: currentIndex * cardWidth,
-        behavior: 'smooth',
-      })
-    }
-  }, [currentIndex, visibleAnnouncements.length])
+  }, [total, currentIndex])
 
   const dismiss = useCallback((id: string) => {
     setDismissedIds((prev) => new Set([...prev, id]))
   }, [])
 
-  // Nothing to show
-  if (visibleAnnouncements.length === 0) return null
+  if (total === 0) return null
 
-  const current = visibleAnnouncements[currentIndex]
-  if (!current) return null
+  const item = visible[currentIndex]
+  if (!item) return null
 
-  const config = typeConfig[current.type] || typeConfig.info
-  const Icon = config.icon
+  const urgent = item.type === 'urgent'
+  const warn = item.type === 'warning'
+
+  const color = urgent ? '#f87171' : warn ? '#fbbf24' : '#60a5fa'
+  const bg = urgent ? 'rgba(239,68,68,0.08)' : warn ? 'rgba(245,158,11,0.08)' : 'rgba(59,130,246,0.08)'
+  const iconBg = urgent ? 'rgba(239,68,68,0.15)' : warn ? 'rgba(245,158,11,0.15)' : 'rgba(59,130,246,0.15)'
+  const label = urgent ? 'عاجل' : warn ? 'تنبيه' : 'معلومة'
+  const Icon = urgent ? AlertCircle : warn ? AlertTriangle : Info
 
   return (
-    <div className="sticky top-[57px] z-30 px-4 md:px-6" dir="rtl">
+    <div className="px-4 md:px-6 mb-3" dir="rtl">
       <div className="max-w-2xl mx-auto">
-        <div className="relative overflow-hidden rounded-xl border" style={{ borderRadius: '12px' }}>
-          {/* Scrolling container */}
-          <div
-            ref={scrollRef}
-            className="flex overflow-x-auto snap-x snap-mandatory scrollbar-hide"
-            style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
-          >
-            {visibleAnnouncements.map((announcement) => {
-              const aConfig = typeConfig[announcement.type] || typeConfig.info
-              const AIcon = aConfig.icon
-              return (
-                <div
-                  key={announcement.id}
-                  className="flex-shrink-0 w-full snap-center p-3 flex items-start gap-3 relative"
-                  style={{
-                    background: announcement.type === 'urgent'
-                      ? 'rgba(239, 68, 68, 0.08)'
-                      : announcement.type === 'warning'
-                        ? 'rgba(245, 158, 11, 0.08)'
-                        : 'rgba(59, 130, 246, 0.08)',
-                    borderColor: announcement.type === 'urgent'
-                      ? 'rgba(239, 68, 68, 0.2)'
-                      : announcement.type === 'warning'
-                        ? 'rgba(245, 158, 11, 0.2)'
-                        : 'rgba(59, 130, 246, 0.2)',
-                  }}
-                >
-                  <div
-                    className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 mt-0.5"
-                    style={{
-                      background: announcement.type === 'urgent'
-                        ? 'rgba(239, 68, 68, 0.15)'
-                        : announcement.type === 'warning'
-                          ? 'rgba(245, 158, 11, 0.15)'
-                          : 'rgba(59, 130, 246, 0.15)',
-                    }}
-                  >
-                    <AIcon
-                      className="w-4 h-4"
-                      style={{
-                        color: announcement.type === 'urgent'
-                          ? '#f87171'
-                          : announcement.type === 'warning'
-                            ? '#fbbf24'
-                            : '#60a5fa',
-                      }}
-                    />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 mb-0.5">
-                      <span
-                        className="text-xs font-bold px-2 py-0.5 rounded-full"
-                        style={{
-                          background: announcement.type === 'urgent'
-                            ? 'rgba(239, 68, 68, 0.15)'
-                            : announcement.type === 'warning'
-                              ? 'rgba(245, 158, 11, 0.15)'
-                              : 'rgba(59, 130, 246, 0.15)',
-                          color: announcement.type === 'urgent'
-                            ? '#f87171'
-                            : announcement.type === 'warning'
-                              ? '#fbbf24'
-                              : '#60a5fa',
-                        }}
-                      >
-                        {announcement.type === 'urgent' ? 'عاجل' : announcement.type === 'warning' ? 'تنبيه' : 'معلومة'}
-                      </span>
-                    </div>
-                    <p className="text-sm font-bold leading-snug">{announcement.title}</p>
-                    <p className="text-xs text-muted-foreground mt-1 leading-relaxed line-clamp-2">{announcement.message}</p>
-                  </div>
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation()
-                      dismiss(announcement.id)
-                    }}
-                    className="w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0 hover:bg-white/10 transition-colors text-muted-foreground hover:text-foreground"
-                  >
-                    <X className="w-3.5 h-3.5" />
-                  </button>
-                </div>
-              )
-            })}
+        <div className="relative overflow-hidden rounded-xl border border-white/10" style={{ background: bg, borderRadius: '12px' }}>
+          <div className="p-3 flex items-start gap-3 transition-opacity duration-200" style={{ opacity: fade ? 1 : 0 }}>
+            <div className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0 mt-0.5" style={{ background: iconBg }}>
+              <Icon className="w-4 h-4" style={{ color }} />
+            </div>
+            <div className="flex-1 min-w-0">
+              <span className="text-xs font-bold px-2 py-0.5 rounded-full inline-block mb-1" style={{ background: iconBg, color }}>
+                {label}
+              </span>
+              <p className="text-sm font-bold leading-snug">{item.title}</p>
+              <p className="text-xs text-muted-foreground mt-1 leading-relaxed line-clamp-2">{item.message}</p>
+            </div>
+            <button
+              onClick={() => dismiss(item.id)}
+              className="w-6 h-6 rounded-full flex items-center justify-center shrink-0 hover:bg-white/10 transition-colors text-muted-foreground hover:text-foreground"
+            >
+              <X className="w-3.5 h-3.5" />
+            </button>
           </div>
 
-          {/* Dot indicators */}
-          {visibleAnnouncements.length > 1 && (
-            <div className="absolute bottom-1.5 left-1/2 -translate-x-1/2 flex items-center gap-1">
-              {visibleAnnouncements.map((_, i) => (
+          {total > 1 && (
+            <div className="flex items-center justify-center gap-1.5 pb-2">
+              {visible.map((_, i) => (
                 <button
-                  key={i}
-                  onClick={() => setCurrentIndex(i)}
-                  className="w-1.5 h-1.5 rounded-full transition-all duration-300"
+                  key={visible[i].id}
+                  onClick={() => slideTo(i)}
+                  className="rounded-full transition-all duration-300"
                   style={{
-                    background: i === currentIndex
-                      ? (current.type === 'urgent'
-                        ? '#f87171'
-                        : current.type === 'warning'
-                          ? '#fbbf24'
-                          : '#60a5fa')
-                      : 'rgba(255,255,255,0.2)',
+                    background: i === currentIndex ? color : 'rgba(255,255,255,0.2)',
                     width: i === currentIndex ? '12px' : '6px',
+                    height: '6px',
                   }}
                 />
               ))}
