@@ -328,7 +328,7 @@ export default function WithdrawForm() {
     setPinError(false)
   }
 
-  const executeWithdrawal = async () => {
+  const executeWithdrawal = async (verifiedPin: string) => {
     setLoading(true)
     try {
       let toAddress = ''
@@ -360,7 +360,7 @@ export default function WithdrawForm() {
           network,
           paymentMethodId: selectedMethod?.id,
           paymentMethodName,
-          pin: pinCode,
+          pin: verifiedPin,
         }),
       })
       const data = await res.json()
@@ -409,7 +409,7 @@ export default function WithdrawForm() {
         setPinCode('')
         return
       }
-      await executeWithdrawal()
+      await executeWithdrawal(code)
     } catch {
       toast.error('خطأ في التحقق')
       setPinError(true)
@@ -887,6 +887,7 @@ export default function WithdrawForm() {
               }}
               onComplete={(val) => handlePinSubmit(val)}
               error={pinError}
+              compact
             />
 
             {pinLoading && (
