@@ -125,7 +125,7 @@ function getMethodLabel(m: any): string {
 }
 
 export default function DepositForm() {
-  const { user, setScreen } = useAuthStore()
+  const { user, setScreen, refreshUser } = useAuthStore()
   const [methods, setMethods] = useState<any[]>([])
   const [selectedMethod, setSelectedMethod] = useState<any>(null)
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null)
@@ -134,6 +134,9 @@ export default function DepositForm() {
   const [amount, setAmount] = useState('')
   const [txId, setTxId] = useState('')
   const [loading, setLoading] = useState(false)
+
+  // Refresh user data on mount to pick up admin changes (e.g. KYC approval)
+  useEffect(() => { refreshUser() }, [refreshUser])
   const [loadingMethods, setLoadingMethods] = useState(false)
   const rates = useExchangeRates()
   const [copiedField, setCopiedField] = useState<string | null>(null)

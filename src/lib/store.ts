@@ -36,6 +36,7 @@ interface AuthState {
   setScreen: (screen: string) => void
   updateBalance: (balance: number) => void
   updateUser: (updates: Partial<User>) => void
+  refreshUser: () => Promise<void>
   setPendingRegistration: (data: { email: string; fullName: string; password: string } | null) => void
   setPendingWithdrawalConfirmation: (id: string | null) => void
   clearForLock: () => void
@@ -76,6 +77,21 @@ export const useAuthStore = create<AuthState>()(
       setScreen: (screen) => set({ currentScreen: screen }),
       updateBalance: (balance) => set((state) => ({ user: state.user ? { ...state.user, balance } : null })),
       updateUser: (updates) => set((state) => ({ user: state.user ? { ...state.user, ...updates } : null })),
+      refreshUser: async () => {
+        try {
+          const token = useAuthStore.getState().token
+          if (!token) return
+          const res = await fetch('/api/user/profile', {
+            headers: { Authorization: `Bearer ${token}` },
+          })
+          const data = await res.json()
+          if (data.success && data.user) {
+            set((state) => ({ user: state.user ? { ...state.user, ...data.user } : null }))
+          }
+        } catch {
+          // silent
+        }
+      },
       setPendingRegistration: (data) => set({ pendingRegistration: data }),
       setPendingWithdrawalConfirmation: (id) => set({ pendingWithdrawalConfirmation: id }),
     }),

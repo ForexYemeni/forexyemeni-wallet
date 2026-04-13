@@ -63,7 +63,7 @@ const getMethodTitle = (m: any) => {
 type AddMethodStep = 'category' | 'type' | 'currency' | 'details'
 
 export default function WithdrawForm() {
-  const { user, updateUser, setScreen } = useAuthStore()
+  const { user, updateUser, setScreen, refreshUser } = useAuthStore()
   const [methods, setMethods] = useState<any[]>([])
   const [selectedMethod, setSelectedMethod] = useState<any>(null)
   const [step, setStep] = useState<'select' | 'details'>('select')
@@ -73,6 +73,9 @@ export default function WithdrawForm() {
   const [feePercentage, setFeePercentage] = useState(0.1)
   const [hasPending, setHasPending] = useState(false)
   const [pendingCheckLoading, setPendingCheckLoading] = useState(false)
+
+  // Refresh user data on mount to pick up admin changes (e.g. KYC approval)
+  useEffect(() => { refreshUser() }, [refreshUser])
   // PIN dialog state
   const [showPinDialog, setShowPinDialog] = useState(false)
   const [pinCode, setPinCode] = useState('')
