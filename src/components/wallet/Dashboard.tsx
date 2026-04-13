@@ -143,6 +143,10 @@ export default function Dashboard() {
           updates.accountNumber = data.accountNumber
           needsUpdate = true
         }
+        if (data.kycStatus && data.kycStatus !== user?.kycStatus) {
+          updates.kycStatus = data.kycStatus
+          needsUpdate = true
+        }
         if (needsUpdate) {
           useAuthStore.getState().updateUser(updates as any)
         }

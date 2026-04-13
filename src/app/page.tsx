@@ -6,6 +6,7 @@ import { useAuthStore } from '@/lib/store'
 import { toast } from 'sonner'
 import { Loader2, Lock, Image as ImageIcon, RefreshCw, AlertTriangle, MessageCircle, X } from 'lucide-react'
 import ScreenTransition from '@/components/layout/ScreenTransition'
+import { useRealtimeSync } from '@/hooks/useRealtimeSync'
 
 // Lazy load ALL components — only loads what's needed
 const LoginForm = dynamic(() => import('@/components/auth/LoginForm'), { ssr: false })
@@ -155,6 +156,10 @@ export default function Home() {
   const [showReportIssue, setShowReportIssue] = useState(false)
   const [reportMessage, setReportMessage] = useState('')
   const [reportSending, setReportSending] = useState(false)
+
+  // Real-time sync — polls user data every 10s for instant updates
+  // (KYC approval, balance changes, status updates, etc.)
+  useRealtimeSync()
 
   // Hydration safety: wait until client-side is mounted
   const [mounted, setMounted] = useState(false)

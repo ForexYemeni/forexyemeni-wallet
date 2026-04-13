@@ -582,6 +582,33 @@ export default function AdminPanel() {
     }
   }
 
+  // Approve all pending KYC records SEQUENTIALLY to avoid race conditions
+  // (simultaneous approvals can leave stale pending records)
+  const handleApproveAllKYC = async (records: { id: string; userId: string }[], totalRecords: number) => {
+    setActionLoading('approve-all')
+    try {
+      for (const r of records) {
+        const res = await apiFetch('/api/admin/kyc', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ recordId: r.id, status: 'approved', userId: r.userId }),
+        })
+        const data = await res.json()
+        if (!data.success) {
+          toast.error(data.message)
+          break
+        }
+      }
+      toast.success(`تم قبول ${records.length} مستندات`)
+      fetchKYC(); fetchUsers()
+      if (records.length === totalRecords) setKycDetailUser(null)
+    } catch {
+      toast.error('خطأ في تحديث KYC')
+    } finally {
+      setActionLoading(null)
+    }
+  }
+
   const handleUpdateUser = async (userId: string, updates: Record<string, unknown>) => {
     setActionLoading(userId)
     try {
@@ -2589,13 +2616,11 @@ export default function AdminPanel() {
                             <div className="space-y-2 pt-1">
                               <div className="flex gap-2">
                                 <button
-                                  onClick={() => {
-                                    pendingRecords.forEach(r => handleUpdateKYC(r.id, 'approved', r.userId!))
-                                    if (pendingRecords.every(r => records.length === pendingRecords.length)) setKycDetailUser(null)
-                                  }}
+                                  onClick={() => handleApproveAllKYC(pendingRecords.map(r => ({ id: r.id, userId: r.userId! })), records.length)}
+                                  disabled={actionLoading === 'approve-all'}
                                   className="flex-1 flex items-center justify-center gap-2 text-sm py-3 rounded-xl bg-green-500/10 text-green-400 hover:bg-green-500/20 transition-all border border-green-500/15 font-bold"
                                 >
-                                  <Check className="w-4 h-4" /> قبول الكل
+                                  {actionLoading === 'approve-all' ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />} قبول الكل
                                 </button>
                                 <button
                                   onClick={() => { setKycRejectDialog({ recordId: pendingRecords[0].id, userId: pendingRecords[0].userId! }); setKycRejectReason('') }}

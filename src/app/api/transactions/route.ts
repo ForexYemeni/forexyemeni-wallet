@@ -24,16 +24,18 @@ export async function GET(request: NextRequest) {
 
     const transactions = await transactionOperations.findMany(userId)
 
-    // Also return latest user balance + accountNumber for real-time updates
+    // Also return latest user balance + accountNumber + kycStatus for real-time updates
     let balance = null
     let accountNumber = null
     let frozenBalance = null
+    let kycStatus = null
     try {
       const userData = await userOperations.findUnique({ id: userId })
       if (userData) {
         balance = userData.balance ?? 0
         frozenBalance = userData.frozenBalance ?? 0
         accountNumber = userData.accountNumber || null
+        kycStatus = userData.kycStatus || 'none'
 
         // Auto-generate account number if missing
         if (!userData.accountNumber) {
@@ -54,6 +56,7 @@ export async function GET(request: NextRequest) {
       balance,
       accountNumber,
       frozenBalance,
+      kycStatus,
     })
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : 'حدث خطأ'
