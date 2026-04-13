@@ -19,7 +19,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ success: false, message: 'الملف مطلوب' }, { status: 400 })
     }
 
-    if (!type || !['id_front', 'id_back'].includes(type)) {
+    if (!type || !['id_front', 'id_back', 'id_photo'].includes(type)) {
       return NextResponse.json({ success: false, message: 'نوع الملف غير صحيح' }, { status: 400 })
     }
 
