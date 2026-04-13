@@ -8,6 +8,7 @@ import { useOfflineMode } from '@/hooks/useOfflineMode'
 import { convertUSDTtoYER, convertUSDTtoSAR, useExchangeRates } from '@/lib/currency'
 import { toast } from 'sonner'
 import BannerSlider from '@/components/BannerSlider'
+import AnnouncementBanner from '@/components/layout/AnnouncementBanner'
 import AnimatedCounter from '@/components/ui/AnimatedCounter'
 import WalletCard3D, { WalletChip, MiniSparkline } from '@/components/ui/WalletCard3D'
 import BalanceChart, { KYCProgressRing } from '@/components/dashboard/BalanceChart'
@@ -389,6 +390,9 @@ export default function Dashboard() {
           </div>
         </div>
       </div>
+
+      {/* ========== ANNOUNCEMENTS ========== */}
+      <AnnouncementBanner />
 
       {/* ========== BANNER ========== */}
       <BannerSlider />
