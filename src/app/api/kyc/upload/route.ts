@@ -12,7 +12,7 @@ export async function POST(request: NextRequest) {
     const userId = auth.user.id
 
     const formData = await request.formData()
-    const type = formData.get('type') as string // 'id_front' | 'id_back'
+    const type = formData.get('type') as string // 'id_front' | 'id_back' | 'id_photo'
     const file = formData.get('file') as File | null
 
     if (!file) {
@@ -41,8 +41,28 @@ export async function POST(request: NextRequest) {
     // Generate unique file name
     const fileName = generateId()
 
-    // Store in Firestore kycFiles collection
     const db = getDb()
+
+    // === IMPORTANT: Delete old pending records of same type to prevent duplicates ===
+    try {
+      const oldRecords = await db.collection('kycRecords')
+        .where('userId', '==', userId)
+        .where('type', '==', type)
+        .where('status', '==', 'pending')
+        .get()
+      if (!oldRecords.empty) {
+        const batch = db.batch()
+        for (const doc of oldRecords.docs) {
+          batch.delete(doc.ref)
+        }
+        await batch.commit()
+      }
+    } catch (err) {
+      // Non-critical — continue even if cleanup fails
+      console.warn('[KYC Upload] Could not clean old records:', err)
+    }
+
+    // Store in Firestore kycFiles collection
     await db.collection('kycFiles').doc(fileName).set({
       userId,
       type,
@@ -51,7 +71,7 @@ export async function POST(request: NextRequest) {
       createdAt: new Date().toISOString(),
     })
 
-    // Create KYC record
+    // Create fresh KYC record
     const fileUrl = `/api/kyc/file/${fileName}`
     await db.collection('kycRecords').add({
       userId,
