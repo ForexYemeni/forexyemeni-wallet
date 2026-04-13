@@ -1,7 +1,7 @@
 import { apiFetch } from '@/lib/api-client'
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useAuthStore } from '@/lib/store'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
@@ -386,14 +386,16 @@ export default function WithdrawForm() {
     }
   }
 
-  const handlePinSubmit = async () => {
-    if (pinCode.length < 6) return
+  const handlePinSubmit = async (pin?: string) => {
+    const code = pin || pinCode
+    if (code.length < 6) return
     setPinLoading(true)
+    setPinError(false)
     try {
       const pinRes = await apiFetch('/api/auth/verify-pin', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userId: user?.id, pin: pinCode }),
+        body: JSON.stringify({ userId: user?.id, pin: code }),
       })
       const pinData = await pinRes.json()
       if (!pinData.success) {
@@ -403,11 +405,15 @@ export default function WithdrawForm() {
           toast.error(pinData.message || 'رمز PIN غير صحيح')
         }
         setPinError(true)
+        // Clear PIN for retry
+        setPinCode('')
         return
       }
       await executeWithdrawal()
     } catch {
       toast.error('خطأ في التحقق')
+      setPinError(true)
+      setPinCode('')
     } finally {
       setPinLoading(false)
     }
@@ -859,15 +865,19 @@ export default function WithdrawForm() {
 
       {/* PIN Verification Dialog */}
       {showPinDialog && (
-        <div className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4">
-          <div className="glass-card p-6 space-y-4 w-full max-w-sm animate-scale-in" onClick={e => e.stopPropagation()}>
-            <div className="text-center space-y-3">
-              <div className="w-14 h-14 mx-auto rounded-2xl bg-gold/10 flex items-center justify-center">
-                <Shield className="w-7 h-7 text-gold" />
+        <div className="fixed inset-0 bg-black/80 z-[60] flex items-end sm:items-center justify-center sm:p-4" onClick={() => { setShowPinDialog(false); setPinCode(''); setPinError(false) }}>
+          <div
+            className="glass-card bg-background/98 backdrop-blur-xl p-5 space-y-4 w-full max-w-[340px] sm:max-w-sm rounded-t-2xl sm:rounded-2xl animate-slide-up sm:animate-scale-in"
+            onClick={e => e.stopPropagation()}
+          >
+            <div className="text-center space-y-2">
+              <div className="w-12 h-12 mx-auto rounded-2xl bg-gold/10 flex items-center justify-center">
+                <Shield className="w-6 h-6 text-gold" />
               </div>
-              <h3 className="text-lg font-bold gold-text">أدخل رمز PIN</h3>
-              <p className="text-sm text-muted-foreground">أدخل رمز الحماية لتأكيد عملية السحب</p>
+              <h3 className="text-base font-bold gold-text">أدخل رمز PIN</h3>
+              <p className="text-xs text-muted-foreground">أدخل رمز الحماية المكون من 6 أرقام لتأكيد السحب</p>
             </div>
+
             <PinDots
               length={6}
               value={pinCode}
@@ -875,15 +885,25 @@ export default function WithdrawForm() {
                 setPinCode(val)
                 setPinError(false)
               }}
-              onComplete={handlePinSubmit}
+              onComplete={(val) => handlePinSubmit(val)}
               error={pinError}
             />
-            <button
-              onClick={() => { setShowPinDialog(false); setPinCode(''); setPinError(false) }}
-              className="w-full h-10 bg-white/10 text-foreground rounded-xl text-sm hover:bg-white/20 transition-colors"
-            >
-              إلغاء
-            </button>
+
+            {pinLoading && (
+              <div className="flex items-center justify-center gap-2 py-1">
+                <Loader2 className="w-4 h-4 animate-spin text-gold" />
+                <span className="text-xs text-muted-foreground">جاري التحقق...</span>
+              </div>
+            )}
+
+            <div className="flex items-center gap-2 pt-1">
+              <button
+                onClick={() => { setShowPinDialog(false); setPinCode(''); setPinError(false) }}
+                className="flex-1 h-10 bg-white/10 text-foreground rounded-xl text-sm font-medium hover:bg-white/20 transition-colors"
+              >
+                إلغاء
+              </button>
+            </div>
           </div>
         </div>
       )}

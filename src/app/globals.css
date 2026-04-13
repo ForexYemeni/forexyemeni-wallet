@@ -1566,6 +1566,17 @@
   animation: pinDotPulse 0.3s ease-out;
 }
 
+/* Active (next) PIN dot — shows cursor-like indicator */
+.pin-dot.active {
+  border-color: rgba(240, 185, 11, 0.3);
+  animation: pinDotCursor 1.2s ease-in-out infinite;
+}
+
+@keyframes pinDotCursor {
+  0%, 100% { border-color: rgba(240, 185, 11, 0.15); }
+  50% { border-color: rgba(240, 185, 11, 0.4); }
+}
+
 .pin-dot.filled::after {
   content: '';
   width: 12px;
