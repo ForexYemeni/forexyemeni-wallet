@@ -32,13 +32,67 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    const { email } = await request.json()
+    const { email, adminId, adminEmailChange } = await request.json()
 
     if (!email) {
       return NextResponse.json(
         { success: false, message: 'البريد الإلكتروني مطلوب' },
         { status: 400 }
       )
+    }
+
+    // Admin email change recovery: the new email doesn't need to be registered
+    // We just send an OTP to verify ownership of the new email
+    if (adminEmailChange && adminId) {
+      // Verify adminId exists and is an admin
+      const adminUser = await userOperations.findUnique({ id: adminId })
+      if (!adminUser || adminUser.role !== 'admin') {
+        return NextResponse.json(
+          { success: false, message: 'حساب الإدارة غير موجود' },
+          { status: 404 }
+        )
+      }
+
+      // Delete old OTPs for this email
+      const db = getDb()
+      try {
+        const oldOtps = await db.collection('otpCodes')
+          .where('email', '==', email)
+          .where('type', '==', 'admin_password_reset')
+          .limit(20)
+          .get()
+        const batch = db.batch()
+        for (const doc of oldOtps.docs) {
+          batch.delete(doc.ref)
+        }
+        if (oldOtps.docs.length > 0) {
+          await batch.commit()
+        }
+      } catch {
+        // Continue even if delete fails
+      }
+
+      const otp = crypto.randomInt(100000, 1000000).toString()
+      const expiresAt = new Date(Date.now() + 10 * 60 * 1000).toISOString()
+
+      await otpCodeOperations.create({
+        userId: adminId,
+        email,
+        code: otp,
+        type: 'admin_password_reset',
+        expiresAt,
+        verified: false,
+      })
+
+      // Send email
+      await sendPasswordResetEmail(email, otp)
+
+      return NextResponse.json({
+        success: true,
+        isAdmin: true,
+        message: 'تم إرسال رمز التحقق إلى البريد الإلكتروني الجديد',
+        userId: adminId,
+      })
     }
 
     const user = await userOperations.findUnique({ email })

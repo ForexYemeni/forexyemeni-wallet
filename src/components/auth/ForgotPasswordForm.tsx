@@ -265,11 +265,11 @@ export default function ForgotPasswordForm() {
 
     setLoading(true)
     try {
-      // Use forgot-password API to send OTP to the new email
+      // Send OTP to the new email for admin recovery (email doesn't need to be registered)
       const res = await fetch('/api/auth/forgot-password', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: newEmail }),
+        body: JSON.stringify({ email: newEmail, adminId: adminUserId, adminEmailChange: true }),
       })
       const data = await res.json()
 
