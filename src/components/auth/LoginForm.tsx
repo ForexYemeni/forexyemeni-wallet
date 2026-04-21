@@ -238,7 +238,7 @@ export default function LoginForm() {
             </div>
 
             {/* Remaining Attempts Dots */}
-            {loginError.remaining !== null && loginError.remaining > 0 && (
+            {loginError.remaining !== null && (loginError.remaining as number) > 0 && (
               <div className="space-y-3">
                 <div className="flex items-center justify-center gap-2">
                   {[1, 2, 3, 4, 5].map((n) => (
@@ -254,7 +254,7 @@ export default function LoginForm() {
                             : 'bg-white/10'
                         }`}
                         style={{
-                          animation: n <= loginError.remaining ? 'successRipple 0.3s ease-out' : 'none',
+                          animation: n <= (loginError.remaining as number) ? 'successRipple 0.3s ease-out' : 'none',
                           animationDelay: `${n * 0.05}s`,
                         }}
                       />

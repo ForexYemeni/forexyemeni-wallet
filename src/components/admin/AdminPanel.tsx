@@ -153,11 +153,8 @@ interface AdminStats {
   totalFees: number
   adminBalance: number
   pendingActions: number
-  depositsPending: number
-  depositsReviewing: number
-  withdrawalsPending: number
-  withdrawalsApproved: number
-  kycRecordsPending: number
+  registeredUsers?: number
+  withdrawalsCompleted?: number
   recentActivity: any[]
 }
 
@@ -397,7 +394,7 @@ export default function AdminPanel() {
 
   const fetchAdminSettings = async () => {
     try {
-      const res = await apiFetch(`/api/admin/settings?userId=${user.id}`)
+      const res = await apiFetch(`/api/admin/settings?userId=${user?.id}`)
       const data = await res.json()
       if (data.success) setAdminSettings(data.settings)
     } catch { /* silent */ }
@@ -1379,7 +1376,7 @@ export default function AdminPanel() {
                       </div>
                       <div className="flex gap-3 mt-2 text-[10px]">
                         <span className="text-green-400">نشط: {stats.activeUsers}</span>
-                        {(stats.registeredUsers ?? 0) > 0 && <span className="text-yellow-400">مسجل: {stats.registeredUsers}</span>}
+                        {(stats.registeredUsers || 0) > 0 && <span className="text-yellow-400">مسجل: {stats.registeredUsers}</span>}
                         <span className="text-red-400">معلق: {stats.suspendedUsers}</span>
                       </div>
                     </div>
@@ -1411,7 +1408,7 @@ export default function AdminPanel() {
                       <div className="flex gap-3 mt-2 text-[10px]">
                         <span className="text-yellow-400">معلق: {stats.withdrawalsPending}</span>
                         <span className="text-blue-400">قيد التنفيذ: {stats.withdrawalsApproved + stats.withdrawalsProcessing}</span>
-                        <span className="text-green-400">مكتمل: {stats.withdrawalsCompleted || 0}</span>
+                        <span className="text-green-400">مكتمل: {stats.withdrawalsCompleted ?? 0}</span>
                       </div>
                     </div>
 
@@ -1902,7 +1899,7 @@ export default function AdminPanel() {
                           {d.screenshot && (
                             <div className="px-4 pb-2">
                               <button
-                                onClick={(e) => { e.stopPropagation(); setPreviewImage(d.screenshot) }}
+                                onClick={(e) => { e.stopPropagation(); setPreviewImage(d.screenshot ?? '') }}
                                 className="rounded-xl overflow-hidden border border-white/10 block w-full"
                               >
                                 <img src={d.screenshot} alt="إثبات الدفع" className="w-full h-32 object-cover" />
@@ -1978,10 +1975,10 @@ export default function AdminPanel() {
                           <div className="text-left">
                             <p className={`font-bold gold-text ${isExpanded ? 'text-sm' : 'text-xs'}`}>{(w.amount ?? 0).toFixed(2)} USDT</p>
                             {!isExpanded && (w.fee ?? 0) > 0 && (
-                              <p className="text-[10px] text-muted-foreground">صافي: {(w.netAmount ?? (w.amount - w.fee) ?? 0).toFixed(2)}</p>
+                              <p className="text-[10px] text-muted-foreground">صافي: {(w.netAmount ?? (w.amount ?? 0 - w.fee ?? 0) ?? 0).toFixed(2)}</p>
                             )}
                             {isExpanded && (w.fee ?? 0) > 0 && (
-                              <p className="text-[10px] text-muted-foreground">الصافي: {(w.netAmount ?? (w.amount - w.fee) ?? 0).toFixed(2)} USDT</p>
+                              <p className="text-[10px] text-muted-foreground">الصافي: {(w.netAmount ?? (w.amount ?? 0 - w.fee ?? 0) ?? 0).toFixed(2)} USDT</p>
                             )}
                             <span className={`px-2 py-0.5 rounded-md font-medium ${isExpanded ? 'text-xs' : 'text-[10px]'} ${WITHDRAWAL_STATUS_MAP[w.status]?.color || ''}`}>
                               {WITHDRAWAL_STATUS_MAP[w.status]?.label || w.status}
@@ -2148,7 +2145,7 @@ export default function AdminPanel() {
                           {/* Payment proof */}
                           {w.screenshot && (
                             <div className="pt-2">
-                              <button onClick={(e) => { e.stopPropagation(); setPreviewImage(w.screenshot) }} className="rounded-xl overflow-hidden border border-white/10 block w-full">
+                              <button onClick={(e) => { e.stopPropagation(); setPreviewImage(w.screenshot ?? '') }} className="rounded-xl overflow-hidden border border-white/10 block w-full">
                                 <img src={w.screenshot} alt="إثبات الدفع" className="w-full h-32 object-cover" />
                               </button>
                             </div>

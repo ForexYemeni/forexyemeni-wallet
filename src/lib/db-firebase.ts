@@ -29,6 +29,9 @@ export interface User {
   permissions?: string | null
   twoFactorEnabled?: boolean | null
   backupCodes?: string[] | null
+  accountNumber?: number | null
+  tempPinHash?: string | null
+  tempPinExpiresAt?: string | null
   createdAt: string
   updatedAt: string
 }
@@ -64,6 +67,7 @@ export interface Deposit {
   amount: number
   fee?: number
   netAmount?: number
+  localAmount?: number
   currency: string
   network: string
   txId?: string | null

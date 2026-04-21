@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback, useRef, Component, ReactNode } from 'react'
 import dynamic from 'next/dynamic'
 import { useAuthStore } from '@/lib/store'
+import { apiFetch } from '@/lib/api-client'
 import { toast } from 'sonner'
 import { Loader2, Lock, Image as ImageIcon, RefreshCw, AlertTriangle, MessageCircle, X } from 'lucide-react'
 import ScreenTransition from '@/components/layout/ScreenTransition'
@@ -202,7 +203,7 @@ export default function Home() {
 
     const checkPending = async () => {
       try {
-        const res = await fetch('/api/user/check-pending', {
+        const res = await apiFetch('/api/user/check-pending', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ userId: user!.id }),
@@ -377,7 +378,7 @@ export default function Home() {
     const fetchWithdrawal = async () => {
       setLoadingWithdrawal(true)
       try {
-        const res = await fetch('/api/withdrawals/[id]', {
+        const res = await apiFetch('/api/withdrawals/[id]', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ userId: user!.id, withdrawalId: user!.pendingConfirmation }),
@@ -440,7 +441,7 @@ export default function Home() {
       if (!confirmPassword) { toast.error('يرجى إدخال كلمة المرور'); return }
       setConfirmLoading(true)
       try {
-        const res = await fetch('/api/withdrawals/confirm-receipt', {
+        const res = await apiFetch('/api/withdrawals/confirm-receipt', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ userId: user.id, withdrawalId: user.pendingConfirmation, password: confirmPassword }),
@@ -585,7 +586,7 @@ export default function Home() {
                   if (!reportMessage.trim()) { toast.error('يرجى كتابة وصف المشكلة'); return }
                   setReportSending(true)
                   try {
-                    const res = await fetch('/api/withdrawals/report-issue', {
+                    const res = await apiFetch('/api/withdrawals/report-issue', {
                       method: 'POST',
                       headers: { 'Content-Type': 'application/json' },
                       body: JSON.stringify({
