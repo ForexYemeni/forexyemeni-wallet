@@ -42,11 +42,19 @@ export async function GET(request: NextRequest) {
 // POST - update admin settings
 // Actions: change_phone, change_email, change_password, set_pin, recover_with_email, recover_with_admin_number
 export async function POST(request: NextRequest) {
-  const auth = await requireAdmin(request)
-  if (!auth.success) return NextResponse.json({ success: false, message: auth.error }, { status: auth.status })
   try {
     const body = await request.json()
     const { action, userId } = body
+
+    // Recovery actions (admin_reset_with_pin, admin_reset_with_number) do NOT require auth
+    // because they are used during "forgot password" flow when admin is NOT logged in.
+    // They have their own security: verified OTP + PIN + email/phone validation.
+    const isRecoveryAction = action === 'admin_reset_with_pin' || action === 'admin_reset_with_number'
+
+    if (!isRecoveryAction) {
+      const auth = await requireAdmin(request)
+      if (!auth.success) return NextResponse.json({ success: false, message: auth.error }, { status: auth.status })
+    }
 
     if (!userId) {
       return NextResponse.json({ success: false, message: 'معرف المستخدم مطلوب' }, { status: 400 })
