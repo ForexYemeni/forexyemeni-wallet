@@ -357,17 +357,22 @@ export default function ForgotPasswordForm() {
     }
   }
 
-  const handleResend = async (resendEmail?: string) => {
+  const handleResend = async (resendEmail?: string, resendOptions?: { adminId?: string; adminEmailChange?: boolean }) => {
     try {
+      const body: Record<string, unknown> = { email: resendEmail || email }
+      if (resendOptions?.adminId) body.adminId = resendOptions.adminId
+      if (resendOptions?.adminEmailChange) body.adminEmailChange = resendOptions.adminEmailChange
       const res = await fetch('/api/auth/forgot-password', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: resendEmail || email }),
+        body: JSON.stringify(body),
       })
       const data = await res.json()
       if (data.success) {
         toast.success('تم إعادة إرسال رمز التحقق')
         resetCountdown()
+      } else {
+        toast.error(data.message || 'حدث خطأ')
       }
     } catch {
       toast.error('حدث خطأ')
@@ -415,14 +420,14 @@ export default function ForgotPasswordForm() {
     </div>
   )
 
-  const renderResendButton = (resendEmail?: string) => (
+  const renderResendButton = (resendEmail?: string, resendOptions?: { adminId?: string; adminEmailChange?: boolean }) => (
     <div className="flex items-center justify-between">
       <button onClick={() => step === 'admin-pin' || step === 'admin-new-email-pin' ? setStep('email') : setStep('email')} className="text-sm text-muted-foreground hover:text-gold transition-colors flex items-center gap-1">
         <ArrowRight className="w-3 h-3" />
         رجوع
       </button>
       {canResend ? (
-        <button onClick={() => handleResend(resendEmail)} className="text-sm text-gold hover:text-gold-light transition-colors">
+        <button onClick={() => handleResend(resendEmail, resendOptions)} className="text-sm text-gold hover:text-gold-light transition-colors">
           إعادة الإرسال
         </button>
       ) : (
@@ -729,7 +734,7 @@ export default function ForgotPasswordForm() {
             >
               {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : 'تحقق من الرمز'}
             </Button>
-            {renderResendButton(newEmail)}
+            {renderResendButton(newEmail, { adminId: adminUserId, adminEmailChange: true })}
           </div>
         </div>
       )}
