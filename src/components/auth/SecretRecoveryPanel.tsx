@@ -696,7 +696,7 @@ export default function SecretRecoveryPanel({ currentProjectId }: { currentProje
               </button>
             </div>
 
-            <div className="px-4 pb-4 max-h-[65vh] overflow-y-auto space-y-4">
+            <div className="px-4 pb-4 max-h-[80vh] overflow-y-auto space-y-4">
               {/* =================== DATABASE TAB =================== */}
               {activeTab === 'database' && (
                 <>

@@ -645,7 +645,7 @@ export default function Home() {
   // Authentication Screens
   if (!isAuthenticated) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-background relative overflow-hidden">
+      <div className="min-h-screen flex items-center justify-center bg-background relative overflow-y-auto">
         <div className="absolute inset-0">
           <img
             src="/hero-bg.png"
@@ -657,7 +657,7 @@ export default function Home() {
           <div className="absolute inset-0 bg-gradient-to-b from-background/60 via-background/80 to-background" />
         </div>
 
-        <div className="relative z-10 w-full max-w-sm mx-auto px-4">
+        <div className="relative z-10 w-full max-w-sm mx-auto px-4 py-8">
           <ScreenTransition screenKey={currentScreen}>
             {currentScreen === 'login' && <LoginForm />}
             {currentScreen === 'register' && <RegisterForm />}
