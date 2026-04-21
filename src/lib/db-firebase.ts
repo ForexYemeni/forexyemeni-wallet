@@ -290,7 +290,7 @@ export const otpCodeOperations = {
       query = query.where('userId', '==', options.where.userId)
     }
     query = query.where('type', '==', options.where.type)
-    query = query.where('verified', '==', false)
+    query = query.where('verified', '==', options.where.verified)
     query = query.limit(10) // fetch a few and sort in JS
     
     const snapshot = await query.get()
