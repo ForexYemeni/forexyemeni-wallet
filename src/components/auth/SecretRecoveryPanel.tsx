@@ -1,7 +1,8 @@
 import { apiFetch } from '@/lib/api-client'
 'use client'
 
-import { useState, useRef, useCallback } from 'react'
+import { useState, useRef, useCallback, useEffect } from 'react'
+import { createPortal } from 'react-dom'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -57,6 +58,12 @@ export default function SecretRecoveryPanel({ currentProjectId }: { currentProje
   const [step, setStep] = useState<Step>('closed')
   const [tapCount, setTapCount] = useState(0)
   const tapTimer = useRef<NodeJS.Timeout | null>(null)
+  const [portalTarget, setPortalTarget] = useState<HTMLElement | null>(null)
+
+  // Set up portal target on mount (client-side only)
+  useEffect(() => {
+    setPortalTarget(document.body)
+  }, [])
   const [serviceAccountKey, setServiceAccountKey] = useState('')
   const [adminEmail, setAdminEmail] = useState('')
   const [adminPassword, setAdminPassword] = useState('')
@@ -566,7 +573,7 @@ export default function SecretRecoveryPanel({ currentProjectId }: { currentProje
       </h1>
 
       {/* ===== PIN Pad Modal ===== */}
-      {step === 'pin' && (
+      {step === 'pin' && portalTarget && createPortal(
         <div
           className="fixed inset-0 z-50 flex items-center justify-center p-4"
           style={{ animation: 'srfadeIn 0.2s ease-out' }}
@@ -651,11 +658,12 @@ export default function SecretRecoveryPanel({ currentProjectId }: { currentProje
               ))}
             </div>
           </div>
-        </div>
+        </div>,
+        portalTarget
       )}
 
       {/* ===== Main Recovery Panel ===== */}
-      {step === 'main' && (
+      {step === 'main' && portalTarget && createPortal(
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm overflow-y-auto">
           <div className="w-full max-w-md bg-[#0f172a] border border-amber-500/20 rounded-2xl my-8 space-y-4">
             {/* Header */}
@@ -1240,7 +1248,8 @@ export default function SecretRecoveryPanel({ currentProjectId }: { currentProje
               )}
             </div>
           </div>
-        </div>
+        </div>,
+        portalTarget
       )}
 
       {/* CSS */}
