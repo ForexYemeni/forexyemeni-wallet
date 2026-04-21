@@ -36,6 +36,9 @@ export async function POST(request: NextRequest) {
     }
 
     const senderData = senderDoc.data()
+    if (!senderData) {
+      return NextResponse.json({ success: false, message: 'Sender not found' }, { status: 404 })
+    }
 
     // Check sender is not admin
     if (senderData.role === 'admin') {

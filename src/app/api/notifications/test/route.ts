@@ -38,6 +38,7 @@ export async function POST(request: NextRequest) {
         title: 'اختبار إشعار',
         message: 'هذا إشعار اختبار داخلي (FCM غير متاح)',
         type: 'info',
+        read: false,
       })
 
       return NextResponse.json({
@@ -57,6 +58,7 @@ export async function POST(request: NextRequest) {
       title: 'اختبار إشعار FCM',
       message: 'إذا رأيت هذا في شريط الإشعارات = كل شيء يعمل!',
       type: 'info',
+      read: false,
     })
 
     const pushResult = await sendPushNotification(

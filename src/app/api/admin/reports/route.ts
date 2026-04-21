@@ -74,9 +74,9 @@ export async function GET(request: NextRequest) {
       db.collection('users').limit(1000).get(),
     ])
 
-    const allDeposits = depositsSnap.docs.map(d => ({ id: d.id, ...d.data() }))
-    const allWithdrawals = withdrawalsSnap.docs.map(d => ({ id: d.id, ...d.data() }))
-    const allUsers = usersSnap.docs.map(d => ({ id: d.id, ...d.data() }))
+    const allDeposits = depositsSnap.docs.map(d => ({ id: d.id, ...d.data() })) as any[]
+    const allWithdrawals = withdrawalsSnap.docs.map(d => ({ id: d.id, ...d.data() })) as any[]
+    const allUsers = usersSnap.docs.map(d => ({ id: d.id, ...d.data() })) as any[]
 
     // Build user map for lookup
     const userMap = new Map<string, { fullName: string | null; email: string }>()

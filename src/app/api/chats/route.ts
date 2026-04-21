@@ -35,7 +35,7 @@ export async function GET(request: NextRequest) {
       const userMap = new Map<string, { id: string; fullName: string | null; email: string }>()
       for (const u of userDocs) {
         if (u) {
-          userMap.set(u.id, { id: u.id, fullName: u.fullName, email: u.email })
+          userMap.set(u.id, { id: u.id, fullName: u.fullName ?? null, email: u.email })
         }
       }
       const enrichedChats = chats.map(chat => ({

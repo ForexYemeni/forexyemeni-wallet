@@ -85,7 +85,7 @@ export function useRealtimeSync() {
         const changes: string[] = []
 
         for (const field of MONITORED_FIELDS) {
-          if (currentUser && (currentUser as Record<string, unknown>)[field] !== data.user[field]) {
+          if (currentUser && (currentUser as unknown as Record<string, unknown>)[field] !== data.user[field]) {
             changes.push(field)
           }
         }

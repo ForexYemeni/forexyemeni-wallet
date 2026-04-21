@@ -120,7 +120,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ success: false, message: 'المسؤول غير موجود' }, { status: 404 })
     }
 
-    const adminData = adminDoc.data()
+    const adminData = adminDoc.data()!
     const adminName = adminData.fullName || adminData.email
     const adminEmail = adminData.email
 

@@ -18,7 +18,7 @@
  *   and used wrong channel (default, no sound).
  */
 import { getDb, initializeFirebase } from '@/lib/firebase'
-import { getMessaging, Message } from 'firebase-admin/messaging'
+import { getMessaging } from 'firebase-admin/messaging'
 
 // Channel ID must match MyFirebaseMessagingService.java and MainActivity.java
 const CHANNEL_ID = 'fx_v8'
@@ -69,7 +69,7 @@ export async function sendPushNotification(
     // "data" field:
     //   - Our custom MyFirebaseMessagingService reads this in onMessageReceived()
     //   - Used for foreground handling and custom data
-    const message: Message = {
+    const message: any = {
       android: {
         priority: 'high' as const,
         ttl: 86400,

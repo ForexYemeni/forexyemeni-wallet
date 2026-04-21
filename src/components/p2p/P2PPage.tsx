@@ -157,7 +157,7 @@ export default function P2PPage() {
           onViewTrades={() => setSubScreen('my-trades')}
         />
       )}
-      {subScreen === 'market' && <P2PMarketplace onBuy={handleBuy} onSell={handleBuy} />}
+      {subScreen === 'market' && <P2PMarketplace />}
       {subScreen === 'my-listings' && <P2PMyListings />}
       {subScreen === 'my-trades' && <P2PMyTrades onTradeClick={handleTradeClick} />}
       {subScreen === 'verification' && <MerchantVerification />}

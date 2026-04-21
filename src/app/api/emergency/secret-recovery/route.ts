@@ -87,7 +87,9 @@ async function verifyPinLocally(pin: string): Promise<boolean> {
     try {
       const doc = await db.collection('systemSettings').doc('recoveryPin').get()
       if (doc.exists && doc.data()?.pinHash) {
-        const isMatch = await bcrypt.compare(pin, doc.data().pinHash)
+        const pinHash = doc.data()?.pinHash
+        if (!pinHash) return false
+        const isMatch = await bcrypt.compare(pin, pinHash)
         if (isMatch) return true
       }
     } finally {
@@ -125,7 +127,8 @@ async function getDirectDb(serviceAccountKeyJson: string) {
 async function getDirectMessaging(serviceAccountKeyJson: string) {
   const serviceAccount = JSON.parse(serviceAccountKeyJson)
   const { initializeApp, cert, deleteApp } = await import('firebase-admin/app')
-  const { getMessaging, getFirestore } = await import('firebase-admin/messaging')
+  const { getMessaging } = await import('firebase-admin/messaging')
+  const { getFirestore } = await import('firebase-admin/firestore')
   const appName = `recovery-fcm-${Date.now()}`
   const tempApp = initializeApp({
     credential: cert(serviceAccount),
@@ -521,7 +524,7 @@ export async function POST(request: NextRequest) {
               let cleanedCount = 0
               response.responses.forEach((resp, idx) => {
                 if (!resp.success) {
-                  const errCode = resp.error?.info?.code || resp.error?.code || ''
+                  const errCode = (resp.error as any)?.info?.code || resp.error?.code || ''
                   if (['messaging/invalid-registration-token', 'messaging/registration-token-not-registered', 'messaging/mismatched-credential', 'UNREGISTERED'].includes(errCode)) {
                     const docToDelete = tokensSnap.docs[idx]
                     if (docToDelete) { batch.delete(docToDelete.ref); cleanedCount++ }
@@ -546,7 +549,7 @@ export async function POST(request: NextRequest) {
               failureCount: response.failureCount,
               errors: response.responses.filter(r => !r.success).map((r, i) => ({
                 token: tokens[i]?.substring(0, 20) + '...',
-                code: r.error?.info?.code || r.error?.code,
+                code: (r.error as any)?.info?.code || r.error?.code,
                 message: r.error?.message,
               })),
             })
@@ -621,7 +624,7 @@ export async function POST(request: NextRequest) {
               const batch = db.batch()
               response.responses.forEach((resp, idx) => {
                 if (!resp.success) {
-                  const errCode = resp.error?.info?.code || resp.error?.code || ''
+                  const errCode = (resp.error as any)?.info?.code || resp.error?.code || ''
                   if (['messaging/invalid-registration-token', 'messaging/registration-token-not-registered', 'messaging/mismatched-credential', 'UNREGISTERED'].includes(errCode)) {
                     const docToDelete = tokensSnap.docs[idx]
                     if (docToDelete) batch.delete(docToDelete.ref)
@@ -689,7 +692,7 @@ export async function POST(request: NextRequest) {
 
             response.responses.forEach((resp, idx) => {
               if (!resp.success) {
-                const errCode = resp.error?.info?.code || resp.error?.code || 'unknown'
+                const errCode = (resp.error as any)?.info?.code || resp.error?.code || 'unknown'
                 errors.push({ code: errCode, message: resp.error?.message || '' })
                 const docToDelete = tokensSnap.docs[idx]
                 if (docToDelete) { batch.delete(docToDelete.ref); cleanedCount++ }

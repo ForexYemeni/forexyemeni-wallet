@@ -98,6 +98,7 @@ export async function POST(request: NextRequest) {
         code: otp,
         type: 'email_verify',
         expiresAt,
+        verified: false,
       })
     } catch (err: any) {
       console.error('[REGISTER] Step 3 (otp) failed:', err.code || err.message)

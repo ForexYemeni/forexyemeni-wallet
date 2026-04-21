@@ -90,6 +90,7 @@ export async function POST(request: NextRequest) {
       title,
       message,
       type,
+      read: false,
     })
 
     // Invalidate unread count cache for this user

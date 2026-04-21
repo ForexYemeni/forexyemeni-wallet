@@ -25,7 +25,7 @@ export async function GET(request: NextRequest) {
 
     // Support filtering by single ID
     if (id) {
-      const withdrawal = await withdrawalOperations.findUnique({ id })
+      const withdrawal = await withdrawalOperations.findUnique(id)
       if (!withdrawal) {
         return NextResponse.json({ success: true, withdrawals: [] })
       }
@@ -121,7 +121,7 @@ export async function POST(request: NextRequest) {
         const sendWProcessing = user.role === 'merchant'
           ? sendMerchantWithdrawalProcessingEmail
           : sendUserWithdrawalProcessingEmail
-        sendWProcessing(user.email, user.fullName || user.email, netAmount, withdrawal.toAddress, withdrawal.id)
+        ;(sendWProcessing as any)(user.email, user.fullName || user.email, withdrawal.amount, netAmount, withdrawal.toAddress, withdrawal.id)
       }
 
       // Credit fee to admin's account

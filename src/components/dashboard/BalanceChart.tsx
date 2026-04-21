@@ -14,7 +14,7 @@ export default function BalanceChart({
   gradientStart = 'rgba(240, 185, 11, 0.25)',
   gradientEnd = 'rgba(240, 185, 11, 0)',
 }: {
-  data: { value: number; label: string }[]
+  data?: { value: number; label: string }[]
   height?: number
   color?: string
   gradientStart?: string

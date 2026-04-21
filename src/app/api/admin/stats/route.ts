@@ -66,7 +66,7 @@ export async function GET(request: NextRequest) {
     const depositsPending = pendingDepositsSnap.size
     const depositsReviewing = reviewingDepositsSnap.size
     
-    const allDeposits = allDepositsSnap.docs.map(d => ({ id: d.id, ...d.data() }))
+    const allDeposits = allDepositsSnap.docs.map(d => ({ id: d.id, ...d.data() })) as any[]
     const depositsConfirmed = allDeposits.filter(d => d.status === 'confirmed').length
     const depositsRejected = allDeposits.filter(d => d.status === 'rejected').length
 
@@ -102,7 +102,7 @@ export async function GET(request: NextRequest) {
     const withdrawalsProcessing = processingWithdrawalsSnap.size
     const withdrawalsCompleted = completedWithdrawalsSnap.size
     
-    const allWithdrawals = allWithdrawalsSnap.docs.map(d => ({ id: d.id, ...d.data() }))
+    const allWithdrawals = allWithdrawalsSnap.docs.map(d => ({ id: d.id, ...d.data() })) as any[]
     const withdrawalsRejected = allWithdrawals.filter(w => w.status === 'rejected').length
 
     const totalWithdrawalsAmount = allWithdrawals

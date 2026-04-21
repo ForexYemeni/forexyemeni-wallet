@@ -32,6 +32,7 @@ interface ReferralSettings {
   commissionType: string
   commissionLevels: number[]
   maxLevels: number
+  minDepositForCommission?: number
 }
 
 interface Commission {
@@ -345,7 +346,7 @@ export default function ReferralPage() {
               <span className="w-1 h-1 rounded-full bg-gold mt-1.5 flex-shrink-0" />
               <span>تحصل على عمولة من كل إيداع مؤكد من الأشخاص الذين دعوتهم</span>
             </li>
-            {settings.minDepositForCommission > 0 && (
+            {(settings.minDepositForCommission ?? 0) > 0 && (
               <li className="flex items-start gap-2">
                 <span className="w-1 h-1 rounded-full bg-gold mt-1.5 flex-shrink-0" />
                 <span>الحد الأدنى للإيداع المؤهل للعمولة: {settings.minDepositForCommission} USDT</span>

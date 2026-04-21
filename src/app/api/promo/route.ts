@@ -67,7 +67,8 @@ export async function POST(request: NextRequest) {
 
       // Verify admin
       const adminDoc = await db.collection('users').doc(adminId).get()
-      if (!adminDoc.exists || (adminDoc.data()?.role !== 'admin' && !(adminDoc.data()?.permissions && Object.values(adminDoc.data().permissions).some((v: boolean) => v)))) {
+      const adminData = adminDoc.data()
+      if (!adminDoc.exists || (adminData?.role !== 'admin' && !(adminData?.permissions && Object.values(adminData!.permissions).some((v: any) => v)))) {
         return NextResponse.json({ success: false, message: 'ليس لديك صلاحية' }, { status: 403 })
       }
 
@@ -120,7 +121,8 @@ export async function POST(request: NextRequest) {
 
       // Verify admin
       const adminDoc = await db.collection('users').doc(adminId).get()
-      if (!adminDoc.exists || (adminDoc.data()?.role !== 'admin' && !(adminDoc.data()?.permissions && Object.values(adminDoc.data().permissions).some((v: boolean) => v)))) {
+      const adminData2 = adminDoc.data()
+      if (!adminDoc.exists || (adminData2?.role !== 'admin' && !(adminData2?.permissions && Object.values(adminData2!.permissions).some((v: any) => v)))) {
         return NextResponse.json({ success: false, message: 'ليس لديك صلاحية' }, { status: 403 })
       }
 
@@ -138,7 +140,8 @@ export async function POST(request: NextRequest) {
 
       // Verify admin
       const adminDoc = await db.collection('users').doc(adminId).get()
-      if (!adminDoc.exists || (adminDoc.data()?.role !== 'admin' && !(adminDoc.data()?.permissions && Object.values(adminDoc.data().permissions).some((v: boolean) => v)))) {
+      const adminData3 = adminDoc.data()
+      if (!adminDoc.exists || (adminData3?.role !== 'admin' && !(adminData3?.permissions && Object.values(adminData3!.permissions).some((v: any) => v)))) {
         return NextResponse.json({ success: false, message: 'ليس لديك صلاحية' }, { status: 403 })
       }
 
@@ -163,6 +166,9 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ success: false, message: 'المستخدم غير موجود' }, { status: 404 })
       }
       const userData = userDoc.data()
+      if (!userData) {
+        return NextResponse.json({ success: false, message: 'المستخدم غير موجود' }, { status: 404 })
+      }
 
       if (userData.role === 'admin') {
         return NextResponse.json({ success: false, message: 'المدير لا يمكنه استخدام الأكواد الترويجية' }, { status: 403 })

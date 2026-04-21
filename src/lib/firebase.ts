@@ -219,7 +219,7 @@ export async function generateAccountNumber(): Promise<number> {
 
   return db.runTransaction(async (transaction) => {
     const doc = await transaction.get(ref)
-    const data = doc.exists ? doc.data() : {}
+    const data = doc.data() || {}
     const maxValue = data.value || 1000
 
     // Get all used account numbers in one query

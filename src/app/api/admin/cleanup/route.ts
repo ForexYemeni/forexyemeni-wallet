@@ -265,9 +265,9 @@ export async function POST(request: NextRequest) {
     // 12. Reset account number counter to start from 1001 and clear freed numbers
     try {
       await db.collection('counters').doc('accountNumber').set({ value: 1000, freedNumbers: [] })
-      results.accountCounterReset = true
+      results.accountCounterReset = 1
     } catch (e: unknown) {
-      results.accountCounterReset = false
+      results.accountCounterReset = 0
     }
 
     return NextResponse.json({

@@ -46,7 +46,7 @@ export async function POST(request: NextRequest) {
 
       // Verify the token belongs to this user
       const tokenDoc = await db.collection('fcmTokens').doc(tokenId).get()
-      if (!tokenDoc.exists || tokenDoc.data().userId !== userId) {
+      if (!tokenDoc.exists || tokenDoc.data()?.userId !== userId) {
         return NextResponse.json({ success: false, message: 'الجهاز غير موجود أو لا ينتمي لحسابك' }, { status: 403 })
       }
 

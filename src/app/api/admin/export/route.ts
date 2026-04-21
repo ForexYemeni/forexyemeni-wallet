@@ -146,7 +146,7 @@ export async function GET(request: NextRequest) {
       const snapshot = await db.collection('auditLog').limit(MAX_EXPORT_RECORDS).get()
 
       // Sort in JS by createdAt desc
-      const logs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }))
+      const logs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as any[]
       logs.sort((a: any, b: any) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime())
 
       // Arabic headers

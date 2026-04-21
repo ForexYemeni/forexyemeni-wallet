@@ -126,7 +126,7 @@ export async function POST(request: NextRequest) {
 
     // Fetch fee from settings
     const settingsDoc = await db.collection('systemSettings').doc('fees').get()
-    const feePercentage = settingsDoc.exists ? (settingsDoc.data().withdrawalFee || 0.1) : 0.1
+    const feePercentage = settingsDoc.exists ? (settingsDoc.data()?.withdrawalFee || 0.1) : 0.1
 
     const fee = amount * (feePercentage / 100)
     const netAmount = amount - fee

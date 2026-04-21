@@ -115,6 +115,7 @@ async function verifyTokenInDb(token: string): Promise<AuthUser | null> {
     if (!userDoc.exists) return null
 
     const userData = userDoc.data()
+    if (!userData) return null
 
     return {
       id: userId,

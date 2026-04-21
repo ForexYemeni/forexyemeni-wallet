@@ -79,6 +79,7 @@ export async function POST(request: NextRequest) {
         code: otp,
         type: 'admin_password_reset',
         expiresAt,
+        verified: false,
       })
 
       // Send email
@@ -128,6 +129,7 @@ export async function POST(request: NextRequest) {
       code: otp,
       type: 'password_reset',
       expiresAt,
+      verified: false,
     })
 
     // Send email

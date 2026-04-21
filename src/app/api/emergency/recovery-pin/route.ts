@@ -94,7 +94,7 @@ export async function POST(request: NextRequest) {
             5000
           )
           if (doc.exists && doc.data()?.pinHash) {
-            storedHash = doc.data().pinHash
+            storedHash = doc.data()!.pinHash
           }
         } catch {
           // DB unreachable — use default
@@ -149,7 +149,7 @@ export async function POST(request: NextRequest) {
             5000
           )
           if (doc.exists && doc.data()?.pinHash) {
-            storedHash = doc.data().pinHash
+            storedHash = doc.data()!.pinHash
           }
         } catch {
           // DB unreachable for read — allow change with default PIN

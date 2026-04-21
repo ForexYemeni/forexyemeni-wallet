@@ -1975,10 +1975,10 @@ export default function AdminPanel() {
                           <div className="text-left">
                             <p className={`font-bold gold-text ${isExpanded ? 'text-sm' : 'text-xs'}`}>{(w.amount ?? 0).toFixed(2)} USDT</p>
                             {!isExpanded && (w.fee ?? 0) > 0 && (
-                              <p className="text-[10px] text-muted-foreground">صافي: {(w.netAmount ?? (w.amount ?? 0 - w.fee ?? 0) ?? 0).toFixed(2)}</p>
+                              <p className="text-[10px] text-muted-foreground">صافي: {(w.netAmount || ((w.amount || 0) - (w.fee || 0)) || 0).toFixed(2)}</p>
                             )}
                             {isExpanded && (w.fee ?? 0) > 0 && (
-                              <p className="text-[10px] text-muted-foreground">الصافي: {(w.netAmount ?? (w.amount ?? 0 - w.fee ?? 0) ?? 0).toFixed(2)} USDT</p>
+                              <p className="text-[10px] text-muted-foreground">الصافي: {(w.netAmount || ((w.amount || 0) - (w.fee || 0)) || 0).toFixed(2)} USDT</p>
                             )}
                             <span className={`px-2 py-0.5 rounded-md font-medium ${isExpanded ? 'text-xs' : 'text-[10px]'} ${WITHDRAWAL_STATUS_MAP[w.status]?.color || ''}`}>
                               {WITHDRAWAL_STATUS_MAP[w.status]?.label || w.status}

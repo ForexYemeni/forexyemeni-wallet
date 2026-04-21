@@ -85,7 +85,7 @@ export async function POST(request: NextRequest) {
     const userDoc = await db.collection('users').doc(userId).get()
     if (userDoc.exists) {
       const userData = userDoc.data()
-      if (userData.kycStatus !== 'approved' && userData.kycStatus !== 'pending') {
+      if (userData && userData.kycStatus !== 'approved' && userData.kycStatus !== 'pending') {
         await db.collection('users').doc(userId).update({ kycStatus: 'pending' })
       }
     }

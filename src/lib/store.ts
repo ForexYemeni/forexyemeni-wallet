@@ -22,6 +22,10 @@ export interface User {
   affiliateCode?: string | null
   accountNumber?: string | null
   permissions?: { manageUsers?: boolean; approveDeposits?: boolean; approveWithdrawals?: boolean; approveKYC?: boolean; manageSettings?: boolean } | null
+  country?: string | null
+  kycIdPhoto?: string | null
+  kycSelfie?: string | null
+  kycNotes?: string | null
 }
 
 interface AuthState {

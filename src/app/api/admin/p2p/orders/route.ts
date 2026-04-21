@@ -40,7 +40,7 @@ export async function GET(req: NextRequest) {
     const enriched = await Promise.all(
       orders.map(async (order) => {
         const merchantUser = await userOperations.findUnique({ id: order.merchantId })
-        let buyerUser = null
+        let buyerUser: any = null
         if (order.buyerId) {
           buyerUser = await userOperations.findUnique({ id: order.buyerId })
         }

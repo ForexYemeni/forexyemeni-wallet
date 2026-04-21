@@ -25,10 +25,10 @@ export async function GET(request: NextRequest) {
     const transactions = await transactionOperations.findMany(userId)
 
     // Also return latest user balance + accountNumber + kycStatus for real-time updates
-    let balance = null
-    let accountNumber = null
-    let frozenBalance = null
-    let kycStatus = null
+    let balance: number | string | null = null
+    let accountNumber: number | string | null = null
+    let frozenBalance: number | string | null = null
+    let kycStatus: string | null = null
     try {
       const userData = await userOperations.findUnique({ id: userId })
       if (userData) {

@@ -540,7 +540,7 @@ function CompleteRegistration({ email }: { email: string }) {
                   setTimeout(() => setPinStep('confirm'), 300)
                 }
               }}
-              isError={pin.length >= 6 && !/^\d+$/.test(pin)}
+              error={pin.length >= 6 && !/^\d+$/.test(pin)}
             />
             <p className="text-[11px] text-muted-foreground text-center">أدخل رمز PIN مكون من 6 أرقام</p>
           </div>
@@ -552,8 +552,7 @@ function CompleteRegistration({ email }: { email: string }) {
               onChange={(val) => {
                 setConfirmPin(val)
               }}
-              isError={confirmPin.length >= 6 && pin !== confirmPin}
-              isSuccess={confirmPin.length >= 6 && pin === confirmPin}
+              error={confirmPin.length >= 6 && pin !== confirmPin}
             />
             <p className="text-[11px] text-muted-foreground text-center">
               {confirmPin.length >= 6 && pin === confirmPin

@@ -109,7 +109,7 @@ export async function POST(request: NextRequest) {
 
     // Fetch deposit fee from settings
     const settingsDoc = await db.collection('systemSettings').doc('fees').get()
-    const depositFeePercentage = settingsDoc.exists ? (settingsDoc.data().depositFee || 0) : 0
+    const depositFeePercentage = settingsDoc.exists ? (settingsDoc.data()?.depositFee || 0) : 0
 
     // Calculate fee and net amount
     const fee = amount * (depositFeePercentage / 100)

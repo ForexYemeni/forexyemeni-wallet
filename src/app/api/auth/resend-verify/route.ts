@@ -54,6 +54,7 @@ export async function POST(request: NextRequest) {
       code: otp,
       type: 'email_verify',
       expiresAt,
+      verified: false,
     })
 
     // Send email

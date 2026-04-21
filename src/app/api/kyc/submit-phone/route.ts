@@ -45,6 +45,7 @@ export async function POST(request: NextRequest) {
       type: 'phone_verify',
       purpose: `phone:${phone}`,
       expiresAt,
+      verified: false,
     })
 
     // Send email with phone verification code

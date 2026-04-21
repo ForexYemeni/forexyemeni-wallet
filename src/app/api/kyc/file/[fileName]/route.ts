@@ -21,6 +21,9 @@ export async function GET(
     }
 
     const data = doc.data()
+    if (!data) {
+      return NextResponse.json({ success: false, message: 'الملف غير موجود' }, { status: 404 })
+    }
     const base64 = data.data
     const mimeType = data.mimeType || 'image/jpeg'
 

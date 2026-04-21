@@ -15,7 +15,7 @@ export async function POST(request: NextRequest) {
 
     // Verify admin
     const admin = await userOperations.findUnique({ id: adminId })
-    if (!admin || (admin.role !== 'admin' && !admin.permissions?.manageSettings)) {
+    if (!admin || (admin.role !== 'admin' && !(admin as any).permissions?.manageSettings)) {
       return NextResponse.json({ success: false, message: 'غير مصرح' }, { status: 403 })
     }
 

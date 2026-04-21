@@ -13,8 +13,9 @@ function getPB(): PocketBase {
     // When running on Vercel/external, route through Caddy proxy via XTransformPort
     if (!POCKETBASE_URL.includes('127.0.0.1') && !POCKETBASE_URL.includes('localhost')) {
       _pb.beforeSend = function(url, options) {
-        url.searchParams.set('XTransformPort', '8090')
-        return { url, options }
+        const urlObj = new URL(url, POCKETBASE_URL)
+        urlObj.searchParams.set('XTransformPort', '8090')
+        return { url: urlObj.toString(), options }
       }
     }
   }
@@ -132,6 +133,7 @@ export interface Deposit {
   currency: string; network: string; txId?: string | null; fromAddress?: string | null;
   toAddress?: string | null; status: string; method: string; merchantId?: string | null;
   merchantNote?: string | null; adminNote?: string | null; screenshot?: string | null;
+  paymentMethodName?: string | null; paymentMethodId?: string | null;
   createdAt: string; updatedAt: string;
 }
 

@@ -26,6 +26,9 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ success: false, message: 'المستخدم غير موجود' }, { status: 404 })
     }
     const userData = userDoc.data()
+    if (!userData) {
+      return NextResponse.json({ success: false, message: 'المستخدم غير موجود' }, { status: 404 })
+    }
 
     // Fetch transactions for the user
     const snapshot = await db.collection('transactions')

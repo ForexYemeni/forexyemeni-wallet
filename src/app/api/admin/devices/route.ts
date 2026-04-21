@@ -32,8 +32,9 @@ export async function POST(request: NextRequest) {
       let dName = deviceName || 'جهاز مصرح به'
 
       if (!fp && pendingDoc.exists) {
-        fp = pendingDoc.data().fingerprint
-        dName = pendingDoc.data().deviceName || deviceName || 'جهاز مصرح به'
+        const pendingData = pendingDoc.data()
+        fp = pendingData?.fingerprint
+        dName = pendingData?.deviceName || deviceName || 'جهاز مصرح به'
         // Delete pending
         await pendingDoc.ref.delete()
       }
@@ -101,9 +102,9 @@ export async function POST(request: NextRequest) {
 
       // Check pending device auth
       const pendingDoc = await db.collection('pendingDeviceAuth').doc(targetUserId).get()
-      let pendingDevice = null
+      let pendingDevice: any = null
       if (pendingDoc.exists) {
-        pendingDevice = pendingDoc.data()
+        pendingDevice = pendingDoc.data() ?? null
       }
 
       return NextResponse.json({ success: true, devices: devicesList, pendingDevice })

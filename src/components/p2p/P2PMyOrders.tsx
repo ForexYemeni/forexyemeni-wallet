@@ -397,9 +397,7 @@ export default function P2PMyOrders() {
                           <div className="w-4 h-px bg-white/10" />
                           <div className="flex items-center gap-1">
                             <div
-                              className={`w-2 h-2 rounded-full ${
-                                order.status === 'completed' ? 'bg-green-400' : 'bg-white/20'
-                              }`}
+                                className="w-2 h-2 rounded-full bg-white/20"
                             />
                             <span className="text-[10px] text-muted-foreground">اكتمل</span>
                           </div>

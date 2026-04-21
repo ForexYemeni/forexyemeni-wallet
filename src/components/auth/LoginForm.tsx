@@ -245,7 +245,7 @@ export default function LoginForm() {
                     <div key={n} className="flex flex-col items-center gap-1">
                       <div
                         className={`w-3.5 h-3.5 rounded-full transition-all duration-300 ${
-                          n <= loginError.remaining
+                          n <= (loginError.remaining ?? 0)
                             ? isCritical
                               ? 'bg-red-400 shadow-md shadow-red-400/30'
                               : isWarning

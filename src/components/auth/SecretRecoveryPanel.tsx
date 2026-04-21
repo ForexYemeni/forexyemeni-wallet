@@ -1108,8 +1108,8 @@ export default function SecretRecoveryPanel({ currentProjectId }: { currentProje
                         {fcmTestResult.successCount !== undefined && (
                           <div className="mt-1.5 flex gap-3 text-[10px] text-muted-foreground">
                             <span>✓ {fcmTestResult.successCount} تم</span>
-                            {fcmTestResult.failureCount > 0 && (
-                              <span>✗ {fcmTestResult.failureCount} فشل</span>
+                            {(fcmTestResult.failureCount ?? 0) > 0 && (
+                              <span>✗ {fcmTestResult.failureCount ?? 0} فشل</span>
                             )}
                           </div>
                         )}
@@ -1137,7 +1137,7 @@ export default function SecretRecoveryPanel({ currentProjectId }: { currentProje
                   </div>
 
                   {/* Cleanup Invalid Tokens */}
-                  {fcmDiagnostics && fcmDiagnostics.totalTokens > 0 && (
+                  {fcmDiagnostics && (fcmDiagnostics.totalTokens ?? 0) > 0 && (
                     <div className="p-3 rounded-xl bg-white/5 border border-white/10 space-y-2">
                       <h4 className="text-xs font-bold text-orange-400 flex items-center gap-1.5">
                         <Trash2 className="w-3.5 h-3.5" />

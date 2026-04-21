@@ -79,6 +79,8 @@ export interface Deposit {
   merchantNote?: string | null
   adminNote?: string | null
   screenshot?: string | null
+  paymentMethodName?: string | null
+  paymentMethodId?: string | null
   createdAt: string
   updatedAt: string
 }
@@ -328,13 +330,13 @@ export const kycRecordOperations = {
     if (snapshot.empty) return []
 
     // Batch fetch all users in a single call
-    const records = snapshot.docs.map(doc => ({ id: doc.id, ...(doc.data() as KYCRecord) }))
+    const records = snapshot.docs.map(doc => ({ ...(doc.data() as KYCRecord), id: doc.id }))
     const uniqueUserIds = [...new Set(records.map(r => r.userId))]
     const userDocs = await Promise.all(uniqueUserIds.map(uid => db.collection('users').doc(uid).get()))
     const userMap = new Map<string, { id: string; email: string; fullName: string | null; phone: string | null }>()
     for (const userDoc of userDocs) {
       if (userDoc.exists) {
-        const ud = userDoc.data()
+        const ud = userDoc.data()!
         userMap.set(userDoc.id, { id: userDoc.id, email: ud.email, fullName: ud.fullName || null, phone: ud.phone || null })
       }
     }
@@ -387,13 +389,13 @@ export const depositOperations = {
     if (snapshot.empty) return []
 
     // Batch fetch all users in parallel
-    const deposits = snapshot.docs.map(doc => ({ id: doc.id, ...(doc.data() as Deposit) }))
+    const deposits = snapshot.docs.map(doc => ({ ...(doc.data() as Deposit), id: doc.id }))
     const uniqueUserIds = [...new Set(deposits.map(d => d.userId))]
     const userDocs = await Promise.all(uniqueUserIds.map(uid => db.collection('users').doc(uid).get()))
     const userMap = new Map<string, { id: string; email: string; fullName: string | null }>()
     for (const userDoc of userDocs) {
       if (userDoc.exists) {
-        const ud = userDoc.data()
+        const ud = userDoc.data()!
         userMap.set(userDoc.id, { id: userDoc.id, email: ud.email, fullName: ud.fullName || null })
       }
     }
@@ -444,13 +446,13 @@ export const withdrawalOperations = {
     if (snapshot.empty) return []
 
     // Batch fetch all users in parallel
-    const withdrawals = snapshot.docs.map(doc => ({ id: doc.id, ...(doc.data() as Withdrawal) }))
+    const withdrawals = snapshot.docs.map(doc => ({ ...(doc.data() as Withdrawal), id: doc.id }))
     const uniqueUserIds = [...new Set(withdrawals.map(w => w.userId))]
     const userDocs = await Promise.all(uniqueUserIds.map(uid => db.collection('users').doc(uid).get()))
     const userMap = new Map<string, { id: string; email: string; fullName: string | null; phone: string | null }>()
     for (const userDoc of userDocs) {
       if (userDoc.exists) {
-        const ud = userDoc.data()
+        const ud = userDoc.data()!
         userMap.set(userDoc.id, { id: userDoc.id, email: ud.email, fullName: ud.fullName || null, phone: ud.phone || null })
       }
     }
@@ -1421,7 +1423,10 @@ export interface P2POrder {
   sellerReleasedAt?: string | null
   escrowAmount: number
   p2pFee: number
+  p2pFeePercent?: number
   totalAmount: number
+  adminCommissionPercent?: number
+  adminCommission?: number
   createdAt: string
   updatedAt: string
   expiresAt: string
