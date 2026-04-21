@@ -1,11 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { userOperations } from '@/lib/db-firebase'
-import { requireAdmin } from '@/lib/auth-server'
 
 // POST - Verify admin phone number for account recovery
+// This endpoint does NOT require auth because it's used during "forgot password" flow
+// when admin is NOT logged in. Security: only reveals adminId + hasPIN after matching phone.
 export async function POST(request: NextRequest) {
-  const auth = await requireAdmin(request)
-  if (!auth.success) return NextResponse.json({ success: false, message: auth.error }, { status: auth.status })
   try {
     const body = await request.json()
     const { adminNumber } = body
